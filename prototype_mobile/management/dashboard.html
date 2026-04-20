@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Dashboard Direction</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Tableau de bord</div>
+          <div class="topbar-sub">Direction</div>
+        </div>
+        <div class="topbar-avatar">DG</div>
+      </div>
+      <div class="content">
+        <!-- Stats principales -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-radius:16px;padding:16px;text-align:center;border:1px solid #86efac;">
+            <div style="font-size:24px;font-weight:700;color:#166534;">3</div>
+            <div style="font-size:11px;color:#15803d;">Projets actifs</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:16px;padding:16px;text-align:center;border:1px solid #fbbf24;">
+            <div style="font-size:24px;font-weight:700;color:#78350f;">14</div>
+            <div style="font-size:11px;color:#92400e;">Techniciens</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:16px;padding:16px;text-align:center;border:1px solid #93c5fd;">
+            <div style="font-size:24px;font-weight:700;color:#1e3a8a;">9</div>
+            <div style="font-size:11px;color:#1e40af;">Sur chantier</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);border-radius:16px;padding:16px;text-align:center;border:1px solid #f9a8d4;">
+            <div style="font-size:24px;font-weight:700;color:#831843;">32</div>
+            <div style="font-size:11px;color:#9f1239;">Photos aujourd'hui</div>
+          </div>
+        </div>
+
+        <!-- Alertes et activités -->
+        <div style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border-radius:16px;padding:16px;margin-bottom:20px;border:1px solid #fecaca;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:40px;height:40px;background:#dc2626;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+              <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#ffffff;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:700;color:#991b1b;">2 alertes en cours</div>
+              <div style="font-size:12px;color:#b91c1c;">Retards sur chantier Bastille</div>
+            </div>
+            <i data-lucide="chevron-right" style="width:16px;height:16px;color:#dc2626;"></i>
+          </div>
+        </div>
+
+        <!-- Gestion principale -->
+        <div class="label">Gestion</div>
+        
+        <!-- Cartes principales - 2 colonnes -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          <a href="gestion-projets.html" class="card" style="text-decoration:none;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;transition:all 0.2s;">
+            <div style="text-align:center;padding:18px;">
+              <div style="width:36px;height:36px;background:#0284c7;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 2px 4px rgba(2,132,199,0.2);">
+                <i data-lucide="building-2" style="width:20px;height:20px;color:#ffffff;"></i>
+              </div>
+              <div style="font-size:13px;font-weight:700;color:#0c4a6e;">Projets</div>
+              <div style="font-size:10px;color:#075985;margin-top:2px;">Gérer tous les projets</div>
+            </div>
+          </a>
+          
+          <a href="gestion-chantiers.html" class="card" style="text-decoration:none;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;transition:all 0.2s;">
+            <div style="text-align:center;padding:18px;">
+              <div style="width:36px;height:36px;background:#16a34a;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 2px 4px rgba(22,163,74,0.2);">
+                <i data-lucide="map-pin" style="width:20px;height:20px;color:#ffffff;"></i>
+              </div>
+              <div style="font-size:13px;font-weight:700;color:#14532d;">Chantiers</div>
+              <div style="font-size:10px;color:#166534;margin-top:2px;">Gérer tous les chantiers</div>
+            </div>
+          </a>
+        </div>
+
+        <!-- Cartes secondaires - 2 colonnes -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+          <a href="photo-management.html" class="card" style="text-decoration:none;background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid #fbbf24;transition:all 0.2s;">
+            <div style="text-align:center;padding:16px;">
+              <div style="width:36px;height:36px;background:#d97706;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 2px 4px rgba(217,119,6,0.2);">
+                <i data-lucide="camera" style="width:18px;height:18px;color:#ffffff;"></i>
+              </div>
+              <div style="font-size:12px;font-weight:600;color:#78350f;">Caméra</div>
+              <div style="font-size:10px;color:#92400e;">Prendre photo</div>
+            </div>
+          </a>
+          
+          <a href="gestion-equipes.html" class="card" style="text-decoration:none;background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid #fbbf24;transition:all 0.2s;">
+            <div style="text-align:center;padding:16px;">
+              <div style="width:36px;height:36px;background:#d97706;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 2px 4px rgba(217,119,6,0.2);">
+                <i data-lucide="users" style="width:18px;height:18px;color:#ffffff;"></i>
+              </div>
+              <div style="font-size:12px;font-weight:600;color:#78350f;">Équipes</div>
+              <div style="font-size:10px;color:#92400e;">Personnel</div>
+            </div>
+          </a>
+        </div>
+
+        
+
+              </div>
+      <div class="nav">
+        <a href="../management/dashboard.html" class="nav-item active">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <div class="nav-lbl active">Dashboard</div>
+        </a>
+        <a href="../management/galerie.html" class="nav-item">
+          <i data-lucide="image" class="nav-icon"></i>
+          <div class="nav-lbl">Galerie</div>
+        </a>
+        <a href="../management/presences.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="profil.html" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+      
+          </div>
+  </div>
+  
+  <script>
+    // Initialiser les icônes Lucide
+    lucide.createIcons();
+  </script>
+</body>
+</html>

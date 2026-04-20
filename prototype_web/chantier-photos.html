@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChantierPro - Main Layout</title>
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Babel standalone for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 20px; }
+    </style>
+</head>
+
+<body>  
+    <div id="root"></div>
+
+    <script type="text/babel">
+
+        // SVG Icons
+        const LayoutDashboard = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></svg>);
+        const HardHat = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z" /><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5" /><path d="M4 15v-3a6 6 0 0 1 6-6h0" /><path d="M14 6h0a6 6 0 0 1 6 6v3" /></svg>);
+        const Users = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>);
+        const FileBarChart = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M8 18v-1" /><path d="M12 18v-6" /><path d="M16 18v-3" /></svg>);
+        const Settings = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>);
+        const Bell = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>);
+        const Search = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>);
+        const LogOut = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>);
+        const History = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>);
+        const Clock = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>);
+        const ListGrid = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="14" y="14" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></svg>);
+        const Camera = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></svg>);
+        const UserIcon = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>);
+        const AlertTriangle = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>);
+        const MapPin = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 15 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>);
+        const Calendar = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>);
+        const Filter = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>);
+        const ChevronRight = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6" /></svg>);
+        const ArrowRight = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>);
+        const UserPlus = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" x2="19" y1="8" y2="14" /><line x1="22" x2="16" y1="11" y2="11" /></svg>);
+        const ShieldCheck = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2-1 4-2 7-2 2.82 0 4.88 1 6.94 2a1 1 0 0 1 .06 1.83V13Z" /><path d="m9 12 2 2 4-4" /></svg>);
+        const CheckCircle2 = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>);
+        const XCircle = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>);
+        const MoreVertical = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" /></svg>);
+        const Download = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>);
+
+
+                const MenuIcon = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>);
+        const XIcon = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>);
+
+        // MainLayout Component
+        const MainLayout = ({ children, activePage, breadcrumb, userRole = 'Admin' }) => {
+            const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+            const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+            const menuItems = [
+                { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard size={20} />, path: 'dashboard.html' },
+                { id: 'mes-projets', label: 'Mes projets', icon: <HardHat size={20} />, path: 'mes-projets.html' },
+                { id: 'projets', label: 'Tous les projets', icon: <ListGrid size={20} />, path: 'projets.html' },
+                { id: 'suivi-rh', label: 'Suivi RH', icon: <Clock size={20} />, path: 'suivi-rh.html' },
+                                { id: 'timeline', label: 'Timeline activité', icon: <Clock size={20} />, path: 'chantier-photos.html' },
+                { id: 'logs', label: 'Logs de suppression', icon: <History size={20} />, path: 'admin-logs.html' },
+                { id: 'utilisateurs', label: 'Utilisateurs', icon: <Users size={20} />, path: 'admin.html' },
+                { id: 'profil', label: 'Mon profil', icon: <UserIcon size={20} />, path: 'profil.html' },
+            ];
+
+            return (
+                <div className="flex min-h-screen bg-slate-50 relative overflow-hidden">
+                    {/* Overlay mobile */}
+                    {isSidebarOpen && (
+                        <div 
+                            className="fixed inset-0 bg-slate-900/50 z-30 xl:hidden transition-opacity" 
+                            onClick={toggleSidebar}
+                        ></div>
+                    )}
+
+                    {/* Sidebar */}
+                    <aside className={`w-[260px] bg-slate-900 text-white flex flex-col fixed h-full shadow-2xl z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} xl:translate-x-0`}>
+                        <div className="p-5 border-b border-slate-800 flex justify-between items-center">
+                            <h1 className="text-xl font-bold tracking-tight text-white">
+                                CHANTIER<span className="text-orange-500">PRO</span>
+                            </h1>
+                            <button onClick={toggleSidebar} className="xl:hidden text-slate-400 hover:text-white transition-colors">
+                                <XIcon size={24} />
+                            </button>
+                        </div>
+                        <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar pb-20">
+                            {menuItems.map((item) => (
+                                <a
+                                    key={item.id}
+                                    href={item.path}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium ${activePage === item.id ? 'bg-orange-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                        }`}
+                                >
+                                    {item.icon}
+                                    {item.label}
+                                </a>
+                            ))}
+                        </nav>
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="flex-1 xl:ml-[260px] flex flex-col min-h-screen w-full transition-all duration-300 bg-slate-50 min-w-0">
+                        {/* Topbar */}
+                        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-20 shadow-sm w-full">
+                            <div className="flex items-center gap-3 lg:gap-4 flex-1">
+                                <button onClick={toggleSidebar} className="xl:hidden text-slate-600 hover:text-orange-600 transition-colors">
+                                    <MenuIcon size={24} />
+                                </button>
+                                <nav className="text-xs sm:text-sm font-medium text-slate-500 flex items-center truncate">
+                                    <span className="hover:text-slate-800 cursor-pointer transition-colors hidden sm:inline">Accueil</span>
+                                    <span className="mx-2 text-slate-300 hidden sm:inline">/</span>
+                                    <span className="text-slate-900 font-bold truncate max-w-[150px] sm:max-w-xs md:max-w-md">{breadcrumb}</span>
+                                </nav>
+                            </div>
+                            
+                            <div className="flex items-center gap-3 sm:gap-6 justify-end">
+                                <div className="relative hidden md:block">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <input
+                                        type="text"
+                                        placeholder="Rechercher..."
+                                        className="pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-sm focus:ring-2 focus:ring-orange-500 w-48 lg:w-64 outline-none transition-all"
+                                    />
+                                </div>
+                                <button className="relative text-slate-500 hover:text-orange-600 transition-colors hidden sm:block">
+                                    <Bell size={20} className="sm:w-[22px] sm:h-[22px]" />
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] sm:text-[10px] flex items-center justify-center rounded-full font-bold shadow-sm border border-white">3</span>
+                                </button>
+                                
+                                <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 sm:border-l sm:border-slate-200 relative group cursor-pointer h-16">
+                                    <div className="text-right hidden sm:block">
+                                        <p className="text-sm font-bold text-slate-900 leading-tight">M. Kader</p>
+                                        <div className="mt-0.5">
+                                            <span className="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded-full uppercase tracking-wider">{userRole}</span>
+                                        </div>
+                                    </div>
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold shadow-sm border-2 border-transparent group-hover:border-orange-500 transition-all text-sm sm:text-base">
+                                        MK
+                                    </div>
+                                    {/* Dropdown */}
+                                    <div className="absolute right-0 top-14 mt-1 sm:mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2 z-50">
+                                        <div className="p-2 space-y-1">
+                                            <a href="profil.html" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-bold transition-colors">
+                                                <UserIcon size={16} /> Mon profil
+                                            </a>
+                                            <div className="h-px bg-slate-100 my-1 mx-2"></div>
+                                            <a href="index.html" className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-bold transition-colors">
+                                                <LogOut size={16} /> Déconnexion
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="p-4 sm:p-6 lg:p-8 relative z-10 w-full overflow-x-hidden">
+                            {children}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+        const GalerieChantierPage = () => {
+            const [viewMode, setViewMode] = React.useState("timeline");
+            const [sortBy, setSortBy] = React.useState("recent");
+            const [activeFilter, setActiveFilter] = React.useState("Toutes");
+            const [selectedProject, setSelectedProject] = React.useState(null);
+            const [selectedSite, setSelectedSite] = React.useState(null);
+            const [navigationLevel, setNavigationLevel] = React.useState("global");
+
+            const categories = ["Toutes", "Gros Œuvre", "Finitions", "Signalements"];
+
+            // Structure de données multi-niveaux
+            const projectsData = [
+                {
+                    id: "rue-lyon",
+                    name: "Rue de Lyon",
+                    status: "En cours",
+                    sites: [
+                        {
+                            id: "site-a",
+                            name: "Site A - Secteur Nord",
+                            photos: [
+                                {
+                                    id: 1,
+                                    date: "2024-04-15",
+                                    time: "08h32",
+                                    author: "Martin D.",
+                                    authorRole: "Chef d'équipe",
+                                    category: "Gros Œuvre",
+                                    description: "Début des fondations du secteur A",
+                                    image: "https://picsum.photos/600/400?random=1"
+                                },
+                                {
+                                    id: 2,
+                                    date: "2024-04-15",
+                                    time: "14h30",
+                                    author: "Kemal A.",
+                                    authorRole: "Ouvrier",
+                                    category: "Signalements",
+                                    description: "Problème d'étanchéité repéré",
+                                    image: "https://picsum.photos/600/400?random=3"
+                                }
+                            ]
+                        },
+                        {
+                            id: "site-b",
+                            name: "Site B - Secteur Sud",
+                            photos: [
+                                {
+                                    id: 3,
+                                    date: "2024-04-14",
+                                    time: "10h15",
+                                    author: "Sophie R.",
+                                    authorRole: "Technicienne",
+                                    category: "Finitions",
+                                    description: "Installation des cloisons",
+                                    image: "https://picsum.photos/600/400?random=5"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: "bastille-b2",
+                    name: "Bastille B2",
+                    status: "En cours",
+                    sites: [
+                        {
+                            id: "site-principal",
+                            name: "Site Principal",
+                            photos: [
+                                {
+                                    id: 4,
+                                    date: "2024-04-15",
+                                    time: "10h18",
+                                    author: "Lucie B.",
+                                    authorRole: "Technicienne",
+                                    category: "Finitions",
+                                    description: "Pose des fenêtres 2ème étage",
+                                    image: "https://picsum.photos/600/400?random=2"
+                                },
+                                {
+                                    id: 5,
+                                    date: "2024-04-14",
+                                    time: "16h45",
+                                    author: "Tom L.",
+                                    authorRole: "Chef de chantier",
+                                    category: "Gros Œuvre",
+                                    description: "Montage de la structure",
+                                    image: "https://picsum.photos/600/400?random=6"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: "clichy-nord",
+                    name: "Clichy Nord",
+                    status: "En cours",
+                    sites: [
+                        {
+                            id: "site-1",
+                            name: "Site 1 - Bâtiment A",
+                            photos: [
+                                {
+                                    id: 6,
+                                    date: "2024-04-14",
+                                    time: "15h33",
+                                    author: "Tom L.",
+                                    authorRole: "Chef de chantier",
+                                    category: "Gros Œuvre",
+                                    description: "Structure métallique terminée",
+                                    image: "https://picsum.photos/600/400?random=4"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            // Extraire toutes les photos pour la vue globale
+            const getAllPhotos = () => {
+                const allPhotos = [];
+                projectsData.forEach(project => {
+                    project.sites.forEach(site => {
+                        site.photos.forEach(photo => {
+                            allPhotos.push({
+                                ...photo,
+                                projectId: project.id,
+                                projectName: project.name,
+                                siteId: site.id,
+                                siteName: site.name
+                            });
+                        });
+                    });
+                });
+                return allPhotos.sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time));
+            };
+
+            // Filtrer les données selon le mode de tri
+            const getFilteredData = () => {
+                if (sortBy === "recent") {
+                    return getAllPhotos();
+                } else if (sortBy === "project") {
+                    if (selectedProject) {
+                        const project = projectsData.find(p => p.id === selectedProject);
+                        if (project) {
+                            const photos = [];
+                            project.sites.forEach(site => {
+                                site.photos.forEach(photo => {
+                                    photos.push({
+                                        ...photo,
+                                        projectId: project.id,
+                                        projectName: project.name,
+                                        siteId: site.id,
+                                        siteName: site.name
+                                    });
+                                });
+                            });
+                            return photos.sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time));
+                        }
+                    }
+                    return projectsData;
+                } else if (sortBy === "site") {
+                    if (selectedProject && selectedSite) {
+                        const project = projectsData.find(p => p.id === selectedProject);
+                        if (project) {
+                            const site = project.sites.find(s => s.id === selectedSite);
+                            if (site) {
+                                return site.photos.map(photo => ({
+                                    ...photo,
+                                    projectId: project.id,
+                                    projectName: project.name,
+                                    siteId: site.id,
+                                    siteName: site.name
+                                })).sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time));
+                            }
+                        }
+                    } else if (selectedProject) {
+                        const project = projectsData.find(p => p.id === selectedProject);
+                        return project ? project.sites : [];
+                    }
+                    // Si aucun projet sélectionné, afficher tous les sites de tous les projets
+                    const allSites = [];
+                    projectsData.forEach(project => {
+                        project.sites.forEach(site => {
+                            allSites.push({
+                                ...site,
+                                projectId: project.id,
+                                projectName: project.name
+                            });
+                        });
+                    });
+                    return allSites;
+                }
+                return [];
+            };
+
+            const filteredData = getFilteredData();
+
+            const TimelinePost = ({ post }) => {
+                // Vérifier si post a les propriétés nécessaires pour une photo
+                if (!post.author || !post.image) {
+                    return null;
+                }
+
+                return (
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6 max-w-3xl mx-auto">
+                        {/* Header */}
+                        <div className="p-4 pb-3">
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                        {post.author.split(' ').map(n => n[0]).join('')}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-900">{post.author}</p>
+                                        <p className="text-xs text-slate-500">
+                                            {post.authorRole} • {post.projectName || post.project || 'Projet inconnu'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">
+                                        {post.category}
+                                    </span>
+                                    <span className="text-xs text-slate-500">{post.time}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="px-4 pb-3">
+                            <p className="text-slate-800 font-medium">{post.description}</p>
+                        </div>
+
+                        {/* Image */}
+                        <div className="relative">
+                            <img 
+                                src={post.image} 
+                                alt={post.description}
+                                className="w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                            />
+                        </div>
+                    </div>
+                );
+            };
+
+            const ProjectCard = ({ project }) => (
+                <div 
+                    onClick={() => {
+                        setSelectedProject(project.id);
+                        setNavigationLevel("project");
+                    }}
+                    className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                >
+                    <div className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 group-hover:text-orange-600 transition-colors">
+                                    {project.name}
+                                </h3>
+                                <span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full mt-1">
+                                    {project.status}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-500">
+                                <HardHat size={16} />
+                                <span className="text-sm font-bold">{project.sites.length} sites</span>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-slate-600">Sites du projet</span>
+                                <ChevronRight size={16} className="text-slate-400 group-hover:text-orange-500 transition-colors" />
+                            </div>
+                            <div className="space-y-2">
+                                {project.sites.slice(0, 3).map(site => (
+                                    <div key={site.id} className="flex items-center gap-2 text-sm text-slate-600">
+                                        <MapPin size={12} className="text-slate-400" />
+                                        <span>{site.name}</span>
+                                        <span className="text-xs text-slate-400">({site.photos.length} photos)</span>
+                                    </div>
+                                ))}
+                                {project.sites.length > 3 && (
+                                    <div className="text-xs text-slate-400 italic">
+                                        +{project.sites.length - 3} autres sites
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-slate-500">
+                                    {project.sites.reduce((total, site) => total + site.photos.length, 0)} photos au total
+                                </span>
+                                <span className="text-xs text-orange-600 font-bold">
+                                    Voir les détails →
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const SiteCard = ({ site, project }) => (
+                <div 
+                    onClick={() => {
+                        setSelectedProject(project.id);
+                        setSelectedSite(site.id);
+                        setNavigationLevel("site");
+                    }}
+                    className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                >
+                    <div className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 group-hover:text-orange-600 transition-colors">
+                                    {site.name}
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">{project.name}</p>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-500">
+                                <Camera size={16} />
+                                <span className="text-sm font-bold">{site.photos.length} photos</span>
+                            </div>
+                        </div>
+                        
+                        {/* Aperçu des photos */}
+                        <div className="grid grid-cols-3 gap-2 mb-4">
+                            {site.photos.slice(0, 3).map(photo => (
+                                <div key={photo.id} className="aspect-square rounded-lg overflow-hidden bg-slate-100">
+                                    <img 
+                                        src={photo.image} 
+                                        alt={photo.description}
+                                        className="w-full h-full object-cover hover:scale-105 transition-transform"
+                                    />
+                                </div>
+                            ))}
+                            {site.photos.length > 3 && (
+                                <div className="aspect-square rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center">
+                                    <span className="text-sm text-slate-600 font-bold">+{site.photos.length - 3}</span>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-500">
+                                Dernière photo : {new Date(site.photos[site.photos.length - 1]?.date).toLocaleDateString('fr-FR')}
+                            </span>
+                            <ChevronRight size={16} className="text-slate-400 group-hover:text-orange-500 transition-colors" />
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const PhotoGallery = ({ photos }) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {photos.map(post => (
+                        <div key={post.id} className="relative group cursor-pointer">
+                            <div className="aspect-[4/3] bg-slate-100 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
+                                <img 
+                                    src={post.image} 
+                                    alt={post.description} 
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    <div className="absolute bottom-3 left-3 right-3">
+                                        <p className="text-white text-sm font-semibold truncate drop-shadow-md">{post.description}</p>
+                                        <p className="text-white/90 text-xs truncate drop-shadow-md">{post.author}</p>
+                                    </div>
+                                </div>
+                                <span className="absolute top-2 right-2 bg-white/90 backdrop-blur text-xs font-bold px-2 py-1 rounded-lg text-slate-800 shadow-sm">
+                                    {post.category}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+
+            const GridView = () => {
+                if (sortBy === "project" && !selectedProject) {
+                    // Vue des projets
+                    return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredData.map(project => (
+                                <ProjectCard key={project.id} project={project} />
+                            ))}
+                        </div>
+                    );
+                } else if (sortBy === "site" && !selectedSite) {
+                    // Vue des sites (avec projet sélectionné ou tous les sites)
+                    return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredData.map(site => {
+                                // Trouver le projet parent pour ce site
+                                const project = projectsData.find(p => p.id === site.projectId);
+                                return (
+                                    <SiteCard key={site.id} site={site} project={project} />
+                                );
+                            })}
+                        </div>
+                    );
+                } else {
+                    // Vue des photos - GALERIE MODERNE
+                    return <PhotoGallery photos={filteredData} />;
+                }
+            };
+
+            // Statistiques pour la vue Direction
+            const getStatistics = () => {
+                const allPhotos = getAllPhotos();
+                const today = new Date().toISOString().split('T')[0];
+                const todayPhotos = allPhotos.filter(photo => photo.date === today);
+                const weekPhotos = allPhotos.filter(photo => {
+                    const photoDate = new Date(photo.date);
+                    const weekAgo = new Date();
+                    weekAgo.setDate(weekAgo.getDate() - 7);
+                    return photoDate >= weekAgo;
+                });
+
+                return {
+                    totalPhotos: allPhotos.length,
+                    todayPhotos: todayPhotos.length,
+                    weekPhotos: weekPhotos.length,
+                    totalProjects: projectsData.length,
+                    totalSites: projectsData.reduce((total, project) => total + project.sites.length, 0),
+                    activeProjects: projectsData.filter(p => p.status === "En cours").length
+                };
+            };
+
+            const stats = getStatistics();
+
+            return (
+                <div className="space-y-6">
+                    {/* Header avec statistiques pour Direction */}
+                    <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <h2 className="text-2xl font-bold text-slate-900">Galerie Photo - Vue Direction</h2>
+                                <p className="text-slate-500">Vue consolidée de l'activité sur tous les chantiers.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button className="px-4 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 shadow-md">
+                                    + Ajouter Photo
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Cartes de statistiques */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                            <div className="bg-white rounded-lg border border-slate-200 p-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Camera size={16} className="text-slate-500" />
+                                    <span className="text-xs text-slate-500 font-bold">Total Photos</span>
+                                </div>
+                                <p className="text-2xl font-bold text-slate-900">{stats.totalPhotos}</p>
+                            </div>
+                            <div className="bg-white rounded-lg border border-slate-200 p-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Calendar size={16} className="text-orange-500" />
+                                    <span className="text-xs text-slate-500 font-bold">Aujourd'hui</span>
+                                </div>
+                                <p className="text-2xl font-bold text-orange-600">{stats.todayPhotos}</p>
+                            </div>
+                            <div className="bg-white rounded-lg border border-slate-200 p-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Clock size={16} className="text-blue-500" />
+                                    <span className="text-xs text-slate-500 font-bold">7 derniers jours</span>
+                                </div>
+                                <p className="text-2xl font-bold text-blue-600">{stats.weekPhotos}</p>
+                            </div>
+                            <div className="bg-white rounded-lg border border-slate-200 p-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <HardHat size={16} className="text-green-500" />
+                                    <span className="text-xs text-slate-500 font-bold">Projets</span>
+                                </div>
+                                <p className="text-2xl font-bold text-green-600">{stats.totalProjects}</p>
+                            </div>
+                            <div className="bg-white rounded-lg border border-slate-200 p-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <MapPin size={16} className="text-purple-500" />
+                                    <span className="text-xs text-slate-500 font-bold">Sites</span>
+                                </div>
+                                <p className="text-2xl font-bold text-purple-600">{stats.totalSites}</p>
+                            </div>
+                            <div className="bg-white rounded-lg border border-slate-200 p-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <CheckCircle2 size={16} className="text-emerald-500" />
+                                    <span className="text-xs text-slate-500 font-bold">Actifs</span>
+                                </div>
+                                <p className="text-2xl font-bold text-emerald-600">{stats.activeProjects}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Advanced Navigation */}
+                    <div className="space-y-4">
+                        {/* Sort Options */}
+                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                            <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
+                                <button 
+                                    onClick={() => {
+                                        setSortBy("recent");
+                                        setSelectedProject(null);
+                                        setSelectedSite(null);
+                                        setNavigationLevel("global");
+                                    }}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${
+                                        sortBy === "recent" 
+                                        ? 'bg-white text-slate-900 shadow-sm' 
+                                        : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    <Clock size={16} className="inline mr-1" />
+                                    Récent
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        setSortBy("project");
+                                        setSelectedProject(null);
+                                        setSelectedSite(null);
+                                        setNavigationLevel("projects");
+                                    }}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${
+                                        sortBy === "project" 
+                                        ? 'bg-white text-slate-900 shadow-sm' 
+                                        : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    <HardHat size={16} className="inline mr-1" />
+                                    Projet
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        setSortBy("site");
+                                        setSelectedProject(null);
+                                        setSelectedSite(null);
+                                        setNavigationLevel("projects");
+                                    }}
+                                    className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${
+                                        sortBy === "site" 
+                                        ? 'bg-white text-slate-900 shadow-sm' 
+                                        : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    <MapPin size={16} className="inline mr-1" />
+                                    Site
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Navigation Breadcrumb */}
+                        {(selectedProject || selectedSite) && (
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                                <button 
+                                    onClick={() => {
+                                        setSelectedProject(null);
+                                        setSelectedSite(null);
+                                        setNavigationLevel("global");
+                                    }}
+                                    className="hover:text-slate-900 font-bold"
+                                >
+                                    Tous les projets
+                                </button>
+                                {selectedProject && (
+                                    <>
+                                        <ChevronRight size={16} />
+                                        <button 
+                                            onClick={() => {
+                                                setSelectedSite(null);
+                                                setNavigationLevel("project");
+                                            }}
+                                            className="hover:text-slate-900 font-bold"
+                                        >
+                                            {projectsData.find(p => p.id === selectedProject)?.name}
+                                        </button>
+                                    </>
+                                )}
+                                {selectedSite && (
+                                    <>
+                                        <ChevronRight size={16} />
+                                        <span className="text-slate-900 font-bold">
+                                            {projectsData.find(p => p.id === selectedProject)?.sites.find(s => s.id === selectedSite)?.name}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Content - GALERIE PHOTO MODERNE */}
+                    <GridView />
+                </div>
+            );
+        };
+
+        const App = () => (
+            <MainLayout activePage="timeline" breadcrumb="Mes projets > Résidence Horizon > Activité" userRole="Chef de Projet">
+                <GalerieChantierPage />
+            </MainLayout>
+        );
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>

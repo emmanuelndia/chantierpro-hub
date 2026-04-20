@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Profil Technicien</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <a href="home.html" style="font-size:12px;color:#aaa;cursor:pointer;text-decoration:none;">← Retour</a>
+        <div style="text-align:right;"><div class="topbar-title">Mon Profil</div><div class="topbar-sub">Technicien</div></div>
+      </div>
+
+      <div class="content">
+        <!-- Informations du technicien -->
+        <div class="card" style="margin-bottom:16px;text-align:center;">
+          <div style="width:80px;height:80px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+            <span style="font-size:28px;font-weight:700;color:white;">MD</span>
+          </div>
+          <div class="card-title">Martin Dupont</div>
+          <div class="card-sub">Technicien BTP • 3 ans d'expérience</div>
+          
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px;">
+            <div style="text-align:center;">
+              <div style="font-size:18px;font-weight:700;color:#334155;">127</div>
+              <div style="font-size:10px;color:#64748b;">Photos</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:18px;font-weight:700;color:#334155;">98%</div>
+              <div style="font-size:10px;color:#64748b;">Présence</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:18px;font-weight:700;color:#334155;">4.8</div>
+              <div style="font-size:10px;color:#64748b;">Note</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chantier actuel -->
+        <div class="label">Chantier actuel</div>
+        <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <i data-lucide="map-pin" style="width:16px;height:16px;color:#0284c7;"></i>
+            <div class="card-title" style="font-size:14px;">Site A — Entrée principale</div>
+          </div>
+          <div class="card-sub" style="font-size:11px;">Rénovation Rue de Lyon • Paris 12e</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            <span class="badge badge-green" style="font-size:9px;">Présent aujourd'hui</span>
+            <span class="badge badge-blue" style="font-size:9px;">Gros Œuvre</span>
+          </div>
+        </div>
+
+        
+        <!-- Bouton voir mon historique -->
+        <div style="margin:20px 0;">
+          <a href="historique.html" class="btn-primary" style="display:block;text-align:center;text-decoration:none;">
+            <i data-lucide="clipboard-list" style="width: 16px; height: 16px; margin-right: 8px;"></i>
+            Voir mon historique complet
+          </a>
+        </div>
+        
+      </div>
+
+      <div class="nav">
+        <a href="home.html" class="nav-item">
+          <i data-lucide="home" class="nav-icon"></i>
+          <div class="nav-lbl">Accueil</div>
+        </a>
+        <a href="mes-photos.html" class="nav-item">
+          <i data-lucide="camera" class="nav-icon"></i>
+          <div class="nav-lbl">Photos</div>
+        </a>
+        <a href="pointage.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="profil-technicien.html" class="nav-item active">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl active">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Gestion des onglets
+    function showTab(tabName) {
+      // Masquer tous les contenus
+      document.getElementById('photos-content').style.display = 'none';
+      document.getElementById('presences-content').style.display = 'none';
+      document.getElementById('toutes-content').style.display = 'none';
+      
+      // Afficher le contenu sélectionné
+      document.getElementById(tabName + '-content').style.display = 'block';
+      
+      // Mettre à jour les boutons
+      const buttons = document.querySelectorAll('.tab-btn');
+      buttons.forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+      });
+      
+      event.target.classList.add('active');
+      event.target.style.background = 'white';
+    }
+
+    // Charger les photos depuis localStorage
+    function loadPhotos() {
+      const photos = JSON.parse(localStorage.getItem('photos_technicien') || '[]');
+      const photosContent = document.getElementById('photos-content');
+      
+      if (photos.length > 0) {
+        // Afficher les photos récentes
+        photosContent.innerHTML = photos.slice(-5).reverse().map(photo => {
+          const date = new Date(photo.date);
+          const timeAgo = getTimeAgo(date);
+          
+          return `
+            <div class="card" style="margin-bottom:12px;">
+              <div style="display:flex;gap:12px;">
+                <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                  <i data-lucide="camera" style="width:24px;height:24px;color:#3b82f6;"></i>
+                </div>
+                <div style="flex:1;">
+                  <div style="font-size:13px;font-weight:600;color:#334155;">Photo prise</div>
+                  <div style="font-size:11px;color:#64748b;">${photo.chantier} — ${photo.categorie}</div>
+                  <div style="font-size:10px;color:#94a3b8;">${timeAgo}</div>
+                </div>
+                <div style="text-align:right;">
+                  <span class="badge badge-blue" style="font-size:8px;">${photo.categorie}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        
+        // Réinitialiser les icônes
+        lucide.createIcons();
+      }
+    }
+
+    // Calculer le temps écoulé
+    function getTimeAgo(date) {
+      const seconds = Math.floor((new Date() - date) / 1000);
+      
+      if (seconds < 60) return 'Il y a quelques secondes';
+      if (seconds < 3600) return `Il y a ${Math.floor(seconds / 60)} minutes`;
+      if (seconds < 86400) return `Il y a ${Math.floor(seconds / 3600)} heures`;
+      if (seconds < 604800) return `Il y a ${Math.floor(seconds / 86400)} jours`;
+      
+      return date.toLocaleDateString('fr-FR');
+    }
+
+    // Initialiser les icônes au chargement de la page
+    document.addEventListener('DOMContentLoaded', function() {
+      // S'assurer que Lucide est bien chargé
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+      
+      // Charger les photos après l'initialisation des icônes
+      loadPhotos();
+      
+      // Réinitialiser les icônes après le chargement des photos
+      setTimeout(() => {
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons();
+        }
+      }, 100);
+    });
+    
+    // Initialiser les icônes au cas où le DOM est déjà chargé
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons();
+        }
+      });
+    } else {
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+    }
+  </script>
+</body>
+</html>

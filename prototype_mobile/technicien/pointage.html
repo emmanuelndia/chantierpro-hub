@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Pointage</title>
+  <link rel="stylesheet" href="../styles.css">
+  
+  <!-- Styles spécifiques pour le pointage -->
+  <style>
+    .sbar {
+      background: #1c1c1c;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .sdot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #2da85b;
+      margin-right: 6px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+    .st {
+      font-size: 10px;
+      color: #fff;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+    }
+    .stime {
+      font-size: 11px;
+      color: #E07A3A;
+      font-weight: 700;
+    }
+    .geo {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      margin: 4px auto;
+    }
+    .gn {
+      border: 3px solid #2da85b;
+      background: #f0faf4;
+    }
+    .ge {
+      border: 3px solid #e74c3c;
+      background: #fdf0f0;
+    }
+    .gp {
+      border: 3px solid #E07A3A;
+      background: #fff8f4;
+    }
+    .gnum {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1c1c1c;
+    }
+    .gsub {
+      font-size: 8px;
+      color: #aaa;
+      margin-top: 1px;
+    }
+    .ok {
+      background: #f0faf4;
+      border: 1.5px solid #a8dbb8;
+      border-radius: 11px;
+      padding: 12px;
+      text-align: center;
+    }
+    .er {
+      background: #fdf0f0;
+      border: 1.5px solid #f5c6c6;
+      border-radius: 11px;
+      padding: 12px;
+      text-align: center;
+    }
+    .wa {
+      background: #fff8f4;
+      border: 1.5px solid #f5c6a0;
+      border-radius: 11px;
+      padding: 12px;
+    }
+    .ok-t {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1a6b35;
+    }
+    .er-t {
+      font-size: 12px;
+      font-weight: 700;
+      color: #c0392b;
+    }
+    .wa-t {
+      font-size: 12px;
+      font-weight: 700;
+      color: #b54d00;
+      text-align: center;
+    }
+    .sm {
+      font-size: 10px;
+      color: #555;
+      margin-top: 3px;
+    }
+    .mta {
+      margin-top: auto;
+    }
+    .btns {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .btn-danger {
+      background: #fff;
+      color: #c0392b;
+      border: 1.5px solid #f5c6c6;
+      border-radius: 12px;
+      padding: 11px;
+      width: 100%;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-danger:hover {
+      border-color: #e8a8a8;
+    }
+    .btn-confirm {
+      background: #c0392b;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 9px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      flex: 1;
+    }
+    .tli {
+      display: flex;
+      gap: 9px;
+      padding: 5px 0;
+    }
+    .tldot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+    .tlv {
+      width: 2px;
+      flex: 1;
+      background: #e8e5de;
+      margin: 2px 0;
+    }
+    .tlc {
+      flex: 1;
+    }
+    .tlt {
+      font-size: 10px;
+      font-weight: 600;
+      color: #1c1c1c;
+    }
+    .tls {
+      font-size: 9px;
+      color: #aaa;
+      margin-top: 1px;
+    }
+    .recap-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid #f5dcc0;
+    }
+    .recap-row:last-child {
+      border-bottom: none;
+    }
+    .recap-lbl {
+      font-size: 10px;
+      color: #aaa;
+    }
+    .recap-val {
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .state-screen {
+      display: none;
+    }
+    .state-screen.active {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      
+      <!-- ÉTAT UC1 : ARRIVÉE - PAS DE SESSION -->
+      <div id="state-arrival" class="state-screen active">
+        <div class="topbar">
+          <div>
+            <div class="topbar-title">Bonjour Martin 👋</div>
+            <div class="topbar-sub">15 avril 2026</div>
+          </div>
+          <div class="topbar-avatar">MD</div>
+        </div>
+        <div class="content">
+          <div class="label">Chantier assigné</div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div class="card-title">Rénovation Rue de Lyon</div>
+                <div class="card-sub">Site A · Paris 12e</div>
+              </div>
+              <span class="badge badge-gray">Non pointé</span>
+            </div>
+          </div>
+          
+          <!-- État géolocalisation dynamique -->
+          <div id="geo-status" class="geo gp">
+            <div style="font-size:18px;color:#E07A3A;">⟳</div>
+            <div class="gsub">Localisation…</div>
+          </div>
+          
+          <!-- Message d'erreur si hors zone -->
+          <div id="error-message" style="display:none;" class="er">
+            <div class="er-t">Trop loin du chantier</div>
+            <div class="sm">Vous devez être à moins de 2 km.<br>Distance actuelle : <span id="distance-value">4.3</span> km.</div>
+          </div>
+          
+          <div class="mta">
+            <button id="btn-arrival" class="btn-primary" onclick="simulateArrival()">📍 Pointer mon arrivée</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÉTAT UC2 : SESSION ACTIVE -->
+      <div id="state-session" class="state-screen">
+        <div class="topbar">
+          <div>
+            <div class="topbar-title">Session en cours</div>
+            <div class="topbar-sub">Rénovation Rue de Lyon</div>
+          </div>
+          <div class="topbar-avatar">MD</div>
+        </div>
+        <div class="sbar">
+          <div class="st"><div class="sdot"></div>En cours depuis <span id="start-time">08h14</span></div>
+          <div class="stime" id="duration">3h42</div>
+        </div>
+        <div class="content">
+          <div class="label">Activité aujourd'hui</div>
+          <div id="timeline">
+            <div class="tli">
+              <div style="display:flex;flex-direction:column;align-items:center;width:14px;">
+                <div class="tldot" style="background:#2da85b;"></div>
+                <div class="tlv"></div>
+              </div>
+              <div class="tlc">
+                <div class="tlt">Arrivée</div>
+                <div class="tls">08h14 · GPS confirmé</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mta btns">
+            <button class="btn-secondary" onclick="intermediateCheck()">📍 Je suis toujours sur site</button>
+            <button class="btn-danger" onclick="showDepartureConfirm()">🚪 Pointer mon départ</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÉTAT UC3 : NOTIFICATION AUTO -->
+      <div id="state-notification" class="state-screen">
+        <div class="topbar">
+          <div>
+            <div class="topbar-title">Session en cours</div>
+            <div class="topbar-sub">Rénovation Rue de Lyon</div>
+          </div>
+          <div class="topbar-avatar">MD</div>
+        </div>
+        <div class="sbar">
+          <div class="st"><div class="sdot"></div>En cours depuis 08h14</div>
+          <div class="stime">3h42</div>
+        </div>
+        <div class="content">
+          <div class="ok" style="margin-top:16px;">
+            <div style="font-size:26px;margin-bottom:5px;">📍</div>
+            <div class="ok-t">Présence confirmée</div>
+            <div class="sm">11h56 · Via notification auto</div>
+          </div>
+          
+          <div class="mta btns">
+            <button class="btn-secondary" onclick="intermediateCheck()">📍 Je suis toujours sur site</button>
+            <button class="btn-danger" onclick="showDepartureConfirm()">🚪 Pointer mon départ</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÉTAT UC4 : DÉPART -->
+      <div id="state-departure" class="state-screen">
+        <div class="topbar">
+          <div>
+            <div class="topbar-title">Session en cours</div>
+            <div class="topbar-sub">Rénovation Rue de Lyon</div>
+          </div>
+          <div class="topbar-avatar">MD</div>
+        </div>
+        <div class="sbar">
+          <div class="st"><div class="sdot"></div>En cours depuis 08h14</div>
+          <div class="stime" id="departure-duration">8h18</div>
+        </div>
+        <div class="content">
+          <div style="background:#fdf0f0;border:1.5px solid #f5c6c6;border-radius:13px;padding:14px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:7px;">🚪</div>
+            <div style="font-size:12px;font-weight:700;color:#c0392b;margin-bottom:5px;">Pointer votre départ ?</div>
+            <div style="font-size:10px;color:#888;margin-bottom:12px;">Cela clôturera votre session de<br><strong>8h18</strong> sur ce chantier.</div>
+            <div style="display:flex;gap:7px;">
+              <button class="btn-ghost" style="flex:1;padding:9px;font-size:11px;" onclick="cancelDeparture()">Annuler</button>
+              <button class="btn-confirm" onclick="confirmDeparture()">Confirmer</button>
+            </div>
+          </div>
+          
+          <div class="label">Session du jour</div>
+          <div id="departure-timeline">
+            <div class="tli">
+              <div style="display:flex;flex-direction:column;align-items:center;width:14px;">
+                <div class="tldot" style="background:#2da85b;"></div>
+                <div class="tlv"></div>
+              </div>
+              <div class="tlc">
+                <div class="tlt">Arrivée</div>
+                <div class="tls">08h14</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÉTAT FINAL : RÉCAPITULATIF -->
+      <div id="state-summary" class="state-screen">
+        <div class="topbar">
+          <div>
+            <div class="topbar-title">Bonjour Martin 👋</div>
+            <div class="topbar-sub">15 avril 2026</div>
+          </div>
+          <div class="topbar-avatar">MD</div>
+        </div>
+        <div class="content">
+          <div class="wa" style="margin-top:8px;">
+            <div style="font-size:28px;text-align:center;margin-bottom:6px;">🏁</div>
+            <div class="wa-t" style="margin-bottom:12px;">Bonne journée Martin !</div>
+            <div class="recap-row"><span class="recap-lbl">Chantier</span><span class="recap-val">Rue de Lyon</span></div>
+            <div class="recap-row"><span class="recap-lbl">Arrivée</span><span class="recap-val">08h14</span></div>
+            <div class="recap-row"><span class="recap-lbl">Départ</span><span class="recap-val" id="final-departure">16h32</span></div>
+            <div class="recap-row"><span class="recap-lbl">Durée</span><span class="recap-val" style="font-size:13px;color:#E07A3A;" id="final-duration">8h18</span></div>
+            <div class="recap-row"><span class="recap-lbl">Pointages</span><span class="recap-val" id="final-count">4 au total</span></div>
+          </div>
+          <div class="mta">
+            <a href="historique.html" class="btn-ghost" style="display:block;text-align:center;">
+            <i data-lucide="clipboard-list" style="width: 16px; height: 16px; margin-right: 8px;"></i>
+            Voir mon historique
+          </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="nav">
+        <a href="home.html" class="nav-item">
+          <i data-lucide="home" class="nav-icon"></i>
+          <div class="nav-lbl">Accueil</div>
+        </a>
+        <a href="mes-photos.html" class="nav-item">
+          <i data-lucide="camera" class="nav-icon"></i>
+          <div class="nav-lbl">Photos</div>
+        </a>
+        <a href="pointage.html" class="nav-item active">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl active">Présences</div>
+        </a>
+        <a href="profil-technicien.html" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    let currentState = 'arrival';
+    let sessionData = {
+      startTime: '08h14',
+      intermediateCheckins: [],
+      distance: 1.2
+    };
+
+    // Simulation de la géolocalisation
+    function simulateGeolocation() {
+      const geoStatus = document.getElementById('geo-status');
+      const errorMessage = document.getElementById('error-message');
+      const btnArrival = document.getElementById('btn-arrival');
+      
+      setTimeout(() => {
+        if (sessionData.distance <= 2) {
+          geoStatus.className = 'geo gn';
+          geoStatus.innerHTML = `<div class="gnum" style="color:#1a6b35;">${sessionData.distance} km</div><div class="gsub">du chantier ✅</div>`;
+          errorMessage.style.display = 'none';
+          btnArrival.style.opacity = '1';
+          btnArrival.style.cursor = 'pointer';
+        } else {
+          geoStatus.className = 'geo ge';
+          geoStatus.innerHTML = `<div class="gnum" style="color:#c0392b;">${sessionData.distance} km</div><div class="gsub">du chantier ❌</div>`;
+          errorMessage.style.display = 'block';
+          document.getElementById('distance-value').textContent = sessionData.distance;
+          btnArrival.style.opacity = '0.35';
+          btnArrival.style.cursor = 'not-allowed';
+        }
+      }, 2000);
+    }
+
+    // Simulation d'arrivée
+    function simulateArrival() {
+      if (sessionData.distance > 2) {
+        alert('Vous êtes trop loin du chantier !');
+        return;
+      }
+      
+      showState('session');
+      updateDuration();
+    }
+
+    // Pointage intermédiaire
+    function intermediateCheck() {
+      const now = new Date();
+      const time = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      
+      sessionData.intermediateCheckins.push({
+        time: time,
+        type: 'manuel'
+      });
+      
+      addTimelineItem('Pointage intermédiaire', time + ' · Manuel', 'E07A3A');
+      showNotification('Pointage enregistré', 'Présence confirmée à ' + time);
+    }
+
+    // Afficher confirmation départ
+    function showDepartureConfirm() {
+      showState('departure');
+    }
+
+    // Annuler départ
+    function cancelDeparture() {
+      showState('session');
+    }
+
+    // Confirmer départ
+    function confirmDeparture() {
+      const now = new Date();
+      const departureTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      
+      document.getElementById('final-departure').textContent = departureTime;
+      document.getElementById('final-count').textContent = (sessionData.intermediateCheckins.length + 2) + ' au total';
+      
+      showState('summary');
+    }
+
+    // Notification auto (simulation)
+    function showNotification(title, message) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, { body: message, icon: '📍' });
+      }
+    }
+
+    // Changer d'état
+    function showState(state) {
+      document.querySelectorAll('.state-screen').forEach(screen => {
+        screen.classList.remove('active');
+      });
+      document.getElementById('state-' + state).classList.add('active');
+      currentState = state;
+    }
+
+    // Ajouter un élément à la timeline
+    function addTimelineItem(title, subtitle, color = 'E07A3A') {
+      const timeline = document.getElementById('timeline');
+      const item = document.createElement('div');
+      item.className = 'tli';
+      item.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;width:14px;">
+          <div class="tldot" style="background:#${color};"></div>
+          <div class="tlv"></div>
+        </div>
+        <div class="tlc">
+          <div class="tlt">${title}</div>
+          <div class="tls">${subtitle}</div>
+        </div>
+      `;
+      timeline.appendChild(item);
+    }
+
+    // Mettre à jour la durée
+    function updateDuration() {
+      if (currentState === 'session' || currentState === 'departure') {
+        const start = new Date();
+        start.setHours(8, 14, 0);
+        const now = new Date();
+        const diff = Math.floor((now - start) / 1000 / 60);
+        const hours = Math.floor(diff / 60);
+        const minutes = diff % 60;
+        const duration = hours + 'h' + minutes.toString().padStart(2, '0');
+        
+        document.getElementById('duration').textContent = duration;
+        document.getElementById('departure-duration').textContent = duration;
+        
+        setTimeout(updateDuration, 60000); // Update every minute
+      }
+    }
+
+    // Simulation de notification auto (toutes les 2 heures)
+    function simulateAutoNotification() {
+      if (currentState === 'session') {
+        showState('notification');
+        setTimeout(() => {
+          showState('session');
+        }, 3000);
+      }
+    }
+
+    // Initialisation
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initialiser les icônes Lucide
+      lucide.createIcons();
+      
+      simulateGeolocation();
+      updateDuration();
+      
+      // Simuler notification auto après 5 secondes pour démo
+      setTimeout(simulateAutoNotification, 5000);
+      
+      // Demander permission pour les notifications
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    });
+  </script>
+</body>
+</html>

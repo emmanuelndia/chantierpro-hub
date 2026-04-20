@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Détail Projet</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    .photo-grid {
+      display: grid !important;
+      grid-template-columns: repeat(3, 1fr) !important;
+      gap: 8px !important;
+      margin-bottom: 16px !important;
+    }
+    .photo-item {
+      position: relative !important;
+      aspect-ratio: 1 / 1 !important;
+      border-radius: 10px !important;
+      overflow: hidden !important;
+      cursor: pointer !important;
+      transition: transform 0.2s ease !important;
+    }
+    .photo-overlay {
+      position: absolute !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      background: linear-gradient(to top, rgba(0,0,0,0.7), transparent) !important;
+      color: white !important;
+      padding: 8px !important;
+      font-size: 9px !important;
+      font-weight: 500 !important;
+      line-height: 1.2 !important;
+      backdrop-filter: blur(2px) !important;
+    }
+    .photo-item:hover {
+      transform: scale(1.03) !important;
+    }
+      </style>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <div style="font-size:12px;color:#aaa;cursor:pointer;" onclick="show('projets',document.querySelectorAll('.tab-i')[0])">← Projets</div>
+        <div style="text-align:right;"><div class="topbar-title">Rénovation Rue de Lyon</div><div class="topbar-sub">Paris 12e · fin juin 2026</div></div>
+      </div>
+      <div class="tabs-inner">
+        <div class="tab-i on" id="ti-general" onclick="setTab('general')">Général</div>
+        <div class="tab-i" id="ti-chantiers" onclick="setTab('chantiers')">Chantiers</div>
+        <div class="tab-i" id="ti-photos" onclick="setTab('photos')">Photos (14)</div>
+        <div class="tab-i" id="ti-pres" onclick="setTab('pres')">Présences</div>
+      </div>
+      <div class="content" id="tab-general">
+        <div class="stat-row" style="margin-top:4px;">
+          <div class="stat-box"><div class="stat-num">6</div><div class="stat-lbl">Techniciens</div></div>
+          <div class="stat-box"><div class="stat-num">2</div><div class="stat-lbl">Chantiers</div></div>
+          <div class="stat-box"><div class="stat-num">14</div><div class="stat-lbl">Photos</div></div>
+        </div>
+        <div class="label">Techniciens assignés</div>
+        <div class="card">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;font-weight:500;">Martin Dupont</span><span class="badge badge-green">Présent</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;font-weight:500;">Lucie Bernard</span><span class="badge badge-green">Présente</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;font-weight:500;">Paul Martin</span><span class="badge badge-gray">Parti</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;font-weight:500;">Kemal Aydin</span><span class="badge badge-red">Absent</span></div>
+          </div>
+        </div>
+        <div class="label">Infos projet</div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:10px;color:#64748b;">Début</span><span style="font-size:10px;">1 mars 2026</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:10px;color:#64748b;">Fin prévue</span><span style="font-size:10px;">30 juin 2026</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="font-size:10px;color:#64748b;">Chef de projet</span><span style="font-size:10px;">Sophie Renard</span></div>
+        </div>
+      </div>
+
+      <div class="content" id="tab-chantiers" style="display:none;">
+        <div class="label" style="margin-top:4px;">2 CHANTIERS</div>
+        <div style="display:flex;gap:8px;">
+          <div class="card" style="cursor:pointer;flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div><div class="card-title">Site A — Entrée principale</div><div class="card-sub">48.8484, 2.3701 · 3 techniciens</div></div>
+              <span class="badge badge-green" style="font-size:9px;">2 PRÉSENTS</span>
+            </div>
+            <div style="margin-top:6px;display:flex;gap:4px;"><span class="badge badge-blue" style="font-size:9px;">8 PHOTOS</span></div>
+          </div>
+          <div class="card" style="cursor:pointer;flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div><div class="card-title">Site B — Façade arrière</div><div class="card-sub">48.8486, 2.3704 · 3 techniciens</div></div>
+              <span class="badge badge-green" style="font-size:9px;">2 PRÉSENTS</span>
+            </div>
+            <div style="margin-top:6px;display:flex;gap:4px;"><span class="badge badge-blue" style="font-size:9px;">6 PHOTOS</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content" id="tab-photos" style="display:none;">
+        <!-- Bouton de prise de photo -->
+        <div style="margin-bottom:12px;">
+          <a href="photo-management.html" class="btn-primary" style="display:flex;align-items:center;justify-content:center;text-decoration:none;padding:12px;">
+            <i data-lucide="camera" style="width:16px;height:16px;margin-right:6px;"></i>
+            Prendre une photo
+          </a>
+        </div>
+        
+        <div class="chips" style="padding:4px 0 8px;">
+          <div class="chip active" style="font-size:9px;">Tous sites</div>
+          <div class="chip" style="font-size:9px;">Site A</div>
+          <div class="chip" style="font-size:9px;">Site B</div>
+        </div>
+        <div class="group-head"><div class="group-title">📍 Site A — Entrée principale</div><div class="group-count">8 photos</div></div>
+        <div class="photo-grid">
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#c8c4bc;">🏗️</div>
+            <div class="photo-overlay">08h32<br>Martin D.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#d4d0c8;">🔧</div>
+            <div class="photo-overlay">09h15<br>Lucie B.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#cac7bf;">🪜</div>
+            <div class="photo-overlay">11h02<br>Paul M.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#c8c4bc;">🏗️</div>
+            <div class="photo-overlay">14h20<br>Martin D.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#d4d0c8;">🔧</div>
+            <div class="photo-overlay">15h45<br>Lucie B.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#cac7bf;">🪜</div>
+            <div class="photo-overlay">16h10<br>Paul M.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#b8b5ad;font-size:12px;font-weight:700;color:#fff;">+2</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="group-head"><div class="group-title">📍 Site B — Façade arrière</div><div class="group-count">6 photos</div></div>
+        <div class="photo-grid">
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#bcb9b1;">📐</div>
+            <div class="photo-overlay">10h44<br>Martin D.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#d0cdc5;">⚙️</div>
+            <div class="photo-overlay">13h30<br>Lucie B.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#c9c6be;">🔨</div>
+            <div class="photo-overlay">14h15<br>Kemal A.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#bcb9b1;">📐</div>
+            <div class="photo-overlay">15h20<br>Martin D.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#d0cdc5;">⚙️</div>
+            <div class="photo-overlay">16h30<br>Lucie B.</div>
+          </div>
+          <div class="photo-item">
+            <div class="photo-thumb" style="background:#b9b6ae;font-size:12px;font-weight:700;color:#fff;">+1</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content" id="tab-pres" style="display:none;">
+        <div class="label" style="margin-top:4px;">AUJOURD'HUI</div>
+        <div class="presence-row"><div class="presence-dot dot-green"></div><div style="flex:1;"><div class="card-title" style="font-size:12px;">Martin Dupont</div><div class="card-sub">08h14 → en cours · Site A</div></div><span class="badge badge-green" style="font-size:9px;">PRÉSENT</span></div>
+        <div class="presence-row"><div class="presence-dot dot-green"></div><div style="flex:1;"><div class="card-title" style="font-size:12px;">Lucie Bernard</div><div class="card-sub">07h58 → en cours · Site A</div></div><span class="badge badge-green" style="font-size:9px;">PRÉSENTE</span></div>
+        <div class="presence-row"><div class="presence-dot dot-gray"></div><div style="flex:1;"><div class="card-title" style="font-size:12px;">Paul Martin</div><div class="card-sub">08h10 → 12h30 · Site B · 4h20</div></div><span class="badge badge-gray" style="font-size:9px;">4h20</span></div>
+        <div class="presence-row"><div class="presence-dot" style="background:#E07A3A;"></div><div style="flex:1;"><div class="card-title" style="font-size:12px;">Kemal Aydin</div><div class="card-sub">Absent aujourd'hui</div></div><span class="badge badge-red" style="font-size:9px;">ABSENT</span></div>
+      </div>
+
+      <div class="nav">
+        <a href="dashboard.html" class="nav-item active">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <div class="nav-lbl active">Dashboard</div>
+        </a>
+        <a href="galerie.html" class="nav-item">
+          <i data-lucide="image" class="nav-icon"></i>
+          <div class="nav-lbl">Galerie</div>
+        </a>
+        <a href="presences.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setTab(tabName) {
+      // Masquer tous les contenus
+      document.querySelectorAll('.content').forEach(content => {
+        content.style.display = 'none';
+      });
+      
+      // Désactiver tous les onglets
+      document.querySelectorAll('.tab-i').forEach(tab => {
+        tab.classList.remove('on');
+      });
+      
+      // Afficher le contenu sélectionné
+      const selectedContent = document.getElementById('tab-' + tabName);
+      if (selectedContent) {
+        selectedContent.style.display = 'block';
+      }
+      
+      // Activer l'onglet sélectionné
+      const selectedTab = document.getElementById('ti-' + tabName);
+      if (selectedTab) {
+        selectedTab.classList.add('on');
+      }
+    }
+    
+    function show(section, button) {
+      // Fonction de retour vers les projets
+      window.location.href = 'dashboard.html';
+    }
+    
+    // Initialiser les icônes Lucide
+    lucide.createIcons();
+    
+    // Initialisation au chargement de la page
+    document.addEventListener('DOMContentLoaded', function() {
+      // S'assurer que seul l'onglet Général est affiché au chargement
+      setTab('general');
+    });
+  </script>
+</body>
+</html>

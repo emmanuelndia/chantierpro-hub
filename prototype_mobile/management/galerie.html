@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Galerie Photos</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Galerie photos</div>
+          <div class="topbar-sub">32 photos · tous projets</div>
+        </div>
+        <i data-lucide="settings" style="width: 20px; height: 20px; cursor: pointer;"></i>
+      </div>
+      <div class="sort-bar">
+        <span class="sort-lbl">Grouper</span>
+        <span class="sort-chip active" onclick="setGroup('recent')">Récent</span>
+        <span class="sort-chip" onclick="setGroup('projet')">Projet</span>
+        <span class="sort-chip" onclick="setGroup('chantier')">Chantier</span>
+      </div>
+      <div class="chips" id="gal-chips">
+        <div class="chip active">Tous</div>
+        <div class="chip">Rue de Lyon</div>
+        <div class="chip">Bastille B2</div>
+        <div class="chip">Clichy Nord</div>
+      </div>
+      <div class="content" id="gal-content">
+        <!-- recent par défaut -->
+        <div id="gal-recent">
+          <div class="group-head"><div class="group-title">Aujourd'hui — 15 avr</div><div class="group-count">18 photos</div></div>
+          <div class="photo-grid cols-3">
+            <div class="thumb" style="background:#c8c4bc;" onclick="showPhotoModal('building', '08h32', 'Rue de Lyon')"><i data-lucide="building-2" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">08h32</span><span class="tauth">Rue de Lyon</span></div></div>
+            <div class="thumb" style="background:#c5c8cc;" onclick="showPhotoModal('hammer', '10h18', 'Bastille B2')"><i data-lucide="hammer" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">10h18</span><span class="tauth">Bastille B2</span></div></div>
+            <div class="thumb" style="background:#d4d0c8;" onclick="showPhotoModal('wrench', '09h15', 'Rue de Lyon')"><i data-lucide="wrench" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">09h15</span><span class="tauth">Rue de Lyon</span></div></div>
+            <div class="thumb" style="background:#cac7bf;" onclick="showPhotoModal('saw', '08h40', 'Bastille B2')"><i data-lucide="saw" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">08h40</span><span class="tauth">Bastille B2</span></div></div>
+            <div class="thumb" style="background:#bcb9b1;" onclick="showPhotoModal('ruler', '08h32', 'Rue de Lyon')"><i data-lucide="ruler" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">08h32</span><span class="tauth">Rue de Lyon</span></div></div>
+            <div class="thumb" style="background:#c2c6ca;font-size:12px;font-weight:700;color:#fff;" onclick="alert('Voir les 13 photos restantes')">+13</div>
+          </div>
+          <div class="divider"></div>
+          <div class="group-head"><div class="group-title">Hier — 14 avr</div><div class="group-count">9 photos</div></div>
+          <div class="photo-grid cols-3">
+            <div class="thumb" style="background:#ccc9c1;" onclick="showPhotoModal('building', '15h33', 'Clichy Nord')"><i data-lucide="building" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">15h33</span><span class="tauth">Clichy Nord</span></div></div>
+            <div class="thumb" style="background:#c4c1b9;" onclick="showPhotoModal('window', '14h10', 'Clichy Nord')"><i data-lucide="window" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">14h10</span><span class="tauth">Clichy Nord</span></div></div>
+            <div class="thumb" style="background:#b9b6ae;font-size:12px;font-weight:700;color:#fff;" onclick="alert('Voir les 7 photos restantes')">+7</div>
+          </div>
+        </div>
+        <div id="gal-projet" style="display:none;">
+          <div class="group-head"><div class="group-title"><i data-lucide="folder" style="width: 14px; height: 14px; margin-right: 4px;"></i>Rénovation Rue de Lyon</div><div class="group-count">14 photos</div></div>
+          <div class="photo-grid cols-3">
+            <div class="thumb" style="background:#c8c4bc;" onclick="showPhotoModal('building-2', '08h32', 'Martin D.')"><i data-lucide="building-2" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">08h32</span><span class="tauth">Martin D.</span></div></div>
+            <div class="thumb" style="background:#d4d0c8;" onclick="showPhotoModal('wrench', '09h15', 'Lucie B.')"><i data-lucide="wrench" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">09h15</span><span class="tauth">Lucie B.</span></div></div>
+            <div class="thumb" style="background:#b8b5ad;font-size:12px;font-weight:700;color:#fff;" onclick="alert('Voir les 12 photos restantes')">+12</div>
+          </div>
+          <div class="divider"></div>
+          <div class="group-head"><div class="group-title"><i data-lucide="folder" style="width: 14px; height: 14px; margin-right: 4px;"></i>Chantier Bastille B2</div><div class="group-count">11 photos</div></div>
+          <div class="photo-grid cols-3">
+            <div class="thumb" style="background:#c5c8cc;" onclick="showPhotoModal('package', '07h55', 'Kemal A.')"><i data-lucide="package" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">07h55</span><span class="tauth">Kemal A.</span></div></div>
+            <div class="thumb" style="background:#b8bec4;" onclick="showPhotoModal('hammer', '08h40', 'Sophie R.')"><i data-lucide="hammer" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">08h40</span><span class="tauth">Sophie R.</span></div></div>
+            <div class="thumb" style="background:#b0b5ba;font-size:12px;font-weight:700;color:#fff;" onclick="alert('Voir les 9 photos restantes')">+9</div>
+          </div>
+          <div class="divider"></div>
+          <div class="group-head"><div class="group-title"><i data-lucide="folder" style="width: 14px; height: 14px; margin-right: 4px;"></i>Immeuble Clichy Nord</div><div class="group-count">7 photos</div></div>
+          <div class="photo-grid cols-3">
+            <div class="thumb" style="background:#ccc9c1;" onclick="showPhotoModal('building', '14h10', 'Tom L.')"><i data-lucide="building" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">14h10</span><span class="tauth">Tom L.</span></div></div>
+            <div class="thumb" style="background:#b9b6ae;font-size:12px;font-weight:700;color:#fff;" onclick="alert('Voir les 6 photos restantes')">+6</div>
+          </div>
+        </div>
+        <div id="gal-chantier" style="display:none;">
+          <div class="group-head"><div class="group-title"><i data-lucide="map-pin" style="width: 14px; height: 14px; margin-right: 4px;"></i>Site A — Rue de Lyon</div><div class="group-count">8 photos</div></div>
+          <div class="photo-grid cols-3">
+            <div class="thumb" style="background:#c8c4bc;" onclick="showPhotoModal('building-2', '08h32', 'Martin D.')"><i data-lucide="building-2" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">08h32</span><span class="tauth">Martin D.</span></div></div>
+            <div class="thumb" style="background:#d4d0c8;" onclick="showPhotoModal('wrench', '09h15', 'Lucie B.')"><i data-lucide="wrench" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">09h15</span><span class="tauth">Lucie B.</span></div></div>
+            <div class="thumb" style="background:#b8b5ad;font-size:12px;font-weight:700;color:#fff;" onclick="alert('Voir les 6 photos restantes')">+6</div>
+          </div>
+          <div class="divider"></div>
+          <div class="group-head"><div class="group-title"><i data-lucide="map-pin" style="width: 14px; height: 14px; margin-right: 4px;"></i>Site B — Rue de Lyon</div><div class="group-count">6 photos</div></div>
+          <div class="photo-grid cols-3">
+            <div class="thumb" style="background:#bcb9b1;" onclick="showPhotoModal('ruler', '10h44', 'Martin D.')"><i data-lucide="ruler" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">10h44</span><span class="tauth">Martin D.</span></div></div>
+            <div class="thumb" style="background:#b8b5ad;font-size:12px;font-weight:700;color:#fff;" onclick="alert('Voir les 5 photos restantes')">+5</div>
+          </div>
+          <div class="divider"></div>
+          <div class="group-head"><div class="group-title"><i data-lucide="map-pin" style="width: 14px; height: 14px; margin-right: 4px;"></i>Bastille B2</div><div class="group-count">11 photos</div></div>
+          <div class="photo-grid cols-3">
+            <div class="thumb" style="background:#c5c8cc;" onclick="showPhotoModal('package', '07h55', 'Kemal A.')"><i data-lucide="package" style="width: 24px; height: 24px;"></i><div class="tmeta"><span class="ttime">07h55</span><span class="tauth">Kemal A.</span></div></div>
+            <div class="thumb" style="background:#b0b5ba;font-size:12px;font-weight:700;color:#fff;" onclick="alert('Voir les 10 photos restantes')">+10</div>
+          </div>
+        </div>
+      </div>
+      <!-- Bouton flottant de prise de photo -->
+      <div style="position:fixed;bottom:100px;right:30px;z-index:100;">
+        <a href="photo-management.html" style="display:block;width:56px;height:56px;background:#3b82f6;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(59,130,246,0.4);text-decoration:none;">
+          <i data-lucide="camera" style="width:24px;height:24px;color:white;"></i>
+        </a>
+      </div>
+      <div class="nav">
+        <a href="dashboard.html" class="nav-item">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <div class="nav-lbl">Dashboard</div>
+        </a>
+        <a href="galerie.html" class="nav-item active">
+          <i data-lucide="image" class="nav-icon"></i>
+          <div class="nav-lbl active">Galerie</div>
+        </a>
+        <a href="presences.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="profil.html" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal pour le détail photo -->
+  <div id="photoModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:16px;padding:20px;margin:20px;max-width:320px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:10px;" id="modalIcon"><i data-lucide="building-2" style="width: 48px; height: 48px;"></i></div>
+      <div style="font-size:14px;font-weight:600;color:#1c1c1c;margin-bottom:5px;" id="modalTime">08h32</div>
+      <div style="font-size:12px;color:#888;margin-bottom:15px;" id="modalAuthor">Martin D.</div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button onclick="closePhotoModal()" style="background:#f0f0f0;border:none;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;">Fermer</button>
+        <button onclick="deletePhoto()" style="background:#E07A3A;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;">Supprimer</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setGroup(groupName) {
+      // Cacher tous les groupes
+      document.querySelectorAll('[id^="gal-"]').forEach(group => {
+        group.style.display = 'none';
+      });
+      
+      // Désactiver tous les chips de tri
+      document.querySelectorAll('.sort-chip').forEach(chip => {
+        chip.classList.remove('active');
+      });
+      
+      // Afficher le groupe sélectionné
+      const selectedGroup = document.getElementById('gal-' + groupName);
+      if (selectedGroup) {
+        selectedGroup.style.display = 'block';
+      }
+      
+      // Activer le chip de tri cliqué
+      const clickedChip = document.getElementById('g-' + groupName);
+      if (clickedChip) {
+        clickedChip.classList.add('active');
+      }
+    }
+
+    function showPhotoModal(icon, time, author) {
+      document.getElementById('modalIcon').textContent = icon;
+      document.getElementById('modalTime').textContent = time;
+      document.getElementById('modalAuthor').textContent = author;
+      document.getElementById('photoModal').style.display = 'flex';
+    }
+
+    function closePhotoModal() {
+      document.getElementById('photoModal').style.display = 'none';
+    }
+
+    function deletePhoto() {
+      if (confirm('Supprimer cette photo ?')) {
+        alert('Photo supprimée');
+        closePhotoModal();
+      }
+    }
+
+    // Initialiser les icônes Lucide au chargement
+    document.addEventListener('DOMContentLoaded', function() {
+      lucide.createIcons();
+      
+      // Gestion des chips de filtre
+      document.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', function() {
+          document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+          this.classList.add('active');
+        });
+      });
+    });
+  </script>
+</body>
+</html>

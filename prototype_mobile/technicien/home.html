@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Accueil Technicien</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Bonjour Martin 👋</div>
+          <div class="topbar-sub">Mardi 15 avril 2026</div>
+        </div>
+        <div class="topbar-avatar">MD</div>
+      </div>
+      <div class="content">
+        <!-- Statut du jour -->
+        <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:20px;padding:20px;margin-bottom:20px;border:1px solid #bae6fd;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:48px;height:48px;background:#0ea5e9;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+              <i data-lucide="calendar-check" style="width:24px;height:24px;color:#ffffff;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:16px;font-weight:700;color:#0c4a6e;">Jour de chantier</div>
+              <div style="font-size:13px;color:#0369a1;">Présent sur site aujourd'hui</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chantier du jour -->
+        <div class="label" style="margin-bottom:12px;">Chantier du jour</div>
+        <div class="card" style="background:linear-gradient(135deg,#ffffff,#fefefe);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+            <div style="flex:1;">
+              <div class="card-title">Rénovation Rue de Lyon</div>
+              <div class="card-sub" style="display:flex;align-items:center;gap:4px;">
+                <i data-lucide="map-pin" style="width:14px;height:14px;"></i>
+                Paris 12e • 1.2 km
+              </div>
+            </div>
+            <span class="badge badge-green">Assigné</span>
+          </div>
+          
+          <!-- Infos supplémentaires -->
+          <div style="display:flex;gap:16px;margin-top:16px;">
+            <div style="flex:1;text-align:center;padding:12px;background:#f8fafc;border-radius:12px;">
+              <div style="font-size:18px;font-weight:700;color:#0f172a;">08:00</div>
+              <div style="font-size:11px;color:#64748b;">Début</div>
+            </div>
+            <div style="flex:1;text-align:center;padding:12px;background:#f8fafc;border-radius:12px;">
+              <div style="font-size:18px;font-weight:700;color:#0f172a;">18:00</div>
+              <div style="font-size:11px;color:#64748b;">Fin</div>
+            </div>
+            <div style="flex:1;text-align:center;padding:12px;background:#f8fafc;border-radius:12px;">
+              <div style="font-size:18px;font-weight:700;color:#0f172a;">10h</div>
+              <div style="font-size:11px;color:#64748b;">Durée</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Géolocalisation améliorée -->
+        <div style="margin:24px 0;text-align:center;">
+          <div style="width:120px;height:120px;margin:0 auto 16px;position:relative;">
+            <div style="width:100%;height:100%;border:8px solid #e2e8f0;border-radius:50%;position:relative;">
+              <div style="width:100%;height:100%;border:8px solid #EA580C;border-radius:50%;position:absolute;top:0;left:0;clip-path:polygon(0 0, 50% 0, 50% 100%, 0 100%);"></div>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:24px;height:24px;background:#EA580C;border-radius:50%;border:4px solid #ffffff;box-shadow:0 2px 8px rgba(234,90,12,0.4);"></div>
+            </div>
+          </div>
+          <div style="font-size:24px;font-weight:700;color:#0f172a;margin-bottom:4px;">1.2 km</div>
+          <div style="font-size:13px;color:#64748b;">du chantier</div>
+          <div style="font-size:12px;color:#10b981;margin-top:4px;">✓ En zone de chantier</div>
+        </div>
+
+        <!-- Bouton pointage ultra visible -->
+        <a href="pointage.html" class="big-btn" style="margin-top:0;text-decoration:none;position:relative;overflow:hidden;">
+          <div style="position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);animation:shimmer 2s infinite;"></div>
+          <div style="text-align:center;position:relative;z-index:1;">
+            <i data-lucide="map-pin" style="width: 32px; height: 32px;"></i>
+            <div style="color:#fff;font-weight:700;font-size:16px;margin-top:4px;">Pointer l'arrivée</div>
+            <div style="color:#fff;font-size:12px;opacity:0.9;">Appuyer pour pointer</div>
+          </div>
+        </a>
+
+              </div>
+      <div class="nav">
+        <a href="home.html" class="nav-item active">
+          <i data-lucide="home" class="nav-icon"></i>
+          <div class="nav-lbl active">Accueil</div>
+        </a>
+        <a href="mes-photos.html" class="nav-item">
+          <i data-lucide="camera" class="nav-icon"></i>
+          <div class="nav-lbl">Photos</div>
+        </a>
+        <a href="pointage.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="profil-technicien.html" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Initialiser les icônes Lucide
+    lucide.createIcons();
+  </script>
+</body>
+</html>

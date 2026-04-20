@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Photo chantier</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <a href="javascript:history.back()" style="font-size:12px;color:#aaa;cursor:pointer;text-decoration:none;">← Retour</a>
+        <div style="text-align:right;"><div class="topbar-title">Nouvelle Photo</div><div class="topbar-sub">Technicien</div></div>
+      </div>
+
+      <div class="content">
+        <!-- Étape 1: Sélection du chantier -->
+        <div id="etape-chantier">
+          <div class="label">Sélectionner le chantier</div>
+          
+          <div class="card" style="margin-bottom:12px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:50px;height:50px;background:#3b82f6;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="map-pin" style="width:24px;height:24px;color:white;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">Rénovation Rue de Lyon</div>
+                <div style="font-size:11px;color:#64748b;">Paris 12e • Gros Œuvre</div>
+                <div style="font-size:10px;color:#10b981;">● Actif</div>
+              </div>
+              <i data-lucide="chevron-right" style="width:16px;height:16px;color:#94a3b8;"></i>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:50px;height:50px;background:#64748b;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="map-pin" style="width:24px;height:24px;color:white;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">Chantier Bastille B2</div>
+                <div style="font-size:11px;color:#64748b;">Paris 11e • Finitions</div>
+                <div style="font-size:10px;color:#64748b;">● Inactif</div>
+              </div>
+              <i data-lucide="chevron-right" style="width:16px;height:16px;color:#94a3b8;"></i>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:50px;height:50px;background:#64748b;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="map-pin" style="width:24px;height:24px;color:white;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">Site C - Plomberie</div>
+                <div style="font-size:11px;color:#64748b;">Paris 15e • Plomberie</div>
+                <div style="font-size:10px;color:#64748b;">● Inactif</div>
+              </div>
+              <i data-lucide="chevron-right" style="width:16px;height:16px;color:#94a3b8;"></i>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;">
+            <button onclick="selectionnerChantier('Rénovation Rue de Lyon')" class="btn-primary" style="display:block;width:100%;">
+              <i data-lucide="camera" style="width: 16px; height: 16px; margin-right: 8px;"></i>
+              Continuer avec le chantier actif
+            </button>
+          </div>
+        </div>
+
+        <!-- Étape 2: Catégorie et description -->
+        <div id="etape-categorie" style="display:none;">
+          <div class="label">Type de photo</div>
+          
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+            <button onclick="selectionnerCategorie('Gros Œuvre')" class="categorie-btn active" data-categorie="Gros Œuvre">
+              <i data-lucide="hard-hat" style="width:16px;height:16px;"></i>
+              Gros Œuvre
+            </button>
+            <button onclick="selectionnerCategorie('Finitions')" class="categorie-btn" data-categorie="Finitions">
+              <i data-lucide="paintbrush" style="width:16px;height:16px;"></i>
+              Finitions
+            </button>
+            <button onclick="selectionnerCategorie('Signalement')" class="categorie-btn" data-categorie="Signalement">
+              <i data-lucide="alert-triangle" style="width:16px;height:16px;"></i>
+              Signalement
+            </button>
+            <button onclick="selectionnerCategorie('Progression')" class="categorie-btn" data-categorie="Progression">
+              <i data-lucide="trending-up" style="width:16px;height:16px;"></i>
+              Progression
+            </button>
+          </div>
+
+          <div class="label">Description (optionnel)</div>
+          <textarea placeholder="Ajouter une description..." style="width:100%;min-height:80px;padding:12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit;resize:none;margin-bottom:16px;"></textarea>
+
+          <div style="display:flex;gap:8px;">
+            <button onclick="retourChantier()" class="btn-ghost" style="flex:1;">
+              Retour
+            </button>
+            <button onclick="ouvrirCamera()" class="btn-primary" style="flex:1;">
+              <i data-lucide="camera" style="width: 16px; height: 16px; margin-right: 8px;"></i>
+              Prendre photo
+            </button>
+          </div>
+        </div>
+
+        <!-- Étape 3: Historique des photos -->
+        <div id="etape-historique" style="display:none;">
+          <div class="label">Mes photos récentes</div>
+          
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="camera" style="width:24px;height:24px;color:#3b82f6;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Photo prise</div>
+                <div style="font-size:11px;color:#64748b;">Site A — Gros Œuvre</div>
+                <div style="font-size:10px;color:#94a3b8;">Il y a 2 heures</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-blue" style="font-size:8px;">Gros Œuvre</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="camera" style="width:24px;height:24px;color:#10b981;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Photo prise</div>
+                <div style="font-size:11px;color:#64748b;">Site B — Finitions</div>
+                <div style="font-size:10px;color:#94a3b8;">Il y a 5 heures</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-orange" style="font-size:8px;">Finitions</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#f59e0b;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Signalement</div>
+                <div style="font-size:11px;color:#64748b;">Site A — Problème électrique</div>
+                <div style="font-size:10px;color:#94a3b8;">Hier</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-red" style="font-size:8px;">Signalement</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="trending-up" style="width:24px;height:24px;color:#8b5cf6;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Progression</div>
+                <div style="font-size:11px;color:#64748b;">Site A — Avancement murs</div>
+                <div style="font-size:10px;color:#94a3b8;">Hier</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-purple" style="font-size:8px;">Progression</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;">
+            <button onclick="nouvellePhoto()" class="btn-primary" style="display:block;width:100%;">
+              <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 8px;"></i>
+              Nouvelle photo
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="nav">
+        <a href="home.html" class="nav-item">
+          <i data-lucide="home" class="nav-icon"></i>
+          <div class="nav-lbl">Accueil</div>
+        </a>
+        <a href="mes-photos.html" class="nav-item">
+          <i data-lucide="camera" class="nav-icon"></i>
+          <div class="nav-lbl">Photos</div>
+        </a>
+        <a href="pointage.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="profil-technicien.html" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+  
+  <style>
+    .categorie-btn {
+      padding: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: white;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .categorie-btn:hover {
+      border-color: #3b82f6;
+      background: #f8fafc;
+    }
+    
+    .categorie-btn.active {
+      border-color: #3b82f6;
+      background: #3b82f6;
+      color: white;
+    }
+  </style>
+  
+  <script>
+    let chantierSelectionne = '';
+    let categorieSelectionnee = 'Gros Œuvre';
+
+    function selectionnerChantier(chantier) {
+      chantierSelectionne = chantier;
+      document.getElementById('etape-chantier').style.display = 'none';
+      document.getElementById('etape-categorie').style.display = 'block';
+      lucide.createIcons();
+    }
+
+    function retourChantier() {
+      document.getElementById('etape-categorie').style.display = 'none';
+      document.getElementById('etape-chantier').style.display = 'block';
+      lucide.createIcons();
+    }
+
+    function selectionnerCategorie(categorie) {
+      categorieSelectionnee = categorie;
+      
+      // Mettre à jour les boutons
+      document.querySelectorAll('.categorie-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.categorie === categorie) {
+          btn.classList.add('active');
+        }
+      });
+    }
+
+    function ouvrirCamera() {
+      // Simuler la prise de photo
+      alert('Photo prise pour ' + chantierSelectionne + ' - Catégorie: ' + categorieSelectionnee);
+      
+      // Afficher l'historique
+      document.getElementById('etape-categorie').style.display = 'none';
+      document.getElementById('etape-historique').style.display = 'block';
+      lucide.createIcons();
+    }
+
+    function nouvellePhoto() {
+      // Réinitialiser et recommencer
+      document.getElementById('etape-historique').style.display = 'none';
+      document.getElementById('etape-chantier').style.display = 'block';
+      lucide.createIcons();
+    }
+
+    // Initialiser les icônes au chargement de la page
+    document.addEventListener('DOMContentLoaded', function() {
+      lucide.createIcons();
+    });
+    
+    // Initialiser les icônes
+    lucide.createIcons();
+  </script>
+</body>
+</html>

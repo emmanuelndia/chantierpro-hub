@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Gestion Projets</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <a href="dashboard.html" style="font-size:12px;color:#aaa;cursor:pointer;text-decoration:none;">← Dashboard</a>
+        <div style="text-align:right;"><div class="topbar-title">Gestion Projets</div><div class="topbar-sub">Direction</div></div>
+      </div>
+
+      <div class="content">
+        <!-- Actions rapides -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <a href="creer-projet.html" class="btn-primary" style="flex:1;font-size:12px;padding:10px;text-decoration:none;display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="plus" style="width:16px;height:16px;margin-right:4px;"></i>
+            Nouveau Projet
+          </a>
+          <a href="photo-management.html" class="btn-secondary" style="flex:1;font-size:12px;padding:10px;text-decoration:none;display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="camera" style="width:16px;height:16px;margin-right:4px;"></i>
+            Photo
+          </a>
+          <button class="btn-secondary" style="flex:1;font-size:12px;padding:10px;">
+            <i data-lucide="filter" style="width:16px;height:16px;margin-right:4px;"></i>
+            Filtrer
+          </button>
+        </div>
+
+        <!-- Liste des projets -->
+        <div class="label">Tous les projets</div>
+        
+        <!-- Projet 1 -->
+        <div class="card" style="margin-bottom:12px;cursor:pointer;" onclick="window.location.href='chantier-detail.html'">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div style="flex:1;">
+              <a href="chantier-detail.html" style="text-decoration:none;">
+                <div class="card-title">Rénovation Rue de Lyon</div>
+              </a>
+              <div class="card-sub">Paris 12e • Créé le 1 mars 2026</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn-icon" style="padding:6px;background:#f0f9ff;" onclick="event.stopPropagation();">
+                <i data-lucide="edit-2" style="width:14px;height:14px;color:#0284c7;"></i>
+              </button>
+              <button class="btn-icon" style="padding:6px;background:#fef2f2;" onclick="event.stopPropagation();">
+                <i data-lucide="trash-2" style="width:14px;height:14px;color:#dc2626;"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#64748b;margin-bottom:2px;">Progression</div>
+              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+                <div style="background:#10b981;height:100%;width:68%;"></div>
+              </div>
+              <div style="font-size:9px;color:#64748b;margin-top:2px;">68% • fin juin 2026</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">2</div>
+                <div style="font-size:9px;color:#64748b;">Chantiers</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">6</div>
+                <div style="font-size:9px;color:#64748b;">Équipes</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:4px;">
+            <span class="badge badge-green">Actif</span>
+            <span class="badge badge-orange">Prioritaire</span>
+            <span class="badge badge-gray">14 photos</span>
+          </div>
+        </div>
+
+        <!-- Projet 2 -->
+        <div class="card" style="margin-bottom:12px;cursor:pointer;" onclick="window.location.href='chantier-detail.html'">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div style="flex:1;">
+              <a href="chantier-detail.html" style="text-decoration:none;">
+                <div class="card-title">Chantier Bastille B2</div>
+              </a>
+              <div class="card-sub">Paris 11e • Créé le 15 janvier 2026</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn-icon" style="padding:6px;background:#f0f9ff;" onclick="event.stopPropagation();">
+                <i data-lucide="edit-2" style="width:14px;height:14px;color:#0284c7;"></i>
+              </button>
+              <button class="btn-icon" style="padding:6px;background:#fef2f2;" onclick="event.stopPropagation();">
+                <i data-lucide="trash-2" style="width:14px;height:14px;color:#dc2626;"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#64748b;margin-bottom:2px;">Progression</div>
+              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+                <div style="background:#f59e0b;height:100%;width:45%;"></div>
+              </div>
+              <div style="font-size:9px;color:#64748b;margin-top:2px;">45% • fin sept 2026</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">1</div>
+                <div style="font-size:9px;color:#64748b;">Chantier</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">4</div>
+                <div style="font-size:9px;color:#64748b;">Équipes</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:4px;">
+            <span class="badge badge-green">Actif</span>
+            <span class="badge badge-red">Retard</span>
+            <span class="badge badge-gray">11 photos</span>
+          </div>
+        </div>
+
+        <!-- Projet 3 -->
+        <div class="card" style="margin-bottom:12px;cursor:pointer;" onclick="window.location.href='chantier-detail.html'">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div style="flex:1;">
+              <a href="chantier-detail.html" style="text-decoration:none;">
+                <div class="card-title">Extension Bureau Marais</div>
+              </a>
+              <div class="card-sub">Paris 4e • Créé le 10 février 2026</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn-icon" style="padding:6px;background:#f0f9ff;" onclick="event.stopPropagation();">
+                <i data-lucide="edit-2" style="width:14px;height:14px;color:#0284c7;"></i>
+              </button>
+              <button class="btn-icon" style="padding:6px;background:#fef2f2;" onclick="event.stopPropagation();">
+                <i data-lucide="trash-2" style="width:14px;height:14px;color:#dc2626;"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#64748b;margin-bottom:2px;">Progression</div>
+              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+                <div style="background:#10b981;height:100%;width:25%;"></div>
+              </div>
+              <div style="font-size:9px;color:#64748b;margin-top:2px;">25% • fin déc 2026</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">3</div>
+                <div style="font-size:9px;color:#64748b;">Chantiers</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">8</div>
+                <div style="font-size:9px;color:#64748b;">Équipes</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:4px;">
+            <span class="badge badge-green">Actif</span>
+            <span class="badge badge-gray">23 photos</span>
+          </div>
+        </div>
+
+        <!-- Projet terminé -->
+        <div class="card" style="margin-bottom:12px;cursor:pointer;opacity:0.7;" onclick="window.location.href='chantier-detail.html'">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div style="flex:1;">
+              <a href="chantier-detail.html" style="text-decoration:none;">
+                <div class="card-title">Rénovation Appartement Haussmann</div>
+              </a>
+              <div class="card-sub">Paris 16e • Créé le 1 nov 2025</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn-icon" style="padding:6px;background:#f0f9ff;" onclick="event.stopPropagation();">
+                <i data-lucide="edit-2" style="width:14px;height:14px;color:#0284c7;"></i>
+              </button>
+              <button class="btn-icon" style="padding:6px;background:#fef2f2;" onclick="event.stopPropagation();">
+                <i data-lucide="trash-2" style="width:14px;height:14px;color:#dc2626;"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#64748b;margin-bottom:2px;">Progression</div>
+              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+                <div style="background:#64748b;height:100%;width:100%;"></div>
+              </div>
+              <div style="font-size:9px;color:#64748b;margin-top:2px;">100% • Terminé le 15 mars 2026</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">1</div>
+                <div style="font-size:9px;color:#64748b;">Chantier</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">3</div>
+                <div style="font-size:9px;color:#64748b;">Équipes</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:4px;">
+            <span class="badge badge-gray">Terminé</span>
+            <span class="badge badge-gray">45 photos</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav">
+        <a href="../management/dashboard.html" class="nav-item active">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <div class="nav-lbl active">Dashboard</div>
+        </a>
+        <a href="../management/galerie.html" class="nav-item">
+          <i data-lucide="image" class="nav-icon"></i>
+          <div class="nav-lbl">Galerie</div>
+        </a>
+        <a href="../management/presences.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialiser les icônes Lucide
+    lucide.createIcons();
+  </script>
+</body>
+</html>

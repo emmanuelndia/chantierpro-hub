@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Dashboard Admin</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Tableau de bord</div>
+          <div class="topbar-sub">Administrateur</div>
+        </div>
+        <div class="topbar-avatar">AD</div>
+      </div>
+      <div class="content">
+        <!-- Stats principales -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-radius:16px;padding:16px;text-align:center;border:1px solid #86efac;">
+            <div style="font-size:24px;font-weight:700;color:#166534;">5</div>
+            <div style="font-size:11px;color:#15803d;">Projets totaux</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:16px;padding:16px;text-align:center;border:1px solid #fbbf24;">
+            <div style="font-size:24px;font-weight:700;color:#78350f;">28</div>
+            <div style="font-size:11px;color:#92400e;">Techniciens</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:16px;padding:16px;text-align:center;border:1px solid #93c5fd;">
+            <div style="font-size:24px;font-weight:700;color:#1e3a8a;">18</div>
+            <div style="font-size:11px;color:#1e40af;">Sur chantier</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);border-radius:16px;padding:16px;text-align:center;border:1px solid #f9a8d4;">
+            <div style="font-size:24px;font-weight:700;color:#831843;">45</div>
+            <div style="font-size:11px;color:#9f1239;">Photos aujourd'hui</div>
+          </div>
+        </div>
+
+        <!-- Alertes et activités -->
+        <div style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border-radius:16px;padding:16px;margin-bottom:20px;border:1px solid #fecaca;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:40px;height:40px;background:#dc2626;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+              <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#ffffff;"></i>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:700;color:#991b1b;">3 alertes en cours</div>
+              <div style="font-size:12px;color:#b91c1c;">Retards et incidents</div>
+            </div>
+            <i data-lucide="chevron-right" style="width:16px;height:16px;color:#dc2626;"></i>
+          </div>
+        </div>
+
+        <!-- Administration -->
+        <div class="label">Administration</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;">
+          <a href="photo-admin.html" class="card" style="text-decoration:none;background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid #fbbf24;">
+            <div style="text-align:center;padding:16px;">
+              <div style="width:32px;height:32px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;">
+                <i data-lucide="camera" style="width:18px;height:18px;color:#ffffff;"></i>
+              </div>
+              <div style="font-size:12px;font-weight:600;color:#78350f;">Photo</div>
+              <div style="font-size:9px;color:#92400e;">Prendre une photo</div>
+            </div>
+          </a>
+          
+          <a href="galerie.html" class="card" style="text-decoration:none;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;">
+            <div style="text-align:center;padding:16px;">
+              <div style="width:32px;height:32px;background:#0284c7;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;">
+                <i data-lucide="image" style="width:18px;height:18px;color:#ffffff;"></i>
+              </div>
+              <div style="font-size:12px;font-weight:600;color:#0c4a6e;">Galerie</div>
+              <div style="font-size:9px;color:#075985;">Toutes les photos</div>
+            </div>
+          </a>
+          
+          <a href="presences.html" class="card" style="text-decoration:none;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;">
+            <div style="text-align:center;padding:16px;">
+              <div style="width:32px;height:32px;background:#16a34a;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;">
+                <i data-lucide="users" style="width:18px;height:18px;color:#ffffff;"></i>
+              </div>
+              <div style="font-size:12px;font-weight:600;color:#14532d;">Présences</div>
+              <div style="font-size:9px;color:#166534;">Pointages</div>
+            </div>
+          </a>
+          
+          <a href="admin-logs.html" class="card" style="text-decoration:none;background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid #fecaca;">
+            <div style="text-align:center;padding:16px;">
+              <div style="width:32px;height:32px;background:#dc2626;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;">
+                <i data-lucide="file-text" style="width:18px;height:18px;color:#ffffff;"></i>
+              </div>
+              <div style="font-size:12px;font-weight:600;color:#991b1b;">Logs</div>
+              <div style="font-size:9px;color:#b91c1c;">Activités système</div>
+            </div>
+          </a>
+        </div>
+
+        <!-- Projets récents -->
+        <div class="label">Projets récents</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <a href="chantier-detail.html" class="card" style="text-decoration:none;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="flex:1;">
+                <div class="card-title">Rénovation Rue de Lyon</div>
+                <div class="card-sub">Paris 12e • 2 chantiers • 6 techniciens</div>
+              </div>
+              <span class="badge badge-green">Actif</span>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:4px;">
+              <span class="badge badge-blue">14 photos</span>
+              <span class="badge badge-gray">65% avancé</span>
+            </div>
+          </a>
+          
+          <a href="#" class="card" style="text-decoration:none;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="flex:1;">
+                <div class="card-title">Bastille B2</div>
+                <div class="card-sub">Paris 4e • 1 chantier • 5 techniciens</div>
+              </div>
+              <span class="badge badge-green">Actif</span>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:4px;">
+              <span class="badge badge-blue">12 photos</span>
+              <span class="badge badge-gray">78% avancé</span>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <div class="nav">
+        <a href="admin.html" class="nav-item active">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <div class="nav-lbl active">Dashboard</div>
+        </a>
+        <a href="galerie.html" class="nav-item">
+          <i data-lucide="image" class="nav-icon"></i>
+          <div class="nav-lbl">Galerie</div>
+        </a>
+        <a href="presences.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialiser les icônes
+    lucide.createIcons();
+  </script>
+</body>
+</html>

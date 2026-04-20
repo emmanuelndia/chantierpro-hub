@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Caméra</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    .camera-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+    
+    .camera-preview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .camera-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 100;
+    }
+    
+    .camera-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: auto;
+    }
+    
+    .camera-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: auto;
+    }
+    
+    .camera-controls {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    
+    .capture-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: white;
+      border: 5px solid rgba(255,255,255,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 2px 4px rgba(0,0,0,0.1);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .capture-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.4) 100%);
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .capture-btn:hover {
+      transform: scale(1.08);
+      border-color: rgba(255,255,255,0.6);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4), inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .capture-btn:hover::before {
+      opacity: 1;
+    }
+    
+    .capture-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .capture-btn-inner {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      border-radius: 50%;
+      position: relative;
+      z-index: 1;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
+      transition: all 0.3s;
+    }
+    
+    .capture-btn:hover .capture-btn-inner {
+      background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
+    }
+    
+    .camera-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      border: 2px solid rgba(255,255,255,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+    
+    .camera-btn:hover {
+      background: rgba(255,255,255,0.25);
+      border-color: rgba(255,255,255,0.8);
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+    
+    .camera-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .viewfinder {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      height: 200px;
+      border: 3px solid rgba(255,255,255,0.9);
+      border-radius: 12px;
+      pointer-events: none;
+      z-index: 50;
+    }
+    
+    .viewfinder::before,
+    .viewfinder::after {
+      content: '';
+      position: absolute;
+      background: rgba(255,255,255,0.9);
+    }
+    
+    .viewfinder::before {
+      top: 50%;
+      left: -20px;
+      right: -20px;
+      height: 2px;
+      transform: translateY(-50%);
+    }
+    
+    .viewfinder::after {
+      left: 50%;
+      top: -20px;
+      bottom: -20px;
+      width: 2px;
+      transform: translateX(-50%);
+    }
+    
+    .photo-info {
+      position: absolute;
+      top: 80px;
+      left: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      border-radius: 8px;
+      padding: 12px;
+      color: white;
+    }
+    
+    .flash-indicator {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 30px;
+      height: 30px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .captured-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: white;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .captured-image {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    
+    .captured-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen" style="padding: 0;">
+      <div class="camera-container">
+        <!-- Simulation de caméra simplifiée -->
+        <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%); position: relative; display: flex; align-items: center; justify-content: center;">
+          <!-- Éléments de base visibles -->
+          <div style="position: absolute; top: 20%; left: 15%; width: 100px; height: 150px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); border-radius: 8px;"></div>
+          <div style="position: absolute; top: 35%; right: 20%; width: 80px; height: 80px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.15); border-radius: 50%;"></div>
+          <div style="position: absolute; bottom: 30%; left: 25%; width: 120px; height: 60px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1); border-radius: 6px;"></div>
+          
+          <!-- Texte central visible -->
+          <div style="text-align: center; color: white; z-index: 10;">
+            <i data-lucide="camera" style="width:48px;height:48px;margin-bottom:12px;opacity:0.8;"></i>
+            <div style="font-size:16px;font-weight:600;opacity:0.9;">Vue de la caméra</div>
+            <div style="font-size:12px;opacity:0.7;">Simulation chantier</div>
+          </div>
+          
+          <!-- Indicateur LIVE simplifié -->
+          <div style="position: absolute; top: 60px; right: 20px; background: rgba(239, 68, 68, 0.9); padding: 6px 10px; border-radius: 15px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="width: 8px; height: 8px; background: white; border-radius: 50%;"></div>
+              <span style="color: white; font-size: 11px; font-weight: 600;">LIVE</span>
+            </div>
+          </div>
+        </div>
+        
+        <style>
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+        </style>
+        
+        <!-- Overlay de la caméra -->
+        <div class="camera-overlay">
+          <!-- Haut de l'overlay -->
+          <div class="camera-top">
+            <a href="pointage.html" style="color: white; text-decoration: none;">
+              <i data-lucide="x" style="width:24px;height:24px;"></i>
+            </a>
+            
+            <div class="flash-indicator">
+              <i data-lucide="zap" style="width:16px;height:16px;color:white;"></i>
+            </div>
+          </div>
+          
+          <!-- Informations de la photo -->
+          <div class="photo-info" id="photo-info">
+            <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Site A — Entrée principale</div>
+            <div style="font-size:11px;opacity:0.8;">Rénovation Rue de Lyon • Gros Œuvre</div>
+            <div style="font-size:10px;opacity:0.6;margin-top:4px;">Chantier sélectionné</div>
+          </div>
+          
+          <!-- Viseur -->
+          <div class="viewfinder"></div>
+          
+          <!-- Bas de l'overlay -->
+          <div class="camera-bottom">
+            <div class="camera-controls">
+              <div class="camera-btn" onclick="toggleFlash()">
+                <i data-lucide="zap-off" style="width:20px;height:20px;color:white;"></i>
+              </div>
+              
+              <div class="capture-btn" onclick="capturePhoto()">
+                <div class="capture-btn-inner"></div>
+              </div>
+              
+              <div class="camera-btn" onclick="switchCamera()">
+                <i data-lucide="rotate-cw" style="width:20px;height:20px;color:white;"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Overlay photo capturée -->
+        <div class="captured-overlay" id="captured-overlay">
+          <img id="captured-image" class="captured-image" src="" alt="Photo capturée">
+          
+          <div class="captured-controls">
+            <button onclick="retakePhoto()" style="flex:1;padding:12px;background:rgba(0,0,0,0.8);color:white;border:none;border-radius:8px;">
+              <i data-lucide="refresh-cw" style="width:16px;height:16px;margin-right:4px;"></i>
+              Reprendre
+            </button>
+            <button onclick="validatePhoto()" style="flex:1;padding:12px;background:#10b981;color:white;border:none;border-radius:8px;">
+              <i data-lucide="check" style="width:16px;height:16px;margin-right:4px;"></i>
+              Valider
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let flashOn = false;
+    let currentChantier = null;
+    
+    // Récupérer le chantier sélectionné depuis localStorage
+    function loadSelectedChantier() {
+      const selectedChantier = localStorage.getItem('selected_chantier');
+      if (selectedChantier) {
+        currentChantier = JSON.parse(selectedChantier);
+        updatePhotoInfo();
+      } else {
+        // Rediriger vers la sélection de chantier si aucun chantier sélectionné
+        window.location.href = 'photo-technicien.html';
+      }
+    }
+    
+    // Mettre à jour les informations de la photo
+    function updatePhotoInfo() {
+      if (currentChantier) {
+        document.getElementById('photo-info').innerHTML = `
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px;">${currentChantier.nom}</div>
+          <div style="font-size:11px;opacity:0.8;">${currentChantier.projet} • ${currentChantier.categorie}</div>
+          <div style="font-size:10px;opacity:0.6;margin-top:4px;">Chantier sélectionné</div>
+        `;
+      }
+    }
+    
+    // Capturer la photo
+    function capturePhoto() {
+      // Simulation de capture de photo
+      const overlay = document.getElementById('captured-overlay');
+      const image = document.getElementById('captured-image');
+      
+      // Simuler une image (en réalité, ce serait la photo capturée)
+      image.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iIzJjM2U1MCIvPgogIDx0ZXh0IHg9IjE1MCIgeT0iMjAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIxOCIgZm9udC1mYW1pbHk9IkFyaWFsIj5QaG90byBjYXB0dXLDqWU8L3RleHQ+CiAgPHRleHQgeD0iMTUwIiB5PSIyMzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjEyIiBmb250LWZhbWlseT0iQXJpYWwiIG9wYWNpdHk9IjAuOCI+JHtuZXcgRGF0ZSgpLnRvTG9jYWxlVGltZVN0cmluZygnZnItRlJfKX08L3RleHQ+Cjwvc3ZnPg==';
+      
+      // Effet de flash
+      document.body.style.backgroundColor = 'white';
+      setTimeout(() => {
+        document.body.style.backgroundColor = '';
+        overlay.style.display = 'flex';
+      }, 100);
+    }
+    
+    // Reprendre la photo
+    function retakePhoto() {
+      document.getElementById('captured-overlay').style.display = 'none';
+    }
+    
+    // Valider la photo
+    function validatePhoto() {
+      if (currentChantier) {
+        // Sauvegarder la photo
+        const photoData = {
+          chantier: currentChantier.nom,
+          categorie: currentChantier.categorie,
+          description: currentChantier.description || '',
+          date: new Date().toISOString(),
+          technicien: 'Martin Dupont',
+          validated: true
+        };
+        
+        // Stocker dans localStorage
+        let photos = JSON.parse(localStorage.getItem('photos_technicien') || '[]');
+        photos.push(photoData);
+        localStorage.setItem('photos_technicien', JSON.stringify(photos));
+        
+        // Nettoyer le chantier sélectionné
+        localStorage.removeItem('selected_chantier');
+        
+        // Rediriger vers la galerie
+        window.location.href = 'mes-photos.html';
+      }
+    }
+    
+    // Toggle flash
+    function toggleFlash() {
+      flashOn = !flashOn;
+      const flashIcon = document.querySelector('.flash-indicator i');
+      if (flashOn) {
+        flashIcon.setAttribute('data-lucide', 'zap');
+        document.querySelector('.flash-indicator').style.background = 'rgba(255,255,255,0.8)';
+      } else {
+        flashIcon.setAttribute('data-lucide', 'zap-off');
+        document.querySelector('.flash-indicator').style.background = 'rgba(255,255,255,0.2)';
+      }
+      lucide.createIcons();
+    }
+    
+    // Changer de caméra
+    function switchCamera() {
+      // Simulation de changement de caméra
+      const container = document.querySelector('.camera-container > div');
+      container.style.filter = container.style.filter === 'hue-rotate(180deg)' ? 'none' : 'hue-rotate(180deg)';
+    }
+    
+    // Charger le chantier au démarrage
+    loadSelectedChantier();
+    
+    // Initialiser les icônes
+    lucide.createIcons();
+  </script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Prise Photo</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <a href="home.html" style="font-size:12px;color:#aaa;cursor:pointer;text-decoration:none;">← Retour</a>
+        <div style="text-align:right;"><div class="topbar-title">Nouvelle Photo</div><div class="topbar-sub">Technicien</div></div>
+      </div>
+
+      <div class="content">
+        <!-- Sélection du chantier -->
+        <div class="label">Sélectionner le chantier</div>
+        <div class="card" style="margin-bottom:16px;">
+          <select id="chantier-select" style="width:100%;padding:12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;background:white;">
+            <option value="">-- Choisir un chantier --</option>
+            <option value="site-a">📍 Site A — Entrée principale (Rénovation Lyon)</option>
+            <option value="site-b">📍 Site B — Façade arrière (Rénovation Lyon)</option>
+            <option value="bastille">📍 Chantier Principal (Bastille B2)</option>
+            <option value="marais">📍 Site A — Extension (Extension Marais)</option>
+          </select>
+        </div>
+
+        <!-- Informations du chantier sélectionné -->
+        <div id="chantier-info" style="display:none;">
+          <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <i data-lucide="map-pin" style="width:16px;height:16px;color:#0284c7;"></i>
+              <div class="card-title" style="font-size:14px;" id="chantier-nom">Site A — Entrée principale</div>
+            </div>
+            <div class="card-sub" style="font-size:11px;" id="chantier-details">Rénovation Rue de Lyon • Paris 12e</div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:12px;font-weight:600;color:#334155;" id="chantier-photos">8</div>
+                <div style="font-size:9px;color:#64748b;">Photos</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:12px;font-weight:600;color:#334155;" id="chantier-equipe">3</div>
+                <div style="font-size:9px;color:#64748b;">Équipe</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:12px;font-weight:600;color:#10b981;" id="chantier-progress">72%</div>
+                <div style="font-size:9px;color:#64748b;">Progression</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Catégorie de la photo -->
+        <div class="label">Catégorie de la photo</div>
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <label style="display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;">
+              <input type="radio" name="categorie" value="gros-oeuvre" checked>
+              <span style="font-size:12px;">Gros Œuvre</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;">
+              <input type="radio" name="categorie" value="finitions">
+              <span style="font-size:12px;">Finitions</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;">
+              <input type="radio" name="categorie" value="signalement">
+              <span style="font-size:12px;">Signalement</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;">
+              <input type="radio" name="categorie" value="progression">
+              <span style="font-size:12px;">Progression</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Zone de prise de photo -->
+        <div class="label">Prendre la photo</div>
+        <div class="card" style="margin-bottom:16px;text-align:center;">
+          <div id="camera-preview" style="width:100%;height:200px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;position:relative;overflow:hidden;">
+            <div style="text-align:center;">
+              <i data-lucide="camera" style="width:32px;height:32px;color:#94a3b8;margin-bottom:8px;"></i>
+              <div style="font-size:14px;color:#64748b;">Appareil photo</div>
+              <div style="font-size:11px;color:#94a3b8;">Tapez pour prendre une photo</div>
+            </div>
+          </div>
+          
+          <button id="capture-btn" class="btn-primary" style="width:100%;font-size:14px;padding:12px;">
+            <i data-lucide="camera" style="width:16px;height:16px;margin-right:6px;"></i>
+            Ouvrir la caméra
+          </button>
+        </div>
+
+        
+
+        <!-- Aperçu de la photo -->
+        <div id="photo-preview" style="display:none;">
+          <div class="label">Aperçu de la photo</div>
+          <div class="card" style="margin-bottom:16px;">
+            <div style="width:100%;height:200px;background:#f8fafc;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;position:relative;overflow:hidden;">
+              <img id="preview-image" style="width:100%;height:100%;object-fit:cover;display:none;">
+              <div id="preview-placeholder" style="text-align:center;">
+                <i data-lucide="image" style="width:24px;height:24px;color:#94a3b8;margin-bottom:6px;"></i>
+                <div style="font-size:12px;color:#64748b;">Aperçu de la photo</div>
+              </div>
+            </div>
+            
+            <div style="display:flex;gap:8px;">
+              <button id="retake-btn" class="btn-secondary" style="flex:1;font-size:12px;padding:10px;">
+                <i data-lucide="refresh-cw" style="width:14px;height:14px;margin-right:4px;"></i>
+                Reprendre
+              </button>
+              <button id="validate-btn" class="btn-primary" style="flex:1;font-size:12px;padding:10px;">
+                <i data-lucide="check" style="width:14px;height:14px;margin-right:4px;"></i>
+                Valider
+              </button>
+            </div>
+          </div>
+        </div>
+
+        
+      </div>
+
+      <div class="nav">
+        <a href="home.html" class="nav-item">
+          <i data-lucide="home" class="nav-icon"></i>
+          <div class="nav-lbl">Accueil</div>
+        </a>
+        <a href="mes-photos.html" class="nav-item">
+          <i data-lucide="camera" class="nav-icon"></i>
+          <div class="nav-lbl">Photos</div>
+        </a>
+        <a href="pointage.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="profil-technicien.html" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Données des chantiers
+    const chantiers = {
+      'site-a': {
+        nom: 'Site A — Entrée principale',
+        projet: 'Rénovation Rue de Lyon',
+        localisation: 'Paris 12e',
+        photos: 8,
+        equipe: 3,
+        progression: 72
+      },
+      'site-b': {
+        nom: 'Site B — Façade arrière',
+        projet: 'Rénovation Rue de Lyon',
+        localisation: 'Paris 12e',
+        photos: 6,
+        equipe: 3,
+        progression: 65
+      },
+      'bastille': {
+        nom: 'Chantier Principal',
+        projet: 'Chantier Bastille B2',
+        localisation: 'Paris 11e',
+        photos: 11,
+        equipe: 4,
+        progression: 45
+      },
+      'marais': {
+        nom: 'Site A — Extension',
+        projet: 'Extension Bureau Marais',
+        localisation: 'Paris 4e',
+        photos: 12,
+        equipe: 3,
+        progression: 30
+      }
+    };
+
+    // Gestion de la sélection du chantier
+    document.getElementById('chantier-select').addEventListener('change', function(e) {
+      const selectedChantier = e.target.value;
+      const infoDiv = document.getElementById('chantier-info');
+      
+      if (selectedChantier && chantiers[selectedChantier]) {
+        const chantier = chantiers[selectedChantier];
+        
+        document.getElementById('chantier-nom').textContent = chantier.nom;
+        document.getElementById('chantier-details').textContent = `${chantier.projet} • ${chantier.localisation}`;
+        document.getElementById('chantier-photos').textContent = chantier.photos;
+        document.getElementById('chantier-equipe').textContent = chantier.equipe;
+        document.getElementById('chantier-progress').textContent = chantier.progression + '%';
+        
+        infoDiv.style.display = 'block';
+      } else {
+        infoDiv.style.display = 'none';
+      }
+    });
+
+    // Redirection vers la caméra après sélection du chantier
+    document.getElementById('capture-btn').addEventListener('click', function() {
+      const chantierSelect = document.getElementById('chantier-select');
+      const categorie = document.querySelector('input[name="categorie"]:checked').value;
+      
+      if (!chantierSelect.value) {
+        alert('Veuillez sélectionner un chantier');
+        return;
+      }
+
+      // Sauvegarder les informations du chantier sélectionné
+      const selectedChantier = {
+        nom: chantierSelect.options[chantierSelect.selectedIndex].text.split(' — ')[0],
+        projet: chantiers[chantierSelect.value].projet,
+        categorie: categorie,
+        description: '',
+        localisation: chantiers[chantierSelect.value].localisation
+      };
+      
+      localStorage.setItem('selected_chantier', JSON.stringify(selectedChantier));
+      
+      // Rediriger vers l'écran caméra
+      window.location.href = 'photo.html';
+    });
+
+    
+    // Initialiser les icônes
+    lucide.createIcons();
+  </script>
+</body>
+</html>

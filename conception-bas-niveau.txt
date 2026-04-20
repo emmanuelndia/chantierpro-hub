@@ -1,0 +1,390 @@
+#**Exigences :  
+
+	- Quelles opérations ce système doit t'il prendre en charge ? : 
+
+		. Un technicien pointe son arrivée et sa sortie sur un chantier afin de déclarer sa présence, sous réserve d'être dans un rayon de 2 km
+
+		. Un technicien prend une photo instantanée rattachée à son chantier afin de documenter l'avancement ou un incident
+
+		. Un technicien consulter son historique de pointages afin de vérifier ses heures déclarées
+
+		. Un chef de projet voit en temps réel quels techniciens sont présents sur ses chantiers afin de suivre l'activité terrain	
+
+		. Un chef de projet consulte les photos d'un chantier afin de suivre l'avancement des travaux à distance
+
+		. Un chef de projet prend une photo lors de sa visite afin de documenter l'état du chantier
+
+		. Un chef de projet supprime une photo inappropriée afin de maintenir la qualité de la documentation
+
+		. Un membre de la direction a accès à tous les chantiers actifs afin d'avoir une vision globale de l'activité	
+
+		. Un membre de la direction prend et consulte des photos sur n'importe quel chantier afin d'assurer mon suivi terrain
+
+
+	- Quelles conditions définissent le succès, l'échec, ou le moment où le système s'arrête ou transite à l'état ?
+		
+		. Le pointage est refusé si la distance au chantier > 2 km
+
+		. Une photo est immédiatement rattachée au chantier, horodatée et géolocalisée
+
+		. Une photo supprimée génère un log traçable  
+
+
+	- Comment le système doit-il réagir lorsque des entrées ou actions sont invalides ?
+
+		. En cas de distance au chantier > 2 km, message d'erreur explicite avec la distance au chantier
+
+		
+
+	- Quels sont les domaines sont dans les champ d'application (logique de base, règles métier) et quels domaines sont explicitement exclus (interface utilisateur, stockage, réseau, concurrence, extensibilité) ?
+
+		* champ d'application : 
+
+			- Authentification & Gestion des comptes
+			
+			- Pointage Géolocalisé (Technicien)
+
+			- Documentation Photographique
+
+			- Gestion de Projets, Chantiers, Equipes (Chef de Projet / Direction)
+
+			- Export CSV / Excel des données mensuelles
+
+
+		* Hors champ : 
+
+			- Couche UI/rendu - interface utilisateur
+
+
+
+#**Entités et relations : 
+
+- Entités
+
+Users (id, nom, prenom, password, role, contact, isActive) 
+# role = (chef de projet, direction, rh, technicien)
+
+Projets (id, nom, adresse, description, ville, date_debut, date_fin, budget_total statut, chef_projet, created_by)
+
+Chantiers (id, projet_id, nom, localisation, adresse, description, statut, date_debut, date_fin, superficie, budget_alloue, chef_projet, created_by)
+
+Pointages (id, chantier_id, user_id, type, date_pointage, heure_pointage, latitude, longitude, statut, distance_chantier) 
+
+Equipes (id, nom, description?, chef_equipe_id?, chantier_id, statut, created_by)
+
+Equipe_membres (id, equipe_id, user_id, role_equipe, date_affectation, date_fin_affectation, statut, created_by)
+
+photos (id, chantier_id, user_id, categorie?, description?, nom_fichier?, chemin_fichier?, url?, taille, format, date_prise?, longitude, latitude)
+
+LogPhoto (id, photo_id, deletedBy, raison, date_suppression)
+
+
+- Relations
+
+
+Users -> Projets (1:N)           # created_by
+Users -> Projets (1:N)           # chef_projet
+
+Users -> Chantiers (1:N)         # created_by
+Users -> Chantiers (1:N)         # chef_projet
+
+Projets -> Chantiers (1:N)
+
+Chantiers -> Pointages (1:N)
+Users -> Pointages (1:N)
+
+Chantiers -> Photos (1:N)
+Users -> Photos (1:N)
+
+Chantiers -> Equipes (1:N)
+
+Equipes -> Equipe_membres (1:N)
+Users -> Equipe_membres (1:N)
+
+Photos -> LogPhoto (1:N)
+Users -> LogPhoto (1:N)          # deletedBy
+
+
+Un User peut selon le rôle :
+	- créer projets/chantiers/équipes
+	- pointer
+	- prendre des photos 
+
+Un Projet contient plusieurs Chantiers
+
+Un Chantier contient :
+	- des Pointages
+	- des Photos
+	- des Equipes
+
+Une Equipe contient plusieurs Users via Equipe_membres
+
+Une Photo appartient à: 
+	- un Chantier
+	- un User
+
+Une suppression de photo par un User autorisé est dans LogPhoto
+
+
+
+#** Etat et comportement par entité
+
+Chantier (orchestrateur - tout tourne autour du chantier)
+
+class Chantier:
+	Etat : 	
+		- id
+		- projet_id
+		- localisation (lat, lng)
+		- adresse
+		- description
+		- statut   // ACTIF, TERMINE, EN_PAUSE
+		- date_debut
+		- date_fin
+		- superficie
+		- budget_alloue
+		- chef_projet: User
+		- created_by: User
+
+	Comportement : 
+		- assignerEquipe(equipe: Equipe) -> void
+		- getEquipes() -> List[Equipe]
+		- getPointages() -> List[Pointage]
+		- getPhotos() -> List[Photo]
+		- calculerPresencesJour(date) -> int
+		- verifierPointage(user, lat, lng) -> bool  // si chantier = 2km
+		- estActif() -> bool
+
+class User : 
+	Etat : 
+		- id
+		- nom
+		- prenom
+		- password (hashé)
+		- role  // TECHNICIEN, CHEF_PROJET, DIRECTION, RH, ADMIN
+		- contact	
+		- isActive
+
+	Comportement : 
+		- pointer(chantier, type, lat, lng) -> pointage
+		- prendrePhoto(chantier, fichier, categorie) -> Photo
+		- rejoindreEquipe(equipe) -> EquipeMembre
+		- quitterEquipe(equipe) -> void
+
+	# Règles de permission liées au rôle 
+		- peutPointer() -> bool // TECHNICIEN
+		- peutPrendrePhoto
+		- peutCreerProjet() -> bool  // CHEF_PROJET, DIRECTION, ADMIN
+		- peutCreerChantier() -> bool // CHEF_PROJET, DIRECTION, ADMIN
+		- peutCreerEquipe() -> bool // CHEF_PROJET, DIRECTION, ADMIN
+		- peutSupprimerPhoto() -> bool // CHEF_PROJET, DIRECTION, ADMIN
+		- peutVoirTousChantier() -> bool // DIRECTION, ADMIN
+		- peutExporterDonnees() -> bool // RH, DIRECTION, ADMIN
+		- peutVoirLogs() -> bool // DIRECTION, ADMIN
+		
+
+class Pointage : 
+	Etat : 
+		- id
+		- chantier_id
+		- user_id
+		- type 		// ARRIVEE, DEPART, INTERMEDIAIRE
+		- date_pointage
+		- heure_pointage
+		- latitude
+		- longitude
+		- statut  	// VALIDE, REFUSE (si distance respecté)
+		- distance_chantier  // calculée au moment du pointage
+
+	Comportement : 
+		- estValide() -> bool	// distance <= 2 km et statut = Valide
+		- getDistanceChantier() -> float
+		- getType -> PointageType
+		- getDureeSession() -> Duree, si type = DEPART, calculée depuis ARRIVEE
+
+Règle clé : La validation de distance vit sur Pointage (il possède latitude, longitude, distance_chantier) ET sur Chantier.verifierSiUserPeutPointer() — le Chantier valide avant création, le Pointage l'encode après création. Deux responsabilités distinctes.
+
+Projet : 
+
+class Projet :
+	Etat : 
+		- id
+    		- nom
+    		- adresse
+    		- description
+    		- ville
+    		- date_debut
+    		- date_fin
+    		- budget_total
+    		- statut          // EN_COURS, TERMINE, EN_PAUSE
+    		- chef_projet: User
+    		- created_by: User
+
+	Comportement : 
+		- ajouterChantier(chantier: Chantier) -> void
+		- getChantiers() -> List[Chantier]
+		- getChantiersActifs() -> List[Chantier]
+		- estActif() -> bool
+		- getBudgetConsomme() -> float  // somme des budgets alloués aux chantiers
+
+
+Equipe : 
+	Etat :
+		- id
+    		- nom
+    		- description?
+    		- chef_equipe: User?
+    		- chantier: Chantier
+    		- statut            # ACTIVE, INACTIVE
+    		- created_by: User 
+
+	Comportement : 
+		- ajouterMembre(user: User, roleEquipe) -> EquipeMembre
+		- retirerMembre(user: User) -> void
+		- getMembres() -> List[User]  // Membres actifs uniquement
+		- getMembresActifs() -> List[User]
+		- estActive() -> bool
+		- contientUser(user: User) -> bool  // Pour vérifier avant d'ajouter
+
+
+EquipeMembre
+	Etat : 
+		- id
+    		- equipe: Equipe
+    		- user: User
+    		- role_equipe       // ex: CHEF, MEMBRE
+    		- date_affectation
+    		- date_fin_affectation?
+    		- statut            // ACTIF, INACTIF
+    		- created_by: User
+
+	Comportement: 
+		- estActif() -> bool
+		- terminerAffectation(date) -> passe statut à INACTIF, set date_fin
+
+
+
+Photo : 
+	Etat : 
+		- id
+    		- chantier: Chantier
+    		- user: User             // auteur
+    		- categorie?             // AVANCEMENT, INCIDENT, etc.
+    		- description?
+    		- nom_fichier?
+    		- chemin_fichier?
+    		- url?
+    		- taille
+    		- format
+    		- date_prise             // horodatage automatique
+    		- latitude
+    		- longitude
+
+	Comportement : 
+		- supprimer(deletedBy: User, raison: string) -> LogPhoto  // génère log
+		- appartientChantier(chantier: Chantier) -> bool
+		- getUrl() -> string
+
+
+
+LogPhoto : 
+	Etat : 
+		- id
+    		- photo_id          // référence conservée même si photo supprimée
+    		- deleted_by: User
+    		- raison: string
+    		- date_suppression  // horodatage automatique ← manquait dans ta liste
+		
+	Comportement : 
+		- getDetails() -> LogDetails  // Résumé visible de l'action
+
+
+
+#** IMPLEMENTATION DES METHODES PRINCIPALES
+
+. User.pointer(chantier, type, lat, lng) -> pointage
+
+pointer(chantier, type, lat, lng):
+
+    // Cas limites
+    if not self.isActive
+        raise "Compte utilisateur inactif"
+
+    if not chantier.estActif()
+        raise "Ce chantier n'est pas actif"
+
+    if type == ARRIVEE
+        if chantier.aDejaUnPointageOuvert(self)
+            raise "Une session est déjà ouverte sur ce chantier"
+
+    if type == DEPART
+        if not chantier.aDejaUnPointageOuvert(self)
+            raise "Aucune arrivée enregistrée pour clôturer"
+
+    // Happy path 
+    distance = calculerDistance(lat, lng, chantier.localisation)
+
+    if distance > 2.0
+        raise "Pointage refusé : vous êtes à " + distance + " km du chantier"
+
+    pointage = new Pointage(
+        chantier_id       = chantier.id,
+        user_id           = self.id,
+        type              = type,
+        date_pointage     = aujourdhui(),
+        heure_pointage    = maintenant(),
+        latitude          = lat,
+        longitude         = lng,
+        statut            = VALIDE,
+        distance_chantier = distance
+    )
+
+    return pointage
+
+Note: User orchestre l'action, Chantier valide le contexte, Pointage encode le résultat
+
+
+. Chantier.verifierPointage(user, lat, lng) -> bool
+
+verifierPointage(user, lat, lng):
+
+    // Cas limites 
+    if not self.estActif()
+        return false
+
+    if user == null
+        return false
+
+    // Happy path 
+    distance = calculerDistance(lat, lng, self.localisation)
+
+    return distance <= 2.0
+
+
+
+. Photo.supprimer(deletedBy, raison) -> LogPhoto
+
+supprimer(deletedBy: User, raison: string) -> LogPhoto:
+
+    // Cas limites 
+    if not deletedBy.peutSupprimerPhoto()
+        raise "Permission refusée : rôle insuffisant"
+
+    if not deletedBy.isActive
+        raise "Compte utilisateur inactif"
+
+    if raison == null or raison == ""
+        raise "Une raison est obligatoire pour la suppression"
+
+    // Happy path 
+    log = new LogPhoto(
+        photo_id         = self.id,
+        deleted_by       = deletedBy,
+        raison           = raison,
+        date_suppression = maintenant()
+    )
+
+
+    return log
+
+Note: LogPhoto conserve photo_id, pour préserver la traçabilité 

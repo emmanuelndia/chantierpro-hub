@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Photo chantier</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen" style="background:#000;">
+      <!-- Topbar caméra admin -->
+      <div style="position:absolute;top:0;left:0;right:0;z-index:10;background:linear-gradient(to bottom,rgba(0,0,0,0.3),transparent);padding:12px 16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <a href="javascript:history.back()" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:500;text-decoration:none;display:flex;align-items:center;gap:4px;backdrop-filter:blur(10px);background:rgba(0,0,0,0.2);padding:6px 10px;border-radius:20px;">
+            <i data-lucide="chevron-left" style="width:16px;height:16px;"></i>
+          </a>
+          <div style="color:rgba(255,255,255,0.8);font-size:11px;font-weight:500;backdrop-filter:blur(10px);background:rgba(0,0,0,0.2);padding:4px 8px;border-radius:12px;">
+            Administrateur
+          </div>
+        </div>
+      </div>
+
+      <!-- Viseur caméra avec informations projet -->
+      <div style="flex:1;position:relative;background:#000;overflow:hidden;">
+        <!-- Image de fond simulant la caméra -->
+        <div style="width:100%;height:100%;background:linear-gradient(135deg,#1e293b,#334155);display:flex;align-items:center;justify-content:center;">
+          <div style="text-align:center;color:rgba(255,255,255,0.3);">
+            <i data-lucide="camera" style="width:48px;height:48px;margin-bottom:8px;"></i>
+            <div style="font-size:14px;">Vue caméra</div>
+          </div>
+        </div>
+
+        <!-- Overlay d'informations chantier (admin a plus d'infos) -->
+        <div style="position:absolute;top:60px;left:16px;right:16px;">
+          <div style="background:rgba(0,0,0,0.6);backdrop-filter:blur(10px);border-radius:12px;padding:12px;margin-bottom:12px;">
+            <div style="color:white;font-size:12px;font-weight:600;margin-bottom:4px;" id="chantier-info">Rénovation Rue de Lyon</div>
+            <div style="color:rgba(255,255,255,0.8);font-size:10px;" id="site-info">Site A — Entrée principale</div>
+            <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+              <span style="background:#3b82f6;color:white;font-size:8px;padding:2px 6px;border-radius:8px;" id="categorie-info">Gros Œuvre</span>
+              <span style="background:#10b981;color:white;font-size:8px;padding:2px 6px;border-radius:8px;" id="budget-info">2.3M€</span>
+              <span style="color:rgba(255,255,255,0.6);font-size:9px;" id="location-info">48.8484, 2.3701</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grille de visée admin (plus précise) -->
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:200px;border:2px solid rgba(255,255,255,0.3);border-radius:8px;">
+          <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(255,255,255,0.2);"></div>
+          <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2);"></div>
+          <!-- Coins pour alignement -->
+          <div style="position:absolute;top:10px;left:10px;width:20px;height:20px;border-left:2px solid rgba(255,255,255,0.4);border-top:2px solid rgba(255,255,255,0.4);"></div>
+          <div style="position:absolute;top:10px;right:10px;width:20px;height:20px;border-right:2px solid rgba(255,255,255,0.4);border-top:2px solid rgba(255,255,255,0.4);"></div>
+          <div style="position:absolute;bottom:10px;left:10px;width:20px;height:20px;border-left:2px solid rgba(255,255,255,0.4);border-bottom:2px solid rgba(255,255,255,0.4);"></div>
+          <div style="position:absolute;bottom:10px;right:10px;width:20px;height:20px;border-right:2px solid rgba(255,255,255,0.4);border-bottom:2px solid rgba(255,255,255,0.4);"></div>
+        </div>
+      </div>
+
+      <!-- Contrôles caméra admin (plus d'options) -->
+      <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,0.8),transparent);padding:20px 16px 32px;">
+        <!-- Actions supérieures -->
+        <div style="display:flex;justify-content:space-around;align-items:center;margin-bottom:20px;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div style="width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <i data-lucide="image" style="width:20px;height:20px;color:rgba(255,255,255,0.8);"></i>
+            </div>
+            <div style="color:rgba(255,255,255,0.6);font-size:9px;">Galerie</div>
+          </div>
+          
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div style="width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <i data-lucide="settings" style="width:20px;height:20px;color:rgba(255,255,255,0.8);"></i>
+            </div>
+            <div style="color:rgba(255,255,255,0.6);font-size:9px;">Réglages</div>
+          </div>
+          
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div style="width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <i data-lucide="zap" style="width:20px;height:20px;color:#fbbf24;"></i>
+            </div>
+            <div style="color:rgba(255,255,255,0.6);font-size:9px;">Flash</div>
+          </div>
+          
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div style="width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <i data-lucide="shield" style="width:20px;height:20px;color:#ef4444;"></i>
+            </div>
+            <div style="color:rgba(255,255,255,0.6);font-size:9px;">Qualité</div>
+          </div>
+        </div>
+
+        <!-- Bouton capture principal -->
+        <div style="display:flex;justify-content:center;align-items:center;gap:20px;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div style="width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <i data-lucide="rotate-ccw" style="width:20px;height:20px;color:rgba(255,255,255,0.8);"></i>
+            </div>
+            <div style="color:rgba(255,255,255,0.6);font-size:9px;">Rotation</div>
+          </div>
+          
+          <button onclick="capturePhoto()" style="width:70px;height:70px;background:white;border-radius:50%;border:4px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;">
+            <div style="width:56px;height:56px;background:#dc2626;border-radius:50%;"></div>
+          </button>
+          
+          <div style="display:flex;flex-direction:column;align-items-center;gap:8px;">
+            <div style="width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <i data-lucide="video" style="width:20px;height:20px;color:rgba(255,255,255,0.8);"></i>
+            </div>
+            <div style="color:rgba(255,255,255,0.6);font-size:9px;">Vidéo</div>
+          </div>
+        </div>
+
+        <!-- Info bas admin -->
+        <div style="text-align:center;margin-top:16px;">
+          <div style="color:rgba(255,255,255,0.6);font-size:11px;">📍 GPS activé • 📅 Horodatage automatique • 👤 Administrateur • 🛡️ Accès complet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Récupérer les informations du chantier sélectionné
+    const selectedChantier = JSON.parse(localStorage.getItem('selected_chantier') || '{}');
+    
+    // Mettre à jour les informations affichées
+    document.addEventListener('DOMContentLoaded', function() {
+      if (selectedChantier.projet) {
+        document.getElementById('chantier-info').textContent = selectedChantier.projet;
+      }
+      if (selectedChantier.nom) {
+        document.getElementById('site-info').textContent = selectedChantier.nom;
+      }
+      if (selectedChantier.categorie) {
+        const categorieLabels = {
+          'gros-oeuvre': '🏗️ Gros Œuvre',
+          'finitions': '🎨 Finitions',
+          'signalement': '⚠️ Signalement',
+          'progression': '📈 Progression',
+          'securite': '🛡️ Sécurité',
+          'controle': '✅ Contrôle qualité'
+        };
+        document.getElementById('categorie-info').textContent = categorieLabels[selectedChantier.categorie] || selectedChantier.categorie;
+      }
+      if (selectedChantier.localisation) {
+        document.getElementById('location-info').textContent = selectedChantier.localisation;
+      }
+      
+      // Afficher le budget si disponible (admin only)
+      if (selectedChantier.budget) {
+        document.getElementById('budget-info').style.display = 'inline-block';
+        document.getElementById('budget-info').textContent = selectedChantier.budget;
+      }
+      
+      // Initialiser les icônes
+      lucide.createIcons();
+    });
+
+    function capturePhoto() {
+      // Simuler la prise de photo
+      const button = event.target.closest('button');
+      button.style.transform = 'scale(0.95)';
+      
+      setTimeout(() => {
+        button.style.transform = 'scale(1)';
+        
+        // Créer une notification de succès admin
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+          position: fixed;
+          top: 80px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #dc2626;
+          color: white;
+          padding: 12px 20px;
+          border-radius: 8px;
+          font-size: 12px;
+          z-index: 1000;
+          animation: slideDown 0.3s ease;
+        `;
+        notification.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="check-circle" style="width: 16px; height: 16px;"></i>
+            Photo enregistrée (Admin)
+          </div>
+        `;
+        
+        document.body.appendChild(notification);
+        lucide.createIcons();
+        
+        setTimeout(() => {
+          notification.remove();
+          // Retour à la page précédente
+          history.back();
+        }, 2000);
+      }, 150);
+    }
+
+    // Ajouter l'animation CSS
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideDown {
+        from { transform: translate(-50%, -100%); opacity: 0; }
+        to { transform: translate(-50%, 0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  </script>
+</body>
+</html>

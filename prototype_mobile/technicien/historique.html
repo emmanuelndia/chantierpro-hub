@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Historique</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Historique</div>
+          <div class="topbar-sub">Avril 2026</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#EA580C,#dc2626);border-radius:12px;padding:6px 12px;font-size:11px;color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(234,90,12,0.3);">37h ce mois</div>
+      </div>
+      <div class="content" style="overflow-y:auto;">
+        <!-- Stats rapides -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:16px;padding:16px;text-align:center;border:1px solid #bae6fd;">
+            <div style="font-size:20px;font-weight:700;color:#0c4a6e;">5</div>
+            <div style="font-size:11px;color:#0369a1;">Jours ce mois</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:16px;padding:16px;text-align:center;border:1px solid #fbbf24;">
+            <div style="font-size:20px;font-weight:700;color:#78350f;">7h24</div>
+            <div style="font-size:11px;color:#92400e;">Moyenne/jour</div>
+          </div>
+        </div>
+
+        <!-- Onglets pour filtrer -->
+        <div style="display:flex;gap:4px;margin-bottom:16px;background:#f1f5f9;border-radius:8px;padding:2px;">
+          <button class="tab-btn active" onclick="showTab('toutes')" style="flex:1;font-size:11px;padding:6px;border-radius:6px;background:white;border:none;">
+            Toutes
+          </button>
+          <button class="tab-btn" onclick="showTab('presences')" style="flex:1;font-size:11px;padding:6px;border-radius:6px;background:transparent;border:none;">
+            Présences
+          </button>
+          <button class="tab-btn" onclick="showTab('photos')" style="flex:1;font-size:11px;padding:6px;border-radius:6px;background:transparent;border:none;">
+            Photos
+          </button>
+        </div>
+
+        <!-- Contenu des onglets -->
+        <div id="toutes-content">
+          <!-- Cette semaine -->
+          <div class="label">Cette semaine</div>
+          
+          <!-- Session en cours -->
+          <div class="card" style="background:linear-gradient(135deg,#ffffff,#fefefe);border-left:4px solid #10b981;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+              <div style="flex:1;">
+                <div class="card-title">Rénovation Rue de Lyon</div>
+                <div class="card-sub" style="display:flex;align-items:center;gap:6px;">
+                  <i data-lucide="calendar" style="width:14px;height:14px;"></i>
+                  Aujourd'hui · 08h14 → <span style="color:#10b981;font-weight:600;">en cours</span>
+                </div>
+              </div>
+              <span class="badge badge-green" style="background:#10b981;color:white;">En cours</span>
+            </div>
+            
+            <!-- Progression journée -->
+            <div style="background:#f8fafc;border-radius:12px;padding:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:12px;color:#64748b;">Progression journée</span>
+                <span style="font-size:12px;font-weight:600;color:#0f172a;">6h46 / 10h</span>
+              </div>
+              <div style="background:#e2e8f0;border-radius:6px;height:6px;overflow:hidden;">
+                <div style="background:linear-gradient(90deg,#10b981,#059669);width:68%;height:100%;border-radius:6px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Photo récente -->
+          <div class="card">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="camera" style="width:24px;height:24px;color:#3b82f6;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Photo prise</div>
+                <div style="font-size:11px;color:#64748b;">Site A — Gros Œuvre</div>
+                <div style="font-size:10px;color:#94a3b8;">Il y a 2 heures</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-blue" style="font-size:8px;">Gros Œuvre</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sessions complètes -->
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="flex:1;">
+                <div class="card-title">Rénovation Rue de Lyon</div>
+                <div class="card-sub" style="display:flex;align-items:center;gap:6px;">
+                  <i data-lucide="clock" style="width:14px;height:14px;"></i>
+                  Lundi · 07h52 → 16h30
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-gray">8h38</span>
+                <div style="font-size:10px;color:#10b981;margin-top:2px;">✓ Validé</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="camera" style="width:24px;height:24px;color:#10b981;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Photo prise</div>
+                <div style="font-size:11px;color:#64748b;">Site B — Finitions</div>
+                <div style="font-size:10px;color:#94a3b8;">Il y a 5 heures</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-orange" style="font-size:8px;">Finitions</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Semaine passée -->
+          <div class="label" style="margin-top:20px;">Semaine passée</div>
+        </div>
+
+        <div id="presences-content" style="display:none;">
+          <div class="label">Historique des présences</div>
+          
+          <!-- Session en cours -->
+          <div class="card" style="background:linear-gradient(135deg,#ffffff,#fefefe);border-left:4px solid #10b981;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+              <div style="flex:1;">
+                <div class="card-title">Rénovation Rue de Lyon</div>
+                <div class="card-sub" style="display:flex;align-items:center;gap:6px;">
+                  <i data-lucide="calendar" style="width:14px;height:14px;"></i>
+                  Aujourd'hui · 08h14 → <span style="color:#10b981;font-weight:600;">en cours</span>
+                </div>
+              </div>
+              <span class="badge badge-green" style="background:#10b981;color:white;">En cours</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="flex:1;">
+                <div class="card-title">Rénovation Rue de Lyon</div>
+                <div class="card-sub" style="display:flex;align-items:center;gap:6px;">
+                  <i data-lucide="clock" style="width:14px;height:14px;"></i>
+                  Lundi · 07h52 → 16h30
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-gray">8h38</span>
+                <div style="font-size:10px;color:#10b981;margin-top:2px;">✓ Validé</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="flex:1;">
+                <div class="card-title">Chantier Bastille B2</div>
+                <div class="card-sub" style="display:flex;align-items:center;gap:6px;">
+                  <i data-lucide="clock" style="width:14px;height:14px;"></i>
+                  Vendredi · 08h00 → 17h15
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-gray">9h15</span>
+                <div style="font-size:10px;color:#10b981;margin-top:2px;">✓ Validé</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="flex:1;">
+                <div class="card-title">Rénovation Rue de Lyon</div>
+                <div class="card-sub" style="display:flex;align-items:center;gap:6px;">
+                  <i data-lucide="clock" style="width:14px;height:14px;"></i>
+                  Jeudi · 08h05 → 16h45
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-gray">8h40</span>
+                <div style="font-size:10px;color:#10b981;margin-top:2px;">✓ Validé</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="photos-content" style="display:none;">
+          <div class="label">Historique des photos</div>
+          
+          <div class="card">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="camera" style="width:24px;height:24px;color:#3b82f6;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Photo prise</div>
+                <div style="font-size:11px;color:#64748b;">Site A — Gros Œuvre</div>
+                <div style="font-size:10px;color:#94a3b8;">Il y a 2 heures</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-blue" style="font-size:8px;">Gros Œuvre</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="camera" style="width:24px;height:24px;color:#10b981;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Photo prise</div>
+                <div style="font-size:11px;color:#64748b;">Site B — Finitions</div>
+                <div style="font-size:10px;color:#94a3b8;">Il y a 5 heures</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-orange" style="font-size:8px;">Finitions</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#f59e0b;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Signalement</div>
+                <div style="font-size:11px;color:#64748b;">Site A — Problème électrique</div>
+                <div style="font-size:10px;color:#94a3b8;">Hier</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-red" style="font-size:8px;">Signalement</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="trending-up" style="width:24px;height:24px;color:#8b5cf6;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Progression</div>
+                <div style="font-size:11px;color:#64748b;">Site A — Avancement murs</div>
+                <div style="font-size:10px;color:#94a3b8;">Hier</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-purple" style="font-size:8px;">Progression</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;gap:12px;">
+              <div style="width:60px;height:60px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="camera" style="width:24px;height:24px;color:#06b6d4;"></i>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:#334155;">Photo prise</div>
+                <div style="font-size:11px;color:#64748b;">Site C — Plomberie</div>
+                <div style="font-size:10px;color:#94a3b8;">Il y a 2 jours</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-cyan" style="font-size:8px;">Plomberie</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="flex:1;">
+              <div class="card-title">Chantier Bastille B2</div>
+              <div class="card-sub" style="display:flex;align-items:center;gap:6px;">
+                <i data-lucide="clock" style="width:14px;height:14px;"></i>
+                Jeu 10 · 07h45 → 16h00
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <span class="badge badge-gray">8h15</span>
+              <div style="font-size:10px;color:#10b981;margin-top:2px;">✓ Validé</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Résumé mensuel -->
+        <div style="margin-top:24px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:20px;padding:20px;border:1px solid #e2e8f0;">
+          <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:16px;">Résumé Avril 2026</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="text-align:center;">
+              <div style="font-size:18px;font-weight:700;color:#0f172a;">37h00</div>
+              <div style="font-size:11px;color:#64748b;">Total travaillé</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:18px;font-weight:700;color:#EA580C;">2</div>
+              <div style="font-size:11px;color:#64748b;">Chantiers</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav">
+        <a href="home.html" class="nav-item">
+          <i data-lucide="home" class="nav-icon"></i>
+          <div class="nav-lbl">Accueil</div>
+        </a>
+        <a href="mes-photos.html" class="nav-item">
+          <i data-lucide="camera" class="nav-icon"></i>
+          <div class="nav-lbl">Photos</div>
+        </a>
+        <a href="pointage.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="profil-technicien.html" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Gestion des onglets
+    function showTab(tabName) {
+      // Masquer tous les contenus
+      document.getElementById('toutes-content').style.display = 'none';
+      document.getElementById('presences-content').style.display = 'none';
+      document.getElementById('photos-content').style.display = 'none';
+      
+      // Afficher le contenu sélectionné
+      document.getElementById(tabName + '-content').style.display = 'block';
+      
+      // Mettre à jour les boutons
+      const buttons = document.querySelectorAll('.tab-btn');
+      buttons.forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+      });
+      
+      // Activer le bouton cliqué
+      event.target.classList.add('active');
+      event.target.style.background = 'white';
+    }
+
+    // Initialiser les icônes Lucide
+    lucide.createIcons();
+  </script>
+</body>
+</html>

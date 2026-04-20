@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Prise Photo</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <a href="dashboard.html" style="font-size:12px;color:#aaa;cursor:pointer;text-decoration:none;">← Retour</a>
+        <div style="text-align:right;"><div class="topbar-title">Nouvelle Photo</div><div class="topbar-sub">Chef de projet</div></div>
+      </div>
+
+      <div class="content">
+        <!-- Sélection du projet -->
+        <div class="label">Sélectionner le projet</div>
+        <div class="card" style="margin-bottom:16px;">
+          <select id="projet-select" style="width:100%;padding:12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;background:white;">
+            <option value="">-- Choisir un projet --</option>
+            <option value="renovation-lyon">🏗️ Rénovation Rue de Lyon</option>
+            <option value="bastille">🏗️ Bastille B2</option>
+            <option value="marais">🏗️ Extension Marais</option>
+          </select>
+        </div>
+
+        <!-- Sélection du chantier (après projet sélectionné) -->
+        <div id="chantier-section" style="display:none;">
+          <div class="label">Sélectionner le chantier</div>
+          <div class="card" style="margin-bottom:16px;">
+            <select id="chantier-select" style="width:100%;padding:12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;background:white;">
+              <option value="">-- Choisir un chantier --</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Catégorie de photo -->
+        <div class="label">Catégorie de photo</div>
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="radio" name="categorie" value="gros-oeuvre" checked style="margin:0;">
+              <span style="font-size:13px;">🏗️ Gros Œuvre</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="radio" name="categorie" value="finitions" style="margin:0;">
+              <span style="font-size:13px;">🎨 Finitions</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="radio" name="categorie" value="signalement" style="margin:0;">
+              <span style="font-size:13px;">⚠️ Signalement</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="radio" name="categorie" value="progression" style="margin:0;">
+              <span style="font-size:13px;">📈 Progression</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Informations du chantier sélectionné -->
+        <div id="chantier-info" style="display:none;">
+          <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <i data-lucide="map-pin" style="width:16px;height:16px;color:#0284c7;"></i>
+              <div class="card-title" style="font-size:14px;" id="chantier-nom">Site A — Entrée principale</div>
+            </div>
+            <div class="card-sub" style="font-size:11px;" id="chantier-details">Rénovation Rue de Lyon • Paris 12e</div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:12px;font-weight:600;color:#334155;" id="chantier-photos">8</div>
+                <div style="font-size:9px;color:#64748b;">Photos</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:12px;font-weight:600;color:#334155;" id="chantier-equipe">3</div>
+                <div style="font-size:9px;color:#64748b;">Équipe</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:12px;font-weight:600;color:#334155;" id="chantier-avancement">65%</div>
+                <div style="font-size:9px;color:#64748b;">Avancement</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zone d'appareil photo -->
+        <div class="card" style="margin-bottom:16px;text-align:center;cursor:pointer;" onclick="openCamera()">
+          <div style="background:linear-gradient(135deg,#f8fafc,#e2e8f0);border-radius:12px;padding:24px;margin-bottom:12px;">
+            <i data-lucide="camera" style="width:32px;height:32px;color:#94a3b8;margin-bottom:8px;"></i>
+            <div style="font-size:14px;color:#64748b;">Appareil photo</div>
+            <div style="font-size:11px;color:#94a3b8;">Tapez pour prendre une photo</div>
+          </div>
+          
+          <button id="capture-btn" class="btn-primary" style="width:100%;font-size:14px;padding:12px;">
+            <i data-lucide="camera" style="width:16px;height:16px;margin-right:6px;"></i>
+            Ouvrir la caméra
+          </button>
+        </div>
+      </div>
+
+      <div class="nav">
+        <a href="dashboard.html" class="nav-item active">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <div class="nav-lbl active">Dashboard</div>
+        </a>
+        <a href="galerie.html" class="nav-item">
+          <i data-lucide="image" class="nav-icon"></i>
+          <div class="nav-lbl">Galerie</div>
+        </a>
+        <a href="presences.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Données des projets et chantiers
+    const projets = {
+      'renovation-lyon': {
+        nom: 'Rénovation Rue de Lyon',
+        chantiers: {
+          'site-a': { nom: 'Site A — Entrée principale', localisation: '48.8484, 2.3701', photos: 8, equipe: 3, avancement: '65%' },
+          'site-b': { nom: 'Site B — Façade arrière', localisation: '48.8486, 2.3704', photos: 6, equipe: 3, avancement: '45%' }
+        }
+      },
+      'bastille': {
+        nom: 'Bastille B2',
+        chantiers: {
+          'principal': { nom: 'Chantier Principal', localisation: '48.8530, 2.3690', photos: 12, equipe: 5, avancement: '78%' }
+        }
+      },
+      'marais': {
+        nom: 'Extension Marais',
+        chantiers: {
+          'site-a': { nom: 'Site A — Extension', localisation: '48.8560, 2.3600', photos: 4, equipe: 2, avancement: '30%' }
+        }
+      }
+    };
+
+    // Gestion de la sélection de projet
+    document.getElementById('projet-select').addEventListener('change', function() {
+      const projetSelect = document.getElementById('projet-select');
+      const chantierSection = document.getElementById('chantier-section');
+      const chantierSelect = document.getElementById('chantier-select');
+      
+      // Vider les options précédentes
+      chantierSelect.innerHTML = '<option value="">-- Choisir un chantier --</option>';
+      
+      if (projetSelect.value) {
+        // Afficher la section des chantiers
+        chantierSection.style.display = 'block';
+        
+        // Ajouter les chantiers du projet sélectionné
+        const projet = projets[projetSelect.value];
+        for (const [key, chantier] of Object.entries(projet.chantiers)) {
+          const option = document.createElement('option');
+          option.value = key;
+          option.textContent = `📍 ${chantier.nom}`;
+          chantierSelect.appendChild(option);
+        }
+      } else {
+        chantierSection.style.display = 'none';
+        document.getElementById('chantier-info').style.display = 'none';
+      }
+    });
+
+    // Gestion de la sélection du chantier
+    document.getElementById('chantier-select').addEventListener('change', function() {
+      const projetSelect = document.getElementById('projet-select');
+      const chantierSelect = document.getElementById('chantier-select');
+      const infoDiv = document.getElementById('chantier-info');
+      
+      if (chantierSelect.value && projetSelect.value) {
+        const projet = projets[projetSelect.value];
+        const chantier = projet.chantiers[chantierSelect.value];
+        
+        // Mettre à jour les informations
+        document.getElementById('chantier-nom').textContent = chantier.nom;
+        document.getElementById('chantier-details').textContent = `${projet.nom} • ${chantier.localisation}`;
+        document.getElementById('chantier-photos').textContent = chantier.photos;
+        document.getElementById('chantier-equipe').textContent = chantier.equipe;
+        document.getElementById('chantier-avancement').textContent = chantier.avancement;
+        
+        infoDiv.style.display = 'block';
+      } else {
+        infoDiv.style.display = 'none';
+      }
+    });
+
+    // Redirection vers la caméra après sélection du chantier
+    document.getElementById('capture-btn').addEventListener('click', function() {
+      const projetSelect = document.getElementById('projet-select');
+      const chantierSelect = document.getElementById('chantier-select');
+      const categorie = document.querySelector('input[name="categorie"]:checked').value;
+      
+      if (!projetSelect.value) {
+        alert('Veuillez sélectionner un projet');
+        return;
+      }
+      
+      if (!chantierSelect.value) {
+        alert('Veuillez sélectionner un chantier');
+        return;
+      }
+
+      // Sauvegarder les informations du chantier sélectionné
+      const projet = projets[projetSelect.value];
+      const chantier = projet.chantiers[chantierSelect.value];
+      const selectedChantier = {
+        projet: projet.nom,
+        nom: chantier.nom,
+        categorie: categorie,
+        description: '',
+        localisation: chantier.localisation,
+        role: 'management'
+      };
+      
+      localStorage.setItem('selected_chantier', JSON.stringify(selectedChantier));
+      
+      // Rediriger vers l'écran caméra
+      window.location.href = 'photo-camera-management.html';
+    });
+
+    function openCamera() {
+      document.getElementById('capture-btn').click();
+    }
+
+    // Initialiser les icônes
+    lucide.createIcons();
+  </script>
+</body>
+</html>

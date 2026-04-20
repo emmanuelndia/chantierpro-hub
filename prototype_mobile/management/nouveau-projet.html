@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Nouveau Projet</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <a href="dashboard.html" style="font-size:12px;color:#aaa;cursor:pointer;text-decoration:none;">← Retour</a>
+        <div style="text-align:right;"><div class="topbar-title">Nouveau Projet</div><div class="topbar-sub">Management</div></div>
+      </div>
+
+      <div class="content">
+        <!-- Message de redirection -->
+        <div style="text-align:center;padding:40px 20px;">
+          <div style="width:80px;height:80px;background:linear-gradient(135deg,#EA580C,#dc2626);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 4px 12px rgba(234,90,12,0.3);">
+            <i data-lucide="plus" style="width:40px;height:40px;color:#ffffff;"></i>
+          </div>
+          
+          <div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:8px;">Création d'un nouveau projet</div>
+          <div style="font-size:14px;color:#64748b;margin-bottom:24px;">Vous allez être redirigé vers le formulaire de création</div>
+          
+          <div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:24px;border:1px solid #e2e8f0;">
+            <div style="font-size:12px;color:#64748b;margin-bottom:8px;">Redirection automatique dans</div>
+            <div id="countdown" style="font-size:24px;font-weight:700;color:#EA580C;">3</div>
+          </div>
+          
+          <a href="creer-projet.html" class="btn-primary" style="display:inline-block;text-decoration:none;">
+            <i data-lucide="arrow-right" style="width: 16px; height: 16px; margin-right: 8px;"></i>
+            Accéder directement
+          </a>
+        </div>
+      </div>
+      
+      <div class="nav">
+        <a href="dashboard.html" class="nav-item">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <div class="nav-lbl">Dashboard</div>
+        </a>
+        <a href="galerie.html" class="nav-item">
+          <i data-lucide="image" class="nav-icon"></i>
+          <div class="nav-lbl">Galerie</div>
+        </a>
+        <a href="presences.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="profil.html" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    let countdown = 3;
+    const countdownElement = document.getElementById('countdown');
+    
+    // Compte à rebours
+    const interval = setInterval(() => {
+      countdown--;
+      countdownElement.textContent = countdown;
+      
+      if (countdown <= 0) {
+        clearInterval(interval);
+        window.location.href = 'creer-projet.html';
+      }
+    }, 1000);
+    
+    // Initialiser les icônes
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>

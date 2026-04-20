@@ -1,0 +1,47 @@
+Salut,
+
+Voici le récap qu'on s'était dit sur l'architecture des écrans du proto. Je l'ai découpé en deux grandes parties pour que ce soit plus clair : comment l'app est structurée techniquement (par modules), et comment chaque profil l'utilise au quotidien (le parcours utilisateur).
+
+---
+
+### 1. Structure par Modules (L'architecture de l'app)
+
+**A. La base : Compte & Connexion**
+- index.html : La page de login classique.
+- profil.html : C'est là que l'utilisateur gère son mot de passe et ses infos persos.
+
+**B. Le Terrain : Pilotage & Chantiers**
+- dashboard.html : L'accueil principal avec les gros indicateurs. Tout le monde atterrit ici.
+- projets.html : L'annuaire complet de tous les chantiers de la boîte.
+- mes-projets.html : La même chose, mais filtrée uniquement pour montrer les chantiers de la personne connectée.
+- chantier-presences.html : Le zoom sur un chantier précis pour voir le détail de qui a pointé aujourd'hui.
+- chantier-photos.html : L'album photo pour documenter l'avancée des travaux.
+
+**C. Le back-office RH**
+- rh-presences.html : Le grand tableau de bord avec tous les temps de travail consolidés.
+- rh-export.html : L'interface pour sortir les heures en CSV ou en PDF pour préparer la paie.
+
+**D. Supervision & Admin**
+- admin.html : C'est ici qu'on crée les comptes et qu'on attribue les rôles (RH, chef de projet, admin...).
+- admin-logs.html : L'historique de sécurité pour savoir qui a supprimé quoi en cas de souci.
+
+---
+
+### 2. Le Flow par Utilisateur (Qui fait quoi ?)
+
+**-> Le flow de base (Tout le monde y passe)**
+On arrive sur index.html > on se logue > on débarque sur le dashboard.html. Si on veut modifier son mot de passe, on clique sur l'avatar en haut à droite pour aller sur profil.html, puis on clique sur déconnexion pour revenir au login.
+
+**-> Le Chef de Projet**
+Son but c'est de gérer son terrain. Depuis le dashboard, il clique plutôt sur "Mes Projets" (mes-projets.html). S'il a besoin de vérifier un truc sur un de ses chantiers, il rentre dans chantier-presences.html. Ensuite, s'il est sur le site, il va sur chantier-photos.html pour uploader des photos de l'état d'avancement pour son rapport final.
+
+**-> Le Service RH**
+La RH ne va pas sur le terrain. Depuis le dashboard, elle va direct sur rh-presences.html pour vérifier que les heures pointées dans la semaine sont cohérentes. En fin de mois, elle utilise rh-export.html pour sortir la matrice de paie.
+
+**-> La Direction**
+La direction veut une vue macro. Depuis le dashboard, elle consulte les indicateurs globaux. S'il y a un doute sur un gros chantier, elle peut fouiller directement dedans via projets.html ou regarder les dernières photos via chantier-photos.html.
+
+**-> L'Administrateur Système**
+C'est le couteau suisse. Sur le dashboard, s'il a une demande d'onboarding, il va direct sur admin.html pour créer le compte du nouveau. S'il y a eu une erreur de suppression (genre une photo importante effacée), il piste l'historique via admin-logs.html.
+
+Si tu penses qu'on doit réorganiser certains écrans ou fusionner des parcours, hésite pas à me le dire !

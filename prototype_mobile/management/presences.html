@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Présences</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">Présences</div>
+          <div class="topbar-sub">Aujourd'hui · 9 sur chantier</div>
+        </div>
+        <div style="background:#2da85b;border-radius:6px;padding:3px 8px;font-size:9px;font-weight:700;color:#fff;">9 actifs</div>
+      </div>
+      <div class="chips">
+        <div class="chip active">Tous</div>
+        <div class="chip">Rue de Lyon</div>
+        <div class="chip">Bastille B2</div>
+        <div class="chip">Clichy Nord</div>
+      </div>
+      <div class="content">
+        <div class="label">En ce moment</div>
+        <div class="tl-item">
+          <div class="tl-dot green"></div>
+          <div class="tl-line">
+            <div class="tl-title">Martin Dupont</div>
+            <div class="tl-sub">Arrivée 08h14 · en cours (6h12)</div>
+            <div class="tl-tag">📍 Rénovation Rue de Lyon</div>
+          </div>
+          <span class="badge badge-green">Présent</span>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot green"></div>
+          <div class="tl-line">
+            <div class="tl-title">Lucie Bernard</div>
+            <div class="tl-sub">Arrivée 07h58 · en cours (6h28)</div>
+            <div class="tl-tag">📍 Rénovation Rue de Lyon</div>
+          </div>
+          <span class="badge badge-green">Présent</span>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot green"></div>
+          <div class="tl-line">
+            <div class="tl-title">Kemal Aydin</div>
+            <div class="tl-sub">Arrivée 08h05 · en cours (6h21)</div>
+            <div class="tl-tag">📍 Bastille B2</div>
+          </div>
+          <span class="badge badge-green">Présent</span>
+        </div>
+        <div class="divider"></div>
+        <div class="label">Partis aujourd'hui</div>
+        <div class="tl-item">
+          <div class="tl-dot gray"></div>
+          <div class="tl-line">
+            <div class="tl-title">Paul Martin</div>
+            <div class="tl-sub">08h10 → 12h30 · 4h20</div>
+            <div class="tl-tag">📍 Rénovation Rue de Lyon</div>
+          </div>
+          <span class="badge badge-gray">4h20</span>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot gray"></div>
+          <div class="tl-line">
+            <div class="tl-title">Sophie Renard</div>
+            <div class="tl-sub">07h45 → 16h00 · 8h15</div>
+            <div class="tl-tag">📍 Bastille B2</div>
+          </div>
+          <span class="badge badge-gray">8h15</span>
+        </div>
+        <div class="divider"></div>
+        <div class="label">Absents</div>
+        <div class="tl-item">
+          <div class="tl-dot" style="background:#E07A3A;"></div>
+          <div class="tl-line">
+            <div class="tl-title">Tom Laurent</div>
+            <div class="tl-sub">Aucun pointage aujourd'hui</div>
+            <div class="tl-tag">📍 Clichy Nord</div>
+          </div>
+          <span class="badge badge-red">Absent</span>
+        </div>
+      </div>
+      <div class="nav">
+        <a href="dashboard.html" class="nav-item">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <div class="nav-lbl">Dashboard</div>
+        </a>
+        <a href="galerie.html" class="nav-item">
+          <i data-lucide="image" class="nav-icon"></i>
+          <div class="nav-lbl">Galerie</div>
+        </a>
+        <a href="presences.html" class="nav-item active">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl active">Présences</div>
+        </a>
+        <a href="profil.html" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Initialiser les icônes Lucide
+    lucide.createIcons();
+  </script>
+  
+  <script>
+    // Gestion des chips de filtre
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', function() {
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Simuler un filtrage
+        const filterText = this.textContent;
+        console.log('Filtrer par:', filterText);
+        
+        // Ici vous pourriez ajouter la logique de filtrage réelle
+        if (filterText !== 'Tous') {
+          alert('Filtrage par: ' + filterText + '\n(Démonstration - filtrage à implémenter)');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

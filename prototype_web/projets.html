@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChantierPro - Projets</title>
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Babel standalone for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 20px; }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // SVG Icons
+        const LayoutDashboard = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></svg>);
+        const HardHat = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z" /><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5" /><path d="M4 15v-3a6 6 0 0 1 6-6h0" /><path d="M14 6h0a6 6 0 0 1 6 6v3" /></svg>);
+        const Users = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>);
+        const FileBarChart = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M8 18v-1" /><path d="M12 18v-6" /><path d="M16 18v-3" /></svg>);
+        const Settings = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>);
+        const Bell = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>);
+        const Search = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>);
+        const LogOut = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>);
+        const History = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>);
+        const Clock = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>);
+        const ListGrid = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="14" y="14" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></svg>);
+        const Camera = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></svg>);
+        const UserIcon = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>);
+        const AlertTriangle = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>);
+        const MapPin = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 15 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>);
+        const Calendar = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>);
+        const Filter = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>);
+        const ChevronRight = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6" /></svg>);
+        const ArrowRight = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>);
+        const UserPlus = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" x2="19" y1="8" y2="14" /><line x1="22" x2="16" y1="11" y2="11" /></svg>);
+        const ShieldCheck = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2-1 4-2 7-2 2.82 0 4.88 1 6.94 2a1 1 0 0 1 .06 1.83V13Z" /><path d="m9 12 2 2 4-4" /></svg>);
+        const CheckCircle2 = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>);
+        const XCircle = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>);
+        const MoreVertical = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" /></svg>);
+        const Download = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>);
+
+
+                const MenuIcon = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>);
+        const XIcon = ({ size = 24, className }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>);
+
+        // MainLayout Component
+        const MainLayout = ({ children, activePage, breadcrumb, userRole = 'Admin' }) => {
+            const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+            const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+            const menuItems = [
+                { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard size={20} />, path: 'dashboard.html' },
+                { id: 'mes-projets', label: 'Mes projets', icon: <HardHat size={20} />, path: 'mes-projets.html' },
+                { id: 'projets', label: 'Tous les projets', icon: <ListGrid size={20} />, path: 'projets.html' },
+                { id: 'suivi-rh', label: 'Suivi RH', icon: <Clock size={20} />, path: 'suivi-rh.html' },
+                { id: 'galerie', label: 'Galerie photos', icon: <Camera size={20} />, path: 'chantier-photos.html' },
+                { id: 'logs', label: 'Logs de suppression', icon: <History size={20} />, path: 'admin-logs.html' },
+                { id: 'utilisateurs', label: 'Utilisateurs', icon: <Users size={20} />, path: 'admin.html' },
+                { id: 'profil', label: 'Mon profil', icon: <UserIcon size={20} />, path: 'profil.html' },
+            ];
+
+            return (
+                <div className="flex min-h-screen bg-slate-50 relative overflow-hidden">
+                    {/* Overlay mobile */}
+                    {isSidebarOpen && (
+                        <div 
+                            className="fixed inset-0 bg-slate-900/50 z-30 xl:hidden transition-opacity" 
+                            onClick={toggleSidebar}
+                        ></div>
+                    )}
+
+                    {/* Sidebar */}
+                    <aside className={`w-[260px] bg-slate-900 text-white flex flex-col fixed h-full shadow-2xl z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} xl:translate-x-0`}>
+                        <div className="p-5 border-b border-slate-800 flex justify-between items-center">
+                            <h1 className="text-xl font-bold tracking-tight text-white">
+                                CHANTIER<span className="text-orange-500">PRO</span>
+                            </h1>
+                            <button onClick={toggleSidebar} className="xl:hidden text-slate-400 hover:text-white transition-colors">
+                                <XIcon size={24} />
+                            </button>
+                        </div>
+                        <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar pb-20">
+                            {menuItems.map((item) => (
+                                <a
+                                    key={item.id}
+                                    href={item.path}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium ${activePage === item.id ? 'bg-orange-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                        }`}
+                                >
+                                    {item.icon}
+                                    {item.label}
+                                </a>
+                            ))}
+                        </nav>
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="flex-1 xl:ml-[260px] flex flex-col min-h-screen w-full transition-all duration-300 bg-slate-50 min-w-0">
+                        {/* Topbar */}
+                        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-20 shadow-sm w-full">
+                            <div className="flex items-center gap-3 lg:gap-4 flex-1">
+                                <button onClick={toggleSidebar} className="xl:hidden text-slate-600 hover:text-orange-600 transition-colors">
+                                    <MenuIcon size={24} />
+                                </button>
+                                <nav className="text-xs sm:text-sm font-medium text-slate-500 flex items-center truncate">
+                                    <span className="hover:text-slate-800 cursor-pointer transition-colors hidden sm:inline">Accueil</span>
+                                    <span className="mx-2 text-slate-300 hidden sm:inline">/</span>
+                                    <span className="text-slate-900 font-bold truncate max-w-[150px] sm:max-w-xs md:max-w-md">{breadcrumb}</span>
+                                </nav>
+                            </div>
+                            
+                            <div className="flex items-center gap-3 sm:gap-6 justify-end">
+                                <div className="relative hidden md:block">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <input
+                                        type="text"
+                                        placeholder="Rechercher..."
+                                        className="pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-sm focus:ring-2 focus:ring-orange-500 w-48 lg:w-64 outline-none transition-all"
+                                    />
+                                </div>
+                                <button className="relative text-slate-500 hover:text-orange-600 transition-colors hidden sm:block">
+                                    <Bell size={20} className="sm:w-[22px] sm:h-[22px]" />
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] sm:text-[10px] flex items-center justify-center rounded-full font-bold shadow-sm border border-white">3</span>
+                                </button>
+                                
+                                <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 sm:border-l sm:border-slate-200 relative group cursor-pointer h-16">
+                                    <div className="text-right hidden sm:block">
+                                        <p className="text-sm font-bold text-slate-900 leading-tight">M. Kader</p>
+                                        <div className="mt-0.5">
+                                            <span className="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded-full uppercase tracking-wider">{userRole}</span>
+                                        </div>
+                                    </div>
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold shadow-sm border-2 border-transparent group-hover:border-orange-500 transition-all text-sm sm:text-base">
+                                        MK
+                                    </div>
+                                    {/* Dropdown */}
+                                    <div className="absolute right-0 top-14 mt-1 sm:mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2 z-50">
+                                        <div className="p-2 space-y-1">
+                                            <a href="profil.html" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-orange-50 hover:text-orange-600 rounded-lg font-bold transition-colors">
+                                                <UserIcon size={16} /> Mon profil
+                                            </a>
+                                            <div className="h-px bg-slate-100 my-1 mx-2"></div>
+                                            <a href="index.html" className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-bold transition-colors">
+                                                <LogOut size={16} /> Déconnexion
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="p-4 sm:p-6 lg:p-8 relative z-10 w-full overflow-x-hidden">
+                            {children}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+        const ProjectsPage = () => {
+            const [view, setView] = useState('list'); // 'list' | 'detail' | 'create'
+            const [activeTab, setActiveTab] = useState('chantiers'); // 'chantiers', 'equipe', 'presences', 'galerie'
+            const [showCreateForm, setShowCreateForm] = useState(false);
+            const [newProject, setNewProject] = useState({
+                name: '',
+                description: '',
+                location: '',
+                gps: '',
+                startDate: '',
+                endDate: '',
+            });
+
+            const projectsList = [
+                { 
+                    id: 1, 
+                    name: 'Résidence Horizon', 
+                    description: 'Construction d\'un complexe résidentiel de 120 logements',
+                    location: 'Lyon 3ème', 
+                    gps: '45.7544° N, 4.8500° E',
+                    startDate: '15/03/2026',
+                    endDate: '30/11/2026',
+                    status: 'En cours', 
+                    progress: 65, 
+                    workers: 42, 
+                    date: 'Mar 2026',
+                    chantiers: [
+                        { id: 1, name: 'Bloc A - Fondations', status: 'Terminé', progress: 100 },
+                        { id: 2, name: 'Bloc B - Élévation', status: 'En cours', progress: 45 },
+                        { id: 3, name: 'Bloc C - Terrassement', status: 'En cours', progress: 30 }
+                    ]
+                },
+                { 
+                    id: 2, 
+                    name: 'Parking Central', 
+                    description: 'Parking souterrain de 3 niveaux avec 200 places',
+                    location: 'Villeurbanne', 
+                    gps: '45.7719° N, 4.8901° E',
+                    startDate: '01/04/2026',
+                    endDate: '31/12/2026',
+                    status: 'Préparation', 
+                    progress: 10, 
+                    workers: 8, 
+                    date: 'Avr 2026',
+                    chantiers: [
+                        { id: 4, name: 'Sous-sol Niveau 1', status: 'Préparation', progress: 5 },
+                        { id: 5, name: 'Sous-sol Niveau 2', status: 'Planification', progress: 0 }
+                    ]
+                },
+                { 
+                    id: 3, 
+                    name: 'Tour Ivoire', 
+                    description: 'Immeuble de bureaux de 15 étages avec commerces au rez-de-chaussée',
+                    location: 'Lyon 7ème', 
+                    gps: '45.7435° N, 4.8465° E',
+                    startDate: '10/01/2026',
+                    endDate: '15/02/2026',
+                    status: 'Terminé', 
+                    progress: 100, 
+                    workers: 120, 
+                    date: 'Fév 2026',
+                    chantiers: [
+                        { id: 6, name: 'Fondations', status: 'Terminé', progress: 100 },
+                        { id: 7, name: 'Structure', status: 'Terminé', progress: 100 },
+                        { id: 8, name: 'Façade', status: 'Terminé', progress: 100 }
+                    ]
+                },
+            ];
+
+            if (view === 'list') {
+                return (
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-2xl font-bold text-slate-900">Liste des projets</h2>
+                                <p className="text-slate-500 font-medium">Inventaire complet de vos chantiers.</p>
+                            </div>
+                            <button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-all shadow-md">
+                                + Nouveau Projet
+                            </button>
+                        </div>
+
+                        {/* Filtres */}
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
+                            <div className="flex items-center gap-2">
+                                <Filter size={18} className="text-slate-400" />
+                                <span className="text-sm font-bold text-slate-700">Filtres :</span>
+                            </div>
+                            <select className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-600 font-medium">
+                                <option>Statut: Tous</option>
+                                <option>En cours</option>
+                                <option>Terminé</option>
+                            </select>
+                        </div>
+
+                        {/* Formulaire de création de projet */}
+                        {showCreateForm && (
+                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-xl font-bold text-slate-900">Créer un nouveau projet</h3>
+                                    <button onClick={() => setShowCreateForm(false)} className="text-slate-400 hover:text-slate-600">
+                                        <XIcon size={24} />
+                                    </button>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Nom du projet *</label>
+                                        <input
+                                            type="text"
+                                            value={newProject.name}
+                                            onChange={(e) => setNewProject({...newProject, name: e.target.value})}
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                                            placeholder="Ex: Résidence Horizon"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Localisation *</label>
+                                        <input
+                                            type="text"
+                                            value={newProject.location}
+                                            onChange={(e) => setNewProject({...newProject, location: e.target.value})}
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                                            placeholder="Ex: Lyon 3ème"
+                                        />
+                                    </div>
+                                    
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Description</label>
+                                        <textarea
+                                            value={newProject.description}
+                                            onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none h-24"
+                                            placeholder="Description détaillée du projet..."
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Date de début *</label>
+                                        <input
+                                            type="date"
+                                            value={newProject.startDate}
+                                            onChange={(e) => setNewProject({...newProject, startDate: e.target.value})}
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Date de fin *</label>
+                                        <input
+                                            type="date"
+                                            value={newProject.endDate}
+                                            onChange={(e) => setNewProject({...newProject, endDate: e.target.value})}
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                                        />
+                                    </div>
+                                    
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Localisation GPS</label>
+                                        <input
+                                            type="text"
+                                            value={newProject.gps}
+                                            onChange={(e) => setNewProject({...newProject, gps: e.target.value})}
+                                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                                            placeholder="Ex: 45.7544° N, 4.8500° E"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowCreateForm(false)} className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 transition-colors">
+                                        Annuler
+                                    </button>
+                                    <button onClick={() => {
+                                        alert('Projet créé avec succès!');
+                                        setShowCreateForm(false);
+                                        setNewProject({
+                                            name: '',
+                                            description: '',
+                                            location: '',
+                                            gps: '',
+                                            startDate: '',
+                                            endDate: '',
+                                        });
+                                    }} className="px-6 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 transition-colors">
+                                        Créer le projet
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Grille Projets */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {projectsList.map((p) => (
+                                <div key={p.id} onClick={() => setView('detail')} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="p-3 bg-slate-50 rounded-lg text-slate-700 group-hover:bg-orange-50 group-hover:text-orange-600 transition-colors">
+                                            <HardHat size={24} />
+                                        </div>
+                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${p.status === 'En cours' ? 'bg-blue-100 text-blue-700' : p.status === 'Terminé' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                                            {p.status}
+                                        </span>
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-900 mb-1">{p.name}</h3>
+                                    <div className="flex items-center gap-2 text-slate-500 text-sm mb-6">
+                                        <MapPin size={14} /> {p.location}
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-sm font-medium">
+                                            <span className="text-slate-600">Progression</span>
+                                            <span className="text-slate-900">{p.progress}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 rounded-full h-2">
+                                            <div className={`h-2 rounded-full ${p.progress === 100 ? 'bg-emerald-500' : 'bg-orange-600'}`} style={{ width: `${p.progress}%` }}></div>
+                                        </div>
+                                        <div className="flex items-center justify-between mt-4 border-t border-slate-100 pt-4">
+                                            <div className="flex items-center gap-1 text-slate-500 text-xs font-bold">
+                                                <Users size={14} /> {p.workers} personnes
+                                            </div>
+                                            <div className="flex items-center gap-1 text-slate-400 text-xs font-bold hover:text-orange-600 transition-colors">
+                                                Voir détail <ChevronRight size={14} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            // Detail View
+            return (
+                <div className="space-y-6 animate-in slide-in-from-right-4">
+                    <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <div>
+                            <button onClick={() => setView('list')} className="text-slate-400 hover:text-orange-600 text-sm font-bold mb-2 flex items-center gap-1 transition-colors">
+                                ← Retour aux projets
+                            </button>
+                            <h2 className="text-3xl font-bold text-slate-900">Résidence Horizon</h2>
+                            <div className="flex gap-4 mt-2 text-sm font-medium text-slate-500">
+                                <span className="flex items-center gap-1"><MapPin size={16} className="text-slate-400" /> Lyon 3ème</span>
+                                <span className="flex items-center gap-1"><Calendar size={16} className="text-slate-400" /> Début: Janvier 2026</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="px-3 py-1 bg-blue-100 text-blue-700 font-bold rounded-lg text-sm">En cours (65%)</span>
+                            <button className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold shadow-md hover:bg-slate-800 transition-all">Actions du projet</button>
+                        </div>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex gap-1 border-b border-slate-200">
+                        {[
+                            { id: 'chantiers', label: 'Chantiers rattachés', icon: <HardHat size={18} /> },
+                            { id: 'equipe', label: 'Équipe', icon: <Users size={18} /> },
+                            { id: 'presences', label: 'Historique présences', icon: <Clock size={18} /> },
+                            { id: 'galerie', label: 'Galerie photo', icon: <Camera size={18} /> },
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-2 px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-orange-600 text-orange-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                                    }`}
+                            >
+                                {tab.icon} {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Tab Content */}
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 min-h-[400px]">
+                        {activeTab === 'chantiers' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-bold text-slate-900">Chantiers rattachés au projet</h3>
+                                    <button className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 text-white rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors">
+                                        <HardHat size={16} /> Ajouter un chantier
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {['Bloc A - Fondations', 'Bloc B - Élévation', 'Bloc C - Terrassement'].map((bloc, i) => (
+                                        <div key={i} className="p-4 border border-slate-200 rounded-lg flex justify-between items-center hover:border-orange-200 cursor-pointer">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400">
+                                                    <LayoutDashboard size={20} />
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-slate-900">{bloc}</p>
+                                                    <p className="text-xs text-slate-500">22 actifs aujourd'hui</p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight className="text-slate-300" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'equipe' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-slate-900">Équipe du projet</h3>
+                                    <button className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 text-white rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors">
+                                        <UserPlus size={16} /> Ajouter membre
+                                    </button>
+                                </div>
+                                
+                                {/* Statistiques équipe */}
+                                <div className="grid grid-cols-3 gap-4 mb-6">
+                                    <div className="bg-slate-50 p-4 rounded-lg text-center">
+                                        <div className="text-2xl font-bold text-slate-900">18</div>
+                                        <div className="text-xs text-slate-600 font-medium">Total membres</div>
+                                    </div>
+                                    <div className="bg-green-50 p-4 rounded-lg text-center">
+                                        <div className="text-2xl font-bold text-green-700">15</div>
+                                        <div className="text-xs text-green-600 font-medium">Présents aujourd'hui</div>
+                                    </div>
+                                    <div className="bg-orange-50 p-4 rounded-lg text-center">
+                                        <div className="text-2xl font-bold text-orange-700">3</div>
+                                        <div className="text-xs text-orange-600 font-medium">En congé</div>
+                                    </div>
+                                </div>
+
+                                {/* Liste des membres */}
+                                <div className="space-y-3">
+                                    {/* Chef de projet */}
+                                    <div className="p-4 border border-slate-200 rounded-lg hover:border-orange-200 transition-colors">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-orange-600 text-white rounded-full flex items-center justify-center font-bold">
+                                                    MK
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-slate-900">M. Kader</p>
+                                                    <p className="text-xs text-slate-600">Chef de projet</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                                                    Présent
+                                                </span>
+                                                <span className="text-xs text-slate-500">08:00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Membres de l'équipe */}
+                                    {[
+                                        { name: 'Martin Dupont', role: 'Maçon', initials: 'MD', status: 'present', time: '07:45' },
+                                        { name: 'Lucie Bernard', role: 'Électricienne', initials: 'LB', status: 'present', time: '08:15' },
+                                        { name: 'Thomas Martin', role: 'Plombier', initials: 'TM', status: 'present', time: '07:30' },
+                                        { name: 'Sophie Durand', role: 'Peintre', initials: 'SD', status: 'present', time: '08:20' },
+                                        { name: 'Pierre Lefebvre', role: 'Couvreur', initials: 'PL', status: 'present', time: '08:05' },
+                                        { name: 'Marie Petit', role: 'Menuisère', initials: 'MP', status: 'conge', time: '-' },
+                                        { name: 'Jean Rousseau', role: 'Maçon', initials: 'JR', status: 'present', time: '07:50' },
+                                        { name: 'Claire Dubois', role: 'Électricienne', initials: 'CD', status: 'present', time: '08:10' },
+                                        { name: 'Robert Martin', role: 'Plombier', initials: 'RM', status: 'absent', time: '-' },
+                                        { name: 'Isabelle Laurent', role: 'Peintre', initials: 'IL', status: 'present', time: '07:55' },
+                                        { name: 'Philippe Bernard', role: 'Couvreur', initials: 'PB', status: 'present', time: '08:00' },
+                                        { name: 'Anne Sophie', role: 'Menuisère', initials: 'AS', status: 'conge', time: '-' },
+                                    ].map((member, i) => (
+                                        <div key={i} className="p-4 border border-slate-200 rounded-lg hover:border-orange-200 transition-colors">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 ${member.status === 'present' ? 'bg-green-600' : member.status === 'absent' ? 'bg-red-600' : 'bg-slate-400'} text-white rounded-full flex items-center justify-center font-bold`}>
+                                                        {member.initials}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-900">{member.name}</p>
+                                                        <p className="text-xs text-slate-600">{member.role}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                                        member.status === 'present' ? 'bg-green-100 text-green-700' : 
+                                                        member.status === 'absent' ? 'bg-red-100 text-red-700' : 
+                                                        'bg-slate-100 text-slate-700'
+                                                    }`}>
+                                                        {member.status === 'present' ? 'Présent' : member.status === 'absent' ? 'Absent' : 'En congé'}
+                                                    </span>
+                                                    <span className="text-xs text-slate-500">{member.time}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'presences' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-slate-900">Historique des pointages</h3>
+                                    <div className="flex items-center gap-2">
+                                        <select className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-orange-600 font-medium">
+                                            <option>Cette semaine</option>
+                                            <option>Ce mois</option>
+                                            <option>3 derniers mois</option>
+                                        </select>
+                                        <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors">
+                                            <Download size={16} /> Exporter
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Statistiques présences */}
+                                <div className="grid grid-cols-4 gap-4 mb-6">
+                                    <div className="bg-green-50 p-3 rounded-lg text-center">
+                                        <div className="text-xl font-bold text-green-700">95%</div>
+                                        <div className="text-xs text-green-600 font-medium">Taux de présence</div>
+                                    </div>
+                                    <div className="bg-blue-50 p-3 rounded-lg text-center">
+                                        <div className="text-xl font-bold text-blue-700">8.5h</div>
+                                        <div className="text-xs text-blue-600 font-medium">Moyenne/jour</div>
+                                    </div>
+                                    <div className="bg-orange-50 p-3 rounded-lg text-center">
+                                        <div className="text-xl font-bold text-orange-700">2</div>
+                                        <div className="text-xs text-orange-600 font-medium">Retards</div>
+                                    </div>
+                                    <div className="bg-red-50 p-3 rounded-lg text-center">
+                                        <div className="text-xl font-bold text-red-700">1</div>
+                                        <div className="text-xs text-red-600 font-medium">Absences</div>
+                                    </div>
+                                </div>
+
+                                {/* Liste des pointages récents */}
+                                <div className="space-y-2">
+                                    <h4 className="font-medium text-slate-700 text-sm mb-3">Aujourd'hui - Jeudi 17 Avril</h4>
+                                    
+                                    {[
+                                        { name: 'Martin Dupont', time: '07:45', type: 'arrivee', site: 'Bloc A - Fondations' },
+                                        { name: 'Thomas Martin', time: '07:30', type: 'arrivee', site: 'Bloc A - Fondations' },
+                                        { name: 'Jean Rousseau', time: '07:50', type: 'arrivee', site: 'Bloc A - Fondations' },
+                                        { name: 'M. Kader', time: '08:00', type: 'arrivee', site: 'Bloc B - Élévation' },
+                                        { name: 'Pierre Lefebvre', time: '08:05', type: 'arrivee', site: 'Bloc C - Terrassement' },
+                                        { name: 'Lucie Bernard', time: '08:15', type: 'arrivee', site: 'Bloc B - Élévation' },
+                                        { name: 'Claire Dubois', time: '08:10', type: 'arrivee', site: 'Bloc B - Élévation' },
+                                        { name: 'Isabelle Laurent', time: '07:55', type: 'arrivee', site: 'Bloc C - Terrassement' },
+                                        { name: 'Philippe Bernard', time: '08:00', type: 'arrivee', site: 'Bloc C - Terrassement' },
+                                        { name: 'Sophie Durand', time: '08:20', type: 'arrivee', site: 'Bloc A - Fondations' },
+                                        { name: 'Robert Martin', time: '-', type: 'absence', site: '-' },
+                                        { name: 'Marie Petit', time: '-', type: 'conge', site: '-' },
+                                        { name: 'Anne Sophie', time: '-', type: 'conge', site: '-' },
+                                    ].map((pointage, i) => (
+                                        <div key={i} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-2 h-2 rounded-full ${
+                                                    pointage.type === 'arrivee' ? 'bg-green-500' : 
+                                                    pointage.type === 'absence' ? 'bg-red-500' : 'bg-orange-500'
+                                                }`}></div>
+                                                <div>
+                                                    <p className="font-medium text-slate-900 text-sm">{pointage.name}</p>
+                                                    <p className="text-xs text-slate-500">{pointage.site}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                                    pointage.type === 'arrivee' ? 'bg-green-100 text-green-700' : 
+                                                    pointage.type === 'absence' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                                                }`}>
+                                                    {pointage.type === 'arrivee' ? 'Présent' : pointage.type === 'absence' ? 'Absent' : 'Congé'}
+                                                </span>
+                                                <span className="text-xs text-slate-600 font-medium">{pointage.time}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Historique des jours précédents */}
+                                <div className="space-y-2 mt-6">
+                                    <h4 className="font-medium text-slate-700 text-sm mb-3">Mercredi 16 Avril</h4>
+                                    
+                                    {[
+                                        { name: 'Martin Dupont', arrivee: '07:42', depart: '17:15', total: '9h33' },
+                                        { name: 'Lucie Bernard', arrivee: '08:10', depart: '17:20', total: '9h10' },
+                                        { name: 'Thomas Martin', arrivee: '07:28', depart: '17:05', total: '9h37' },
+                                        { name: 'Jean Rousseau', arrivee: '07:48', depart: '17:10', total: '9h22' },
+                                        { name: 'Claire Dubois', arrivee: '08:05', depart: '17:15', total: '9h10' },
+                                        { name: 'Isabelle Laurent', arrivee: '07:52', depart: '17:08', total: '9h16' },
+                                    ].map((jour, i) => (
+                                        <div key={i} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                                <div>
+                                                    <p className="font-medium text-slate-900 text-sm">{jour.name}</p>
+                                                    <p className="text-xs text-slate-500">Journée complète</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs text-slate-600">
+                                                <span>📍 {jour.arrivee}</span>
+                                                <span>🏁 {jour.depart}</span>
+                                                <span className="font-bold text-slate-900">⏱️ {jour.total}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'galerie' && (
+                            <div className="grid grid-cols-4 gap-4">
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                                    <div key={i} className="aspect-square bg-slate-100 rounded-lg overflow-hidden group cursor-pointer relative">
+                                        <img src={`https://picsum.photos/300?random=${i + 10}`} alt="photo" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                                            <p className="text-white text-xs font-bold">12 Avr 2026</p>
+                                            <p className="text-white/80 text-[10px]">Par M. Kader</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => (
+            <MainLayout activePage="projects" breadcrumb="Projets & Chantiers">
+                <ProjectsPage />
+            </MainLayout>
+        );
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>

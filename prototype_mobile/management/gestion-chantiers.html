@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chantier Pro - Gestion Chantiers</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch">
+      <div class="notch-dot"></div>
+    </div>
+    <div class="screen">
+      <div class="topbar">
+        <a href="dashboard.html" style="font-size:12px;color:#aaa;cursor:pointer;text-decoration:none;">← Dashboard</a>
+        <div style="text-align:right;"><div class="topbar-title">Gestion Chantiers</div><div class="topbar-sub">Direction</div></div>
+      </div>
+
+      <div class="content">
+        <!-- Actions rapides -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button class="btn-primary" style="flex:1;font-size:12px;padding:10px;">
+            <i data-lucide="plus" style="width:16px;height:16px;margin-right:4px;"></i>
+            Nouveau Chantier
+          </button>
+          <a href="photo-management.html" class="btn-secondary" style="flex:1;font-size:12px;padding:10px;text-decoration:none;display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="camera" style="width:16px;height:16px;margin-right:4px;"></i>
+            Photo
+          </a>
+          <button class="btn-secondary" style="flex:1;font-size:12px;padding:10px;">
+            <i data-lucide="map" style="width:16px;height:16px;margin-right:4px;"></i>
+            Vue Carte
+          </button>
+        </div>
+
+        <!-- Filtres par projet -->
+        <div class="label">Filtrer par projet</div>
+        <div style="display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;">
+          <button class="chip active" style="white-space:nowrap;">Tous</button>
+          <button class="chip" style="white-space:nowrap;">Rénovation Lyon</button>
+          <button class="chip" style="white-space:nowrap;">Bastille B2</button>
+          <button class="chip" style="white-space:nowrap;">Extension Marais</button>
+        </div>
+
+        <!-- Liste des chantiers -->
+        <div class="label">Tous les chantiers</div>
+        
+        <!-- Chantier 1 -->
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div class="card-title">Site A — Entrée principale</div>
+              <div class="card-sub">Rénovation Rue de Lyon • Paris 12e</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn-icon" style="padding:6px;background:#f0f9ff;">
+                <i data-lucide="edit-2" style="width:14px;height:14px;color:#0284c7;"></i>
+              </button>
+              <button class="btn-icon" style="padding:6px;background:#fef2f2;">
+                <i data-lucide="trash-2" style="width:14px;height:14px;color:#dc2626;"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <i data-lucide="map-pin" style="width:14px;height:14px;color:#64748b;"></i>
+            <div style="font-size:11px;color:#64748b;">48.8484, 2.3701</div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#64748b;margin-bottom:2px;">Progression</div>
+              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+                <div style="background:#10b981;height:100%;width:72%;"></div>
+              </div>
+              <div style="font-size:9px;color:#64748b;margin-top:2px;">72% • 15 jours restants</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">3</div>
+                <div style="font-size:9px;color:#64748b;">Équipes</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">2</div>
+                <div style="font-size:9px;color:#64748b;">Présents</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:4px;">
+            <span class="badge badge-green">Actif</span>
+            <span class="badge badge-gray">8 photos</span>
+            <span class="badge badge-blue">Gros Œuvre</span>
+          </div>
+        </div>
+
+        <!-- Chantier 2 -->
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div class="card-title">Site B — Façade arrière</div>
+              <div class="card-sub">Rénovation Rue de Lyon • Paris 12e</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn-icon" style="padding:6px;background:#f0f9ff;">
+                <i data-lucide="edit-2" style="width:14px;height:14px;color:#0284c7;"></i>
+              </button>
+              <button class="btn-icon" style="padding:6px;background:#fef2f2;">
+                <i data-lucide="trash-2" style="width:14px;height:14px;color:#dc2626;"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <i data-lucide="map-pin" style="width:14px;height:14px;color:#64748b;"></i>
+            <div style="font-size:11px;color:#64748b;">48.8486, 2.3704</div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#64748b;margin-bottom:2px;">Progression</div>
+              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+                <div style="background:#10b981;height:100%;width:65%;"></div>
+              </div>
+              <div style="font-size:9px;color:#64748b;margin-top:2px;">65% • 20 jours restants</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">3</div>
+                <div style="font-size:9px;color:#64748b;">Équipes</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">2</div>
+                <div style="font-size:9px;color:#64748b;">Présents</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:4px;">
+            <span class="badge badge-green">Actif</span>
+            <span class="badge badge-gray">6 photos</span>
+            <span class="badge badge-blue">Gros Œuvre</span>
+          </div>
+        </div>
+
+        <!-- Chantier 3 -->
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div class="card-title">Chantier Principal</div>
+              <div class="card-sub">Chantier Bastille B2 • Paris 11e</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn-icon" style="padding:6px;background:#f0f9ff;">
+                <i data-lucide="edit-2" style="width:14px;height:14px;color:#0284c7;"></i>
+              </button>
+              <button class="btn-icon" style="padding:6px;background:#fef2f2;">
+                <i data-lucide="trash-2" style="width:14px;height:14px;color:#dc2626;"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <i data-lucide="map-pin" style="width:14px;height:14px;color:#64748b;"></i>
+            <div style="font-size:11px;color:#64748b;">48.8530, 2.3690</div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#64748b;margin-bottom:2px;">Progression</div>
+              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+                <div style="background:#f59e0b;height:100%;width:45%;"></div>
+              </div>
+              <div style="font-size:9px;color:#64748b;margin-top:2px;">45% • 60 jours restants</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">4</div>
+                <div style="font-size:9px;color:#64748b;">Équipes</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">3</div>
+                <div style="font-size:9px;color:#64748b;">Présents</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:4px;">
+            <span class="badge badge-green">Actif</span>
+            <span class="badge badge-red">Retard</span>
+            <span class="badge badge-gray">11 photos</span>
+            <span class="badge badge-blue">Gros Œuvre</span>
+          </div>
+        </div>
+
+        <!-- Chantier 4 -->
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div class="card-title">Site A — Extension</div>
+              <div class="card-sub">Extension Bureau Marais • Paris 4e</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn-icon" style="padding:6px;background:#f0f9ff;">
+                <i data-lucide="edit-2" style="width:14px;height:14px;color:#0284c7;"></i>
+              </button>
+              <button class="btn-icon" style="padding:6px;background:#fef2f2;">
+                <i data-lucide="trash-2" style="width:14px;height:14px;color:#dc2626;"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <i data-lucide="map-pin" style="width:14px;height:14px;color:#64748b;"></i>
+            <div style="font-size:11px;color:#64748b;">48.8566, 2.3522</div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:#64748b;margin-bottom:2px;">Progression</div>
+              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+                <div style="background:#10b981;height:100%;width:30%;"></div>
+              </div>
+              <div style="font-size:9px;color:#64748b;margin-top:2px;">30% • 90 jours restants</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">3</div>
+                <div style="font-size:9px;color:#64748b;">Équipes</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:14px;font-weight:600;color:#334155;">2</div>
+                <div style="font-size:9px;color:#64748b;">Présents</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:4px;">
+            <span class="badge badge-green">Actif</span>
+            <span class="badge badge-gray">12 photos</span>
+            <span class="badge badge-orange">Finitions</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav">
+        <a href="../management/dashboard.html" class="nav-item active">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <div class="nav-lbl active">Dashboard</div>
+        </a>
+        <a href="../management/galerie.html" class="nav-item">
+          <i data-lucide="image" class="nav-icon"></i>
+          <div class="nav-lbl">Galerie</div>
+        </a>
+        <a href="../management/presences.html" class="nav-item">
+          <i data-lucide="users" class="nav-icon"></i>
+          <div class="nav-lbl">Présences</div>
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="user" class="nav-icon"></i>
+          <div class="nav-lbl">Profil</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialiser les icônes Lucide
+    lucide.createIcons();
+  </script>
+</body>
+</html>
