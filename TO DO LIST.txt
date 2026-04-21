@@ -1,0 +1,23 @@
+Ce qui a été fait avant : 
+
+- Maquettes de l'application (version web et mobile)
+- Analyse des maquettes pour comprendre les besoins 
+- Lecture et application de la méthodologie de la conception de bas niveau
+- Rédaction des exigences du système, règles métier
+- Entités du système, définition des relations puis description des états et des comportements de chaque entité
+
+
+Ce qui se fait actuellement : 
+
+- Simulation de la logique métier en code pur Python
+- Script composé de toutes les classes principales avec leurs méthodes
+
+
+Ce qui se fera après : 
+
+- S'assurer que le script marche de bout en bout avant de passer à la suite
+- Mise en place de la véritable infrastructure backend
+- Création et configuration de la vrai base de données en se basant sur les modèles existants
+- Transformation des fonctions codées en véritables routes/API prêtes à être connecter au moteur
+
+- Création de l'interface visuelle et la connexion au moteur 

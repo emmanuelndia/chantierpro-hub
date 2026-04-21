@@ -1,66 +1,66 @@
 from datetime import datetime
 import math
 
-# ── Constantes ────────────────────────────────────────────
-ROLES = ["TECHNICIEN", "CHEF_PROJET", "RH", "DIRECTION", "ADMIN"]
+# ── Constants ─────────────────────────────────────────────
+ROLES = ["TECHNICIAN", "PROJECT_MANAGER", "HR", "DIRECTION", "ADMIN"]
 
 PERMISSIONS = {
-    "TECHNICIEN": [
-        "POINTER",
-        "PRENDRE_PHOTO",
-        "VOIR_SES_POINTAGES"
+    "TECHNICIAN": [
+        "CLOCK_IN",
+        "TAKE_PHOTO",
+        "VIEW_OWN_TIMESHEETS"
     ],
-    "CHEF_PROJET": [
-        "PRENDRE_PHOTO",
-        "SUPPRIMER_PHOTO",
-        "GERER_PROJETS",
-        "GERER_EQUIPE",
-        "GERER_CHANTIER",
-        "VOIR_PRESENCES"
+    "PROJECT_MANAGER": [
+        "TAKE_PHOTO",
+        "DELETE_PHOTO",
+        "MANAGE_PROJECTS",
+        "MANAGE_TEAM",
+        "MANAGE_SITE",
+        "VIEW_ATTENDANCE"
     ],
-    "RH": [
-        "PRENDRE_PHOTO",
-        "VOIR_HEURE_RH",
-        "EXPORTER_DONNEES"
+    "HR": [
+        "TAKE_PHOTO",
+        "VIEW_HR_HOURS",
+        "EXPORT_DATA"
     ],
     "DIRECTION": [
-        "PRENDRE_PHOTO",
-        "SUPPRIMER_PHOTO",
-        "GERER_PROJETS",
-        "GERER_EQUIPE",
-        "GERER_CHANTIER",
-        "VOIR_PRESENCES",
-        "VOIR_HEURE_RH",
-        "EXPORTER_DONNEES",
-        "VOIR_LOGS_SUPPRESSION"
+        "TAKE_PHOTO",
+        "DELETE_PHOTO",
+        "MANAGE_PROJECTS",
+        "MANAGE_TEAM",
+        "MANAGE_SITE",
+        "VIEW_ATTENDANCE",
+        "VIEW_HR_HOURS",
+        "EXPORT_DATA",
+        "VIEW_DELETION_LOGS"
     ],
     "ADMIN": ["*"],
 }
 
-EXCLUSION_PERMISSIONS  = {"ADMIN": ["POINTER"]}
-TYPE_POINTAGE          = ["ARRIVEE", "DEPART", "INTERMEDIAIRE"]
-STATUT_POINTAGE        = ["VALIDE", "REFUSE"]
-STATUT_PROJET          = ["EN_COURS", "TERMINE", "EN_PAUSE", "ARCHIVE"]
-STATUT_CHANTIER        = ["ACTIF", "TERMINE", "EN_PAUSE"]
-STATUT_EQUIPE          = ["ACTIVE", "INACTIVE"]
-ROLE_EQUIPE            = ["CHEF_EQUIPE", "MEMBRE"]
-STATUT_EQUIPEMEMBRE    = ["ACTIF", "INACTIF"]
-CATEGORIE_PHOTO        = ["AVANCEMENT", "INCIDENT", "AUTRE"]
+EXCLUSION_PERMISSIONS   = {"ADMIN": ["CLOCK_IN"]}
+CLOCK_IN_TYPES          = ["ARRIVAL", "DEPARTURE", "INTERMEDIATE"]
+CLOCK_IN_STATUSES       = ["VALID", "REJECTED"]
+PROJECT_STATUSES        = ["IN_PROGRESS", "COMPLETED", "ON_HOLD", "ARCHIVED"]
+SITE_STATUSES           = ["ACTIVE", "COMPLETED", "ON_HOLD"]
+TEAM_STATUSES           = ["ACTIVE", "INACTIVE"]
+TEAM_ROLES              = ["TEAM_LEAD", "MEMBER"]
+TEAM_MEMBER_STATUSES    = ["ACTIVE", "INACTIVE"]
+PHOTO_CATEGORIES        = ["PROGRESS", "INCIDENT", "OTHER"]
 
 
 # ── USER ──────────────────────────────────────────────────
 class User:
 
-    def __init__(self, id, nom, prenom, password, role, contact, isActive=True):
-        self.id       = id
-        self.nom      = nom
-        self.prenom   = prenom
-        self.password = password
-        self.role     = role
-        self.contact  = contact
-        self.isActive = isActive
+    def __init__(self, id, last_name, first_name, password, role, contact, is_active=True):
+        self.id         = id
+        self.last_name  = last_name
+        self.first_name = first_name
+        self.password   = password
+        self.role       = role
+        self.contact    = contact
+        self.is_active  = is_active
 
-    def peut(self, action):
+    def can(self, action):
         if self.role not in PERMISSIONS:
             return False
         perms = PERMISSIONS[self.role]
@@ -69,607 +69,571 @@ class User:
             return action not in excluded
         return action in perms
 
-    def modifierProfil(self, **kwargs):
-        for cle, valeur in kwargs.items():
-            if cle in ['nom', 'prenom', 'contact', 'password']:
-                setattr(self, cle, valeur)
+    def update_profile(self, **kwargs):
+        for key, value in kwargs.items():
+            if key in ['last_name', 'first_name', 'contact', 'password']:
+                setattr(self, key, value)
 
-    def desactiverCompte(self, admin_user):
-        if not admin_user.role == "ADMIN":
-            raise Exception("Action réservée aux administrateurs")
-        self.isActive = False
+    def deactivate_account(self, admin_user):
+        if admin_user.role != "ADMIN":
+            raise Exception("Action restricted to administrators")
+        self.is_active = False
 
-    def pointer(self, chantier, type_pointage, lat, lng):
-        if not self.isActive:
-            raise Exception("Compte utilisateur inactif")
-        if not self.peut("POINTER"):
-            raise Exception("Permission refusée : cet utilisateur ne peut pas pointer")
-        if not chantier.estActif():
-            raise Exception("Ce chantier n'est pas actif")
+    def clock_in(self, site, clock_in_type, lat, lng):
+        if not self.is_active:
+            raise Exception("User account is inactive")
+        if not self.can("CLOCK_IN"):
+            raise Exception("Permission denied: this user cannot clock in")
+        if not site.is_active():
+            raise Exception("This site is not active")
 
-        # ── Nouveaux cas limites ──────────────────────────────
-        if type_pointage == "ARRIVEE":
-            if chantier.aDejaUnPointageOuvert(self):
-                raise Exception("Une session est déjà ouverte sur ce chantier")
+        if clock_in_type == "ARRIVAL":
+            if site.has_open_session(self):
+                raise Exception("A session is already open on this site")
 
-        if type_pointage == "DEPART":
-            if not chantier.aDejaUnPointageOuvert(self):
-                raise Exception("Aucune arrivée enregistrée pour clôturer")
-        # ─────────────────────────────────────────────────────
+        if clock_in_type == "DEPARTURE":
+            if not site.has_open_session(self):
+                raise Exception("No arrival recorded to close")
 
-        distance = chantier.verifierPointage(self, lat, lng)
+        distance = site.verify_clock_in(self, lat, lng)
         if distance > 2.0:
-            raise Exception(f"Pointage refusé : vous êtes à {distance:.2f} km du chantier")
+            raise Exception(f"Clock-in rejected: you are {distance:.2f} km away from the site")
 
-        pointage = Pointage(
-            chantier=chantier,
-            user=self,
-            type_pointage=type_pointage,
-            latitude=lat,
-            longitude=lng,
-            distance_chantier=distance
+        record = ClockInRecord(
+            site              = site,
+            user              = self,
+            clock_in_type     = clock_in_type,
+            latitude          = lat,
+            longitude         = lng,
+            distance_to_site  = distance
         )
-        return pointage
+        return record
 
-    def prendrePhoto(self, chantier, fichier, categorie=None):
-        if not self.isActive:
-            raise Exception("Compte utilisateur inactif")
-        if not self.peut("PRENDRE_PHOTO"):
-            raise Exception("Permission refusée")
-        if not chantier.estActif():
-            raise Exception("Ce chantier n'est pas actif")
+    def take_photo(self, site, filename, category=None):
+        if not self.is_active:
+            raise Exception("User account is inactive")
+        if not self.can("TAKE_PHOTO"):
+            raise Exception("Permission denied")
+        if not site.is_active():
+            raise Exception("This site is not active")
 
         photo = Photo(
-            chantier  = chantier,
-            user      = self,
-            fichier   = fichier,
-            categorie = categorie
+            site     = site,
+            user     = self,
+            filename = filename,
+            category = category
         )
         return photo
 
-    def getHistoriquePointages(self, chantier):
-        if not self.peut("VOIR_SES_POINTAGES"):
-            raise Exception("Permission refusée")
+    def get_clock_in_history(self, site):
+        if not self.can("VIEW_OWN_TIMESHEETS"):
+            raise Exception("Permission denied")
+        return [r for r in site.get_clock_in_records() if r.user.id == self.id]
 
-        return [p for p in chantier.getPointages() if p.user.id == self.id]
+    def export_data(self, site, month, year):
+        if not self.can("EXPORT_DATA"):
+            raise Exception("Permission denied")
 
-    def exporterDonnees(self, chantier, mois, annee):
-        if not self.peut("EXPORTER_DONNEES"):
-            raise Exception("Permission refusée")
-
-        pointages_mois = [
-            p for p in chantier.getPointages()
-            if p.date_pointage.startswith(f"{annee}-{mois:02d}")
+        monthly_records = [
+            r for r in site.get_clock_in_records()
+            if r.clock_in_date.startswith(f"{year}-{month:02d}")
         ]
 
-        lignes = []
-        for p in pointages_mois:
-            lignes.append({
-                "employe": f"{p.user.prenom} {p.user.nom}",
-                "type": p.type_pointage,
-                "date": p.date_pointage,
-                "heure": p.heure_pointage,
-                "statut": p.statut,
-                "distance": p.distance_chantier
+        rows = []
+        for r in monthly_records:
+            rows.append({
+                "employee"        : f"{r.user.first_name} {r.user.last_name}",
+                "type"            : r.clock_in_type,
+                "date"            : r.clock_in_date,
+                "time"            : r.clock_in_time,
+                "status"          : r.status,
+                "distance_km"     : r.distance_to_site
             })
-
-        return lignes  # Phase 3 → vrai fichier CSV
-
-    def __repr__(self):
-        return f"User({self.prenom} {self.nom} | {self.role})"
-
-
-# ── POINTAGE ──────────────────────────────────────────────
-class Pointage:
-
-    def __init__(self, chantier, user, type_pointage, latitude, longitude,
-                 distance_chantier):
-
-        # Cas limite
-        if type_pointage not in TYPE_POINTAGE:
-            raise Exception(f"Type de pointage invalide : {type_pointage}")
-
-        self.chantier          = chantier
-        self.user              = user
-        self.type_pointage     = type_pointage
-        self.latitude          = latitude
-        self.longitude         = longitude
-        self.distance_chantier = distance_chantier
-        self.date_pointage     = datetime.now().strftime("%Y-%m-%d")
-        self.heure_pointage    = datetime.now().strftime("%H:%M:%S")
-        self.statut            = "VALIDE" if distance_chantier <= 2.0 else "REFUSE"
-
-    def estValide(self):
-        return self.statut == "VALIDE" and self.distance_chantier <= 2.0
-
-    def getDistanceChantier(self):
-        return self.distance_chantier
-
-    def getTypePointage(self):
-        return self.type_pointage
-
-    def getDureeSession(self, pointage_arrivee):
-        if self.type_pointage != "DEPART":
-            raise Exception("getDureeSession() uniquement disponible sur un DEPART")
-        if pointage_arrivee.type_pointage != "ARRIVEE":
-            raise Exception("Le pointage fourni n'est pas une ARRIVEE")
-
-        format_heure  = "%H:%M:%S"
-        heure_arrivee = datetime.strptime(pointage_arrivee.heure_pointage, format_heure)
-        heure_depart  = datetime.strptime(self.heure_pointage, format_heure)
-        return heure_depart - heure_arrivee
+        return rows  # Phase 3 → real CSV/Excel file
 
     def __repr__(self):
-        return (f"Pointage({self.user.prenom} {self.user.nom} | "
-                f"{self.type_pointage} | {self.heure_pointage} | "
-                f"{self.statut} | {self.distance_chantier:.2f} km)")
+        return f"User({self.first_name} {self.last_name} | {self.role})"
 
 
-# ── PROJET ────────────────────────────────────────────────
-class Projet:
+# ── CLOCK-IN RECORD ───────────────────────────────────────
+class ClockInRecord:
 
-    def __init__(self, id, nom, adresse, description, ville, date_debut, date_fin, budget_total, chef_projet, created_by,
-                 statut="EN_COURS"):
+    def __init__(self, site, user, clock_in_type, latitude, longitude, distance_to_site):
 
-        if not created_by.peut("GERER_PROJETS"):
-            raise Exception(f"{created_by.prenom} n'est pas habilité à faire cette action")
-        if statut not in STATUT_PROJET:
-            raise Exception(f"Statut invalide : {statut}")
+        if clock_in_type not in CLOCK_IN_TYPES:
+            raise Exception(f"Invalid clock-in type: {clock_in_type}")
 
-        self.id           = id
-        self.nom          = nom
-        self.adresse      = adresse
-        self.description  = description
-        self.ville        = ville
-        self.date_debut   = date_debut
-        self.date_fin     = date_fin
-        self.budget_total = budget_total
-        self.chef_projet  = chef_projet
-        self.created_by   = created_by
-        self.statut       = statut
-        self.chantiers    = []
+        self.site             = site
+        self.user             = user
+        self.clock_in_type    = clock_in_type
+        self.latitude         = latitude
+        self.longitude        = longitude
+        self.distance_to_site = distance_to_site
+        self.clock_in_date    = datetime.now().strftime("%Y-%m-%d")
+        self.clock_in_time    = datetime.now().strftime("%H:%M:%S")
+        self.status           = "VALID" if distance_to_site <= 2.0 else "REJECTED"
 
-    def modifierProjet(self, modifier_by, **kwargs):
-        if not modifier_by.peut("GERER_PROJETS"):
-            raise Exception("Permission refusée")
-        for cle, valeur in kwargs.items():
-            if cle in ['nom', 'ville', 'budget_total', 'statut']:
-                if cle == 'statut' and valeur not in STATUT_PROJET: continue
-                setattr(self, cle, valeur)
+    def is_valid(self):
+        return self.status == "VALID" and self.distance_to_site <= 2.0
 
-    def supprimerProjet(self, deleted_by):
-        if not deleted_by.peut("GERER_PROJETS"):
-            raise Exception("Permission refusée")
-        if any(c.estActif() for c in self.chantiers):
-            raise Exception("Impossible de supprimer : Chantiers en cours")
-        self.statut = "ARCHIVE"  # Suppression logique
+    def get_distance(self):
+        return self.distance_to_site
 
-    def ajouterChantier(self, chantier):
-        if self.statut in ["TERMINE", "ARCHIVE"]:
-            raise Exception("Impossible d'ajouter un chantier : projet terminé")
-        if chantier in self.chantiers:
-            raise Exception("Ce chantier est déjà rattaché au projet")
-        self.chantiers.append(chantier)
+    def get_type(self):
+        return self.clock_in_type
 
-    def getChantiers(self):
-        return self.chantiers
+    def get_session_duration(self, arrival_record):
+        if self.clock_in_type != "DEPARTURE":
+            raise Exception("get_session_duration() is only available on a DEPARTURE record")
+        if arrival_record.clock_in_type != "ARRIVAL":
+            raise Exception("The provided record is not an ARRIVAL")
 
-    def getChantiersActifs(self):
-        return [c for c in self.chantiers if c.estActif()]
-
-    def estActif(self):
-        return self.statut == "EN_COURS"
-
-    def getBudgetConsomme(self):
-        return sum(c.budget_alloue for c in self.chantiers)
-
-    def getBudgetRestant(self):
-        return self.budget_total - self.getBudgetConsomme()
+        fmt           = "%H:%M:%S"
+        arrival_time  = datetime.strptime(arrival_record.clock_in_time, fmt)
+        departure_time = datetime.strptime(self.clock_in_time, fmt)
+        return departure_time - arrival_time
 
     def __repr__(self):
-        return (f"Projet({self.nom} | {self.ville} | {self.statut} | "
-                f"Budget: {self.budget_total} | Chantiers: {len(self.chantiers)})")
+        return (f"ClockInRecord({self.user.first_name} {self.user.last_name} | "
+                f"{self.clock_in_type} | {self.clock_in_time} | "
+                f"{self.status} | {self.distance_to_site:.2f} km)")
 
 
-# ── CHANTIER ──────────────────────────────────────────────
-class Chantier:
+# ── PROJECT ───────────────────────────────────────────────
+class Project:
 
-    def __init__(self, id, projet, nom, localisation, adresse, description,
-                 date_debut, date_fin, superficie, budget_alloue,
-                 chef_projet, created_by, statut="ACTIF"):
+    def __init__(self, id, name, address, description, city, start_date, end_date,
+                 total_budget, project_manager, created_by, status="IN_PROGRESS"):
 
-        if not created_by.peut("GERER_CHANTIER"):
-            raise Exception(f"Action non autorisée")
-        if statut not in STATUT_CHANTIER:
-            raise Exception(f"Statut invalide : {statut}")
+        if not created_by.can("MANAGE_PROJECTS"):
+            raise Exception(f"{created_by.first_name} is not authorized to create a project")
+        if status not in PROJECT_STATUSES:
+            raise Exception(f"Invalid status: {status}")
 
-        self.id           = id
-        self.projet       = projet
-        self.nom          = nom
-        self.localisation = localisation  # (lat, lng)
-        self.adresse      = adresse
-        self.description  = description
-        self.date_debut   = date_debut
-        self.date_fin     = date_fin
-        self.superficie   = superficie
-        self.budget_alloue = budget_alloue
-        self.chef_projet  = chef_projet
-        self.created_by   = created_by
-        self.statut       = statut
+        self.id              = id
+        self.name            = name
+        self.address         = address
+        self.description     = description
+        self.city            = city
+        self.start_date      = start_date
+        self.end_date        = end_date
+        self.total_budget    = total_budget
+        self.project_manager = project_manager
+        self.created_by      = created_by
+        self.status          = status
+        self.sites           = []
 
-        # Listes internes
-        self.pointages = []
-        self.photos    = []
-        self.equipes   = []
+    def update_project(self, updated_by, **kwargs):
+        if not updated_by.can("MANAGE_PROJECTS"):
+            raise Exception("Permission denied")
+        for key, value in kwargs.items():
+            if key in ['name', 'city', 'total_budget', 'status']:
+                if key == 'status' and value not in PROJECT_STATUSES:
+                    continue
+                setattr(self, key, value)
 
-    def modifierChantier(self, modifier_by, **kwargs):
-        if not modifier_by.peut("GERER_CHANTIER"):
-            raise Exception("Permission refusée")
-        if 'budget_alloue' in kwargs:
-            diff = kwargs['budget_alloue'] - self.budget_alloue
-            if diff > self.projet.getBudgetRestant(): raise Exception("Budget projet dépassé")
+    def delete_project(self, deleted_by):
+        if not deleted_by.can("MANAGE_PROJECTS"):
+            raise Exception("Permission denied")
+        if any(s.is_active() for s in self.sites):
+            raise Exception("Cannot delete: project has active sites")
+        self.status = "ARCHIVED"
 
-        for cle, valeur in kwargs.items():
-            if cle in ['nom', 'budget_alloue', 'statut']:
-                setattr(self, cle, valeur)
+    def add_site(self, site):
+        if self.status in ["COMPLETED", "ARCHIVED"]:
+            raise Exception("Cannot add a site: project is closed")
+        if site in self.sites:
+            raise Exception("This site is already linked to the project")
+        self.sites.append(site)
 
-    def supprimerChantier(self, deleted_by):
-        if not deleted_by.peut("GERER_CHANTIER"):
-            raise Exception("Permission refusée")
-        self.statut = "ANNULE" if not self.pointages else "TERMINE"
+    def get_sites(self):
+        return self.sites
 
-    # ── Vérification GPS ──────────────────────────────────
-    def verifierPointage(self, user, lat, lng):
-        # Calcul distance en km avec la formule de Haversine
-        lat1, lng1 = self.localisation
+    def get_active_sites(self):
+        return [s for s in self.sites if s.is_active()]
+
+    def is_active(self):
+        return self.status == "IN_PROGRESS"
+
+    def get_spent_budget(self):
+        return sum(s.allocated_budget for s in self.sites)
+
+    def get_remaining_budget(self):
+        return self.total_budget - self.get_spent_budget()
+
+    def __repr__(self):
+        return (f"Project({self.name} | {self.city} | {self.status} | "
+                f"Budget: {self.total_budget} | Sites: {len(self.sites)})")
+
+
+# ── SITE (CHANTIER) ───────────────────────────────────────
+class Site:
+
+    def __init__(self, id, project, name, location, address, description,
+                 start_date, end_date, area, allocated_budget,
+                 site_manager, created_by, status="ACTIVE"):
+
+        if not created_by.can("MANAGE_SITE"):
+            raise Exception("Action not authorized")
+        if status not in SITE_STATUSES:
+            raise Exception(f"Invalid status: {status}")
+
+        self.id               = id
+        self.project          = project
+        self.name             = name
+        self.location         = location  # (lat, lng)
+        self.address          = address
+        self.description      = description
+        self.start_date       = start_date
+        self.end_date         = end_date
+        self.area             = area
+        self.allocated_budget = allocated_budget
+        self.site_manager     = site_manager
+        self.created_by       = created_by
+        self.status           = status
+
+        self.clock_in_records = []
+        self.photos           = []
+        self.teams            = []
+
+    def update_site(self, updated_by, **kwargs):
+        if not updated_by.can("MANAGE_SITE"):
+            raise Exception("Permission denied")
+        if 'allocated_budget' in kwargs:
+            diff = kwargs['allocated_budget'] - self.allocated_budget
+            if diff > self.project.get_remaining_budget():
+                raise Exception("Project budget exceeded")
+        for key, value in kwargs.items():
+            if key in ['name', 'allocated_budget', 'status']:
+                setattr(self, key, value)
+
+    # ── GPS Verification ──────────────────────────────────
+    def verify_clock_in(self, user, lat, lng):
+        lat1, lng1 = self.location
         lat2, lng2 = lat, lng
-
-        R = 6371  # rayon de la Terre en km
-
+        R     = 6371
         d_lat = math.radians(lat2 - lat1)
         d_lng = math.radians(lng2 - lng1)
+        a     = (math.sin(d_lat / 2) ** 2 +
+                 math.cos(math.radians(lat1)) *
+                 math.cos(math.radians(lat2)) *
+                 math.sin(d_lng / 2) ** 2)
+        return round(R * 2 * math.asin(math.sqrt(a)), 2)
 
-        a = (math.sin(d_lat / 2) ** 2 +
-             math.cos(math.radians(lat1)) *
-             math.cos(math.radians(lat2)) *
-             math.sin(d_lng / 2) ** 2)
+    def has_open_session(self, user):
+        arrivals   = [r for r in self.clock_in_records
+                      if r.user.id == user.id and r.clock_in_type == "ARRIVAL" and r.is_valid()]
+        departures = [r for r in self.clock_in_records
+                      if r.user.id == user.id and r.clock_in_type == "DEPARTURE" and r.is_valid()]
+        return len(arrivals) > len(departures)
 
-        distance = R * 2 * math.asin(math.sqrt(a))
-        return round(distance, 2)
+    # ── Teams ─────────────────────────────────────────────
+    def assign_team(self, team):
+        if team in self.teams:
+            raise Exception("This team is already assigned to the site")
+        self.teams.append(team)
 
-    # ── Gestion des équipes ───────────────────────────────
-    def assignerEquipe(self, equipe):
-        if equipe in self.equipes:
-            raise Exception("Cette équipe est déjà assignée au chantier")
-        self.equipes.append(equipe)
+    def get_teams(self):
+        return self.teams
 
-    def getEquipes(self):
-        return self.equipes
+    # ── Clock-in records ──────────────────────────────────
+    def add_clock_in_record(self, record):
+        self.clock_in_records.append(record)
 
-    # ── Gestion des pointages ─────────────────────────────
-    def ajouterPointage(self, pointage):
-        self.pointages.append(pointage)
+    def get_clock_in_records(self):
+        return self.clock_in_records
 
-    def getPointages(self):
-        return self.pointages
+    def count_present_today(self, date):
+        present = set()
+        for r in self.clock_in_records:
+            if r.clock_in_date == date and r.clock_in_type == "ARRIVAL" and r.is_valid():
+                present.add(r.user.id)
+        return len(present)
 
-    def calculerPresencesJour(self, date):
-        # Compte les techniciens avec un pointage ARRIVEE VALIDE à cette date
-        presents = set()
-        for p in self.pointages:
-            if (p.date_pointage == date and
-                p.type_pointage == "ARRIVEE" and
-                p.estValide()):
-                presents.add(p.user.id)
-        return len(presents)
+    def get_present_workers(self, date):
+        if not self.is_active():
+            raise Exception("This site is not active")
+        present = {}
+        for r in self.clock_in_records:
+            if r.clock_in_date == date and r.is_valid():
+                if r.clock_in_type == "ARRIVAL":
+                    present[r.user.id] = r.user
+                elif r.clock_in_type == "DEPARTURE":
+                    present.pop(r.user.id, None)
+        return list(present.values())
 
-    def aDejaUnPointageOuvert(self, user):
-        arrivees = [p for p in self.pointages
-                    if p.user.id == user.id and p.type_pointage == "ARRIVEE" and p.estValide()]
-        departs = [p for p in self.pointages
-                   if p.user.id == user.id and p.type_pointage == "DEPART" and p.estValide()]
-        return len(arrivees) > len(departs)
-
-    def getTechniciensPresents(self, date):
-        if not self.estActif():
-            raise Exception("Ce chantier n'est pas actif")
-
-        presents = {}
-        for p in self.pointages:
-            if p.date_pointage == date and p.estValide():
-                if p.type_pointage == "ARRIVEE":
-                    presents[p.user.id] = p.user
-                elif p.type_pointage == "DEPART":
-                    presents.pop(p.user.id, None)
-
-        return list(presents.values())
-
-    def getLogsSuppressionPhotos(self, demandeur):
-        if not demandeur.peut("VOIR_LOGS_SUPPRESSION"):
-            raise Exception("Permission refusée")
-
+    def get_deletion_logs(self, requester):
+        if not requester.can("VIEW_DELETION_LOGS"):
+            raise Exception("Permission denied")
         logs = []
         for photo in self.photos:
-            if photo.est_supprimee and hasattr(photo, 'log'):
+            if photo.is_deleted and hasattr(photo, 'log'):
                 logs.append(photo.log)
         return logs
 
-    # ── Gestion des photos ────────────────────────────────
-    def ajouterPhoto(self, photo):
+    # ── Photos ────────────────────────────────────────────
+    def add_photo(self, photo):
         self.photos.append(photo)
 
-    def getPhotos(self):
+    def get_photos(self):
         return self.photos
 
-    # ── Statut ────────────────────────────────────────────
-    def estActif(self):
-        return self.statut == "ACTIF"
+    # ── Status ────────────────────────────────────────────
+    def is_active(self):
+        return self.status == "ACTIVE"
 
     def __repr__(self):
-        return (f"Chantier({self.nom} | {self.statut} | "
-                f"Budget: {self.budget_alloue} | "
-                f"Pointages: {len(self.pointages)} | "
+        return (f"Site({self.name} | {self.status} | "
+                f"Budget: {self.allocated_budget} | "
+                f"Records: {len(self.clock_in_records)} | "
                 f"Photos: {len(self.photos)})")
 
 
-# ── EQUIPE ────────────────────────────────────────────────
-class Equipe:
+# ── TEAM ──────────────────────────────────────────────────
+class Team:
 
-    def __init__(self, id, nom, chantier, created_by,
-                 description=None, chef_equipe=None, statut="ACTIVE"):
+    def __init__(self, id, name, site, created_by,
+                 description=None, team_lead=None, status="ACTIVE"):
 
-        if not created_by.peut("GERER_EQUIPE"):
-            raise Exception(f"{created_by.prenom} n'est pas habilité faire cette action")
-        if statut not in STATUT_EQUIPE:
-            raise Exception(f"Statut invalide : {statut}")
+        if not created_by.can("MANAGE_TEAM"):
+            raise Exception(f"{created_by.first_name} is not authorized to create a team")
+        if status not in TEAM_STATUSES:
+            raise Exception(f"Invalid status: {status}")
 
         self.id          = id
-        self.nom         = nom
-        self.chantier    = chantier
+        self.name        = name
+        self.site        = site
         self.created_by  = created_by
         self.description = description
-        self.chef_equipe = chef_equipe
-        self.statut      = statut
-        self.membres     = []  # liste d'EquipeMembre
+        self.team_lead   = team_lead
+        self.status      = status
+        self.members     = []
 
-    def modifierEquipe(self, modifier_by, **kwargs):
-        if not modifier_by.peut("GERER_EQUIPE"):
-            raise Exception("Permission refusée")
-        for cle, valeur in kwargs.items():
-            if cle in ['nom', 'statut']: setattr(self, cle, valeur)
+    def add_member(self, user, team_role):
+        if team_role not in TEAM_ROLES:
+            raise Exception(f"Invalid team role: {team_role}")
+        if self.has_member(user):
+            raise Exception(f"{user.first_name} is already a member of this team")
+        member = TeamMember(team=self, user=user, team_role=team_role)
+        self.members.append(member)
+        return member
 
-    def supprimerEquipe(self, deleted_by):
-        if not deleted_by.peut("GERER_EQUIPE"):
-            raise Exception("Permission refusée")
-        self.statut = "INACTIVE"
-
-    def ajouterMembre(self, user, role_equipe):
-        if role_equipe not in ROLE_EQUIPE:
-            raise Exception(f"Rôle équipe invalide : {role_equipe}")
-        if self.contientUser(user):
-            raise Exception(f"{user.prenom} est déjà membre de cette équipe")
-
-        membre = EquipeMembre(
-            equipe      = self,
-            user        = user,
-            role_equipe = role_equipe
-        )
-        self.membres.append(membre)
-        return membre
-
-    def retirerMembre(self, user):
-        for m in self.membres:
-            if m.user.id == user.id and m.estActif():
-                m.terminerAffectation(datetime.now().strftime("%Y-%m-%d"))
+    def remove_member(self, user):
+        for m in self.members:
+            if m.user.id == user.id and m.is_active():
+                m.end_assignment(datetime.now().strftime("%Y-%m-%d"))
                 return
-        raise Exception(f"{user.prenom} n'est pas membre actif de cette équipe")
+        raise Exception(f"{user.first_name} is not an active member of this team")
 
-    def getMembres(self):
-        return [m for m in self.membres if m.estActif()]
+    def get_members(self):
+        return [m for m in self.members if m.is_active()]
 
-    def contientUser(self, user):
-        return any(m.user.id == user.id and m.estActif() for m in self.membres)
+    def has_member(self, user):
+        return any(m.user.id == user.id and m.is_active() for m in self.members)
 
-    def estActive(self):
-        return self.statut == "ACTIVE"
-
-    def __repr__(self):
-        return (f"Equipe({self.nom} | {self.statut} | "
-                f"Membres actifs: {len(self.getMembres())})")
-
-
-# ── EQUIPEMEMBRE ──────────────────────────────────────────
-class EquipeMembre:
-
-    def __init__(self, equipe, user, role_equipe):
-        self.equipe                = equipe
-        self.user                  = user
-        self.role_equipe           = role_equipe
-        self.date_affectation      = datetime.now().strftime("%Y-%m-%d")
-        self.date_fin_affectation  = None
-        self.statut                = "ACTIF"
-
-    def estActif(self):
-        return self.statut == "ACTIF"
-
-    def terminerAffectation(self, date):
-        self.statut               = "INACTIF"
-        self.date_fin_affectation = date
+    def is_active(self):
+        return self.status == "ACTIVE"
 
     def __repr__(self):
-        return (f"EquipeMembre({self.user.prenom} {self.user.nom} | "
-                f"{self.role_equipe} | {self.statut})")
+        return (f"Team({self.name} | {self.status} | "
+                f"Active members: {len(self.get_members())})")
+
+
+# ── TEAM MEMBER ───────────────────────────────────────────
+class TeamMember:
+
+    def __init__(self, team, user, team_role):
+        self.team             = team
+        self.user             = user
+        self.team_role        = team_role
+        self.assignment_date  = datetime.now().strftime("%Y-%m-%d")
+        self.end_date         = None
+        self.status           = "ACTIVE"
+
+    def is_active(self):
+        return self.status == "ACTIVE"
+
+    def end_assignment(self, date):
+        self.status   = "INACTIVE"
+        self.end_date = date
+
+    def __repr__(self):
+        return (f"TeamMember({self.user.first_name} {self.user.last_name} | "
+                f"{self.team_role} | {self.status})")
 
 
 # ── PHOTO ─────────────────────────────────────────────────
 class Photo:
 
-    def __init__(self, chantier, user, fichier, categorie=None):
-        if categorie and categorie not in CATEGORIE_PHOTO:
-            raise Exception(f"Catégorie invalide : {categorie}")
+    def __init__(self, site, user, filename, category=None):
+        if category and category not in PHOTO_CATEGORIES:
+            raise Exception(f"Invalid category: {category}")
 
-        self.chantier   = chantier
+        self.site       = site
         self.user       = user
-        self.fichier    = fichier
-        self.categorie  = categorie
-        self.date_prise = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.est_supprimee = False
+        self.filename   = filename
+        self.category   = category
+        self.taken_at   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.is_deleted = False
 
-    def supprimer(self, deleted_by, raison):
-        if not deleted_by.peut("SUPPRIMER_PHOTO"):
-            raise Exception("Permission refusée : rôle insuffisant")
-        if not deleted_by.isActive:
-            raise Exception("Compte utilisateur inactif")
-        if not raison or raison.strip() == "":
-            raise Exception("Une raison est obligatoire pour la suppression")
-        if self.est_supprimee:
-            raise Exception("Cette photo est déjà supprimée")
+    def delete(self, deleted_by, reason):
+        if not deleted_by.can("DELETE_PHOTO"):
+            raise Exception("Permission denied: insufficient role")
+        if not deleted_by.is_active:
+            raise Exception("User account is inactive")
+        if not reason or reason.strip() == "":
+            raise Exception("A reason is required for deletion")
+        if self.is_deleted:
+            raise Exception("This photo has already been deleted")
 
-        self.est_supprimee = True
-
-        log = LogPhoto(
-            photo      = self,
-            deleted_by = deleted_by,
-            raison     = raison
-        )
+        self.is_deleted = True
+        log = DeletionLog(photo=self, deleted_by=deleted_by, reason=reason)
         return log
 
-    def getUrl(self):
-        return self.fichier
+    def get_url(self):
+        return self.filename
 
     def __repr__(self):
-        statut = "SUPPRIMEE" if self.est_supprimee else "ACTIVE"
-        return (f"Photo({self.user.prenom} | "
-                f"{self.categorie} | {self.date_prise} | {statut})")
+        status = "DELETED" if self.is_deleted else "ACTIVE"
+        return (f"Photo({self.user.first_name} | "
+                f"{self.category} | {self.taken_at} | {status})")
 
 
-# ── LOGPHOTO ──────────────────────────────────────────────
-class LogPhoto:
+# ── DELETION LOG ──────────────────────────────────────────
+class DeletionLog:
 
-    def __init__(self, photo, deleted_by, raison):
-        self.photo            = photo
-        self.deleted_by       = deleted_by
-        self.raison           = raison
-        self.date_suppression = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    def __init__(self, photo, deleted_by, reason):
+        self.photo        = photo
+        self.deleted_by   = deleted_by
+        self.reason       = reason
+        self.deleted_at   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    def getDetails(self):
-        return (f"[LOG] Photo supprimée par {self.deleted_by.prenom} "
-                f"{self.deleted_by.nom} le {self.date_suppression} "
-                f"| Raison : {self.raison}")
+    def get_details(self):
+        return (f"[LOG] Photo deleted by {self.deleted_by.first_name} "
+                f"{self.deleted_by.last_name} on {self.deleted_at} "
+                f"| Reason: {self.reason}")
 
     def __repr__(self):
-        return self.getDetails()
+        return self.get_details()
 
 
-# TESTS
+# ══════════════════════════════════════════════════════════
+# TESTS — End-to-end scenario
+# ══════════════════════════════════════════════════════════
 if __name__ == "__main__":
 
+    print("=" * 55)
+    print("        END-TO-END SCENARIO — CHANTIERPRO")
+    print("=" * 55)
 
-    # ── Setup : les users ──────────────────────────────────
-    chef       = User(1, "Diallo",  "Moussa", "hash1", "CHEF_PROJET", "0700000001")
-    technicien = User(2, "Kouamé",  "Jean",   "hash2", "TECHNICIEN",  "0700000002")
-    direction  = User(3, "Konan",   "Aya",    "hash3", "DIRECTION",   "0700000003")
+    # ── Users ─────────────────────────────────────────────
+    manager    = User(1, "Diallo",  "Moussa", "hash1", "PROJECT_MANAGER", "0700000001")
+    technician = User(2, "Kouame",  "Jean",   "hash2", "TECHNICIAN",      "0700000002")
+    director   = User(3, "Konan",   "Aya",    "hash3", "DIRECTION",       "0700000003")
+    hr         = User(4, "Bamba",   "Fatou",  "hash4", "HR",              "0700000004")
 
-    # ── Projet ────────────────────────────────────────────
-    print("\n── Création Projet ──")
-    projet = Projet(
-        id=1, nom="Rénovation Plateau", adresse="Rue de Lyon",
-        description="Rénovation complète", ville="Abidjan",
-        date_debut="2026-01-01", date_fin="2026-12-31",
-        budget_total=50_000_000, chef_projet=chef, created_by=chef
+    # ── Project ───────────────────────────────────────────
+    print("\n── Project Creation ──")
+    project = Project(
+        id=1, name="Plateau Renovation", address="Rue de Lyon",
+        description="Full building renovation", city="Abidjan",
+        start_date="2026-01-01", end_date="2026-12-31",
+        total_budget=50_000_000, project_manager=manager, created_by=manager
     )
-    print(projet)
+    print(project)
 
-    # ── Chantier ──────────────────────────────────────────
-    print("\n── Création Chantier ──")
-    chantier = Chantier(
-        id=1, projet=projet, nom="Bâtiment A",
-        localisation=(5.3600, -4.0083),
-        adresse="Rue de Lyon, Abidjan",
-        description="Rénovation bâtiment principal",
-        date_debut="2026-02-01", date_fin="2026-10-31",
-        superficie=500, budget_alloue=20_000_000,
-        chef_projet=chef, created_by=chef
+    # ── Site ──────────────────────────────────────────────
+    print("\n── Site Creation ──")
+    site = Site(
+        id=1, project=project, name="Building A",
+        location=(5.3600, -4.0083),
+        address="Rue de Lyon, Abidjan",
+        description="Main building renovation",
+        start_date="2026-02-01", end_date="2026-10-31",
+        area=500, allocated_budget=20_000_000,
+        site_manager=manager, created_by=manager
     )
-    projet.ajouterChantier(chantier)
-    print(chantier)
-    print("Budget consommé :", projet.getBudgetConsomme())  # 20 000 000
-    print("Budget restant  :", projet.getBudgetRestant())   # 30 000 000
+    project.add_site(site)
+    print(site)
+    print("Spent budget  :", project.get_spent_budget())    # 20 000 000
+    print("Remaining budget:", project.get_remaining_budget())  # 30 000 000
 
-    # ── Equipe ────────────────────────────────────────────
-    print("\n── Création Equipe ──")
-    equipe = Equipe(id=1, nom="Equipe A", chantier=chantier, created_by=chef)
-    equipe.ajouterMembre(technicien, "MEMBRE")
-    chantier.assignerEquipe(equipe)
-    print(equipe)
-    print("Contient technicien ?", equipe.contientUser(technicien))  # True
+    # ── Team ──────────────────────────────────────────────
+    print("\n── Team Creation ──")
+    team = Team(id=1, name="Team A", site=site, created_by=manager)
+    team.add_member(technician, "MEMBER")
+    site.assign_team(team)
+    print(team)
+    print("Has technician?", team.has_member(technician))  # True
 
-    # ── Pointage valide ───────────────────────────────────
-    print("\n── Pointage Arrivée (valide) ──")
-    arrivee = technicien.pointer(chantier, "ARRIVEE", 5.3612, -4.0091)
-    chantier.ajouterPointage(arrivee)
-    print(arrivee)
-    print("Est valide ?", arrivee.estValide())                          # True
-    print("Présences aujourd'hui :",
-          chantier.calculerPresencesJour(arrivee.date_pointage))        # 1
+    # ── Valid clock-in ────────────────────────────────────
+    print("\n── Arrival Clock-in (valid) ──")
+    arrival = technician.clock_in(site, "ARRIVAL", 5.3612, -4.0091)
+    site.add_clock_in_record(arrival)
+    print(arrival)
+    print("Is valid?", arrival.is_valid())                              # True
+    print("Present today:", site.count_present_today(arrival.clock_in_date))  # 1
 
-    # ── Pointage refusé (trop loin) ───────────────────────
-    print("\n── Pointage Refusé (trop loin) ──")
+    # ── Rejected clock-in (too far) ───────────────────────
+    print("\n── Clock-in Rejected (too far) ──")
     try:
-        technicien.pointer(chantier, "ARRIVEE", 5.4200, -4.1000)
+        technician.clock_in(site, "ARRIVAL", 5.4200, -4.1000)
     except Exception as e:
-        print("Erreur attendue :", e)
+        print("Expected error:", e)
 
     # ── Photo ─────────────────────────────────────────────
-    print("\n── Prise de Photo ──")
-    photo = technicien.prendrePhoto(chantier, "photo_avancement.jpg", "AVANCEMENT")
-    chantier.ajouterPhoto(photo)
+    print("\n── Taking a Photo ──")
+    photo = technician.take_photo(site, "progress_photo.jpg", "PROGRESS")
+    site.add_photo(photo)
     print(photo)
 
-    # ── Suppression Photo ─────────────────────────────────
-    print("\n── Suppression Photo par Chef ──")
-    log = photo.supprimer(chef, "Photo floue, ne respecte pas les standards")
+    # ── Photo deletion by manager ─────────────────────────
+    print("\n── Photo Deletion by Manager ──")
+    log = photo.delete(manager, "Blurry photo, does not meet quality standards")
     print(log)
 
-    # ── Tentative suppression par technicien ──────────────
-    print("\n── Suppression refusée (technicien) ──")
-    photo2 = technicien.prendrePhoto(chantier, "photo2.jpg", "INCIDENT")
+    # ── Deletion rejected (technician) ───────────────────
+    print("\n── Deletion Rejected (technician) ──")
+    photo2 = technician.take_photo(site, "incident_photo.jpg", "INCIDENT")
     try:
-        photo2.supprimer(technicien, "Test")
+        photo2.delete(technician, "Test")
     except Exception as e:
-        print("Erreur attendue :", e)
+        print("Expected error:", e)
 
-    # ── Historique pointages technicien ───────────────────
-    print("\n── Historique Pointages ──")
-    historique = technicien.getHistoriquePointages(chantier)
-    for p in historique:
-        print(p)
+    # ── Clock-in history ──────────────────────────────────
+    print("\n── Clock-in History ──")
+    history = technician.get_clock_in_history(site)
+    for r in history:
+        print(r)
 
-    # ── Techniciens présents (vue chef) ───────────────────
-    print("\n── Techniciens Présents ──")
-    presents = chantier.getTechniciensPresents(arrivee.date_pointage)
-    for u in presents:
+    # ── Present workers (manager view) ────────────────────
+    print("\n── Present Workers ──")
+    present = site.get_present_workers(arrival.clock_in_date)
+    for u in present:
         print(u)
 
-    # ── Pointage DEPART ───────────────────────────────────
-    print("\n── Pointage Départ ──")
-    depart = technicien.pointer(chantier, "DEPART", 5.3612, -4.0091)
-    chantier.ajouterPointage(depart)
-    print(depart)
-    print("Durée session :", depart.getDureeSession(arrivee))
+    # ── Departure clock-in ────────────────────────────────
+    print("\n── Departure Clock-in ──")
+    departure = technician.clock_in(site, "DEPARTURE", 5.3612, -4.0091)
+    site.add_clock_in_record(departure)
+    print(departure)
+    print("Session duration:", departure.get_session_duration(arrival))
 
-    # ── Double arrivée refusée ────────────────────────────
-    print("\n── Double Arrivée Refusée ──")
-    arrivee2 = technicien.pointer(chantier, "ARRIVEE", 5.3612, -4.0091)
-    chantier.ajouterPointage(arrivee2)
+    # ── Double arrival rejected ───────────────────────────
+    print("\n── Double Arrival Rejected ──")
+    arrival2 = technician.clock_in(site, "ARRIVAL", 5.3612, -4.0091)
+    site.add_clock_in_record(arrival2)
     try:
-        technicien.pointer(chantier, "ARRIVEE", 5.3612, -4.0091)
+        technician.clock_in(site, "ARRIVAL", 5.3612, -4.0091)
     except Exception as e:
-        print("Erreur attendue :", e)
+        print("Expected error:", e)
 
-    # ── Export données RH ─────────────────────────────────
-    print("\n── Export Données ──")
-    rh = User(4, "Bamba", "Fatou", "hash4", "RH", "0700000004")
-    export = rh.exporterDonnees(chantier, mois=4, annee=2026)
-    for ligne in export:
-        print(ligne)
+    # ── HR data export ────────────────────────────────────
+    print("\n── HR Data Export ──")
+    export = hr.export_data(site, month=4, year=2026)
+    for row in export:
+        print(row)
+
+    print("\n" + "=" * 55)
+    print("        SCENARIO COMPLETED — NO ERRORS ✅")
+    print("=" * 55)
