@@ -1,0 +1,391 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPERVISOR
+  COORDINATOR
+  GENERAL_SUPERVISOR
+  PROJECT_MANAGER
+  DIRECTION
+  HR
+  ADMIN
+}
+
+enum ProjectStatus {
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+  ARCHIVED
+}
+
+enum SiteStatus {
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+}
+
+enum TeamStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TeamRole {
+  TEAM_LEAD
+  MEMBER
+}
+
+enum TeamMemberStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ClockInType {
+  ARRIVAL
+  DEPARTURE
+  INTERMEDIATE
+  PAUSE_START
+  PAUSE_END
+}
+
+enum ClockInStatus {
+  VALID
+  REJECTED
+  ANOMALY
+}
+
+enum PhotoCategory {
+  PROGRESS
+  INCIDENT
+  OTHER
+}
+
+enum RhExportFormat {
+  CSV
+  XLSX
+}
+
+enum ReportStatus {
+  RECU
+  EN_REVUE
+  VALIDE
+  ENVOYE
+}
+
+enum ReportValidationStatus {
+  SUBMITTED
+  VALIDATED_FOR_CLIENT
+}
+
+enum PlanningAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  passwordHash       String
+  firstName          String
+  lastName           String
+  role               Role
+  contact            String
+  isActive           Boolean             @default(true)
+  mustChangePassword Boolean             @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime            @default(now())
+  managedProjects    Project[]           @relation("ProjectManager")
+  createdProjects    Project[]           @relation("ProjectCreator")
+  managedSites       Site[]              @relation("SiteManager")
+  createdSites       Site[]              @relation("SiteCreator")
+  ledTeams           Team[]              @relation("TeamLead")
+  createdTeams       Team[]              @relation("TeamCreator")
+  teamMemberships    TeamMember[]        @relation("TeamMemberUser")
+  createdMemberships TeamMember[]        @relation("TeamMemberCreator")
+  clockInRecords     ClockInRecord[]
+  uploadedPhotos     Photo[]             @relation("PhotoUploader")
+  deletedPhotos      Photo[]             @relation("PhotoDeleter")
+  deletedPhotoLogs   PhotoDeletionLog[]  @relation("PhotoDeletionActor")
+  originalPhotoLogs  PhotoDeletionLog[]  @relation("PhotoDeletionOriginalAuthor")
+  reports            Report[]
+  reportsValidated   Report[]            @relation("ReportValidator")
+  rhExportsCreated   RhExportHistory[]    @relation("RhExportCreator")
+  refreshTokens      RefreshToken[]
+  pushTokens         PushToken[]
+  loginAttempts      LoginAttempt[]
+  planningAssignments        PlanningAssignment[] @relation("PlanningAssignmentSupervisor")
+  createdPlanningAssignments PlanningAssignment[] @relation("PlanningAssignmentCreator")
+}
+
+model Project {
+  id               String        @id @default(cuid())
+  name             String
+  description      String
+  address          String
+  city             String
+  startDate        DateTime      @db.Date
+  endDate          DateTime?     @db.Date
+  status           ProjectStatus
+  createdAt        DateTime      @default(now())
+  projectManagerId String
+  createdById      String
+  projectManager   User          @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
+  sites            Site[]
+
+  @@index([projectManagerId])
+  @@index([createdById])
+}
+
+model Site {
+  id             String       @id @default(cuid())
+  projectId      String
+  name           String
+  address        String
+  latitude       Decimal      @db.Decimal(9, 6)
+  longitude      Decimal      @db.Decimal(9, 6)
+  radiusKm       Decimal      @default(2.0) @db.Decimal(4, 2)
+  description    String
+  status         SiteStatus
+  area           Decimal      @db.Decimal(10, 2)
+  startDate      DateTime     @db.Date
+  endDate        DateTime?    @db.Date
+  siteManagerId  String
+  createdById    String
+  createdAt      DateTime     @default(now())
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  siteManager    User         @relation("SiteManager", fields: [siteManagerId], references: [id])
+  createdBy      User         @relation("SiteCreator", fields: [createdById], references: [id])
+  teams          Team[]
+  clockInRecords ClockInRecord[]
+  photos         Photo[]
+  reports        Report[]
+  planningAssignments PlanningAssignment[]
+
+  @@index([projectId])
+  @@index([siteManagerId])
+  @@index([createdById])
+}
+
+model Team {
+  id          String     @id @default(cuid())
+  name        String
+  siteId      String
+  teamLeadId  String
+  status      TeamStatus
+  createdById String
+  createdAt   DateTime   @default(now())
+  site        Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  teamLead    User       @relation("TeamLead", fields: [teamLeadId], references: [id])
+  createdBy   User       @relation("TeamCreator", fields: [createdById], references: [id])
+  members     TeamMember[]
+
+  @@index([siteId])
+  @@index([teamLeadId])
+  @@index([createdById])
+}
+
+model TeamMember {
+  id             String           @id @default(cuid())
+  teamId         String
+  userId         String
+  teamRole       TeamRole
+  assignmentDate DateTime         @db.Date
+  endDate        DateTime?        @db.Date
+  status         TeamMemberStatus
+  createdById    String
+  team           Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user           User             @relation("TeamMemberUser", fields: [userId], references: [id])
+  createdBy      User             @relation("TeamMemberCreator", fields: [createdById], references: [id])
+
+  @@index([teamId])
+  @@index([userId])
+  @@index([createdById])
+}
+
+model ClockInRecord {
+  id             String         @id @default(cuid())
+  siteId         String
+  userId         String
+  type           ClockInType
+  clockInDate    DateTime       @db.Date
+  clockInTime    DateTime       @db.Time(6)
+  latitude       Decimal        @db.Decimal(9, 6)
+  longitude      Decimal        @db.Decimal(9, 6)
+  accuracy       Decimal?       @db.Decimal(6, 2)
+  distanceToSite Decimal        @db.Decimal(5, 2)
+  status         ClockInStatus
+  comment        String?
+  timestampLocal DateTime
+  createdAt      DateTime       @default(now())
+  site           Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id])
+  report         Report?
+
+  @@index([siteId])
+  @@index([userId])
+  @@index([userId, siteId, clockInDate])
+}
+
+model Report {
+  id                       String                 @id @default(cuid())
+  siteId                   String
+  site                     Site                   @relation(fields: [siteId], references: [id])
+  userId                   String
+  user                     User                   @relation(fields: [userId], references: [id])
+  clockInRecordId          String                 @unique
+  clockInRecord            ClockInRecord          @relation(fields: [clockInRecordId], references: [id])
+  content                  String
+  progression              Int?
+  blocage                  String?
+  status                   ReportStatus           @default(RECU)
+  validationStatus         ReportValidationStatus @default(SUBMITTED)
+  validatedForClientAt     DateTime?
+  validatedForClientById   String?
+  validatedForClientBy     User?                  @relation("ReportValidator", fields: [validatedForClientById], references: [id])
+  submittedAt              DateTime               @default(now())
+  createdAt                DateTime               @default(now())
+
+  @@index([siteId])
+  @@index([userId])
+  @@index([status])
+  @@index([validationStatus])
+  @@index([validatedForClientById])
+}
+
+model PlanningAssignment {
+  id             String                   @id @default(cuid())
+  date           DateTime                 @db.Date
+  supervisorId   String
+  siteId         String
+  action         String
+  targetProgress Int?
+  status         PlanningAssignmentStatus @default(ASSIGNED)
+  createdById    String
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  deletedAt      DateTime?
+  supervisor     User                     @relation("PlanningAssignmentSupervisor", fields: [supervisorId], references: [id])
+  site           Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  createdBy      User                     @relation("PlanningAssignmentCreator", fields: [createdById], references: [id])
+
+  @@index([date])
+  @@index([siteId])
+  @@index([supervisorId])
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+model Photo {
+  id          String             @id @default(cuid())
+  siteId      String
+  uploadedById String
+  category    PhotoCategory
+  description String
+  filename    String
+  storageKey  String             @unique
+  url         String
+  fileSize    Int
+  format      String
+  latitude    Decimal?           @db.Decimal(9, 6)
+  longitude   Decimal?           @db.Decimal(9, 6)
+  timestampLocal DateTime        @default(now())
+  takenAt     DateTime
+  isDeleted   Boolean            @default(false)
+  deletedAt   DateTime?
+  deletedById String?
+  createdAt   DateTime           @default(now())
+  site        Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  uploadedBy  User               @relation("PhotoUploader", fields: [uploadedById], references: [id])
+  deletedBy   User?              @relation("PhotoDeleter", fields: [deletedById], references: [id])
+  deletionLogs PhotoDeletionLog[]
+
+  @@index([siteId])
+  @@index([uploadedById])
+  @@index([deletedById])
+  @@index([siteId, isDeleted])
+}
+
+model PhotoDeletionLog {
+  id               String   @id @default(cuid())
+  photoId          String
+  deletedById      String
+  originalAuthorId String
+  reason           String
+  deletedAt        DateTime @default(now())
+  photo            Photo    @relation(fields: [photoId], references: [id])
+  deletedBy        User     @relation("PhotoDeletionActor", fields: [deletedById], references: [id])
+  originalAuthor   User     @relation("PhotoDeletionOriginalAuthor", fields: [originalAuthorId], references: [id])
+
+  @@index([photoId])
+  @@index([deletedById])
+  @@index([originalAuthorId])
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  userAgent  String?
+  ipAddress  String?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PushToken {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  platform   String
+  deviceLabel String?
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id         String   @id @default(cuid())
+  userId     String?
+  emailOrKey String
+  ipAddress  String
+  attemptedAt DateTime @default(now())
+  success    Boolean
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([emailOrKey, ipAddress, attemptedAt])
+}
+
+model RhExportHistory {
+  id          String         @id @default(cuid())
+  createdById String
+  format      RhExportFormat
+  from        DateTime
+  to          DateTime
+  userId      String?
+  projectId   String?
+  rowCount    Int
+  storageKey  String?
+  fileName    String?
+  contentType String?
+  expiresAt   DateTime?
+  createdAt   DateTime       @default(now())
+  createdBy   User           @relation("RhExportCreator", fields: [createdById], references: [id])
+
+  @@index([createdById])
+  @@index([createdAt])
+}

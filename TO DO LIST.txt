@@ -1,23 +1,55 @@
 Ce qui a été fait avant : 
 
-- Maquettes de l'application (version web et mobile)
-- Analyse des maquettes pour comprendre les besoins 
-- Lecture et application de la méthodologie de la conception de bas niveau
-- Rédaction des exigences du système, règles métier
-- Entités du système, définition des relations puis description des états et des comportements de chaque entité
+- Setup projet Next.js + Prisma + Neon
+-  Schéma Prisma complet basé sur les entités
+de main.py
+- système d'authentification complet
+- routes de gestion des utilisateurs
+- routes pour les projets et les sites (chantiers)
+- Tests effectués sur toutes les routes déjà crées
 
 
-Ce qui se fait actuellement : 
+Ce reste à faire : 
+- routes pour les équipes et leurs membres
+- système de pointage GPS
+- système de gestion des photos avec stockage bucket et log d'audit immuable
+- module RH avec tableau de bord mensuel et exports
+- routes pour la vue Direction
+- routes d'administration
+- Re tester les routes avant de passer au Frontend
 
-- Simulation de la logique métier en code pur Python
-- Script composé de toutes les classes principales avec leurs méthodes
+La barre horizontal des PROJECT_MANAGER et DIRECTION ne sont pas complets tu as des maquettes pour ça tu n'as pas respecté un minimum au lieu de photo on doit avoir Galerie, 
+il peut prendre des photos donc on doit pouvoir les prendres mais la caméra ne doit pas s'afficher sur le dashboard
+On arrive pas à afficher les photos, on ne sait pas comment on peut créer un projet, equipe etc rien n'est affiché dans les écrans des PROJECT_MANAGER, DIRECTION, GENERAL_SUPERVISOR
+Superviseur ne peut pas envoyer, voir ses rapport alors qu'il doit le faire
+On t'a donné une maquette des écrans des PROJECT_MANAGER, DIRECTION mais tu ne les suis pas un minimum sinon on aura pas eu ces problèmes
+On ne peut pas pointer sur le mobile la localisation ne marche pas pourtant la loc est activé sur le téléphone
+On peut pas prendre une photo sur le téléphone pour tous les rôles
+On peut pas avoir accès au planning sur sup.general
 
 
-Ce qui se fera après : 
+Après des tests sur le téléphone 
+A la fin de sa journée lorsque le superviseur soumet un rapport on met une erreur rapport impossible
+Erreur affiché : la caméra n'est pas supporté sur le navigateur, 
+Erreur affiché : GPS indisponible, permission refusée. allez dans paramètres > site web > localisation et autorisez ChantierPro, Alors que pour ces deux erreurs sur l'ordinateur on arrive à utiliser le GPS et la camera
+On a toujours l'erreur impossible de charger le planning du jour et impossible de charger les alertes pour le sup général 
+Toujours impossible de charger les rapports, 
+J'ai retirer un membre dans une equipe il est passé inactif mais quand j'ajoute le même membre plutard, le membre est affiché inactif + le même membre est affiché actif donc on se retrouve avec deux fois le même membre mais avec des statuts différents
+Les photos ne s'affichent pas correctement peut importe où ils sont affichés dans l'application
+Quand on clique sur prendre photo on est pas redirigé sur la camera 
+Partout où on doit voir un rapport on a toujours soit un problème pour le chargement des rapports ou l'envoi des rapports
 
-- S'assurer que le script marche de bout en bout avant de passer à la suite
-- Mise en place de la véritable infrastructure backend
-- Création et configuration de la vrai base de données en se basant sur les modèles existants
-- Transformation des fonctions codées en véritables routes/API prêtes à être connecter au moteur
 
-- Création de l'interface visuelle et la connexion au moteur 
+Dans le planning les données des champs de selections superviseur et chantiers ne se chargent pas 
+Dans équipe les données ne se chargent pas aussi dans les différents champs de sélection pour la création d'équipe et même les données des équipes existantes
+Pour tous les roles qui ont accès au rapport on a les erreurs impossibles de charger les rapports même le superviseur ne peut pas charger ses propres rapports
+coordinateur et GENERAL_SUPERVISOR on des erreurs 401 alors qu'ils sont autorisé à voir les rapports
+Le sup general dans son assignation va donner des tâches au superviseur et quand le superviseur finit une tâche il peut prendre une photo pour en sélectionnant la tâche auquel il a été assigné pour dire j'ai fini telle tâche voici la photo donc faut revoir la logique et le fonctionnement, il peut toujours prendre aussi des photos du chantier comme convenu au départ
+Les PROJECT_MANAGER et DIRECTION et GENERAL_SUPERVISOR doivent pouvoir aussi télécharger les rapports comme le COORDINATOR
+
+Je teste sur mon téléphone :
+quand on veut pointer on affiche GPS indisponible, permission refusée allez dans paramètre > site web > Localistaion et autorisez ChantierPro
+Quand je veut prendre une photo on met camera indisponible, la camera n'est pas supportée sur ce navigateur
+Pour ces erreurs de gps et de camera cherchent et résout le problème ou dis moi comment faire pour tester efficacement
+
+

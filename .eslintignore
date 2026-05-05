@@ -1,0 +1,10 @@
+.next
+node_modules
+docs
+chantier_pro_python
+public/sw.js
+public/workbox-*.js
+worker
+next.config.js
+postcss.config.js
+next-env.d.ts

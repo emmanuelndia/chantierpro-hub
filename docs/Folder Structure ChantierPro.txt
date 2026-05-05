@@ -1,0 +1,29 @@
+Folder Structure ChantierPro 
+
+
+app/
+|-------(web)/
+|	|-------(auth)/
+|	|-------(dashboard)/
+|		|-------admin/
+|		|-------hr/
+|		|-------project_manager/
+|		|-------manager/
+|-------(mobile)/
+|	|-------(auth)/
+|	|-------(dashboard)/
+|		|-------admin/
+|		|-------project_manager/
+|		|-------manager/
+|		|-------technician/
+|-------api/
+components/
+|
+hooks/
+|
+lib/
+|
+prisma/
+|
+types/
+

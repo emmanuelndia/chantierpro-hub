@@ -1,0 +1,141 @@
+Plan de test 
+
+Plan de test
+Vérifier que l’application démarre sans erreur avec les variables d’environnement renseignées.
+Vérifier que GET /api/health retourne bien { status: "ok" }.
+Vérifier que les routes placeholder web/mobile principales répondent correctement.
+Vérifier que Prisma peut générer le client sans erreur avec PostgreSQL/Neon.
+Vérifier que le manifest PWA est servi et référence bien les icônes 192x192 et 512x512.
+Vérifier que lint et format passent avec la configuration stricte.
+
+Vérifier qu’un login valide renvoie un JWT access token et pose le refresh cookie.
+Vérifier qu’une route protégée sans access token renvoie 401.
+Vérifier qu’une route protégée avec rôle insuffisant renvoie 403.
+Vérifier qu’un compte isActive = false renvoie ACCOUNT_DISABLED.
+Vérifier que 5 échecs de login en moins de 5 minutes bloquent la tentative suivante avec TOO_MANY_ATTEMPTS et retryAfterSeconds > 0.
+Vérifier que /api/auth/refresh renouvelle silencieusement l’access token avec rotation du refresh token.
+Vérifier que /api/auth/logout invalide le refresh token courant et supprime le cookie.
+Vérifier que POST /api/users/:id/reset-password est accessible uniquement à ADMIN.
+Vérifier qu’après reset admin :
+le mot de passe 12345678 fonctionne
+mustChangePassword = true est visible dans /login ou /me
+Vérifier que POST /api/auth/push-token crée puis met à jour un enregistrement pour le même device/token.
+Vérifier que le middleware web redirige :
+vers /web/login si non authentifié
+vers /403 si rôle insuffisant
+Vérifier que le helper fetch rejoue une requête après refresh sur premier 401, puis échoue proprement si le refresh échoue.
+
+TECHNICIAN appelle GET /api/users → 403
+ADMIN appelle GET /api/users?page=1 → 200, pageSize = 15, structure paginée correcte
+ADMIN crée un compte → 201, mot de passe temporaire renvoyé, mustChangePassword = true
+création avec email déjà existant → erreur explicite de conflit
+ADMIN modifie un utilisateur via PUT /api/users/:id → champs autorisés mis à jour, email inchangé
+utilisateur tente de modifier le profil d’un autre via route admin ou me → 403
+ADMIN désactive un autre compte → isActive = false, historique préservé, refresh tokens révoqués
+ADMIN tente de se désactiver lui-même → erreur explicite dédiée
+GET /api/users/me renvoie bien uniquement le profil du connecté
+PUT /api/users/me modifie uniquement firstName, lastName, contact
+tentative de changer email via PUT /api/users/me ou PUT /api/users/:id → rejet
+PUT /api/users/me/password avec mot de passe invalide → erreur de validation
+PUT /api/users/me/password avec mot de passe valide → 204, mustChangePassword = false, toutes les sessions révoquées
+POST /api/users/:id/reset-password par admin → 204, mot de passe 12345678, mustChangePassword = true, sessions révoquées
+
+PROJECT_MANAGER appelle GET /api/projects :
+ne reçoit que ses projets
+ne voit pas ceux d’un autre chef de projet
+DIRECTION appelle GET /api/projects :
+reçoit tous les projets
+TECHNICIAN appelle POST /api/projects ou PUT /api/sites/:id :
+403
+GET /api/projects/:id pour un projet hors périmètre d’un PROJECT_MANAGER :
+refus cohérent avec le reste de l’API
+POST /api/projects avec nom trop court ou dates invalides :
+400
+PUT /api/projects/:id avec endDate <= startDate :
+400
+POST /api/projects/:id/sites sur projet COMPLETED ou ARCHIVED :
+erreur explicite
+DELETE /api/projects/:id avec au moins un site ACTIVE :
+erreur explicite
+DELETE /api/projects/:id sans site actif :
+projet passe à ARCHIVED
+POST /api/projects/:id/sites avec radiusKm = 1.5 :
+site créé avec radiusKm = 1.5
+vérification DB/API que la valeur persistée est 1.5
+futur calcul Haversine lit bien 1.5 et non 2.0
+GET /api/projects/:id/presences :
+compte correctement les présences du jour à partir des ARRIVAL/DEPARTURE valides
+GET /api/users/me/sites/today pour un technicien :
+renvoie uniquement ses chantiers du jour dans le format minimal prévu
+
+Hypothèses et choix retenus
+Toutes les routes d’administration users sont réservées à ADMIN, pas à RH ni DIRECTION
+La pagination de GET /api/users ne gère que page dans ce ticket ; pas de recherche ni filtres tant que la spec ne l’impose pas
+Le mot de passe temporaire généré à la création est renvoyé une seule fois dans la réponse API pour affichage immédiat côté interface admin
+L’erreur “admin ne peut pas se désactiver lui-même” doit être distincte et lisible, plutôt qu’un simple 403
+/api/auth/me peut rester en place ; /api/users/me devient la route profil orientée gestion utilisateur
+
+
+
+technician_token : eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiVEVDSE5JQ0lBTiIsInR5cGUiOiJhY2Nlc3MiLCJzdWIiOiJjbW9hM2x3M3MwMDA2d2VhZ2p5dHppczhmIiwiaWF0IjoxNzc2OTM1ODM3LCJleHAiOjE3NzY5MzY3Mzd9.WMBJY-k-o1G2TGl5wIdN133Zoza98lQ7TmPOQChTEYE
+
+chef_projet : eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiUFJPSkVDVF9NQU5BR0VSIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6ImNtb2EzbHY0ODAwMDB3ZWFndnZwOHVocjYiLCJpYXQiOjE3NzY5MzQxODMsImV4cCI6MTc3NjkzNTA4M30.UYiSfu84eCVGNYacOAtrM9OYwZKyCcEnjbsms3JMWtI
+
+rh : eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiSFIiLCJ0eXBlIjoiYWNjZXNzIiwic3ViIjoiY21vYTNsdzNtMDAwNHdlYWc3dXF3ZnFnYiIsImlhdCI6MTc3NjkzNDI0MCwiZXhwIjoxNzc2OTM1MTQwfQ.axksqli0FMN78geCZtcSazk2TvfYOQpzmTij7lzxQGY
+
+direction : eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiRElSRUNUSU9OIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6ImNtb2EzbHczazAwMDN3ZWFnbWZoMG02cm4iLCJpYXQiOjE3NzY5MzQyODIsImV4cCI6MTc3NjkzNTE4Mn0.IBPdYjD6YgnDX7mOE9X-k7Il0IUtPhnMRFh9w-Hh5pM
+
+admin : eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiQURNSU4iLCJ0eXBlIjoiYWNjZXNzIiwic3ViIjoiY21vYTNsdzNvMDAwNXdlYWdhcDd4bm4wZyIsImlhdCI6MTc3NjkzNTYyNiwiZXhwIjoxNzc2OTM2NTI2fQ.P4NqxVJTWydv1bPPy_MEz8zdXbf289MkbpRN3DXP3ls
+
+{
+    "email" : "admin@chantierpro.local",
+    "password" : "Admin#2026"
+}
+
+{
+    "email" : "direction@chantierpro.local",
+    "password" : "Direction#2026"
+}
+
+{
+    "email" : "rh@chantierpro.local",
+    "password" : "Hr#2026"
+}
+
+{
+    "email" : "chef.projet@chantierpro.local",
+    "password" : "Project#2026"
+}
+
+{
+    "email" : "tech1@chantierpro.local",
+    "password" : "Tech#2026-1"
+}
+
+
+
+
+Tests
+
+GET 	http://localhost:3000/api/health 				ok
+POST 	http://localhost:3000/api/auth/login 				ok pour tous les rôles
+GET 	http://localhost:3000/api/auth/me 				ok
+POST 	http://localhost:3000/api/auth/refresh				ok
+POST 	http://localhost:3000/api/auth/logout				ok
+POST 	http://localhost:3000/api/auth/push-token			ok
+GET 	http://localhost:3000/api/users					ok pour tous les users mais pas pour le filtrage par role
+POST 	http://localhost:3000/api/users					ok
+GET 	http://localhost:3000/api/users/me				ok
+PUT 	http://localhost:3000/api/users/me				ok 
+PUT 	http://localhost:3000/api/users/me/password			ok
+GET 	http://localhost:3000/api/users/me/sites/today			ok
+GET 	http://localhost:3000/api/users/:id				ok
+PUT 	http://localhost:3000/api/users/:id				ok
+POST 	http://localhost:3000/api/users/:id/reset-password		ok
+PATCH 	http://localhost:3000/api/users/:id/status			ok
+GET 	http://localhost:3000/api/projects				ok mais par de filtre par statuts
+POST http://localhost:3000/api/projects					ok
+
+
+
+

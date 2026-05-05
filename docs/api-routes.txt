@@ -1,0 +1,91 @@
+ChantierPro - Routes API disponibles
+Base URL: http://localhost:3000
+
+Sante
+GET  http://localhost:3000/api/health
+
+Authentification
+POST http://localhost:3000/api/auth/login
+POST http://localhost:3000/api/auth/logout
+GET  http://localhost:3000/api/auth/me
+POST http://localhost:3000/api/auth/push-token
+POST http://localhost:3000/api/auth/refresh
+
+Administration
+GET  http://localhost:3000/api/admin/logs
+POST http://localhost:3000/api/admin/logs/export
+
+Utilisateurs
+GET   http://localhost:3000/api/users
+POST  http://localhost:3000/api/users
+GET   http://localhost:3000/api/users/me
+PUT   http://localhost:3000/api/users/me
+PUT   http://localhost:3000/api/users/me/password
+GET   http://localhost:3000/api/users/me/sites/today
+GET   http://localhost:3000/api/users/me/clock-in
+GET   http://localhost:3000/api/users/me/clock-in/history
+GET   http://localhost:3000/api/users/:id
+PUT   http://localhost:3000/api/users/:id
+POST  http://localhost:3000/api/users/:id/reset-password
+PATCH http://localhost:3000/api/users/:id/status
+
+Direction
+GET http://localhost:3000/api/direction/kpis
+GET http://localhost:3000/api/direction/projects/consolidated
+GET http://localhost:3000/api/direction/sites/active
+GET http://localhost:3000/api/direction/alerts
+
+RH
+GET  http://localhost:3000/api/rh/presences
+GET  http://localhost:3000/api/rh/presences/:userId
+POST http://localhost:3000/api/rh/export
+GET  http://localhost:3000/api/rh/exports/history
+
+Photos
+POST   http://localhost:3000/api/photos
+GET    http://localhost:3000/api/photos/:id
+DELETE http://localhost:3000/api/photos/:id
+GET    http://localhost:3000/api/photos/logs
+DELETE http://localhost:3000/api/photos/logs/:id
+GET    http://localhost:3000/api/sites/:id/photos
+
+Projets
+GET    http://localhost:3000/api/projects
+POST   http://localhost:3000/api/projects
+GET    http://localhost:3000/api/projects/:id
+PUT    http://localhost:3000/api/projects/:id
+DELETE http://localhost:3000/api/projects/:id
+GET    http://localhost:3000/api/projects/form-options
+GET    http://localhost:3000/api/projects/:id/team
+GET    http://localhost:3000/api/projects/:id/presences
+GET    http://localhost:3000/api/projects/:id/photos
+POST   http://localhost:3000/api/projects/:id/sites
+
+Sites
+GET http://localhost:3000/api/sites/nearby
+GET http://localhost:3000/api/sites/:id
+PUT http://localhost:3000/api/sites/:id
+GET http://localhost:3000/api/sites/:id/presences
+GET http://localhost:3000/api/sites/:id/presences/export
+POST http://localhost:3000/api/sites/:id/clock-in
+GET http://localhost:3000/api/sites/:id/clock-in
+GET http://localhost:3000/api/sites/:id/clock-in/session-status
+GET http://localhost:3000/api/sites/:id/attendance/today
+POST http://localhost:3000/api/sites/:id/reports
+GET http://localhost:3000/api/sites/:id/reports
+POST http://localhost:3000/api/sites/:id/teams
+GET http://localhost:3000/api/sites/:id/teams
+GET http://localhost:3000/api/sites/:id/unassigned-users
+GET http://localhost:3000/api/geocoding/search?q=abidjan
+
+Pointage et sync
+PATCH http://localhost:3000/api/clock-in/:id/comment
+POST  http://localhost:3000/api/sync/batch
+
+Rapports
+GET http://localhost:3000/api/reports/:id
+
+Equipes
+PUT    http://localhost:3000/api/teams/:id
+POST   http://localhost:3000/api/teams/:id/members
+DELETE http://localhost:3000/api/teams/:id/members/:userId

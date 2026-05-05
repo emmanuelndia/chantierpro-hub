@@ -1,0 +1,500 @@
+# ChantierPro - Prompts Codex Pour Ecrans Mobiles Manquants
+
+Ce fichier regroupe les prompts a copier dans Codex pour completer les ecrans mobiles manquants ou incomplets.
+
+Contexte commun a tous les prompts :
+- Application : ChantierPro, gestion de chantiers BTP.
+- Maquettes : docs/prototype_mobile et prototype_mobile.zip.
+- Shell mobile existant : app/(mobile)/mobile/(dashboard)/layout.tsx, MobileAppShell, BottomTabBar, OfflineBanner.
+- Respecter safe area iOS/Android, UI mobile-first, boutons tactiles min 48-56px, actions principales visibles.
+- Utiliser React Query avec staleTime : 30s pour listes dynamiques, 5min pour options peu changeantes.
+- Gerer loading, empty, error states.
+- Corriger les textes encodes casses.
+- Ne pas exposer de suppression photo sur mobile.
+- Scopes roles :
+  - PROJECT_MANAGER : uniquement ses projets/chantiers.
+  - DIRECTION : vue globale active.
+  - GENERAL_SUPERVISOR : planning, rapports, equipes selon perimetre operationnel.
+  - HR exclu des ecrans management mobile.
+- Verification attendue a chaque prompt : npm run lint, npm run build. Si les checks echouent sur des erreurs globales preexistantes hors perimetre, le signaler et fournir un lint cible sur les fichiers modifies.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-MGMT-1 Galerie Photos PROJECT_MANAGER / DIRECTION
+
+## Summary
+- Finaliser la galerie photo mobile management sur `/mobile/gallery`.
+- Accessible uniquement a `PROJECT_MANAGER` et `DIRECTION`.
+- Garder `/mobile/photo` comme route camera directe pour les roles terrain.
+
+## Key Changes
+- Route `/mobile/gallery` :
+  - session absente -> `/mobile/login?next=/mobile/gallery...`;
+  - `PROJECT_MANAGER`, `DIRECTION` autorises;
+  - roles terrain -> `/mobile/photo`;
+  - autres roles -> `/mobile/profile`.
+- Navigation :
+  - la tab `Photo` des `PROJECT_MANAGER` et `DIRECTION` pointe vers `/mobile/gallery`;
+  - la tab `Photo` terrain reste `/mobile/photo`.
+- Data :
+  - charger les chantiers via `GET /api/mobile/photo/sites`;
+  - charger les photos via `GET /api/sites/:id/photos?page=&sort=desc&from=&to=&uploadedBy=`;
+  - `PROJECT_MANAGER` voit seulement les photos des chantiers de ses projets;
+  - `DIRECTION` voit les chantiers actifs globaux.
+- UI inspiree de `docs/prototype_mobile/management/galerie.html` :
+  - header compact `Galerie photos`, chantier selectionne, total photos;
+  - grille 2 colonnes, batch de 20, scroll infini;
+  - filtres date debut/fin et auteur multi-select;
+  - lightbox plein ecran avec swipe horizontal, precedent/suivant, overlay auteur/date/site;
+  - mention exacte : `Suppression disponible sur l'application web`;
+  - aucune action de suppression.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier `/mobile/gallery` avec `PROJECT_MANAGER` et `DIRECTION`.
+- Verifier `/mobile/gallery?siteId=...`.
+- Verifier filtres, pagination, lightbox, absence de suppression.
+- Verifier qu'un `PROJECT_MANAGER` ne voit pas de photos hors de ses projets.
+
+## Assumptions
+- La galerie mobile management est contextualisee par chantier; si aucun `siteId`, selectionner le premier chantier accessible.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-MGMT-2 Presences Multi-Chantiers Mobile
+
+## Summary
+- Creer `/mobile/presences` pour supervision des presences multi-chantiers.
+- Accessible a `PROJECT_MANAGER` et `DIRECTION`.
+- L'ecran donne une vue rapide des ressources presentes, en pause, absentes et du dernier pointage par chantier.
+
+## Key Changes
+- Route `/mobile/presences` protegee :
+  - session absente -> `/mobile/login?next=/mobile/presences`;
+  - `PROJECT_MANAGER`, `DIRECTION` autorises;
+  - autres roles -> `/mobile/profile`.
+- Ajouter ou finaliser un endpoint `GET /api/mobile/presences` :
+  - `PROJECT_MANAGER` limite a ses projets;
+  - `DIRECTION` tous les chantiers actifs;
+  - query params : `projectId`, `status`, `q`;
+  - reponse : widgets globaux, liste chantiers, ressources par statut, dernier pointage.
+- UI inspiree de `docs/prototype_mobile/management/presences.html` :
+  - widgets : presents, pause, absents, chantiers actifs;
+  - filtres projet/statut/recherche;
+  - liste de cartes chantier : nom, projet, presents/total, dernier pointage, statut;
+  - tap chantier -> `/mobile/sites/[id]`;
+  - dans chaque carte, apercu ressources : `Present depuis Xhmin`, `En pause`, `Absent`.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier scope `PROJECT_MANAGER`.
+- Verifier vue globale `DIRECTION`.
+- Verifier filtres et navigation vers `/mobile/sites/[id]`.
+- Verifier empty state quand aucun chantier actif.
+
+## Assumptions
+- Les presences affichees sont celles du jour courant.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-MGMT-3 Gestion Projets Mobile
+
+## Summary
+- Creer `/mobile/projects` pour la gestion mobile des projets.
+- Accessible a `PROJECT_MANAGER` et `DIRECTION`.
+- Fournir liste, recherche, filtres, KPI et acces detail projet.
+
+## Key Changes
+- Route `/mobile/projects` protegee :
+  - `PROJECT_MANAGER`, `DIRECTION` autorises;
+  - autres roles -> `/mobile/profile`.
+- Ajouter `GET /api/mobile/projects` :
+  - `PROJECT_MANAGER` : projets dont `projectManagerId = user.id`;
+  - `DIRECTION` : tous les projets;
+  - query params : `q`, `status`;
+  - reponse : projets avec nb chantiers, nb equipes, nb photos, nb rapports, avancement si disponible.
+- UI inspiree de `docs/prototype_mobile/management/gestion-projets.html` :
+  - header `Gestion Projets`;
+  - recherche et chips statut;
+  - KPI : total, actifs, termines, alertes;
+  - liste cartes projet : nom, statut, dates, manager, chantiers, progression;
+  - FAB ou bouton `Nouveau projet` -> `/mobile/projects/new`;
+  - tap carte -> `/mobile/projects/[id]`.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier liste `PROJECT_MANAGER` limitee.
+- Verifier liste `DIRECTION` globale.
+- Verifier recherche, filtres, navigation detail et creation.
+
+## Assumptions
+- Si l'avancement projet n'existe pas en base, calculer un indicateur simple a partir des chantiers actifs/termines sans migration Prisma.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-MGMT-4 Creation Et Edition Projet Mobile
+
+## Summary
+- Creer `/mobile/projects/new` et `/mobile/projects/[id]/edit`.
+- Reutiliser et corriger `MobileCreateProjectPage`.
+- Brancher les champs sur le schema Prisma reel, sans champs inexistants.
+
+## Key Changes
+- Routes :
+  - `/mobile/projects/new`;
+  - `/mobile/projects/[id]/edit`.
+- Acces :
+  - `PROJECT_MANAGER`, `DIRECTION` autorises;
+  - autres roles -> `/mobile/profile`.
+- Endpoints :
+  - corriger ou creer `POST /api/mobile/projects`;
+  - creer `PATCH /api/mobile/projects/:id`;
+  - creer `GET /api/mobile/projects/:id/form`;
+  - utiliser les champs reels Prisma `Project` uniquement.
+- UI inspiree de `docs/prototype_mobile/management/creer-projet.html` et `nouveau-projet.html` :
+  - nom, description, dates, statut, chef de projet si `DIRECTION`;
+  - validation inline;
+  - bouton principal disabled + spinner pendant mutation;
+  - succes -> detail projet `/mobile/projects/[id]`.
+- Nettoyage :
+  - corriger textes encodes;
+  - ne pas garder `clientName`, `budget`, `estimatedStartDate` si ces champs n'existent pas dans Prisma.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Creer un projet comme `PROJECT_MANAGER`.
+- Creer/modifier un projet comme `DIRECTION`.
+- Verifier 403 pour roles non autorises.
+
+## Assumptions
+- Aucun changement Prisma dans cette iteration; les formulaires suivent le schema existant.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-MGMT-5 Detail Projet Mobile
+
+## Summary
+- Creer `/mobile/projects/[id]`.
+- Afficher une fiche projet mobile complete avec onglets resume, chantiers, equipes, photos, rapports.
+- Servir de hub vers les ecrans management.
+
+## Key Changes
+- Route `/mobile/projects/[id]` protegee :
+  - `PROJECT_MANAGER` autorise seulement sur ses projets;
+  - `DIRECTION` autorisee sur tous les projets;
+  - autres roles -> `/mobile/profile`.
+- Ajouter `GET /api/mobile/projects/:id` :
+  - projet, KPI, chantiers, equipes, dernieres photos, derniers rapports.
+- UI inspiree de `docs/prototype_mobile/management/chantier-detail.html` et gestion projets :
+  - header : nom projet, statut, dates, manager;
+  - KPI : chantiers actifs, ressources, photos, rapports;
+  - onglets : Resume, Chantiers, Equipes, Photos, Rapports;
+  - actions : `Modifier`, `Nouveau chantier`, `Nouvelle equipe`;
+  - liens :
+    - chantier -> `/mobile/sites/[id]`;
+    - galerie -> `/mobile/gallery?siteId=...`;
+    - rapports -> `/mobile/reports?projectId=...`.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier detail projet pour `PROJECT_MANAGER` autorise.
+- Verifier refus hors scope.
+- Verifier `DIRECTION` sur projet global.
+- Verifier onglets et liens.
+
+## Assumptions
+- Les photos de l'onglet Photos sont un apercu recent; la galerie reste l'ecran complet.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-MGMT-6 Gestion Chantiers Mobile
+
+## Summary
+- Creer `/mobile/sites` pour la gestion des chantiers.
+- Finaliser `MobileSitesManagementPage`.
+- Ajouter creation/edition chantier.
+
+## Key Changes
+- Routes :
+  - `/mobile/sites`;
+  - `/mobile/sites/new`;
+  - `/mobile/sites/[id]/edit`;
+  - conserver `/mobile/sites/[id]` pour supervision/detail.
+- Acces :
+  - `PROJECT_MANAGER`, `DIRECTION` autorises pour gestion;
+  - `COORDINATOR`, `GENERAL_SUPERVISOR` gardent l'acces supervision detail selon regles existantes.
+- Endpoints :
+  - finaliser `GET /api/mobile/sites/management`;
+  - ajouter `POST /api/mobile/sites`;
+  - ajouter `PATCH /api/mobile/sites/:id`;
+  - scopes par role.
+- UI inspiree de `docs/prototype_mobile/management/gestion-chantiers.html` :
+  - liste chantiers avec projet, statut, adresse, equipes, photos, pointages;
+  - filtres projet/statut;
+  - bouton `Nouveau chantier`;
+  - formulaire chantier : nom, projet, adresse, latitude, longitude, rayon, statut, dates si disponibles;
+  - tap carte -> `/mobile/sites/[id]`.
+- Nettoyage :
+  - remplacer boutons non raccordes `Voir details` / `Gerer` par liens reels.
+  - corriger accents et libelles.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier liste, filtres, creation, edition.
+- Verifier scope `PROJECT_MANAGER` et global `DIRECTION`.
+- Verifier lien vers detail chantier.
+
+## Assumptions
+- Pas de geocoding obligatoire dans cette iteration; latitude/longitude peuvent etre saisies ou reprises depuis un helper existant si disponible.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-MGMT-7 Gestion Equipes Mobile
+
+## Summary
+- Creer `/mobile/teams` pour gestion des equipes.
+- Finaliser `MobileTeamsManagementPage`.
+- Ajouter creation equipe, ajout/retrait membres, affectation chantier/projet.
+
+## Key Changes
+- Routes :
+  - `/mobile/teams`;
+  - `/mobile/teams/new`;
+  - `/mobile/teams/[id]`;
+  - `/mobile/teams/[id]/edit`.
+- Acces :
+  - `GENERAL_SUPERVISOR`, `PROJECT_MANAGER`, `DIRECTION` autorises;
+  - `COORDINATOR` lecture selon perimetre si deja supporte;
+  - autres roles -> `/mobile/profile`.
+- Endpoints :
+  - finaliser `GET /api/mobile/teams/management`;
+  - ajouter endpoints create/update equipe si absents;
+  - reposer sur les endpoints web existants `api/teams` si possible.
+- UI inspiree de `docs/prototype_mobile/management/gestion-equipes.html` :
+  - liste equipes avec projet, chantier, statut, membres actifs;
+  - filtres projet/statut;
+  - detail equipe avec membres, roles, statut;
+  - actions : creer equipe, ajouter membre, retirer/desactiver membre, affecter chantier.
+- Nettoyage :
+  - corriger relations Prisma incorrectes si l'endpoint mobile utilise des champs inexistants.
+  - corriger textes encodes.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier creation equipe par `GENERAL_SUPERVISOR`.
+- Verifier scope `PROJECT_MANAGER`.
+- Verifier vue globale `DIRECTION`.
+- Verifier ajout/retrait membre.
+
+## Assumptions
+- `GENERAL_SUPERVISOR` peut creer des equipes dans son perimetre operationnel.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-MGMT-8 Rapports Management Mobile
+
+## Summary
+- Etendre `/mobile/reports` pour `PROJECT_MANAGER` et `DIRECTION`.
+- Afficher les rapports terrain par projet/chantier avec filtres et detail.
+- Conserver le comportement coordinateur existant si fonctionnel.
+
+## Key Changes
+- Route `/mobile/reports` :
+  - `COORDINATOR` -> page coordinateur existante;
+  - `GENERAL_SUPERVISOR` -> page general supervisor;
+  - `PROJECT_MANAGER`, `DIRECTION` -> nouvelle page management reports;
+  - autres roles -> `/mobile/profile`.
+- Ajouter `GET /api/mobile/management/reports` :
+  - `PROJECT_MANAGER` limite a ses projets;
+  - `DIRECTION` global;
+  - query params : `projectId`, `siteId`, `from`, `to`, `status`, `q`;
+  - liste rapports avec auteur, chantier, projet, date, statut validation, extrait contenu.
+- Detail :
+  - utiliser `/mobile/reports/[id]` ou creer une vue detail compatible multi-role;
+  - afficher auteur, chantier, session liee, contenu, photos associees si disponibles.
+- UI :
+  - filtres compacts;
+  - cartes rapport;
+  - empty/loading/error states;
+  - lien chantier -> `/mobile/sites/[id]`;
+  - lien projet -> `/mobile/projects/[id]`.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier `PROJECT_MANAGER` limite.
+- Verifier `DIRECTION` global.
+- Verifier detail rapport et filtres.
+- Verifier que `COORDINATOR` garde sa page.
+
+## Assumptions
+- La validation client, si existante web, reste selon les regles actuelles; sinon lecture seule mobile pour management.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-GS-1 Rapports General Superviseur Mobile
+
+## Summary
+- Finaliser les rapports mobiles pour `GENERAL_SUPERVISOR`.
+- Corriger `/mobile/reports` qui affiche actuellement surtout coordinateur ou placeholder.
+- Fournir filtres par date, chantier, superviseur et detail rapport.
+
+## Key Changes
+- Route `/mobile/reports` :
+  - `GENERAL_SUPERVISOR` rend `MobileGeneralSupervisorReportsPage`;
+  - conserver les autres branches de roles.
+- Endpoint :
+  - finaliser `GET /api/mobile/general-supervisor/reports/[date]` ou creer `GET /api/mobile/general-supervisor/reports`;
+  - scope operationnel du general supervisor;
+  - inclure rapports, auteurs, sites, statut, photos liees.
+- UI :
+  - header `Rapports terrain`;
+  - filtres date/chantier/superviseur/statut;
+  - liste cartes rapport;
+  - detail plein ecran ou route `/mobile/reports/[id]`;
+  - actions selon droits : consulter, marquer revu si deja prevu.
+- Nettoyage :
+  - corriger imports inutilises et erreurs ESLint du composant.
+  - corriger textes encodes.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier acces `GENERAL_SUPERVISOR`.
+- Verifier filtres et detail.
+- Verifier qu'un rapport hors perimetre n'apparait pas.
+
+## Assumptions
+- Le general supervisor consulte tous les rapports des sites/equipes de son perimetre operationnel.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-GS-2 Planning General Superviseur Mobile
+
+## Summary
+- Corriger `/mobile/planning`, actuellement casse par conflit de nom/import.
+- Afficher le planning general superviseur avec assignations, creation, edition, duplication.
+
+## Key Changes
+- Corriger route `app/(mobile)/mobile/(dashboard)/planning/page.tsx` :
+  - renommer le composant route pour eviter conflit avec `MobilePlanningPage`;
+  - supprimer imports inutiles;
+  - `GENERAL_SUPERVISOR` autorise;
+  - autres roles autorises seulement si explicitement supportes; sinon redirect `/mobile/profile`.
+- Finaliser `MobilePlanningPage` :
+  - corriger erreurs TypeScript exactOptionalPropertyTypes;
+  - corriger promises non await/void;
+  - corriger textes encodes.
+- Endpoints :
+  - verifier `GET /api/mobile/planning/[date]`;
+  - verifier `POST/PATCH /api/mobile/planning/assignment`;
+  - verifier duplication `/api/mobile/planning/duplicate`.
+- UI inspiree des besoins planning :
+  - selection date/semaine;
+  - liste assignations par chantier;
+  - creation/modification affectation superviseur -> chantier;
+  - duplication jour/semaine;
+  - empty/loading/error.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier que `/mobile/planning` s'affiche pour `GENERAL_SUPERVISOR`.
+- Verifier creation, edition, duplication.
+- Verifier refus roles non autorises.
+
+## Assumptions
+- Le planning mobile est prioritaire pour `GENERAL_SUPERVISOR`; `PROJECT_MANAGER` et `DIRECTION` n'y accederont que si la logique existante est fiable.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-GS-3 Creation Equipes Par General Superviseur
+
+## Summary
+- Etendre la gestion equipes mobile pour permettre au `GENERAL_SUPERVISOR` de creer et administrer des equipes.
+- Raccorder l'ecran au perimetre operationnel du role.
+
+## Key Changes
+- Route `/mobile/teams` :
+  - `GENERAL_SUPERVISOR` autorise;
+  - afficher equipes de son perimetre.
+- Formulaire `/mobile/teams/new` :
+  - nom equipe;
+  - projet/chantier du perimetre;
+  - chef d'equipe optionnel;
+  - membres actifs disponibles;
+  - statut.
+- Detail `/mobile/teams/[id]` :
+  - membres, roles, statut;
+  - actions ajouter/retirer membre; 
+  - changer chantier si autorise.
+- Endpoints :
+  - reutiliser endpoints web `api/teams` si possible;
+  - sinon creer endpoints mobile scopes sans migration Prisma.
+- UI :
+  - suivre `docs/prototype_mobile/management/gestion-equipes.html`;
+  - interactions tactiles simples, bottom sheets pour selection membres/chantiers.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier creation equipe par `GENERAL_SUPERVISOR`.
+- Verifier ajout/retrait membre.
+- Verifier impossibilite d'utiliser un chantier hors perimetre.
+
+## Assumptions
+- Les utilisateurs assignables sont les ressources actives du perimetre du general supervisor.
+
+================================================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# MOB-NAV-1 Navigation Mobile Management
+
+## Summary
+- Ajouter une navigation claire vers les ecrans management mobiles sans surcharger la BottomTabBar.
+- Raccorder projets, chantiers, equipes, presences, rapports, galerie.
+
+## Key Changes
+- Conserver BottomTabBar compacte :
+  - `PROJECT_MANAGER`, `DIRECTION` : Accueil, Galerie(remplacer photo par galerie), Profil;
+  - `GENERAL_SUPERVISOR` : Accueil, Planning, Rapports, Profil, et eventuellement Equipes si une tab reste disponible.
+- Ajouter un bloc `Actions rapides` dans `/mobile/home` management :
+  - Projets -> `/mobile/projects`;
+  - Chantiers -> `/mobile/sites`;
+  - Equipes -> `/mobile/teams`;
+  - Presences -> `/mobile/presences`;
+  - Rapports -> `/mobile/reports`;
+  - Galerie -> `/mobile/gallery`.
+- Ajouter des liens depuis `/mobile/profile` si necessaire :
+  - synchronisation, gestion, rapports.
+- Mettre a jour `lib/navigation.ts` et types d'icones si une nouvelle tab est ajoutee.
+- Ne pas dupliquer une navigation interne deja presente dans les pages.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Verifier navigation pour `PROJECT_MANAGER`, `DIRECTION`, `GENERAL_SUPERVISOR`.
+- Verifier que `HR` ne voit pas ces ecrans.
+- Verifier que chaque lien pointe vers une route existante ou creee.
+
+## Assumptions
+- Les ecrans management avances sont accessibles via actions rapides plutot que via une BottomTabBar trop dense.
+

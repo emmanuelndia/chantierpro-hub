@@ -1,0 +1,254 @@
+ChantierPro - Memo systeme photo + configuration Supabase Storage
+
+1. Ce que fait le systeme photo
+
+Le module photo backend ajoute :
+- POST /api/photos
+- GET /api/photos/:id
+- GET /api/sites/:id/photos
+- DELETE /api/photos/:id
+- GET /api/photos/logs
+- DELETE /api/photos/logs/:id
+
+Fonctionnement :
+- upload en multipart/form-data
+- stockage prive dans Supabase Storage
+- aucune URL publique permanente
+- lecture via URL signee valable 15 minutes
+- suppression logique uniquement
+- creation automatique d'un PhotoDeletionLog immuable
+
+
+2. Regles metier importantes
+
+Roles autorises a prendre des photos :
+- SUPERVISOR
+- COORDINATOR
+- GENERAL_SUPERVISOR
+- PROJECT_MANAGER
+- DIRECTION
+- ADMIN
+
+Roles autorises a supprimer une photo :
+- PROJECT_MANAGER
+- DIRECTION
+- ADMIN
+
+Visibilite :
+- SUPERVISOR voit uniquement ses propres photos
+- COORDINATOR, GENERAL_SUPERVISOR, PROJECT_MANAGER, DIRECTION voient toutes les photos du site
+- ADMIN est autorise
+
+Suppression :
+- soft delete seulement
+- isDeleted = true
+- deletedAt renseigne
+- deletedById renseigne
+- creation d'un PhotoDeletionLog
+
+Logs de suppression :
+- consultables uniquement par DIRECTION et ADMIN
+- immuables
+- DELETE /api/photos/logs/:id renvoie toujours 403
+
+
+3. Champs attendus a l'upload
+
+Route :
+POST http://localhost:3000/api/photos
+
+Body :
+multipart/form-data
+
+Champs obligatoires :
+- file
+- siteId
+- category
+- timestampLocal
+
+Champs optionnels :
+- description
+- lat
+- lng
+
+Exemple :
+- file = <IMAGE_FILE>
+- siteId = <SITE_ID>
+- category = PROGRESS
+- description = Photo de suivi chantier
+- lat = 5.361349
+- lng = -4.0083
+- timestampLocal = 2026-04-26T08:00:00.000Z
+
+
+4. Contraintes techniques
+
+- taille max photo : 10 Mo
+- si > 10 Mo : reponse 413
+- si > 5 Mo : compression automatique qualite 80%
+- storageKey jamais expose au client
+- URL signee expire apres 15 minutes
+
+
+5. Ce qui est stocke en base
+
+Modele Photo :
+- siteId
+- uploadedById
+- category
+- description
+- filename
+- storageKey
+- url
+- fileSize
+- format
+- latitude
+- longitude
+- timestampLocal
+- takenAt
+- isDeleted
+- deletedAt
+- deletedById
+- createdAt
+
+Important :
+- storageKey et url restent internes
+- les reponses API ne doivent jamais exposer storageKey
+
+
+6. Configuration Supabase Storage a faire
+
+Tu dois creer :
+- un bucket prive Supabase Storage
+- utiliser la service role key du projet
+
+Variables d'environnement a ajouter dans .env.local :
+
+STORAGE_URL=https://storage.example.com/chantierpro
+SUPABASE_URL=https://ton-projet.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=ta-service-role-key
+SUPABASE_STORAGE_BUCKET=chantierpro-photos
+
+Description :
+- STORAGE_URL : valeur de secours / base interne utilisee par le helper mock
+- SUPABASE_URL : URL du projet Supabase
+- SUPABASE_SERVICE_ROLE_KEY : cle service role backend
+- SUPABASE_STORAGE_BUCKET : nom exact du bucket prive
+
+Important :
+- le bucket doit rester prive
+- ne jamais servir d'URL publique permanente
+- toute lecture doit passer par une URL signee
+
+
+7. Etapes de configuration Supabase Storage
+
+1. Ouvrir le dashboard Supabase
+2. Aller dans Storage
+3. Creer un bucket prive, par exemple :
+   chantierpro-photos
+4. Verifier qu'il est prive
+5. Copier :
+   - Project URL
+   - service_role key
+6. Ajouter ces valeurs dans .env.local
+7. Redemarrer l'application
+
+
+8. Comptes de test utiles
+
+ADMIN
+- email : admin@chantierpro.local
+- password : ChantierPro#2026
+
+DIRECTION
+- email : direction@chantierpro.local
+- password : ChantierPro#2026
+
+PROJECT_MANAGER
+- email : manager@chantierpro.local
+- password : ChantierPro#2026
+
+HR
+- email : rh@chantierpro.local
+- password : ChantierPro#2026
+
+SUPERVISOR
+- email : superviseur@chantierpro.local
+- password : ChantierPro#2026
+
+COORDINATOR
+- email : coordinateur@chantierpro.local
+- password : ChantierPro#2026
+
+GENERAL_SUPERVISOR
+- email : sup.general@chantierpro.local
+- password : ChantierPro#2026
+
+
+9. Checklist Postman
+
+Login :
+- POST /api/auth/login
+- recuperer accessToken
+
+Upload photo :
+- POST /api/photos
+- Body = form-data
+- Authorization: Bearer <ACCESS_TOKEN>
+
+Lire une photo :
+- GET /api/photos/<PHOTO_ID>
+
+Lister les photos d'un site :
+- GET /api/sites/<SITE_ID>/photos?page=1
+
+Supprimer une photo :
+- DELETE /api/photos/<PHOTO_ID>
+- body JSON :
+  {
+    "reason": "Photo floue ou non conforme"
+  }
+
+Lire les logs :
+- GET /api/photos/logs?page=1
+
+Tester l'immuabilite :
+- DELETE /api/photos/logs/<PHOTO_LOG_ID>
+- attendu : 403
+
+
+10. Cas de validation a tester
+
+- SUPERVISOR upload une photo valide -> 201
+- PROJECT_MANAGER upload une photo -> 201
+- fichier > 10 Mo -> 413
+- fichier entre 5 Mo et 10 Mo -> compression automatique
+- GET /api/photos/:id -> URL signee
+- URL signee expire apres 15 minutes
+- SUPERVISOR ne voit que ses propres photos
+- SUPERVISOR tente DELETE /api/photos/:id -> 403
+- PROJECT_MANAGER supprime une photo avec raison -> PhotoDeletionLog cree
+- DELETE /api/photos/logs/:id -> 403 pour tous
+
+
+11. Fichiers du projet lies a cette fonctionnalite
+
+- docs/api-routes.txt
+- docs/api-test-payloads.txt
+- prisma/schema.prisma
+- lib/photo-storage.ts
+- lib/photos.ts
+- app/api/photos/route.ts
+- app/api/photos/[id]/route.ts
+- app/api/photos/logs/route.ts
+- app/api/photos/logs/[id]/route.ts
+- app/api/sites/[id]/photos/route.ts
+
+
+12. Notes utiles
+
+- Si les variables Supabase Storage ne sont pas configurees, le helper utilise un mode de secours pour faciliter les tests backend.
+- Pour un vrai usage production, il faut configurer Supabase Storage avec la service role key.
+- Les routes photo sont protegees par JWT.
+- Pour les routes photo, utiliser form-data et non raw JSON.

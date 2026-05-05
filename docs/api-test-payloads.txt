@@ -1,0 +1,932 @@
+ChantierPro - Donnees de test API pour Postman
+Base URL: http://localhost:3000
+
+==================================================
+1. CONFIGURATION A FAIRE
+==================================================
+
+Fichier a configurer
+- Creer ou completer : .env.local
+- Emplacement : racine du projet
+- Chemin local : C:\Users\EMMANUEL N'DIA\Desktop\chantierpro-hub\.env.local
+
+Variables minimales requises
+DATABASE_URL=postgresql://...
+JWT_SECRET=une_cle_longue_et_secrete
+JWT_REFRESH_SECRET=une_autre_cle_longue_et_secrete
+STORAGE_URL=https://storage.example.com/chantierpro
+
+Variables Supabase Storage recommandees
+SUPABASE_URL=https://ton-projet.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=ta-service-role-key
+SUPABASE_STORAGE_BUCKET=chantierpro-photos
+
+Variable geocoding recommandee
+MAPBOX_ACCESS_TOKEN=ton-token-mapbox-serveur
+
+Variable utile pour les tests smoke
+AUTH_SMOKE_PORT=3105
+
+Ou chercher chaque valeur
+- DATABASE_URL : dashboard Neon / PostgreSQL / fournisseur de base
+- JWT_SECRET : a generer toi-meme, cle longue aleatoire
+- JWT_REFRESH_SECRET : a generer toi-meme, differente de JWT_SECRET
+- STORAGE_URL : valeur de base du mode mock stockage, a garder pour le fallback local
+- SUPABASE_URL : dashboard Supabase > Settings > API > Project URL
+- SUPABASE_SERVICE_ROLE_KEY : dashboard Supabase > Settings > API > service_role key
+- SUPABASE_STORAGE_BUCKET : nom exact du bucket prive Supabase Storage
+- MAPBOX_ACCESS_TOKEN : dashboard Mapbox > Access tokens > token secret utilise par le proxy backend
+- AUTH_SMOKE_PORT : libre, optionnel, seulement pour scripts/auth-smoke.ts
+
+Ou le code utilise ces variables
+- prisma/schema.prisma -> DATABASE_URL
+- lib/auth/tokens.ts -> JWT_SECRET, JWT_REFRESH_SECRET
+- lib/storage.ts et lib/photo-storage.ts -> STORAGE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_STORAGE_BUCKET
+- lib/project-web.ts -> MAPBOX_ACCESS_TOKEN pour l'autocompletion adresse chantier
+- scripts/auth-smoke.ts -> AUTH_SMOKE_PORT
+
+Important
+- Redemarrer le serveur apres modification de .env.local
+- Si Supabase Storage n'est pas configure, le helper photo utilise un mode mock signe
+
+Commandes utiles apres configuration
+- npm install
+- npx prisma db seed
+- npm run dev
+
+==================================================
+2. COMPTES SEEDES UTILESs
+==================================================
+
+ADMIN
+{
+  "email": "admin@chantierpro.local",
+  "password": "ChantierPro#2026"
+}
+
+DIRECTION
+{
+  "email": "direction@chantierpro.local",
+  "password": "ChantierPro#2026"
+}
+
+PROJECT_MANAGER
+{
+  "email": "manager@chantierpro.local",
+  "password": "ChantierPro#2026"
+}
+
+HR
+{
+  "email": "rh@chantierpro.local",
+  "password": "ChantierPro#2026"
+}
+
+SUPERVISOR eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiU1VQRVJWSVNPUiIsInR5cGUiOiJhY2Nlc3MiLCJzdWIiOiJjbW9nN3dpNG8wMDAzd2V1b3d4N2xxcWN3IiwiaWF0IjoxNzc3MjgzMTM4LCJleHAiOjE3NzcyODQwMzh9.xiSSrs9iKGVCzuSAgD8Q5HWw4h7ROUMcotJRUjTAqLU
+{
+  "email": "superviseur@chantierpro.local",
+  "password": "ChantierPro#2026"
+}
+
+COORDINATOR eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiQ09PUkRJTkFUT1IiLCJ0eXBlIjoiYWNjZXNzIiwic3ViIjoiY21vZzd3aTRxMDAwNXdldW9qMWVhMGMzdyIsImlhdCI6MTc3NzI4MzM0NywiZXhwIjoxNzc3Mjg0MjQ3fQ.9q0aqIFIor9pvO3eexFqZ7tWu5aMErwjnnqe4F35N4w
+{
+  "email": "coordinateur@chantierpro.local",
+  "password": "ChantierPro#2026"
+}
+
+GENERAL_SUPERVISOR eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiR0VORVJBTF9TVVBFUlZJU09SIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6ImNtb2c3d2k0bDAwMDJ3ZXVvamR3b2pkOTQiLCJpYXQiOjE3NzcyODM3NTEsImV4cCI6MTc3NzI4NDY1MX0.bXbJGKkUIybtpV9lUtRjjQqebOD4Bwhz9tMxSx5_Q5s
+{
+  "email": "sup.general@chantierpro.local",
+  "password": "ChantierPro#2026"
+}
+
+==================================================
+3. OU RECUPERER LES IDS ET TOKENS
+==================================================
+
+Access token
+- POST /api/auth/login
+
+USER_ID
+- GET /api/users avec un token ADMIN
+
+PROJECT_ID
+- GET /api/projects avec un token PROJECT_MANAGER, DIRECTION ou ADMIN
+
+SITE_ID
+- GET /api/projects/:id
+- ou GET /api/users/me/sites/today pour les roles terrain
+
+TEAM_ID
+- GET /api/sites/:id/teams
+
+CLOCK_IN_ID
+- GET /api/sites/:id/clock-in
+- ou GET /api/users/me/clock-in/history
+
+PHOTO_ID
+- GET /api/sites/:id/photos
+
+PHOTO_LOG_ID
+- GET /api/photos/logs
+- ou GET /api/admin/logs
+
+REPORT_ID
+- GET /api/sites/:id/reports
+
+==================================================
+4. REGLES POSTMAN RAPIDES
+==================================================
+
+- Les routes photo utilisent Body = form-data
+- Les autres payloads utilisent en general Body = raw JSON
+- Pour les routes protegees : Authorization: Bearer <ACCESS_TOKEN>
+- Pour /api/auth/refresh et /api/auth/logout : gerer le cookie chantierpro_refresh
+- ACCESS_TOKEN_TERRAIN = SUPERVISOR ou COORDINATOR ou GENERAL_SUPERVISOR
+
+==================================================
+5. ROUTES ET CAS DE TEST
+==================================================
+
+--------------------------------------------------
+SANTE
+--------------------------------------------------
+
+GET http://localhost:3000/api/health
+Body: aucun
+Test attendu
+- 200
+
+--------------------------------------------------
+AUTHENTIFICATION
+--------------------------------------------------
+
+POST http://localhost:3000/api/auth/login
+Cas succes SUPERVISOR
+{
+  "email": "superviseur@chantierpro.local",
+  "password": "ChantierPro#2026"
+}
+Cas succes ADMIN
+{
+  "email": "admin@chantierpro.local",
+  "password": "ChantierPro#2026"
+}
+Cas echec
+{
+  "email": "superviseur@chantierpro.local",
+  "password": "wrong-password"
+}
+Tests attendus
+- 200 si credentials valides
+- 401 si credentials invalides
+
+GET http://localhost:3000/api/auth/me
+Body: aucun
+Header requis
+Authorization: Bearer <ACCESS_TOKEN>
+Tests attendus
+- 200 avec token valide
+- 401 sans token
+
+POST http://localhost:3000/api/auth/refresh
+Body: aucun
+Cookie requis
+chantierpro_refresh=<REFRESH_TOKEN>
+Tests attendus
+- 200 si refresh token valide
+- 401 si cookie absent ou invalide
+
+POST http://localhost:3000/api/auth/logout
+Body: aucun
+Cookie requis
+chantierpro_refresh=<REFRESH_TOKEN>
+Tests attendus
+- 204 si session logout OK
+
+POST http://localhost:3000/api/auth/push-token
+  {
+    "token": "push-token-device-001",
+    "platform": "web",
+    "deviceLabel": "Postman test device"
+  }
+Header requis
+Authorization: Bearer <ACCESS_TOKEN>
+Tests attendus
+- 200 ou 201 selon creation / mise a jour
+- 401 sans token
+
+--------------------------------------------------
+ADMINISTRATION
+--------------------------------------------------
+
+GET http://localhost:3000/api/admin/logs?page=1
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_ADMIN>
+Exemple URL avec filtres
+http://localhost:3000/api/admin/logs?page=1&from=2026-04-01T00:00:00.000Z&to=2026-04-30T23:59:59.999Z&deletedBy=<USER_ID>
+Tests attendus
+- 200 avec ADMIN
+- 403 avec DIRECTION, HR, PROJECT_MANAGER, roles terrain
+- pagination OK
+- filtres from, to, deletedBy OK
+
+POST http://localhost:3000/api/admin/logs/export
+{
+  "from": "2026-04-01T00:00:00.000Z",
+  "to": "2026-04-30T23:59:59.999Z",
+  "deletedBy": "<USER_ID>"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_ADMIN>
+Tests attendus
+- 200 avec ADMIN
+- 403 avec DIRECTION
+- content-type = text/csv; charset=utf-8
+- CSV avec BOM UTF-8
+
+--------------------------------------------------
+UTILISATEURS
+--------------------------------------------------
+
+GET http://localhost:3000/api/users
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_ADMIN>
+Tests attendus
+- 200 ADMIN
+- 403 non ADMIN
+
+POST http://localhost:3000/api/users
+{
+  "email": "nouveau.user@chantierpro.local",
+  "firstName": "Nouveau",
+  "lastName": "Utilisateur",
+  "role": "SUPERVISOR",
+  "contact": "0700000099"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_ADMIN>
+Tests attendus
+- 201 creation
+- 409 si email existe deja
+
+GET http://localhost:3000/api/users/me
+Header requis
+Authorization: Bearer <ACCESS_TOKEN>
+Tests attendus
+- 200
+
+PUT http://localhost:3000/api/users/me
+{
+  "firstName": "Jean",
+  "lastName": "Kouame",
+  "contact": "0700000011"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN>
+Tests attendus
+- 200
+
+PUT http://localhost:3000/api/users/me/password
+{
+  "currentPassword": "ChantierPro#2026",
+  "newPassword": "UpdatedPass1!"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN>
+Tests attendus
+- 200 si mot de passe courant correct
+- 400 ou 401 si mot de passe courant incorrect
+
+GET http://localhost:3000/api/users/me/sites/today
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Tests attendus
+- 200 pour SUPERVISOR, COORDINATOR, GENERAL_SUPERVISOR
+- 403 pour roles non terrain
+
+GET http://localhost:3000/api/users/me/clock-in
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Tests attendus
+- 200
+
+GET http://localhost:3000/api/users/me/clock-in/history
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Tests attendus
+- 200
+
+GET http://localhost:3000/api/users/:id
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_ADMIN>
+Exemple URL
+http://localhost:3000/api/users/<USER_ID>
+Tests attendus
+- 200 ADMIN
+- 403 non ADMIN
+
+PUT http://localhost:3000/api/users/:id
+{
+  "firstName": "Jean",
+  "lastName": "MisAJour",
+  "role": "SUPERVISOR",
+  "contact": "0700000012"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_ADMIN>
+Exemple URL
+http://localhost:3000/api/users/<USER_ID>
+Tests attendus
+- 200
+
+POST http://localhost:3000/api/users/:id/reset-password
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_ADMIN>
+Exemple URL
+http://localhost:3000/api/users/<USER_ID>/reset-password
+Tests attendus
+- 204
+- le mot de passe de reinitialisation devient : ChantierPro#2026
+- mustChangePassword = true
+
+PATCH http://localhost:3000/api/users/:id/status
+{
+  "isActive": false
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_ADMIN>
+Exemple URL
+http://localhost:3000/api/users/<USER_ID>/status
+Tests attendus
+- 200
+
+--------------------------------------------------
+DIRECTION
+--------------------------------------------------
+
+GET http://localhost:3000/api/direction/kpis?month=4&year=2026 
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_DIRECTION_OU_ADMIN>
+Tests attendus
+- 200 DIRECTION
+- 200 ADMIN
+- 403 HR
+
+GET http://localhost:3000/api/direction/projects/consolidated?month=4&year=2026
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/direction/projects/consolidated?month=4&year=2026&status=IN_PROGRESS&projectManager=<PROJECT_MANAGER_ID>
+Tests attendus
+- 200
+- filtre status OK
+- filtre projectManager OK
+
+GET http://localhost:3000/api/direction/sites/active
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_DIRECTION_OU_ADMIN>
+Tests attendus
+- 200
+- retourne latitude + longitude
+
+GET http://localhost:3000/api/direction/alerts
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_DIRECTION_OU_ADMIN>
+Tests attendus
+- 200
+- remonte sites sans presence
+- remonte sessions incompletes
+- remonte ressources absentes
+
+--------------------------------------------------
+RH
+--------------------------------------------------
+
+GET http://localhost:3000/api/rh/presences?month=4&year=2026
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_HR_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/rh/presences?month=4&year=2026&userId=<USER_ID>&projectId=<PROJECT_ID>
+Tests attendus
+- 200 HR
+- 200 DIRECTION
+- 403 SUPERVISOR
+
+GET http://localhost:3000/api/rh/presences/:userId
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_HR_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/rh/presences/<USER_ID>?month=4&year=2026&projectId=<PROJECT_ID>
+Tests attendus
+- 200
+- session incomplete marquee
+- pauses exclues de la duree reelle
+
+POST http://localhost:3000/api/rh/export
+Cas CSV
+{
+  "format": "csv",
+  "from": "2026-04-01T00:00:00.000Z",
+  "to": "2026-04-30T23:59:59.999Z",
+  "userId": "<USER_ID>",
+  "projectId": "<PROJECT_ID>"
+}
+Cas XLSX
+{
+  "format": "xlsx",
+  "from": "2026-04-01T00:00:00.000Z",
+  "to": "2026-04-30T23:59:59.999Z"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_HR_OU_DIRECTION_OU_ADMIN>
+Tests attendus
+- 200
+- CSV avec BOM UTF-8
+- XLSX avec entetes gras
+- 403 SUPERVISOR
+
+GET http://localhost:3000/api/rh/exports/history
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_HR_OU_DIRECTION_OU_ADMIN>
+Tests attendus
+- 200
+
+--------------------------------------------------
+PHOTOS
+--------------------------------------------------
+
+POST http://localhost:3000/api/photos
+Body = form-data
+file = <IMAGE_FILE>
+siteId = <SITE_ID>
+category = PROGRESS
+description = Photo de suivi chantier
+lat = 5.361349
+lng = -4.0083
+timestampLocal = 2026-04-26T08:00:00.000Z
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_SUPERVISOR_OU_COORDINATOR_OU_GENERAL_SUPERVISOR_OU_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Tests attendus
+- 201 upload valide
+- 413 si fichier > 10 Mo
+- compression auto si fichier > 5 Mo
+
+GET http://localhost:3000/api/photos/:id
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PHOTO_ALLOWED>
+Exemple URL
+http://localhost:3000/api/photos/<PHOTO_ID>
+Tests attendus
+- 200 si photo visible
+- 404 si photo supprimee
+- URL signee 15 min
+
+DELETE http://localhost:3000/api/photos/:id
+{
+  "reason": "Photo floue ou non conforme"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/photos/<PHOTO_ID>
+Tests attendus
+- 200 si suppression valide
+- 403 SUPERVISOR
+- creation PhotoDeletionLog
+
+GET http://localhost:3000/api/photos/logs?page=1
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_DIRECTION_OU_ADMIN>
+Tests attendus
+- 200 DIRECTION
+- 200 ADMIN
+- 403 roles terrain
+
+DELETE http://localhost:3000/api/photos/logs/:id
+Header requis
+Authorization: Bearer <ACCESS_TOKEN>
+Exemple URL
+http://localhost:3000/api/photos/logs/<PHOTO_LOG_ID>
+Tests attendus
+- 403 pour tous les roles y compris ADMIN
+
+GET http://localhost:3000/api/sites/:id/photos?page=1
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PHOTO_ALLOWED>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/photos?page=1&from=2026-04-01T00:00:00.000Z&to=2026-04-30T23:59:59.999Z&uploadedBy=<USER_ID>&category=PROGRESS
+Tests attendus
+- 200
+- SUPERVISOR ne voit que ses photos
+- PROJECT_MANAGER voit les photos du site
+
+--------------------------------------------------
+PROJETS
+--------------------------------------------------
+
+GET http://localhost:3000/api/projects
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Tests attendus
+- 200
+- PROJECT_MANAGER ne voit que ses projets
+- DIRECTION voit tout
+
+POST http://localhost:3000/api/projects
+{
+  "name": "Tour Cocody",
+  "description": "Construction du batiment principal",
+  "address": "Cocody Angre 8e tranche",
+  "city": "Abidjan",
+  "startDate": "2026-06-01",
+  "endDate": "2026-12-31",
+  "projectManagerId": "<PROJECT_MANAGER_ID>",
+  "status": "IN_PROGRESS"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Tests attendus
+- 201
+- 400 si date invalide
+
+GET http://localhost:3000/api/projects/:id
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/projects/<PROJECT_ID>
+Tests attendus
+- 200
+
+PUT http://localhost:3000/api/projects/:id
+{
+  "name": "Tour Cocody Phase 2",
+  "description": "Construction et amenagement du batiment principal",
+  "address": "Cocody Angre 8e tranche",
+  "city": "Abidjan",
+  "startDate": "2026-06-01",
+  "endDate": "2027-01-31",
+  "projectManagerId": "<PROJECT_MANAGER_ID>",
+  "status": "ON_HOLD"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/projects/<PROJECT_ID>
+Tests attendus
+- 200
+- 400 si dates invalides
+
+DELETE http://localhost:3000/api/projects/:id
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/projects/<PROJECT_ID>
+Tests attendus
+- 200 soft archive
+- erreur si sites actifs
+
+GET http://localhost:3000/api/projects/:id/presences
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/projects/<PROJECT_ID>/presences
+Tests attendus
+- 200
+
+POST http://localhost:3000/api/projects/:id/sites
+{
+  "name": "Chantier Cocody Lot A",
+  "address": "Cocody Angre, lot A",
+  "latitude": 5.3601,
+  "longitude": -4.0082,
+  "radiusKm": 1.5,
+  "description": "Zone principale de travaux",
+  "status": "ACTIVE",
+  "area": 450,
+  "startDate": "2026-06-05",
+  "endDate": "2026-11-30",
+  "siteManagerId": "<SITE_MANAGER_ID>"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/projects/<PROJECT_ID>/sites
+Tests attendus
+- 201
+- 403 si PROJECT_MANAGER force radiusKm
+- 400 si projet ARCHIVED ou COMPLETED
+
+--------------------------------------------------
+SITES
+--------------------------------------------------
+
+GET http://localhost:3000/api/sites/:id
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>
+Tests attendus
+- 200
+
+PUT http://localhost:3000/api/sites/:id
+{
+  "name": "Chantier Cocody Lot A - MAJ",
+  "address": "Cocody Angre, lot A",
+  "latitude": 5.3601,
+  "longitude": -4.0082,
+  "radiusKm": 1.5,
+  "description": "Zone principale de travaux mise a jour",
+  "status": "ON_HOLD",
+  "area": 500,
+  "startDate": "2026-06-05",
+  "endDate": "2026-12-15",
+  "siteManagerId": "<SITE_MANAGER_ID>"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>
+Tests attendus
+- 200
+- 403 si PROJECT_MANAGER modifie radiusKm
+- 403 SUPERVISOR
+
+GET http://localhost:3000/api/sites/nearby?lat=5.361349&lng=-4.0083
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Tests attendus
+- 200 avec sites tries par distance
+- { sites: [], message: "OUTSIDE_ALL_SITES" } si aucun site
+
+--------------------------------------------------
+POINTAGE GPS
+--------------------------------------------------
+
+POST http://localhost:3000/api/sites/:id/clock-in
+Cas ARRIVAL
+{
+  "type": "ARRIVAL",
+  "latitude": 5.361349,
+  "longitude": -4.0083,
+  "accuracy": 12.5,
+  "timestampLocal": "2026-04-23T08:00:00.000Z",
+  "comment": "Arrivee chantier"
+}
+Cas DEPARTURE
+{
+  "type": "DEPARTURE",
+  "latitude": 5.361349,
+  "longitude": -4.0083,
+  "accuracy": 10.2,
+  "timestampLocal": "2026-04-23T17:00:00.000Z"
+}
+Cas PAUSE_START
+{
+  "type": "PAUSE_START",
+  "latitude": 5.361349,
+  "longitude": -4.0083,
+  "accuracy": 10.2,
+  "timestampLocal": "2026-04-23T10:00:00.000Z"
+}
+Cas PAUSE_END
+{
+  "type": "PAUSE_END",
+  "latitude": 5.361349,
+  "longitude": -4.0083,
+  "accuracy": 10.2,
+  "timestampLocal": "2026-04-23T10:15:00.000Z"
+}
+Cas INTERMEDIATE
+{
+  "type": "INTERMEDIATE",
+  "latitude": 5.361349,
+  "longitude": -4.0083,
+  "accuracy": 9.8,
+  "timestampLocal": "2026-04-23T14:00:00.000Z"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/clock-in
+Tests attendus
+- 201 ARRIVAL valide
+- 400 OUTSIDE_RADIUS si hors rayon
+- 400 SESSION_ALREADY_OPEN si double ARRIVAL meme site
+- 400 NO_OPEN_SESSION si DEPARTURE sans ARRIVAL
+- 400 PAUSE_ALREADY_ACTIVE si pause deja ouverte
+- 400 NO_ACTIVE_PAUSE si PAUSE_END sans pause active
+- 403 PROJECT_MANAGER
+- 403 ADMIN
+
+GET http://localhost:3000/api/sites/:id/clock-in
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/clock-in
+Tests attendus
+- 200 historique du site
+
+GET http://localhost:3000/api/sites/:id/clock-in/session-status
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/clock-in/session-status
+Tests attendus
+- 200
+- sessionOpen true/false
+- pauseActive true/false
+
+PATCH http://localhost:3000/api/clock-in/:id/comment
+{
+  "comment": "Arrivee valide et commentaire de chantier."
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Exemple URL
+http://localhost:3000/api/clock-in/<CLOCK_IN_ID>/comment
+Tests attendus
+- 200 si auteur
+- 403 si autre utilisateur
+
+GET http://localhost:3000/api/sites/:id/attendance/today
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/attendance/today
+Tests attendus
+- 200
+- presentNow / departedToday / absent
+
+POST http://localhost:3000/api/sync/batch
+{
+  "items": [
+    {
+      "siteId": "<SITE_ID>",
+      "type": "DEPARTURE",
+      "latitude": 5.361349,
+      "longitude": -4.0083,
+      "accuracy": 8.9,
+      "timestampLocal": "2026-04-23T07:30:00.000Z"
+    },
+    {
+      "siteId": "<SITE_ID>",
+      "type": "ARRIVAL",
+      "latitude": 5.361349,
+      "longitude": -4.0083,
+      "accuracy": 8.9,
+      "timestampLocal": "2026-04-23T08:15:00.000Z"
+    },
+    {
+      "siteId": "<SITE_ID>",
+      "type": "PAUSE_START",
+      "latitude": 5.361349,
+      "longitude": -4.0083,
+      "accuracy": 8.9,
+      "timestampLocal": "2026-04-23T08:16:00.000Z"
+    },
+    {
+      "siteId": "<SITE_ID>",
+      "type": "PAUSE_END",
+      "latitude": 5.361349,
+      "longitude": -4.0083,
+      "accuracy": 8.9,
+      "timestampLocal": "2026-04-23T08:17:00.000Z"
+    }
+  ]
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Tests attendus
+- 200
+- item incoherent marque ANOMALY
+
+--------------------------------------------------
+RAPPORTS
+--------------------------------------------------
+
+POST http://localhost:3000/api/sites/:id/reports
+{
+  "content": "Rapport de debut de vacation.",
+  "clockInRecordId": "<CLOCK_IN_ID>"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_TERRAIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/reports
+Tests attendus
+- 201
+- 409 si second rapport sur le meme clockInRecordId
+
+GET http://localhost:3000/api/sites/:id/reports?page=1
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_SUPERVISOR_OU_COORDINATOR_OU_GENERAL_SUPERVISOR_OU_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/reports?page=1&from=2026-04-01T00:00:00.000Z&to=2026-04-30T23:59:59.999Z&userId=<USER_ID>
+Tests attendus
+- 200
+- SUPERVISOR voit ses rapports
+- roles superieurs voient ceux du site
+
+GET http://localhost:3000/api/reports/:id
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_SUPERVISOR_OU_COORDINATOR_OU_GENERAL_SUPERVISOR_OU_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/reports/<REPORT_ID>
+Tests attendus
+- 200 si acces autorise
+
+--------------------------------------------------
+EQUIPES
+--------------------------------------------------
+
+POST http://localhost:3000/api/sites/:id/teams
+{
+  "name": "Equipe Gros Oeuvre",
+  "teamLeadId": "<FIELD_USER_ID>",
+  "status": "ACTIVE"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_GENERAL_SUPERVISOR_OU_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/teams
+Tests attendus
+- 201
+- 403 SUPERVISOR
+
+GET http://localhost:3000/api/sites/:id/teams
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_GENERAL_SUPERVISOR_OU_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/teams
+Tests attendus
+- 200
+- ne retourne que les membres actifs
+
+GET http://localhost:3000/api/sites/:id/unassigned-users
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_GENERAL_SUPERVISOR_OU_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/sites/<SITE_ID>/unassigned-users
+Tests attendus
+- 200
+- retourne les ressources terrain non affectees
+
+PUT http://localhost:3000/api/teams/:id
+{
+  "name": "Equipe Gros Oeuvre - MAJ",
+  "teamLeadId": "<FIELD_USER_ID>",
+  "status": "ACTIVE"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_GENERAL_SUPERVISOR_OU_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/teams/<TEAM_ID>
+Tests attendus
+- 200
+
+POST http://localhost:3000/api/teams/:id/members
+{
+  "userId": "<USER_ID>",
+  "teamRole": "MEMBER"
+}
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_GENERAL_SUPERVISOR_OU_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/teams/<TEAM_ID>/members
+Tests attendus
+- 201
+- erreur explicite si doublon actif
+
+DELETE http://localhost:3000/api/teams/:id/members/:userId
+Header requis
+Authorization: Bearer <ACCESS_TOKEN_GENERAL_SUPERVISOR_OU_PROJECT_MANAGER_OU_DIRECTION_OU_ADMIN>
+Exemple URL
+http://localhost:3000/api/teams/<TEAM_ID>/members/<USER_ID>
+Tests attendus
+- 200
+- soft delete membre = INACTIVE + endDate
+
+==================================================
+6. CHECKLIST RAPIDE DE TEST BOUT EN BOUT
+==================================================
+
+1. Lancer login ADMIN et garder ACCESS_TOKEN_ADMIN
+2. Recuperer PROJECT_ID puis SITE_ID
+3. Lancer login SUPERVISOR et garder ACCESS_TOKEN_TERRAIN
+4. Faire un ARRIVAL sur /api/sites/:id/clock-in
+5. Uploader une photo sur /api/photos
+6. Supprimer la photo avec PROJECT_MANAGER
+7. Verifier /api/photos/logs puis /api/admin/logs
+8. Faire un rapport sur /api/sites/:id/reports
+9. Verifier /api/rh/presences et /api/direction/kpis
+
+==================================================
+7. NOTES IMPORTANTES
+==================================================
+
+- `DELETE /api/photos/logs/:id` doit renvoyer 403 pour tous les roles, y compris ADMIN
+- `GET /api/admin/logs` et `POST /api/admin/logs/export` sont ADMIN only
+- `GET /api/direction/*` est reserve a DIRECTION et ADMIN
+- `GET /api/rh/*` et `POST /api/rh/export` sont reserves a HR, DIRECTION, ADMIN
+- Les routes terrain utilisent les roles SUPERVISOR, COORDINATOR, GENERAL_SUPERVISOR
