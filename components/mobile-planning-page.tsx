@@ -31,6 +31,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
   const [showAddAssignment, setShowAddAssignment] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
   const [formData, setFormData] = useState<CreateAssignmentRequest>(() => createEmptyForm(todayKey));
+  const [usingOfflinePlanning, setUsingOfflinePlanning] = useState(false);
   const queryClient = useQueryClient();
 
   const planningQuery = useQuery({
@@ -41,6 +42,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
       if (!response.ok) {
         const cached = await getMobileOfflineCache<PlanningDayResponse>(`planning-${selectedDate}`);
         if (cached) {
+          setUsingOfflinePlanning(true);
           return cached.payload;
         }
         
@@ -51,6 +53,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
       }
 
       const payload = (await response.json()) as PlanningDayResponse;
+      setUsingOfflinePlanning(false);
       await setMobileOfflineCache(`planning-${selectedDate}`, payload, 24 * 60 * 60 * 1000);
       return payload;
     },
@@ -133,6 +136,9 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
 
   const data = planningQuery.data;
   const selectedDateObject = parseDateKey(selectedDate);
+  const hasAvailableSites = (data?.availableSites.length ?? 0) > 0;
+  const hasAvailableSupervisors = (data?.unassignedSupervisors.length ?? 0) > 0;
+  const canOpenCreateForm = hasAvailableSites && hasAvailableSupervisors;
   const mutationError =
     getMutationError(createAssignmentMutation.error) ??
     getMutationError(updateAssignmentMutation.error) ??
@@ -154,6 +160,10 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
   }
 
   function openCreateForm(supervisorId?: string) {
+    if (!hasAvailableSites || (!supervisorId && !hasAvailableSupervisors)) {
+      return;
+    }
+
     setFormData({
       ...createEmptyForm(selectedDate),
       supervisorId: supervisorId ?? '',
@@ -235,6 +245,10 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
 
       {data ? (
         <>
+          {usingOfflinePlanning ? (
+            <WarningBlock message="Données hors ligne. Le dernier planning sauvegardé est affiché, mais le chargement réseau a échoué." />
+          ) : null}
+
           <section className="grid grid-cols-2 gap-3">
             <StatTile label="Assignations" value={data.assignments.length} />
             <StatTile label="Disponibles" value={data.unassignedSupervisors.length} />
@@ -270,7 +284,8 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
               <button
                 type="button"
                 onClick={() => openCreateForm()}
-                className="min-h-11 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white"
+                disabled={!canOpenCreateForm}
+                className="min-h-11 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Ajouter
               </button>
@@ -283,14 +298,17 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
                 ))}
               </div>
             ) : (
-              <EmptyState title="Aucun superviseur disponible" description="Tous les superviseurs du périmètre sont déjà assignés ou aucun superviseur actif n’est disponible." />
+              <EmptyState title="Aucun superviseur disponible" description={getSupervisorEmptyDescription(data.availableSites.length, data.assignments.length)} />
             )}
           </section>
         </>
       ) : null}
 
-      {data?.assignments.length === 0 && data.unassignedSupervisors.length === 0 && !planningQuery.isLoading ? (
-        <EmptyState title="Planning vide" description="Aucun chantier ou superviseur actif n’est disponible pour cette date." />
+      {data?.availableSites.length === 0 && !planningQuery.isLoading ? (
+        <EmptyState
+          title="Aucun chantier dans votre périmètre"
+          description="Votre compte doit être membre actif d'une équipe active rattachée à un chantier actif pour afficher le planning."
+        />
       ) : null}
 
       {showAddAssignment && data ? (
@@ -509,6 +527,10 @@ function AssignmentBottomSheet({
   onCancel: () => void;
   isSubmitting: boolean;
 }>) {
+  const hasAvailableSites = availableSites.length > 0;
+  const hasAvailableSupervisors = availableSupervisors.length > 0;
+  const canSubmit = Boolean(formData.supervisorId && formData.siteId && formData.action.trim() && hasAvailableSites && hasAvailableSupervisors);
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/50">
       <div className="fixed inset-x-0 bottom-0 mx-auto max-h-[86vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 shadow-[0_-12px_32px_rgba(15,23,42,0.18)]">
@@ -518,6 +540,18 @@ function AssignmentBottomSheet({
             <XIcon className="h-5 w-5" />
           </IconButton>
         </div>
+
+        {!hasAvailableSites ? (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+            Aucun chantier dans votre périmètre.
+          </div>
+        ) : null}
+
+        {hasAvailableSites && !hasAvailableSupervisors ? (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+            Aucun superviseur disponible pour cette date.
+          </div>
+        ) : null}
 
         <div className="mt-4 space-y-4">
           <label className="block text-sm font-semibold text-slate-700">
@@ -589,7 +623,7 @@ function AssignmentBottomSheet({
           <button
             type="button"
             onClick={onSubmit}
-            disabled={!formData.supervisorId || !formData.siteId || !formData.action.trim() || isSubmitting}
+            disabled={!canSubmit || isSubmitting}
             className="min-h-12 rounded-lg bg-slate-950 px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
           >
             {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
@@ -629,6 +663,10 @@ function EmptyState({ title, description }: Readonly<{ title: string; descriptio
 
 function ErrorBlock({ message }: Readonly<{ message: string }>) {
   return <section className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{message}</section>;
+}
+
+function WarningBlock({ message }: Readonly<{ message: string }>) {
+  return <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">{message}</section>;
 }
 
 function PlanningLoadingState() {
@@ -731,6 +769,18 @@ async function getApiErrorMessage(response: Response, fallback: string) {
 
 function getMutationError(error: unknown) {
   return error instanceof Error ? error.message : null;
+}
+
+function getSupervisorEmptyDescription(siteCount: number, assignmentCount: number) {
+  if (siteCount === 0) {
+    return "Aucun chantier n'est rattaché à votre périmètre opérationnel.";
+  }
+
+  if (assignmentCount > 0) {
+    return 'Tous les superviseurs sont déjà assignés pour cette date.';
+  }
+
+  return "Aucun superviseur actif n'est rattaché aux équipes actives de vos chantiers.";
 }
 
 function baseIcon(className: string, children: ReactNode) {

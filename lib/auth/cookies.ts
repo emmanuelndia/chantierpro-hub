@@ -17,7 +17,7 @@ function buildRefreshCookieBase() {
   return {
     httpOnly: true,
     secure: shouldUseSecureCookie(),
-    sameSite: 'strict' as const,
+    sameSite: 'lax' as const,
     path: '/',
   };
 }

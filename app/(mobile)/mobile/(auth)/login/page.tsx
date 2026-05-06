@@ -282,16 +282,7 @@ function MobileLoginContent() {
                 {retryAfterSeconds > 0 ? `Reessayer dans ${retryAfterSeconds}s` : isSubmitting ? 'Connexion...' : 'Se connecter'}
               </button>
 
-              <button
-                className="mx-auto mt-5 min-h-14 px-4 text-sm font-semibold text-orange-600"
-                onClick={() => {
-                  setMode('forgot');
-                  setErrorMessage(null);
-                }}
-                type="button"
-              >
-                Mot de passe oublie ?
-              </button>
+              
             </div>
           ) : null}
 

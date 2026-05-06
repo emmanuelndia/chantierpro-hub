@@ -13,6 +13,7 @@ import type {
   CreateAssignmentRequest,
   DuplicateAssignmentsResponse,
   PlanningAssignment,
+  PlanningClockInStatusItem,
   PlanningClockInStatus,
   PlanningDayResponse,
   UpdateAssignmentRequest,
@@ -36,12 +37,7 @@ type ClockInRow = {
 };
 
 export function canAccessMobilePlanning(role: Role) {
-  const allowedRoles: readonly Role[] = [
-    Role.GENERAL_SUPERVISOR,
-    Role.PROJECT_MANAGER,
-    Role.DIRECTION,
-    Role.ADMIN,
-  ];
+  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR];
 
   return allowedRoles.includes(role);
 }
@@ -107,7 +103,32 @@ export async function getPlanningDay(
     getScopedSupervisorIds(prisma, user, parsedDate),
   ]);
 
-  const assignedSupervisorIds = new Set(assignments.map((assignment) => assignment.supervisorId));
+  if (sites.length === 0) {
+    console.warn('Mobile planning scope empty:', {
+      date: formatPlanningDate(parsedDate),
+      reason: 'NO_SCOPED_SITES',
+      userId: user.id,
+    });
+  }
+
+  if (scopedSupervisorIds.length === 0) {
+    console.warn('Mobile planning supervisor scope empty:', {
+      date: formatPlanningDate(parsedDate),
+      reason: 'NO_SCOPED_SUPERVISORS',
+      userId: user.id,
+    });
+  }
+
+  const assignedSupervisorIds = await getAssignedSupervisorIdsForDay(prisma, parsedDate, scopedSupervisorIds);
+
+  if (scopedSupervisorIds.length > 0 && scopedSupervisorIds.length === assignedSupervisorIds.size) {
+    console.warn('Mobile planning supervisors all assigned:', {
+      date: formatPlanningDate(parsedDate),
+      reason: 'ALL_SCOPED_SUPERVISORS_ASSIGNED',
+      userId: user.id,
+    });
+  }
+
   const [supervisors, clockIns, yesterdayCount] = await Promise.all([
     prisma.user.findMany({
       where: {
@@ -138,6 +159,7 @@ export async function getPlanningDay(
   return {
     date: formatPlanningDate(parsedDate),
     assignments: assignments.map((assignment) => serializePlanningAssignment(assignment, clockIns)),
+    clockInStatuses: buildClockInStatuses(assignments, clockIns),
     unassignedSupervisors: supervisors.map((supervisor) => ({
       id: supervisor.id,
       firstName: supervisor.firstName,
@@ -423,6 +445,31 @@ async function getScopedSupervisorIds(prisma: PrismaClient, user: AuthLikeUser, 
   return supervisors.map((supervisor) => supervisor.id);
 }
 
+async function getAssignedSupervisorIdsForDay(
+  prisma: PrismaClient,
+  date: Date,
+  supervisorIds: string[],
+) {
+  if (supervisorIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const assignments = await prisma.planningAssignment.findMany({
+    where: {
+      date,
+      deletedAt: null,
+      supervisorId: {
+        in: supervisorIds,
+      },
+    },
+    select: {
+      supervisorId: true,
+    },
+  });
+
+  return new Set(assignments.map((assignment) => assignment.supervisorId));
+}
+
 async function loadClockInsForAssignments(
   prisma: PrismaClient,
   date: Date,
@@ -505,10 +552,21 @@ function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns
   };
 }
 
+function buildClockInStatuses(assignments: PlanningAssignmentRow[], clockIns: ClockInRow[]): PlanningClockInStatusItem[] {
+  return assignments.map((assignment) => {
+    const latest = getLatestClockIn(assignment, clockIns);
+
+    return {
+      supervisorId: assignment.supervisorId,
+      siteId: assignment.siteId,
+      status: getClockInStatus(assignment, clockIns),
+      lastEventAt: latest?.timestampLocal.toISOString() ?? null,
+    };
+  });
+}
+
 function getClockInStatus(assignment: Pick<PlanningAssignmentRow, 'siteId' | 'supervisorId'>, clockIns: ClockInRow[]): PlanningClockInStatus {
-  const latest = [...clockIns]
-    .filter((record) => record.siteId === assignment.siteId && record.userId === assignment.supervisorId)
-    .sort((a, b) => b.timestampLocal.getTime() - a.timestampLocal.getTime() || b.createdAt.getTime() - a.createdAt.getTime())[0];
+  const latest = getLatestClockIn(assignment, clockIns);
 
   if (!latest) return 'CLOCKED_OUT';
 
@@ -521,6 +579,12 @@ function getClockInStatus(assignment: Pick<PlanningAssignmentRow, 'siteId' | 'su
   }
 
   return 'CLOCKED_OUT';
+}
+
+function getLatestClockIn(assignment: Pick<PlanningAssignmentRow, 'siteId' | 'supervisorId'>, clockIns: ClockInRow[]) {
+  return [...clockIns]
+    .filter((record) => record.siteId === assignment.siteId && record.userId === assignment.supervisorId)
+    .sort((a, b) => b.timestampLocal.getTime() - a.timestampLocal.getTime() || b.createdAt.getTime() - a.createdAt.getTime())[0];
 }
 
 function parsePlanningDate(value: string | null | undefined) {

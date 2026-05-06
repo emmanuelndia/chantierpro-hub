@@ -498,3 +498,285 @@ PLEASE IMPLEMENT THIS PLAN:
 ## Assumptions
 - Les ecrans management avances sont accessibles via actions rapides plutot que via une BottomTabBar trop dense.
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Contexte commun :
+- Application : ChantierPro, gestion BTP.
+- Déploiement : Vercel.
+- Shell mobile existant : app/(mobile)/mobile/(dashboard)/layout.tsx, MobileAppShell, BottomTabBar, OfflineBanner.
+- Auth mobile/web : vérifier compatibilité cookie session + Bearer token. Les requêtes venant de composants React peuvent utiliser authFetch, mais les navigations/téléchargements/images doivent fonctionner avec les cookies.
+- Respecter les scopes :
+  - SUPERVISOR : ses propres sessions, rapports, photos, tâches assignées.
+  - COORDINATOR : rapports selon périmètre opérationnel existant.
+  - GENERAL_SUPERVISOR : planning, rapports, équipes selon sites où il est membre actif d’une équipe active.
+  - PROJECT_MANAGER : projets/chantiers/rapports de ses projets.
+  - DIRECTION : vue globale.
+  - HR exclu des écrans management mobile.
+- Utiliser React Query avec staleTime 30s pour listes dynamiques, 5min pour options.
+- Gérer loading, empty, error states.
+- Corriger les 401 injustifiés.
+- Ne pas exposer d’URL signée Supabase côté frontend.
+- Vérification attendue : npm run lint, npm run build.
+
+PLEASE IMPLEMENT THIS PLAN:
+# FIX-MOB-6 Audit Auth Vercel Mobile
+
+## Summary
+- Faire un audit transversal des erreurs 401 sur Vercel.
+- Plusieurs routes fonctionnent en local mais échouent en production parce que certaines requêtes utilisent des cookies et d’autres attendent uniquement Bearer token.
+
+## Key Changes
+- Identifier toutes les routes mobiles appelées par :
+  - `<img>` / `next/image`;
+  - `<a href>` / téléchargement;
+  - navigation directe;
+  - React Query via `authFetch`.
+- Créer ou réutiliser un helper serveur d’auth hybride :
+  - Bearer token si présent;
+  - sinon cookie session/refresh;
+  - vérifier utilisateur actif.
+- Appliquer ce helper aux routes qui ne peuvent pas envoyer de header Authorization :
+  - photos content;
+  - downloads rapports;
+  - exports;
+  - routes consultables par lien direct.
+- Garder `withAuth` pour les routes purement API fetch si compatible.
+- Vérifier cookies en prod :
+  - `Secure`;
+  - `SameSite=Lax`;
+  - domaine Vercel correct;
+  - refresh token lisible côté serveur.
+- Ajouter logs serveur utiles mais non sensibles pour distinguer :
+  - `NO_SESSION`;
+  - `TOKEN_EXPIRED`;
+  - `ROLE_FORBIDDEN`;
+  - `OUT_OF_SCOPE`.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester sur Vercel :
+  - galerie photos;
+  - rapports;
+  - téléchargements;
+  - planning;
+  - équipes;
+  - session report;
+  - refresh auth après expiration access token.
+
+
+PLEASE IMPLEMENT THIS PLAN:
+# FIX-MOB-3 Rapports Mobile : Corriger 401 Et Chargement Multi-Rôles
+
+## Summary
+- Corriger les erreurs “Impossible de charger les rapports” pour tous les rôles autorisés.
+- Les rôles `COORDINATOR` et `GENERAL_SUPERVISOR` reçoivent des 401 alors qu’ils doivent pouvoir consulter les rapports.
+- Le `SUPERVISOR` doit pouvoir charger ses propres rapports.
+
+## Key Changes
+- Inspecter `/mobile/reports`, `/mobile/reports/[id]`, `components/mobile-*-reports-page.tsx`, routes :
+  - `/api/reports`;
+  - `/api/users/me/reports`;
+  - `/api/mobile/coordinator/reports`;
+  - `/api/mobile/general-supervisor/reports`;
+  - `/api/mobile/management/reports`;
+  - `/api/mobile/history/reports`.
+- Standardiser l’auth :
+  - les APIs appelées par React doivent accepter `authFetch`;
+  - les routes consultées depuis navigation/téléchargement doivent accepter cookie session web;
+  - ne pas retourner 401 pour une session valide.
+- Corriger le routing par rôle :
+  - `SUPERVISOR` : ses propres rapports;
+  - `COORDINATOR` : rapports de son périmètre;
+  - `GENERAL_SUPERVISOR` : rapports des sites de son périmètre;
+  - `PROJECT_MANAGER` : rapports de ses projets;
+  - `DIRECTION` : global.
+- Corriger les payloads pour que `MobileReportsList` reçoive toujours un format compatible.
+- Ajouter des messages d’erreur précis : non connecté, non autorisé, hors périmètre, erreur serveur.
+- Aucun changement Prisma.
+
+## Public Interfaces
+- Les endpoints rapports doivent retourner `200` avec liste vide si aucun rapport, pas `401`.
+- `401` uniquement si aucune session valide.
+- `403` si rôle connecté mais interdit.
+- `404` si détail rapport hors scope.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester sur Vercel :
+  - `SUPERVISOR` charge ses rapports;
+  - `COORDINATOR` charge ses rapports périmètre;
+  - `GENERAL_SUPERVISOR` charge ses rapports périmètre;
+  - `PROJECT_MANAGER` charge les rapports de ses projets;
+  - `DIRECTION` charge global;
+  - un rapport hors scope retourne 404.
+
+
+
+PLEASE IMPLEMENT THIS PLAN:
+# FIX-MOB-1 Planning Mobile : Options Superviseurs Et Chantiers
+
+## Summary
+- Corriger `/mobile/planning` : les champs de sélection superviseur et chantier ne chargent pas les données sur Vercel.
+- Vérifier l’auth, le scope `GENERAL_SUPERVISOR`, et le payload de `GET /api/mobile/planning/[date]`.
+
+## Key Changes
+- Inspecter `components/mobile-planning-page.tsx`, `types/mobile-planning.ts`, `lib/mobile-planning.ts`, `app/api/mobile/planning/[date]/route.ts`.
+- Corriger l’endpoint pour retourner systématiquement :
+  - `availableSites`;
+  - `unassignedSupervisors`;
+  - `assignments`;
+  - `clockInStatuses`;
+  - `canDuplicateFromYesterday`.
+- Scope `GENERAL_SUPERVISOR` :
+  - sites où l’utilisateur est membre actif d’une équipe active ;
+  - superviseurs disponibles actifs dans ce périmètre ;
+  - exclure les superviseurs déjà assignés à la date.
+- Corriger les erreurs 401 si l’endpoint utilise une auth Bearer-only alors que la session Vercel repose sur cookie.
+- Côté UI :
+  - afficher un message d’erreur explicite si options vides ;
+  - désactiver le submit si aucun chantier/superviseur ;
+  - ne pas masquer silencieusement les erreurs API.
+- Garder création, édition, suppression soft et duplication existantes.
+
+## Public Interfaces
+- `GET /api/mobile/planning/[date]` doit retourner des options non vides pour un `GENERAL_SUPERVISOR` ayant un périmètre.
+- Aucun changement Prisma.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester sur Vercel :
+  - `/mobile/planning` en `GENERAL_SUPERVISOR`;
+  - sélection chantier chargée;
+  - sélection superviseur chargée;
+  - création assignation;
+  - duplication depuis hier;
+  - hors périmètre non visible.
+
+
+
+
+PLEASE IMPLEMENT THIS PLAN:
+# FIX-MOB-2 Équipes Mobile : Liste Et Options Formulaire
+
+## Summary
+- Corriger `/mobile/teams`, `/mobile/teams/new`, `/mobile/teams/[id]/edit`.
+- Les équipes existantes et les options de création ne se chargent pas correctement sur Vercel.
+
+## Key Changes
+- Inspecter `lib/mobile-teams.ts`, `components/mobile-teams-management-page.tsx`, `components/mobile-team-form-page.tsx`, `components/mobile-team-detail-page.tsx`, routes `/api/mobile/teams*`.
+- Corriger `GET /api/mobile/teams/management` :
+  - `DIRECTION` : toutes les équipes;
+  - `PROJECT_MANAGER` : équipes des chantiers de ses projets;
+  - `GENERAL_SUPERVISOR` : équipes des sites où il est membre actif d’une équipe active;
+  - `COORDINATOR` : lecture seule si supporté.
+- Corriger `GET /api/mobile/teams/form-options` :
+  - retourner projets/sites accessibles;
+  - chefs d’équipe actifs;
+  - membres assignables actifs;
+  - pour `GENERAL_SUPERVISOR`, limiter aux ressources du périmètre.
+- Corriger `GET /api/mobile/teams/:id/form` pour préremplir l’édition.
+- Vérifier que les composants utilisent `authFetch` et affichent les erreurs API au lieu d’un select vide.
+- Corriger tout endpoint qui utilise une relation Prisma inexistante `team.project`; le projet passe par `team.site.project`.
+- Ne pas changer Prisma.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester sur Vercel :
+  - `GENERAL_SUPERVISOR` voit ses équipes;
+  - `PROJECT_MANAGER` voit les équipes de ses projets;
+  - `DIRECTION` voit toutes les équipes;
+  - création équipe charge les chantiers;
+  - chef d’équipe requis;
+  - ajout/retrait membre fonctionne.
+
+
+
+
+PLEASE IMPLEMENT THIS PLAN:
+# FIX-MOB-4 Téléchargement Rapports Pour Management Et Général Superviseur
+
+## Summary
+- Étendre le téléchargement de rapports à `PROJECT_MANAGER`, `DIRECTION`, `GENERAL_SUPERVISOR`, en plus de `COORDINATOR`.
+- Corriger les téléchargements sur mobile/Vercel avec auth cookie compatible lien navigateur.
+
+## Key Changes
+- Inspecter `app/api/reports/[id]/download/route.ts`, `app/api/reports/export/route.ts`, `lib/reports.ts`, les boutons UI rapports.
+- Autoriser :
+  - `COORDINATOR`;
+  - `GENERAL_SUPERVISOR`;
+  - `PROJECT_MANAGER`;
+  - `DIRECTION`;
+  - `ADMIN` si déjà supporté.
+- Appliquer le scope réel avant génération :
+  - `PROJECT_MANAGER` uniquement ses projets;
+  - `GENERAL_SUPERVISOR` uniquement sites de son périmètre;
+  - `COORDINATOR` selon son périmètre existant;
+  - `DIRECTION` global.
+- Les liens de téléchargement doivent fonctionner sans header Authorization, donc auth via cookie session aussi.
+- Ajouter boutons “Télécharger PDF” et “Télécharger TXT” dans les détails rapports mobiles autorisés.
+- Ne pas exposer de données hors scope.
+
+## Public Interfaces
+- `GET /api/reports/:id/download?format=pdf`
+- `GET /api/reports/:id/download?format=txt`
+- `GET /api/reports/export?date=YYYY-MM-DD&format=pdf|txt`
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester :
+  - coordinateur télécharge;
+  - général superviseur télécharge;
+  - chef de projet télécharge un rapport de son projet;
+  - direction télécharge;
+  - hors scope retourne 404/403.
+
+
+
+
+PLEASE IMPLEMENT THIS PLAN:
+# FIX-MOB-5 Tâches Assignées Et Photos De Fin De Tâche
+
+## Summary
+- Revoir la logique planning/photo : le `GENERAL_SUPERVISOR` assigne une tâche à un `SUPERVISOR`.
+- Quand le superviseur termine une tâche, il doit pouvoir prendre une photo liée à cette tâche.
+- Il doit aussi pouvoir continuer à prendre des photos chantier classiques.
+
+## Key Changes
+- Inspecter modèle `PlanningAssignment`, routes planning, photo mobile, session report.
+- Ajouter dans l’UI superviseur/photo :
+  - sélection “Photo chantier” ou “Photo liée à une tâche”;
+  - si tâche : charger les assignations du jour du superviseur;
+  - permettre de choisir la tâche assignée.
+- Côté API photo :
+  - accepter un champ optionnel `planningAssignmentId` si le modèle Prisma le supporte déjà;
+  - si le modèle ne le supporte pas, proposer une solution sans migration temporaire via `description` structurée ou créer un ticket migration séparé.
+- Côté planning :
+  - `SUPERVISOR` voit ses tâches assignées du jour;
+  - peut marquer une tâche `COMPLETED` si autorisé;
+  - peut joindre une photo comme preuve de fin de tâche.
+- Côté rapports :
+  - afficher les photos liées aux tâches dans le détail rapport/session si elles existent.
+- Garder les photos chantier classiques inchangées.
+
+## Decision importante
+- Si Prisma n’a pas de relation `Photo -> PlanningAssignment`, implémenter une migration propre :
+  - ajouter `planningAssignmentId String?` sur `Photo`;
+  - relation optionnelle vers `PlanningAssignment`;
+  - index `[planningAssignmentId]`.
+- Ne pas surcharger durablement `description` si une migration est acceptable.
+
+## Test Plan
+- `npm run prisma:generate` si migration ajoutée.
+- `npm run lint`
+- `npm run build`
+- Tester :
+  - GS crée une assignation;
+  - supervisor voit sa tâche;
+  - supervisor prend une photo liée à la tâche;
+  - photo visible dans tâche/rapport;
+  - photo chantier classique fonctionne toujours.

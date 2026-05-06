@@ -53,3 +53,6 @@ Quand je veut prendre une photo on met camera indisponible, la camera n'est pas 
 Pour ces erreurs de gps et de camera cherchent et résout le problème ou dis moi comment faire pour tester efficacement
 
 
+
+Quand un utilisateur rôle SUPERVISOR est crée il est crée comme chef de chantier automatiquement c'est pas normal 
+

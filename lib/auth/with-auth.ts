@@ -1,14 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Role } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
-import { authUserSelect, serializeAuthUser } from '@/lib/auth/serializers';
-import { verifyAccessToken } from '@/lib/auth/tokens';
+import { getAuthResultFromRequest, type RequestAuthUser } from '@/lib/auth/request-user';
 
 type RouteParams = Record<string, string | string[]>;
 
 type WithAuthContext<TParams extends RouteParams> = {
   req: NextRequest;
-  user: ReturnType<typeof serializeAuthUser>;
+  user: RequestAuthUser;
   params: TParams;
 };
 
@@ -26,37 +24,30 @@ export function withAuth<TParams extends RouteParams = RouteParams>(
       params: Promise<TParams>;
     },
   ) => {
-    const authorization = req.headers.get('authorization');
+    const auth = await getAuthResultFromRequest(req, roles);
 
-    if (!authorization?.startsWith('Bearer ')) {
-      return NextResponse.json({ code: 'UNAUTHORIZED' }, { status: 401 });
-    }
-
-    const token = authorization.slice('Bearer '.length);
-
-    try {
-      const payload = await verifyAccessToken(token);
-      const params = await context.params;
-      const user = await prisma.user.findUnique({
-        where: { id: payload.sub },
-        select: authUserSelect,
-      });
-
-      if (!user?.isActive) {
-        return NextResponse.json({ code: 'UNAUTHORIZED' }, { status: 401 });
+    if (!auth.ok) {
+      if (auth.code === 'ROLE_FORBIDDEN') {
+        console.warn('Auth rejected:', {
+          path: req.nextUrl.pathname,
+          reason: 'ROLE_FORBIDDEN',
+        });
+        return NextResponse.json({ code: 'FORBIDDEN', reason: auth.code }, { status: 403 });
       }
 
-      if (roles.length > 0 && !roles.includes(user.role)) {
-        return NextResponse.json({ code: 'FORBIDDEN' }, { status: 403 });
-      }
-
-      return handler({
-        req,
-        user: serializeAuthUser(user),
-        params,
+      console.warn('Auth rejected:', {
+        path: req.nextUrl.pathname,
+        reason: auth.code,
       });
-    } catch {
-      return NextResponse.json({ code: 'UNAUTHORIZED' }, { status: 401 });
+      return NextResponse.json({ code: 'UNAUTHORIZED', reason: auth.code }, { status: 401 });
     }
+
+    const params = await context.params;
+
+    return handler({
+      req,
+      user: auth.user,
+      params,
+    });
   };
 }

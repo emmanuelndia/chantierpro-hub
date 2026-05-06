@@ -17,6 +17,13 @@ export type PlanningAssignment = {
   clockInStatus: PlanningClockInStatus;
 };
 
+export type PlanningClockInStatusItem = {
+  supervisorId: string;
+  siteId: string;
+  status: PlanningClockInStatus;
+  lastEventAt: string | null;
+};
+
 export type UnassignedSupervisor = {
   id: string;
   name: string;
@@ -40,6 +47,7 @@ export type AvailableSite = {
 export type PlanningDayResponse = {
   date: string;
   assignments: PlanningAssignment[];
+  clockInStatuses: PlanningClockInStatusItem[];
   unassignedSupervisors: UnassignedSupervisor[];
   availableSites: AvailableSite[];
   hasAssignments: boolean;
