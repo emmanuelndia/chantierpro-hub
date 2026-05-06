@@ -16,7 +16,7 @@ export type SessionSummary = {
 export type DayAssignment = {
   id: string;
   action: string;
-  targetProgress?: number;
+  targetProgress?: number | undefined;
   siteId: string;
   siteName: string;
 };
@@ -26,16 +26,16 @@ export type SessionPhoto = {
   filename: string;
   url: string;
   takenAt: string;
-  description?: string;
-  thumbnail?: string;
+  description?: string | undefined;
+  thumbnail?: string | undefined;
 };
 
 export type SubmitReportRequest = {
   clockInRecordId: string;
   content: string;
   progressPercentage: number;
-  blockageNote?: string;
-  assignmentId?: string;
+  blockageNote?: string | undefined;
+  assignmentId?: string | undefined;
   photoIds: string[];
 };
 
@@ -48,8 +48,8 @@ export type ReportSubmissionResponse = {
 
 export type SessionReportData = {
   session: SessionSummary;
-  assignment?: DayAssignment;
+  assignment?: DayAssignment | undefined;
   photos: SessionPhoto[];
   hasExistingReport: boolean;
-  existingReportId?: string;
+  existingReportId?: string | undefined;
 };

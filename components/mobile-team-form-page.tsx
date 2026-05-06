@@ -260,7 +260,7 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
   );
 }
 
-function Field({ label, error, children }: Readonly<{ label: string; error?: string; children: ReactNode }>) {
+function Field({ label, error, children }: Readonly<{ label: string; error?: string | undefined; children: ReactNode }>) {
   return (
     <label className="block space-y-2">
       <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{label}</span>

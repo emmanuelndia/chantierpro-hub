@@ -12,12 +12,21 @@ import {
   syncPendingMobilePhotos,
   type PendingMobilePhoto,
 } from '@/lib/mobile-photo-offline';
-import { getMobilePhotoJpegQuality } from '@/lib/mobile-photo-quality';
 import { useGeolocation } from '@/lib/hooks/useGeolocation';
 import type { MobilePhotoSiteOption, MobilePhotoSitesResponse } from '@/types/mobile-photo';
 
 type CameraState = 'loading' | 'ready' | 'denied';
 type FacingMode = 'environment' | 'user';
+type LegacyGetUserMedia = (
+  constraints: MediaStreamConstraints,
+  successCallback: (stream: MediaStream) => void,
+  errorCallback: (error: DOMException) => void,
+) => void;
+type LegacyNavigator = Navigator & {
+  getUserMedia?: LegacyGetUserMedia;
+  webkitGetUserMedia?: LegacyGetUserMedia;
+  mozGetUserMedia?: LegacyGetUserMedia;
+};
 
 type CapturedPhoto = {
   blob: Blob;
@@ -110,6 +119,7 @@ export function MobileCameraManagementPage() {
 
   // Libération propre de la caméra au démontage
   useEffect(() => {
+    const video = videoRef.current;
     return () => {
       // Arrêter toutes les pistes du stream
       if (streamRef.current) {
@@ -120,8 +130,8 @@ export function MobileCameraManagementPage() {
       }
       
       // Nettoyer la référence vidéo
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
+      if (video) {
+        video.srcObject = null;
       }
     };
   }, []);
@@ -131,19 +141,20 @@ export function MobileCameraManagementPage() {
     setCameraMessage('');
 
     // Vérifier le support avec fallbacks pour anciens navigateurs
-    let getUserMedia: typeof navigator.mediaDevices.getUserMedia | null = null;
+    let getUserMedia: ((constraints: MediaStreamConstraints) => Promise<MediaStream>) | null = null;
     
     if (navigator.mediaDevices?.getUserMedia) {
       getUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     } else {
       // Fallbacks pour anciens navigateurs
-      const nav = navigator as any;
-      getUserMedia = nav.getUserMedia || nav.webkitGetUserMedia || nav.mozGetUserMedia;
+      const nav = navigator as LegacyNavigator;
+      const legacyGetUserMedia =
+        nav.getUserMedia ?? nav.webkitGetUserMedia ?? nav.mozGetUserMedia ?? null;
       
-      if (getUserMedia) {
+      if (legacyGetUserMedia) {
         // Wrapper pour l'ancienne API
         getUserMedia = (constraints) => new Promise((resolve, reject) => {
-          getUserMedia.call(navigator, constraints, resolve, reject);
+          legacyGetUserMedia.call(navigator, constraints, resolve, reject);
         });
       }
     }
@@ -182,10 +193,12 @@ export function MobileCameraManagementPage() {
 
       setCameraState('ready');
       setTorchSupported(canUseTorch(stream));
-    } catch (err: any) {
+    } catch (err: unknown) {
       let errorMessage = 'Impossible d\'accéder à la caméra.';
+      const errorName = err instanceof DOMException || err instanceof Error ? err.name : '';
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
       
-      switch (err.name) {
+      switch (errorName) {
         case 'NotAllowedError':
         case 'PermissionDeniedError':
           errorMessage = 'Permission caméra refusée. Autorisez la caméra dans les paramètres du navigateur.';
@@ -206,7 +219,7 @@ export function MobileCameraManagementPage() {
           errorMessage = 'Accès à la caméra bloqué pour des raisons de sécurité.';
           break;
         default:
-          errorMessage = `Erreur caméra: ${err.message || 'Erreur inconnue'}`;
+          errorMessage = `Erreur caméra: ${message}`;
       }
       
       setCameraMessage(errorMessage);
@@ -492,6 +505,7 @@ function PhotoConfirmation({
   return (
     <div className="relative min-h-[calc(100dvh-10rem)]">
       <div className="relative h-full">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           alt="Photo capturée"
           className="h-full w-full object-cover"
@@ -597,9 +611,8 @@ function canUseTorch(stream: MediaStream) {
     return false;
   }
 
-  const capabilities = track.getCapabilities();
-
-  return capabilities.torch ? true : false;
+  const capabilities = track.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
+  return Boolean(capabilities?.torch);
 }
 
 function formatDateTime(value: string) {

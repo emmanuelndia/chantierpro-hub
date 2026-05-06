@@ -10,7 +10,6 @@ import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { SessionStatus, TodayClockInView } from '@/types/clock-in';
 import type { TodaySiteItem } from '@/types/projects';
 import type {
-  CoordinatorKPIs,
   PendingReportItem,
   RecentReportItem,
   CoordinatorDashboardResponse,
@@ -148,7 +147,7 @@ export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePagePro
 
       if (response.ok) {
         // Rafraîchir les données après l'envoi de la notification
-        coordinatorDashboardQuery.refetch();
+        await coordinatorDashboardQuery.refetch();
       }
     } catch (error) {
       console.error('Failed to send reminder:', error);
@@ -269,7 +268,9 @@ export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePagePro
               <PendingReportCard
                 key={report.id}
                 report={report}
-                onRemind={() => handleRemindSupervisor(report.supervisorId, report.id)}
+                onRemind={() => {
+                  void handleRemindSupervisor(report.supervisorId, report.id);
+                }}
               />
             ))}
           </div>

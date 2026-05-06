@@ -91,16 +91,22 @@ export function MobileClockInPage() {
   });
 
   // Convertir l'état du hook vers le format GeoState existant
-  const geoState: GeoState = geolocation.loading 
-    ? { status: 'loading' }
-    : geolocation.error 
-    ? { status: 'unavailable', message: geolocation.error }
-    : { 
-        status: 'ready', 
-        latitude: geolocation.latitude!, 
-        longitude: geolocation.longitude!, 
-        accuracy: geolocation.accuracy 
-      };
+  const geoState = useMemo<GeoState>(() => {
+    if (geolocation.loading) {
+      return { status: 'loading' };
+    }
+
+    if (geolocation.error || geolocation.latitude === null || geolocation.longitude === null) {
+      return { status: 'unavailable', message: geolocation.error ?? 'GPS indisponible.' };
+    }
+
+    return {
+      status: 'ready',
+      latitude: geolocation.latitude,
+      longitude: geolocation.longitude,
+      accuracy: geolocation.accuracy,
+    };
+  }, [geolocation.accuracy, geolocation.error, geolocation.latitude, geolocation.loading, geolocation.longitude]);
 
   const [manualMode, setManualMode] = useState(Boolean(requestedSiteId));
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(requestedSiteId);

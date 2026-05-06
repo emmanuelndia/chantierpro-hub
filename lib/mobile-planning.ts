@@ -36,12 +36,14 @@ type ClockInRow = {
 };
 
 export function canAccessMobilePlanning(role: Role) {
-  return [
+  const allowedRoles: readonly Role[] = [
     Role.GENERAL_SUPERVISOR,
     Role.PROJECT_MANAGER,
     Role.DIRECTION,
     Role.ADMIN,
-  ].includes(role);
+  ];
+
+  return allowedRoles.includes(role);
 }
 
 export function operationalPlanningSiteWhere(user: AuthLikeUser, date?: Date): Prisma.SiteWhereInput {

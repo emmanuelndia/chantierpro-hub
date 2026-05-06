@@ -14,6 +14,7 @@ import type {
   ReportSummary,
   ReportDetail,
   MobileReportsHistoryResponse,
+  ReportStatus,
 } from '@/types/mobile-history-reports';
 
 const statusLabels: Record<MobileHistorySessionStatus, string> = {
@@ -513,11 +514,11 @@ function ReportCard({
   report,
   onOpen,
 }: Readonly<{ report: ReportSummary; onOpen: () => void }>) {
-  const statusConfig = {
-    SUBMITTED: { color: 'bg-blue-100 text-blue-700', label: 'Soumis' },
-    REVIEWED: { color: 'bg-orange-100 text-orange-700', label: 'Révisé' },
-    VALIDATED: { color: 'bg-emerald-100 text-emerald-700', label: 'Validé' },
-    SENT: { color: 'bg-purple-100 text-purple-700', label: 'Envoyé client' },
+  const statusConfig: Record<ReportStatus, { color: string; label: string }> = {
+    RECU: { color: 'bg-blue-100 text-blue-700', label: 'Reçu' },
+    EN_REVUE: { color: 'bg-orange-100 text-orange-700', label: 'En revue' },
+    VALIDE: { color: 'bg-emerald-100 text-emerald-700', label: 'Validé' },
+    ENVOYE: { color: 'bg-purple-100 text-purple-700', label: 'Envoyé client' },
   };
 
   const status = statusConfig[report.status];

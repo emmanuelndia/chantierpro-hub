@@ -1,16 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  MobileReportsLoadingState,
-  MobileReportsErrorState,
-  MobileReportsEmptyState
-} from './mobile-reports-error-state';
+import { useEffect, useState } from 'react';
 import { authFetch } from '@/lib/auth/client-session';
-import { MobileReportsList } from './mobile-reports-list';
+import {
+  MobileReportsEmptyState,
+  MobileReportsErrorState,
+  MobileReportsLoadingState,
+} from './mobile-reports-error-state';
+import { MobileReportsList, type MobileReportsListItem } from './mobile-reports-list';
+
+type ReportsListResponse = {
+  data?: MobileReportsListItem[];
+};
 
 export function MobileManagementReportsPage() {
-  const [reports, setReports] = useState<any[]>([]);
+  const [reports, setReports] = useState<MobileReportsListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,47 +28,55 @@ export function MobileManagementReportsPage() {
           throw new Error(`Erreur ${response.status} lors du chargement des rapports`);
         }
 
-        const data = await response.json();
-        // Le format attendu est { data: [...] } d'après les autres routes standardisées
-        setReports(data.data || data || []);
+        const data = (await response.json()) as ReportsListResponse | MobileReportsListItem[];
+        setReports(Array.isArray(data) ? data : data.data ?? []);
         setError(null);
-      } catch (err: any) {
-        console.error('Fetch reports error:', err);
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Impossible de charger les rapports.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchReports();
+    void fetchReports();
   }, []);
 
-  if (loading) return <div className="p-4"><MobileReportsLoadingState count={4} /></div>;
+  if (loading) {
+    return (
+      <div className="p-4">
+        <MobileReportsLoadingState count={4} />
+      </div>
+    );
+  }
 
-  if (error) return (
-    <div className="p-4">
-      <MobileReportsErrorState
-        message="Erreur de chargement"
-        detail={error}
-        onRetry={() => window.location.reload()}
-      />
-    </div>
-  );
+  if (error) {
+    return (
+      <div className="p-4">
+        <MobileReportsErrorState
+          detail={error}
+          message="Erreur de chargement"
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    );
+  }
 
-  if (reports.length === 0) return (
-    <div className="p-4">
-      <MobileReportsEmptyState
-        message="Aucun rapport trouvé"
-        description="Il n'y a pas encore de rapports soumis dans le système."
-      />
-    </div>
-  );
+  if (reports.length === 0) {
+    return (
+      <div className="p-4">
+        <MobileReportsEmptyState
+          description="Il n'y a pas encore de rapports soumis dans le système."
+          message="Aucun rapport trouvé"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 p-4 pb-20">
       <header>
         <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Direction / Gestion</p>
-        <h1 className="mt-1 text-2xl font-black text-slate-950">Rapports Terrain</h1>
+        <h1 className="mt-1 text-2xl font-black text-slate-950">Rapports terrain</h1>
       </header>
 
       <section>

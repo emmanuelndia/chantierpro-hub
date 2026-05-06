@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { Prisma, Role } from '@prisma/client';
 
 export const GET = withAuth(async ({ user }) => {
   try {
-    const where: any = {};
+    const where: Prisma.ReportWhereInput = {};
     
-    if (user.role === 'SUPERVISOR') {
+    if (user.role === Role.SUPERVISOR) {
       where.userId = user.id;
     }
     // For other roles, they might see all reports or filter by their managed sites

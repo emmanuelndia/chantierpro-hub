@@ -1,4 +1,4 @@
-export type ReportStatus = 'PENDING' | 'SUBMITTED' | 'REVIEWED' | 'VALIDATED' | 'SENT';
+export type ReportStatus = 'RECU' | 'EN_REVUE' | 'VALIDE' | 'ENVOYE';
 
 export type ReportFilter = 'all' | 'pending' | 'received' | 'site';
 
@@ -69,10 +69,10 @@ export type CoordinatorReportsResponse = {
   summary: ReportsSummary;
   pendingReports: PendingReport[];
   receivedReports: ReceivedReport[];
-  sites: Array<{
+  sites: {
     id: string;
     name: string;
-  }>;
+  }[];
 };
 
 export type ReportValidationRequest = {

@@ -146,7 +146,7 @@ export function MobileProjectFormPage({ mode, user, projectId }: MobileProjectFo
 
       return (await response.json()) as ProjectMutationResponse;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       // Validation de sécurité de l'ID du projet
       const projectId = data?.project?.id;
       
@@ -162,8 +162,8 @@ export function MobileProjectFormPage({ mode, user, projectId }: MobileProjectFo
       const projectName = data?.project?.name || 'Projet';
       pushToast({
         title: 'Projet créé avec succès',
-        description: `"${projectName}" a été créé et est maintenant disponible.`,
-        tone: 'success',
+        message: `"${projectName}" a été créé et est maintenant disponible.`,
+        type: 'success',
       });
 
       // Redirection vers le détail du projet
@@ -374,8 +374,8 @@ function TextField({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  error?: string;
-  placeholder?: string;
+  error?: string | undefined;
+  placeholder?: string | undefined;
   required?: boolean;
   type?: 'date' | 'text';
 }>) {
@@ -410,8 +410,8 @@ function TextAreaField({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  error?: string;
-  placeholder?: string;
+  error?: string | undefined;
+  placeholder?: string | undefined;
   required?: boolean;
 }>) {
   return (

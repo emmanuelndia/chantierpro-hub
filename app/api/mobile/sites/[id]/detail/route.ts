@@ -1,10 +1,10 @@
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { createInternalPhotoUrl } from '@/lib/photos';
-import { Role } from '@prisma/client';
+import { Prisma, Role, TeamMemberStatus, TeamStatus } from '@prisma/client';
 
-export const GET = withAuth(async ({ user, params }) => {
-  const allowedRoles = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
+export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
+  const allowedRoles: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
   
   if (!allowedRoles.includes(user.role)) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
@@ -14,8 +14,8 @@ export const GET = withAuth(async ({ user, params }) => {
 
   try {
     // Construire la clause where selon le rôle
-    const whereClause: any = {
-      id: id as string,
+    const whereClause: Prisma.SiteWhereInput = {
+      id,
     };
 
     if (user.role === Role.PROJECT_MANAGER) {
@@ -42,12 +42,12 @@ export const GET = withAuth(async ({ user, params }) => {
         },
         teams: {
           where: {
-            status: 'ACTIVE',
+            status: TeamStatus.ACTIVE,
           },
           include: {
             members: {
               where: {
-                status: 'ACTIVE',
+                status: TeamMemberStatus.ACTIVE,
               },
               include: {
                 user: {
@@ -89,7 +89,7 @@ export const GET = withAuth(async ({ user, params }) => {
             },
           },
           orderBy: {
-            arrivalAt: 'desc',
+            timestampLocal: 'desc',
           },
           take: 50, // Limiter pour la vue mobile
         },
@@ -142,8 +142,8 @@ export const GET = withAuth(async ({ user, params }) => {
       })),
       clockInRecords: site.clockInRecords.map(record => ({
         id: record.id,
-        arrivalAt: record.arrivalAt.toISOString(),
-        departureAt: record.departureAt?.toISOString() || null,
+        type: record.type,
+        timestampLocal: record.timestampLocal.toISOString(),
         user: {
           firstName: record.user.firstName,
           lastName: record.user.lastName,

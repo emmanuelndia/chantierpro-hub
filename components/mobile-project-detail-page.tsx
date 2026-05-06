@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { ProjectStatus, type SiteStatus, type ReportValidationStatus } from '@prisma/client';
 import { useState, type ReactNode } from 'react';
@@ -20,6 +19,7 @@ type MobileProjectDetailPageProps = Readonly<{
 }>;
 
 type ProjectDetailTab = 'summary' | 'sites' | 'teams' | 'photos' | 'reports';
+type HttpStatusError = Error & { status?: number };
 
 const tabs: { id: ProjectDetailTab; label: string }[] = [
   { id: 'summary', label: 'Résumé' },
@@ -38,8 +38,8 @@ export function MobileProjectDetailPage({ projectId }: MobileProjectDetailPagePr
 
       if (!response.ok) {
         // Lancer une erreur avec le statut pour une gestion spécifique
-        const error = new Error(`Mobile project detail request failed with status ${response.status}`);
-        (error as any).status = response.status;
+        const error: HttpStatusError = new Error(`Mobile project detail request failed with status ${response.status}`);
+        error.status = response.status;
         throw error;
       }
 
@@ -58,7 +58,7 @@ export function MobileProjectDetailPage({ projectId }: MobileProjectDetailPagePr
 
   if (detailQuery.isError || !detail) {
     // Déterminer le message d'erreur spécifique selon le statut
-    const error = detailQuery.error as any;
+    const error = detailQuery.error as HttpStatusError;
     let errorMessage = 'Impossible de charger ce projet.';
     let errorDescription = 'Vérifiez votre accès puis réessayez.';
     

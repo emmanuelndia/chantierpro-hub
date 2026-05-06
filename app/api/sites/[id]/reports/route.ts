@@ -1,18 +1,47 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { Prisma, ReportStatus, Role } from '@prisma/client';
+
+type CreateSiteReportBody = {
+  content: string;
+  clockInRecordId: string;
+  progression?: number | null;
+  blocage?: string | null;
+};
+
+function parseCreateSiteReportBody(value: unknown): CreateSiteReportBody | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const content = typeof record.content === 'string' ? record.content.trim() : '';
+  const clockInRecordId = typeof record.clockInRecordId === 'string' ? record.clockInRecordId : '';
+
+  if (!content || !clockInRecordId) {
+    return null;
+  }
+
+  return {
+    content,
+    clockInRecordId,
+    progression: typeof record.progression === 'number' ? record.progression : null,
+    blocage: typeof record.blocage === 'string' ? record.blocage : null,
+  };
+}
 
 export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
   try {
-    const { content, clockInRecordId, progression, blocage } = await req.json();
+    const body = parseCreateSiteReportBody(await req.json().catch(() => null));
 
-    if (!content || content.trim() === '') {
+    if (!body) {
       return NextResponse.json({ error: 'Contenu requis' }, { status: 400 });
     }
 
     // Vérifier que clockInRecordId appartient au user
     const clockIn = await prisma.clockInRecord.findFirst({
-      where: { id: clockInRecordId, userId: user.id }
+      where: { id: body.clockInRecordId, userId: user.id }
     });
     if (!clockIn) {
       return NextResponse.json({ error: 'Session invalide' }, { status: 400 });
@@ -20,7 +49,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
     // Vérifier qu'il n'y a pas déjà un rapport pour cette session
     const existing = await prisma.report.findUnique({
-      where: { clockInRecordId }
+      where: { clockInRecordId: body.clockInRecordId }
     });
     if (existing) {
       return NextResponse.json({ error: 'Rapport déjà soumis' }, { status: 409 });
@@ -30,11 +59,11 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
       data: {
         siteId: params.id,
         userId: user.id,
-        clockInRecordId,
-        content,
-        progression: progression ?? null,
-        blocage: blocage ?? null,
-        status: 'RECU'
+        clockInRecordId: body.clockInRecordId,
+        content: body.content,
+        progression: body.progression ?? null,
+        blocage: body.blocage ?? null,
+        status: ReportStatus.RECU
       }
     });
 
@@ -48,8 +77,8 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
   try {
     // Filtre selon le rôle
-    const where: any = { siteId: params.id };
-    if (user.role === 'SUPERVISOR') {
+    const where: Prisma.ReportWhereInput = { siteId: params.id };
+    if (user.role === Role.SUPERVISOR) {
       where.userId = user.id; // ne voit que ses propres rapports
     }
 

@@ -22,6 +22,7 @@ import type {
 type MobilePlanningPageProps = Readonly<{
   user: WebSessionUser;
 }>;
+type HttpStatusError = Error & { status?: number };
 
 const todayKey = formatDateKey(new Date());
 
@@ -44,8 +45,8 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
         }
         
         // Lancer une erreur avec le statut pour une gestion spécifique
-        const error = new Error(await getApiErrorMessage(response, 'Impossible de charger le planning.'));
-        (error as any).status = response.status;
+        const error: HttpStatusError = new Error(await getApiErrorMessage(response, 'Impossible de charger le planning.'));
+        error.status = response.status;
         throw error;
       }
 
@@ -222,7 +223,12 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
       {planningQuery.isLoading ? <PlanningLoadingState /> : null}
 
       {planningQuery.isError ? (
-        <PlanningErrorBlock error={planningQuery.error} onRetry={() => planningQuery.refetch()} />
+        <PlanningErrorBlock
+          error={planningQuery.error}
+          onRetry={() => {
+            void planningQuery.refetch();
+          }}
+        />
       ) : null}
 
       {mutationError ? <ErrorBlock message={mutationError} /> : null}
@@ -761,7 +767,7 @@ function EditIcon({ className }: Readonly<{ className: string }>) {
 }
 
 function PlanningErrorBlock({ error, onRetry }: Readonly<{ error: unknown; onRetry: () => void }>) {
-  const errorObj = error as any;
+  const errorObj = error as HttpStatusError;
   let title = 'Erreur lors du chargement du planning';
   let description = 'Vérifiez votre connexion puis réessayez.';
   let showRetry = true;

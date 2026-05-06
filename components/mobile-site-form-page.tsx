@@ -366,7 +366,7 @@ function Field({
   children,
 }: Readonly<{
   label: string;
-  error?: string;
+  error?: string | undefined;
   children: ReactNode;
 }>) {
   return (

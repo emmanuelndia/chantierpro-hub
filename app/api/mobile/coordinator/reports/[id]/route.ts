@@ -1,92 +1,116 @@
+import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { getOperationalSiteIds } from '@/lib/dashboard';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import type { ReportDetail } from '@/types/mobile-reports';
 
-export const GET = withAuth(async ({ user, params }) => {
-  if (user.role !== 'COORDINATOR') {
+export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
+  if (user.role !== Role.COORDINATOR) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
-  const { id } = params;
-
   try {
-    // Vérifier que le coordinateur a accès à ce rapport
+    const siteIds = await getOperationalSiteIds(prisma, user.id);
+
+    if (siteIds.length === 0) {
+      return Response.json({ code: 'NOT_FOUND', message: 'Rapport non trouvé' }, { status: 404 });
+    }
+
     const report = await prisma.report.findFirst({
       where: {
-        id,
-        author: {
-          role: 'SUPERVISOR',
-        },
-        site: {
-          coordinatorId: user.id,
+        id: params.id,
+        siteId: { in: siteIds },
+        user: {
+          role: Role.SUPERVISOR,
         },
       },
-      include: {
-        author: true,
-        site: true,
-        photos: {
-          orderBy: {
-            takenAt: 'asc',
+      select: {
+        id: true,
+        userId: true,
+        siteId: true,
+        content: true,
+        progression: true,
+        status: true,
+        submittedAt: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        site: {
+          select: {
+            name: true,
+            address: true,
+          },
+        },
+        clockInRecord: {
+          select: {
+            clockInDate: true,
+            timestampLocal: true,
           },
         },
       },
     });
 
     if (!report) {
-      return Response.json(
-        { code: 'NOT_FOUND', message: 'Rapport non trouvé' },
-        { status: 404 }
-      );
+      return Response.json({ code: 'NOT_FOUND', message: 'Rapport non trouvé' }, { status: 404 });
     }
 
-    // Récupérer la session correspondante
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayStart = new Date(report.clockInRecord.clockInDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
 
-    const session = await prisma.clockInSession.findFirst({
+    const photos = await prisma.photo.findMany({
       where: {
-        userId: report.authorId,
         siteId: report.siteId,
-        date: {
-          gte: today,
-          lt: tomorrow,
+        uploadedById: report.userId,
+        isDeleted: false,
+        timestampLocal: {
+          gte: dayStart,
+          lt: dayEnd,
         },
-        departureAt: {
-          not: null,
-        },
+      },
+      orderBy: [{ takenAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        filename: true,
+        takenAt: true,
+        description: true,
       },
     });
 
-    const sessionDuration = session ? 
-      Math.floor((new Date(session.departureAt!).getTime() - new Date(session.arrivalAt).getTime()) / 1000) 
-      : 0;
+    const sessionDuration = Math.max(
+      0,
+      Math.floor(
+        (report.submittedAt.getTime() - report.clockInRecord.timestampLocal.getTime()) / 1000,
+      ),
+    );
 
     const reportDetail: ReportDetail = {
       id: report.id,
-      supervisorId: report.authorId,
-      supervisorName: report.author.lastName,
-      supervisorFirstName: report.author.firstName,
+      supervisorId: report.userId,
+      supervisorName: report.user.lastName,
+      supervisorFirstName: report.user.firstName,
       siteId: report.siteId,
       siteName: report.site.name,
       siteAddress: report.site.address,
-      sessionStartedAt: session?.arrivalAt.toISOString() || report.createdAt.toISOString(),
-      sessionEndedAt: session?.departureAt?.toISOString() || report.updatedAt.toISOString(),
+      sessionStartedAt: report.clockInRecord.timestampLocal.toISOString(),
+      sessionEndedAt: report.submittedAt.toISOString(),
       sessionDuration,
-      progressPercentage: 100, // Rapport soumis = 100%
-      submittedAt: report.createdAt.toISOString(),
-      content: report.content || '',
-      status: report.status as any,
-      photos: report.photos.map(photo => ({
+      progressPercentage: report.progression ?? 100,
+      submittedAt: report.submittedAt.toISOString(),
+      content: report.content,
+      status: report.status,
+      photos: photos.map((photo) => ({
         id: photo.id,
         filename: photo.filename,
         url: createInternalPhotoUrl(photo.id),
         takenAt: photo.takenAt.toISOString(),
-        description: photo.description,
+        description: photo.description ?? undefined,
       })),
-      coordinatorComment: report.coordinatorComment || undefined,
     };
 
     return Response.json(reportDetail);
@@ -94,7 +118,7 @@ export const GET = withAuth(async ({ user, params }) => {
     console.error('Report detail error:', error);
     return Response.json(
       { code: 'INTERNAL_ERROR', message: 'Erreur lors du chargement du rapport' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

@@ -8,7 +8,7 @@ const mobileCameraManagementRoles: readonly Role[] = [
   Role.DIRECTION,
 ];
 
-export default async function MobileCameraManagementPage() {
+export default async function MobileCameraManagementRoute() {
   const session = await getCurrentWebSession();
 
   if (!session) {

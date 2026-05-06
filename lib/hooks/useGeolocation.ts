@@ -64,7 +64,7 @@ export function useGeolocation(options: {
         });
       },
       (error) => {
-        const errorMessage = ERROR_MESSAGES[error.code] || 'Erreur de localisation inconnue.';
+        const errorMessage = ERROR_MESSAGES[error.code] ?? 'Erreur de localisation inconnue.';
         const permissionState = error.code === 1 ? 'denied' : 'prompt';
 
         setState(prev => ({
@@ -90,17 +90,17 @@ export function useGeolocation(options: {
   // Vérifier l'état de la permission si l'API est disponible
   useEffect(() => {
     if ('permissions' in navigator && 'geolocation' in navigator) {
-      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((result) => {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         setState(prev => ({
           ...prev,
-          permissionState: result.state as GeolocationState['permissionState'],
+          permissionState: result.state,
         }));
 
         // Écouter les changements de permission
         const handleChange = () => {
           setState(prev => ({
             ...prev,
-            permissionState: result.state as GeolocationState['permissionState'],
+            permissionState: result.state,
           }));
         };
 

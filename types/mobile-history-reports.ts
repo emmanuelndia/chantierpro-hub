@@ -1,4 +1,4 @@
-export type ReportStatus = 'SUBMITTED' | 'REVIEWED' | 'VALIDATED' | 'SENT';
+export type ReportStatus = 'RECU' | 'EN_REVUE' | 'VALIDE' | 'ENVOYE';
 
 export type ReportSummary = {
   id: string;
@@ -10,19 +10,20 @@ export type ReportSummary = {
   status: ReportStatus;
   photoCount: number;
   coordinatorComment?: string;
+  blockageNote?: string;
   createdAt: string;
   updatedAt: string;
 };
 
 export type ReportDetail = ReportSummary & {
-  photos: Array<{
+  photos: {
     id: string;
     filename: string;
     url: string;
     thumbnail?: string;
     takenAt: string;
     description?: string;
-  }>;
+  }[];
   sessionInfo: {
     arrivalAt: string;
     departureAt: string;

@@ -1,110 +1,68 @@
+import { ReportStatus, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import type { ReportStatus } from '@/types/mobile-reports';
+import { getOperationalSiteIds } from '@/lib/dashboard';
 
-export const PATCH = withAuth(async ({ user, params, body }) => {
-  if (user.role !== 'COORDINATOR') {
+type UpdateReportStatusBody = {
+  status?: ReportStatus;
+};
+
+const validTransitions: Record<ReportStatus, ReportStatus[]> = {
+  RECU: [ReportStatus.EN_REVUE, ReportStatus.VALIDE],
+  EN_REVUE: [ReportStatus.VALIDE],
+  VALIDE: [ReportStatus.ENVOYE],
+  ENVOYE: [],
+};
+
+export const PATCH = withAuth<{ id: string }>(async ({ user, params, req }) => {
+  if (user.role !== Role.COORDINATOR) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
-  const { id } = params;
-  const { status, coordinatorComment } = body as {
-    status: ReportStatus;
-    coordinatorComment?: string;
-  };
+  const body = (await req.json().catch(() => null)) as UpdateReportStatusBody | null;
+  const status = body?.status;
 
-  if (!status) {
-    return Response.json(
-      { code: 'INVALID_REQUEST', message: 'Statut manquant' },
-      { status: 400 }
-    );
+  if (!status || !Object.values(ReportStatus).includes(status)) {
+    return Response.json({ code: 'INVALID_REQUEST', message: 'Statut invalide' }, { status: 400 });
   }
 
-  // Valider les transitions de statut
-  const validTransitions: Record<ReportStatus, ReportStatus[]> = {
-    PENDING: ['SUBMITTED'],
-    SUBMITTED: ['REVIEWED', 'VALIDATED'],
-    REVIEWED: ['VALIDATED'],
-    VALIDATED: ['SENT'],
-    SENT: [], // Statut final
-  };
-
   try {
-    // Récupérer le rapport actuel
+    const siteIds = await getOperationalSiteIds(prisma, user.id);
     const currentReport = await prisma.report.findFirst({
       where: {
-        id,
-        author: {
-          role: 'SUPERVISOR',
+        id: params.id,
+        siteId: { in: siteIds },
+        user: {
+          role: Role.SUPERVISOR,
         },
-        site: {
-          coordinatorId: user.id,
-        },
+      },
+      select: {
+        id: true,
+        status: true,
       },
     });
 
     if (!currentReport) {
-      return Response.json(
-        { code: 'NOT_FOUND', message: 'Rapport non trouvé' },
-        { status: 404 }
-      );
+      return Response.json({ code: 'NOT_FOUND', message: 'Rapport non trouvé' }, { status: 404 });
     }
 
-    // Vérifier que la transition est valide
-    const allowedStatuses = validTransitions[currentReport.status as ReportStatus] || [];
-    if (!allowedStatuses.includes(status)) {
+    if (!validTransitions[currentReport.status].includes(status)) {
       return Response.json(
-        { 
-          code: 'INVALID_TRANSITION', 
-          message: `Transition de statut invalide: ${currentReport.status} → ${status}` 
+        {
+          code: 'INVALID_TRANSITION',
+          message: `Transition de statut invalide: ${currentReport.status} -> ${status}`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Mettre à jour le rapport
     const updatedReport = await prisma.report.update({
-      where: { id },
-      data: {
-        status,
-        coordinatorComment: coordinatorComment || null,
-        updatedAt: new Date(),
-      },
-      include: {
-        author: true,
-        site: true,
-      },
-    });
-
-    // Créer une notification pour le superviseur si le statut change
-    if (status !== currentReport.status) {
-      await prisma.notification.create({
-        data: {
-          userId: updatedReport.authorId,
-          title: 'Statut du rapport mis à jour',
-          message: `Votre rapport pour ${updatedReport.site.name} est maintenant: ${getStatusLabel(status)}`,
-          type: 'REPORT_STATUS_UPDATE',
-          createdAt: new Date(),
-          readAt: null,
-        },
-      });
-    }
-
-    // Journaliser l'action
-    await prisma.activityLog.create({
-      data: {
-        userId: user.id,
-        action: 'UPDATE_REPORT_STATUS',
-        targetType: 'REPORT',
-        targetId: id,
-        details: {
-          coordinatorName: `${user.firstName} ${user.lastName}`,
-          previousStatus: currentReport.status,
-          newStatus: status,
-          supervisorName: `${updatedReport.author.firstName} ${updatedReport.author.lastName}`,
-          siteName: updatedReport.site.name,
-        },
-        createdAt: new Date(),
+      where: { id: params.id },
+      data: { status },
+      select: {
+        id: true,
+        status: true,
+        submittedAt: true,
       },
     });
 
@@ -113,27 +71,14 @@ export const PATCH = withAuth(async ({ user, params, body }) => {
       report: {
         id: updatedReport.id,
         status: updatedReport.status,
-        coordinatorComment: updatedReport.coordinatorComment,
-        updatedAt: updatedReport.updatedAt,
+        updatedAt: updatedReport.submittedAt.toISOString(),
       },
     });
-
   } catch (error) {
     console.error('Update report status error:', error);
     return Response.json(
       { code: 'INTERNAL_ERROR', message: 'Erreur lors de la mise à jour du statut' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
-
-function getStatusLabel(status: ReportStatus): string {
-  const labels = {
-    PENDING: 'En attente',
-    SUBMITTED: 'Soumis',
-    REVIEWED: 'Révisé',
-    VALIDATED: 'Validé',
-    SENT: 'Envoyé',
-  };
-  return labels[status] || status;
-}

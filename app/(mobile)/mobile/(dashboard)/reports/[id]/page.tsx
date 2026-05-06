@@ -7,24 +7,25 @@ import { getCurrentWebSession } from '@/lib/auth/web-session';
 export default async function MobileReportDetailRoute({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const session = await getCurrentWebSession();
 
   if (!session) {
-    redirect('/mobile/login?next=/mobile/reports/' + params.id);
+    redirect('/mobile/login?next=/mobile/reports/' + id);
   }
 
   if (session.role === 'COORDINATOR') {
-    return <MobileReportDetailPage reportId={params.id} />;
+    return <MobileReportDetailPage reportId={id} />;
   }
 
   if (session.role === 'PROJECT_MANAGER' || session.role === 'DIRECTION') {
-    return <MobileManagementReportDetailPage reportId={params.id} />;
+    return <MobileManagementReportDetailPage reportId={id} />;
   }
 
   if (session.role === 'GENERAL_SUPERVISOR') {
-    return <MobileGeneralSupervisorReportDetailPage reportId={params.id} />;
+    return <MobileGeneralSupervisorReportDetailPage reportId={id} />;
   }
 
   redirect('/mobile/profile');

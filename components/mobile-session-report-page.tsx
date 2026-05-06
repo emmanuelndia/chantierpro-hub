@@ -8,8 +8,6 @@ import { SignedImage } from './mobile/SignedImage';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type {
-  SessionSummary,
-  DayAssignment,
   SessionPhoto,
   SubmitReportRequest,
   ReportSubmissionResponse,
@@ -67,35 +65,20 @@ export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) 
     mutationFn: async (data: SubmitReportRequest) => {
       // Essayer de soumettre en ligne
       try {
-        if (!data.siteId) {
-          throw new Error('Site ID requis pour la soumission du rapport');
-        }
-
-        const response = await authFetch(`/api/sites/${data.siteId}/reports`, {
+        const response = await authFetch('/api/mobile/session-report', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            content: data.content,
-            clockInRecordId: data.clockInRecordId,
-            progression: data.progressPercentage,
-            blocage: data.blockageNote,
-          }),
+          body: JSON.stringify(data),
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Erreur ${response.status}: Échec de la soumission du rapport`);
+          const errorData = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
+          throw new Error(errorData.error ?? errorData.message ?? `Erreur ${response.status}: Échec de la soumission du rapport`);
         }
 
-        const result = await response.json();
-        return {
-          success: true,
-          reportId: result.report.id,
-          message: 'Rapport soumis avec succès',
-          report: result.report,
-        } as ReportSubmissionResponse;
+        return (await response.json()) as ReportSubmissionResponse;
       } catch (error) {
         console.error('Report submission error:', error);
         
@@ -109,20 +92,20 @@ export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) 
         };
 
         // Sauvegarder dans IndexedDB
-        const existingOffline = await getMobileOfflineCache<any[]>('offline-reports') || { payload: [] };
-        existingOffline.payload.push(offlineReport);
-        await setMobileOfflineCache('offline-reports', existingOffline.payload, 7 * 24 * 60 * 60 * 1000); // 7 jours
+        const existingOffline = await getMobileOfflineCache<typeof offlineReport[]>('offline-reports');
+        const nextOfflineReports = [...(existingOffline?.payload ?? []), offlineReport];
+        await setMobileOfflineCache('offline-reports', nextOfflineReports, 7 * 24 * 60 * 60 * 1000); // 7 jours
 
         return {
           success: true,
           reportId: offlineReport.id,
           message: 'Rapport sauvegardé hors ligne',
           isOffline: true,
-        } as ReportSubmissionResponse;
+        };
       }
     },
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['mobile-session-report', sessionId] });
+      void queryClient.invalidateQueries({ queryKey: ['mobile-session-report', sessionId] });
       
       if (response.isOffline) {
         // Notification offline
@@ -293,7 +276,7 @@ export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) 
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">Progression aujourd'hui :</span>
+              <span className="text-sm font-medium text-slate-700">Progression aujourd&apos;hui :</span>
               <span className="text-lg font-bold text-primary">{progressPercentage}%</span>
             </div>
             

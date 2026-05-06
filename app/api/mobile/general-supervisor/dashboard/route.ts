@@ -1,9 +1,14 @@
+import { ClockInStatus, ClockInType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import type { GeneralSupervisorDashboardResponse, TodayAssignment, PriorityAlert } from '@/types/mobile-general-supervisor';
+import type {
+  GeneralSupervisorDashboardResponse,
+  PriorityAlert,
+  TodayAssignment,
+} from '@/types/mobile-general-supervisor';
 
 export const GET = withAuth(async ({ user }) => {
-  if (user.role !== 'GENERAL_SUPERVISOR') {
+  if (user.role !== Role.GENERAL_SUPERVISOR) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
@@ -13,235 +18,232 @@ export const GET = withAuth(async ({ user }) => {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   try {
-    // Récupérer tous les superviseurs sous la responsabilité du superviseur général
-    const supervisors = await prisma.user.findMany({
+    const assignments = await prisma.planningAssignment.findMany({
       where: {
-        role: 'SUPERVISOR',
-        isActive: true,
+        date: today,
+        createdById: user.id,
+        deletedAt: null,
       },
-      include: {
-        assignments: {
-          where: {
-            site: {
-              startDate: {
-                lte: tomorrow,
-              },
-              OR: [
-                { endDate: null },
-                { endDate: { gte: today } },
-              ],
+      orderBy: [{ site: { name: 'asc' } }, { supervisor: { lastName: 'asc' } }],
+      select: {
+        id: true,
+        supervisorId: true,
+        siteId: true,
+        targetProgress: true,
+        supervisor: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        site: {
+          select: {
+            name: true,
+            address: true,
+          },
+        },
+      },
+    });
+
+    const supervisorIds = [...new Set(assignments.map((assignment) => assignment.supervisorId))];
+    const siteIds = [...new Set(assignments.map((assignment) => assignment.siteId))];
+
+    const [records, todayReports] = await Promise.all([
+      prisma.clockInRecord.findMany({
+        where: {
+          clockInDate: today,
+          status: ClockInStatus.VALID,
+          OR: [
+            { userId: { in: supervisorIds } },
+            { userId: user.id },
+          ],
+          ...(siteIds.length > 0 ? { siteId: { in: siteIds } } : {}),
+        },
+        orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          userId: true,
+          siteId: true,
+          type: true,
+          timestampLocal: true,
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
             },
           },
-          include: {
-            site: true,
+          site: {
+            select: {
+              name: true,
+            },
           },
         },
-      },
-    });
-
-    // Récupérer les sessions de pointage du jour
-    const todaySessions = await prisma.clockInSession.findMany({
-      where: {
-        userId: {
-          in: supervisors.map(s => s.id),
+      }),
+      prisma.report.findMany({
+        where: {
+          submittedAt: {
+            gte: today,
+            lt: tomorrow,
+          },
+          userId: { in: supervisorIds },
+          siteId: { in: siteIds },
         },
-        date: {
-          gte: today,
-          lt: tomorrow,
+        select: {
+          id: true,
+          userId: true,
+          siteId: true,
         },
-      },
-      include: {
-        user: true,
-        site: true,
-      },
-    });
+      }),
+    ]);
 
-    // Récupérer les rapports du jour
-    const todayReports = await prisma.report.findMany({
-      where: {
-        authorId: {
-          in: supervisors.map(s => s.id),
-        },
-        createdAt: {
-          gte: today,
-          lt: tomorrow,
-        },
-      },
-      include: {
-        author: true,
-        site: true,
-      },
-    });
-
-    // Calculer les KPIs
-    const totalSupervisors = supervisors.length;
-    const deployedSupervisors = supervisors.filter(s => s.assignments.length > 0).length;
-    const activeSupervisorsNow = todaySessions.filter(s => !s.departureAt).length;
-    const reportsReceived = todayReports.length;
-    const reportsExpected = todaySessions.filter(s => s.departureAt).length;
-
-    // Détecter les alertes
-    const alerts: PriorityAlert[] = [];
-
-    // 1. Superviseurs absents non justifiés
-    const expectedSupervisors = new Set(
-      supervisors
-        .filter(s => s.assignments.length > 0)
-        .map(s => s.id)
-    );
-
-    const presentSupervisors = new Set(todaySessions.map(s => s.userId));
-    const absentSupervisors = [...expectedSupervisors].filter(id => !presentSupervisors.has(id));
-
-    for (const supervisorId of absentSupervisors) {
-      const supervisor = supervisors.find(s => s.id === supervisorId)!;
-      const assignment = supervisor.assignments[0]; // Prendre la première assignation
-      
-      alerts.push({
-        id: `absence-${supervisorId}`,
-        type: 'ABSENCE',
-        supervisorId,
-        supervisorName: supervisor.lastName,
-        supervisorFirstName: supervisor.firstName,
-        siteId: assignment.siteId,
-        siteName: assignment.site.name,
-        severity: 'HIGH',
-        message: 'Superviseur absent non justifié',
-        createdAt: new Date().toISOString(),
-        actionRequired: true,
-      });
-    }
-
-    // 2. Sessions > 10h sans sortie
     const now = new Date();
-    for (const session of todaySessions) {
-      if (!session.departureAt) {
-        const sessionDuration = (now.getTime() - new Date(session.arrivalAt).getTime()) / (1000 * 60 * 60); // heures
-        
-        if (sessionDuration > 10) {
-          alerts.push({
-            id: `long-session-${session.id}`,
+    const alerts: PriorityAlert[] = [];
+    const todayAssignments: TodayAssignment[] = assignments.map((assignment) => {
+      const assignmentRecords = records.filter(
+        (record) => record.userId === assignment.supervisorId && record.siteId === assignment.siteId,
+      );
+      const latestRecord = assignmentRecords.at(-1);
+      const departureRecord = [...assignmentRecords]
+        .reverse()
+        .find((record) => record.type === ClockInType.DEPARTURE);
+      const report = todayReports.find(
+        (item) => item.userId === assignment.supervisorId && item.siteId === assignment.siteId,
+      );
+
+      const isClockedIn = Boolean(
+        latestRecord &&
+          latestRecord.type !== ClockInType.DEPARTURE &&
+          latestRecord.type !== ClockInType.PAUSE_START,
+      );
+
+      let progressPercentage = 0;
+      if (report) {
+        progressPercentage = 100;
+      } else if (departureRecord) {
+        progressPercentage = 75;
+      } else if (isClockedIn && latestRecord) {
+        const elapsed = now.getTime() - latestRecord.timestampLocal.getTime();
+        progressPercentage = Math.min(90, Math.max(5, Math.floor(elapsed / (9 * 60 * 60 * 10))));
+      } else if (assignment.targetProgress !== null) {
+        progressPercentage = assignment.targetProgress;
+      }
+
+      const assignmentAlerts: PriorityAlert[] = [];
+
+      if (!latestRecord) {
+        assignmentAlerts.push({
+          id: `absence-${assignment.id}`,
+          type: 'ABSENCE',
+          supervisorId: assignment.supervisorId,
+          supervisorName: assignment.supervisor.lastName,
+          supervisorFirstName: assignment.supervisor.firstName,
+          siteId: assignment.siteId,
+          siteName: assignment.site.name,
+          severity: 'HIGH',
+          message: 'Superviseur absent non justifié',
+          createdAt: now.toISOString(),
+          actionRequired: true,
+        });
+      }
+
+      if (latestRecord && isClockedIn) {
+        const sessionDurationHours =
+          (now.getTime() - latestRecord.timestampLocal.getTime()) / (1000 * 60 * 60);
+
+        if (sessionDurationHours > 10) {
+          assignmentAlerts.push({
+            id: `long-session-${assignment.id}`,
             type: 'LONG_SESSION',
-            supervisorId: session.userId,
-            supervisorName: session.user.lastName,
-            supervisorFirstName: session.user.firstName,
-            siteId: session.siteId,
-            siteName: session.site.name,
-            severity: sessionDuration > 12 ? 'HIGH' : 'MEDIUM',
-            message: `Session en cours depuis ${Math.floor(sessionDuration)}h`,
-            createdAt: session.arrivalAt.toISOString(),
+            supervisorId: assignment.supervisorId,
+            supervisorName: assignment.supervisor.lastName,
+            supervisorFirstName: assignment.supervisor.firstName,
+            siteId: assignment.siteId,
+            siteName: assignment.site.name,
+            severity: sessionDurationHours > 12 ? 'HIGH' : 'MEDIUM',
+            message: `Session en cours depuis ${Math.floor(sessionDurationHours)}h`,
+            createdAt: latestRecord.timestampLocal.toISOString(),
             actionRequired: true,
           });
         }
       }
-    }
 
-    // 3. Rapports en attente > 2h après fin session
-    for (const session of todaySessions) {
-      if (session.departureAt) {
-        const sessionEnd = new Date(session.departureAt);
-        const twoHoursAfter = new Date(sessionEnd.getTime() + 2 * 60 * 60 * 1000);
-        
-        if (now > twoHoursAfter) {
-          const hasReport = todayReports.some(r => 
-            r.authorId === session.userId && r.siteId === session.siteId
-          );
-          
-          if (!hasReport) {
-            alerts.push({
-              id: `missing-report-${session.id}`,
-              type: 'MISSING_REPORT',
-              supervisorId: session.userId,
-              supervisorName: session.user.lastName,
-              supervisorFirstName: session.user.firstName,
-              siteId: session.siteId,
-              siteName: session.site.name,
-              severity: 'MEDIUM',
-              message: 'Rapport en attente depuis plus de 2h',
-              createdAt: session.departureAt.toISOString(),
-              actionRequired: true,
-            });
+      if (departureRecord && !report) {
+        const dueAt = new Date(departureRecord.timestampLocal.getTime() + 2 * 60 * 60 * 1000);
+
+        if (now > dueAt) {
+          assignmentAlerts.push({
+            id: `missing-report-${assignment.id}`,
+            type: 'MISSING_REPORT',
+            supervisorId: assignment.supervisorId,
+            supervisorName: assignment.supervisor.lastName,
+            supervisorFirstName: assignment.supervisor.firstName,
+            siteId: assignment.siteId,
+            siteName: assignment.site.name,
+            severity: 'MEDIUM',
+            message: 'Rapport en attente depuis plus de 2h',
+            createdAt: departureRecord.timestampLocal.toISOString(),
+            actionRequired: true,
+          });
+        }
+      }
+
+      alerts.push(...assignmentAlerts);
+
+      return {
+        id: assignment.id,
+        supervisorId: assignment.supervisorId,
+        supervisorName: assignment.supervisor.lastName,
+        supervisorFirstName: assignment.supervisor.firstName,
+        siteId: assignment.siteId,
+        siteName: assignment.site.name,
+        siteAddress: assignment.site.address,
+        progressPercentage,
+        isClockedIn,
+        hasAlert: assignmentAlerts.length > 0,
+        ...(assignmentAlerts[0] ? { alertType: assignmentAlerts[0].type } : {}),
+      };
+    });
+
+    const generalSupervisorRecords = records.filter((record) => record.userId === user.id);
+    const latestGeneralSupervisorRecord = generalSupervisorRecords.at(-1);
+    const hasActiveSession = Boolean(
+      latestGeneralSupervisorRecord &&
+        latestGeneralSupervisorRecord.type !== ClockInType.DEPARTURE &&
+        latestGeneralSupervisorRecord.type !== ClockInType.PAUSE_START,
+    );
+
+    const sessionData =
+      hasActiveSession && latestGeneralSupervisorRecord
+        ? {
+            siteId: latestGeneralSupervisorRecord.siteId,
+            siteName: latestGeneralSupervisorRecord.site.name,
+            arrivalAt: latestGeneralSupervisorRecord.timestampLocal.toISOString(),
+            durationSeconds: Math.floor(
+              (now.getTime() - latestGeneralSupervisorRecord.timestampLocal.getTime()) / 1000,
+            ),
+            isPaused: latestGeneralSupervisorRecord.type === ClockInType.PAUSE_START,
           }
-        }
-      }
-    }
-
-    // Créer les assignations du jour
-    const todayAssignments: TodayAssignment[] = [];
-    
-    for (const supervisor of supervisors) {
-      for (const assignment of supervisor.assignments) {
-        const session = todaySessions.find(s => 
-          s.userId === supervisor.id && s.siteId === assignment.siteId
-        );
-        const report = todayReports.find(r => 
-          r.authorId === supervisor.id && r.siteId === assignment.siteId
-        );
-        
-        // Calculer la progression (basée sur le rapport et la session)
-        let progressPercentage = 0;
-        if (session?.departureAt) {
-          progressPercentage = report ? 100 : 75; // Session terminée mais pas de rapport
-        } else if (session) {
-          const sessionProgress = (now.getTime() - new Date(session.arrivalAt).getTime()) / 
-                                (9 * 60 * 60 * 1000) * 100; // 9h de travail prévu
-          progressPercentage = Math.min(Math.floor(sessionProgress), 90);
-        } else {
-          progressPercentage = 0;
-        }
-
-        const hasAlert = alerts.some(a => 
-          a.supervisorId === supervisor.id && a.siteId === assignment.siteId
-        );
-
-        todayAssignments.push({
-          id: `${supervisor.id}-${assignment.siteId}`,
-          supervisorId: supervisor.id,
-          supervisorName: supervisor.lastName,
-          supervisorFirstName: supervisor.firstName,
-          siteId: assignment.siteId,
-          siteName: assignment.site.name,
-          siteAddress: assignment.site.address,
-          progressPercentage,
-          isClockedIn: !!session && !session.departureAt,
-          hasAlert,
-          alertType: hasAlert ? alerts.find(a => 
-            a.supervisorId === supervisor.id && a.siteId === assignment.siteId
-          )?.type : undefined,
-        });
-      }
-    }
-
-    // Vérifier si le superviseur général a une session active
-    const generalSupervisorSession = todaySessions.find(s => s.userId === user.id);
-    const hasActiveSession = !!generalSupervisorSession && !generalSupervisorSession.departureAt;
+        : null;
 
     const dashboard: GeneralSupervisorDashboardResponse = {
       kpis: {
-        deployedSupervisors,
-        totalSupervisors,
-        activeSupervisorsNow,
-        reportsReceived,
-        reportsExpected,
+        deployedSupervisors: supervisorIds.length,
+        totalSupervisors: supervisorIds.length,
+        activeSupervisorsNow: todayAssignments.filter((assignment) => assignment.isClockedIn).length,
+        reportsReceived: todayReports.length,
+        reportsExpected: assignments.length,
         alertCount: alerts.length,
       },
       todayAssignments,
       priorityAlerts: alerts.sort((a, b) => {
-        // Trier par sévérité puis par date
         const severityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1 };
         const severityDiff = severityOrder[b.severity] - severityOrder[a.severity];
-        if (severityDiff !== 0) return severityDiff;
-        
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return severityDiff !== 0
+          ? severityDiff
+          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }),
       hasActiveSession,
-      sessionData: hasActiveSession && generalSupervisorSession ? {
-        siteId: generalSupervisorSession.siteId,
-        siteName: generalSupervisorSession.site.name,
-        arrivalAt: generalSupervisorSession.arrivalAt.toISOString(),
-        durationSeconds: Math.floor((now.getTime() - new Date(generalSupervisorSession.arrivalAt).getTime()) / 1000),
-        isPaused: false, // TODO: Implémenter la logique de pause
-      } : undefined,
+      ...(sessionData ? { sessionData } : {}),
     };
 
     return Response.json(dashboard);
@@ -249,7 +251,7 @@ export const GET = withAuth(async ({ user }) => {
     console.error('General supervisor dashboard error:', error);
     return Response.json(
       { code: 'INTERNAL_ERROR', message: 'Erreur lors du chargement du dashboard' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

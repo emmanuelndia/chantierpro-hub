@@ -2,15 +2,43 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { getOperationalSiteIds } from '@/lib/dashboard';
 import { canCreateReports, canReadAllReports, jsonReportError } from '@/lib/reports';
+import { Prisma } from '@prisma/client';
 import { jsPDF } from 'jspdf';
 
-export const GET = withAuth(async ({ user, searchParams }) => {
+const exportReportInclude = {
+  user: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+    },
+  },
+  site: {
+    select: {
+      id: true,
+      name: true,
+      address: true,
+    },
+  },
+  clockInRecord: {
+    select: {
+      clockInDate: true,
+      clockInTime: true,
+      timestampLocal: true,
+    },
+  },
+} satisfies Prisma.ReportInclude;
+
+type ExportReport = Prisma.ReportGetPayload<{ include: typeof exportReportInclude }>;
+
+export const GET = withAuth(async ({ user, req }) => {
   if (!canCreateReports(user.role) && !canReadAllReports(user.role)) {
     return jsonReportError('FORBIDDEN', 403, 'Export des rapports non autorisé.');
   }
 
+  const searchParams = new URL(req.url).searchParams;
   const date = searchParams.get('date');
-  const format = searchParams.get('format') || 'pdf';
+  const format = searchParams.get('format') ?? 'pdf';
 
   if (!date) {
     return jsonReportError('BAD_REQUEST', 400, 'Le paramètre date est requis.');
@@ -32,34 +60,12 @@ export const GET = withAuth(async ({ user, searchParams }) => {
         gte: new Date(targetDate.setHours(0, 0, 0, 0)),
         lt: new Date(targetDate.setHours(23, 59, 59, 999)),
       },
-      ...(siteIds && { siteId: { in: siteIds } }),
+      ...(siteIds ? { siteId: { in: siteIds } } : {}),
     },
-    include: {
-      supervisor: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-        },
-      },
-      site: {
-        select: {
-          id: true,
-          name: true,
-          address: true,
-        },
-      },
-      clockInRecord: {
-        select: {
-          clockInDate: true,
-          clockInTime: true,
-          timestampLocal: true,
-        },
-      },
-    },
+    include: exportReportInclude,
     orderBy: [
       { site: { name: 'asc' } },
-      { supervisor: { firstName: 'asc' } },
+      { user: { firstName: 'asc' } },
       { submittedAt: 'asc' },
     ],
   });
@@ -75,7 +81,7 @@ export const GET = withAuth(async ({ user, searchParams }) => {
   }
 });
 
-function generateTextExport(reports: any[], date: Date) {
+function generateTextExport(reports: ExportReport[], date: Date) {
   const content = reports.map((report, index) => {
     const startTime = new Date(report.clockInRecord.timestampLocal).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     const endTime = new Date(report.submittedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -85,11 +91,11 @@ function generateTextExport(reports: any[], date: Date) {
 ===================================
 RAPPORT ${index + 1}/${reports.length} — ChantierPro
 ===================================
-Superviseur : ${report.supervisor.firstName} ${report.supervisor.lastName}
+Superviseur : ${report.user.firstName} ${report.user.lastName}
 Site : ${report.site.name}
 Date : ${new Date(report.submittedAt).toLocaleDateString('fr-FR')}
 Session : ${startTime} → ${endTime} (${duration} min)
-Progression : ${report.progressPercentage}%
+Progression : ${report.progression ?? 0}%
 ---
 ${report.content}
 ---
@@ -116,7 +122,7 @@ Généré le : ${new Date().toLocaleString('fr-FR')}
   });
 }
 
-function generatePDFExport(reports: any[], date: Date) {
+function generatePDFExport(reports: ExportReport[], date: Date) {
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const margin = 20;
@@ -150,7 +156,7 @@ function generatePDFExport(reports: any[], date: Date) {
 
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`Superviseur : ${report.supervisor.firstName} ${report.supervisor.lastName}`, margin, y);
+    pdf.text(`Superviseur : ${report.user.firstName} ${report.user.lastName}`, margin, y);
     y += 6;
 
     pdf.text(`Site : ${report.site.name}`, margin, y);
@@ -162,7 +168,7 @@ function generatePDFExport(reports: any[], date: Date) {
     pdf.text(`Session : ${startTime} → ${endTime} (${duration} min)`, margin, y);
     y += 6;
 
-    pdf.text(`Progression : ${report.progressPercentage}%`, margin, y);
+    pdf.text(`Progression : ${report.progression ?? 0}%`, margin, y);
     y += 10;
 
     // Séparateur
@@ -172,7 +178,7 @@ function generatePDFExport(reports: any[], date: Date) {
     // Contenu du rapport
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
-    const lines = pdf.splitTextToSize(report.content, pageWidth - 2 * margin);
+    const lines = pdf.splitTextToSize(report.content, pageWidth - 2 * margin) as string[];
     
     for (const line of lines) {
       if (y > 270) {

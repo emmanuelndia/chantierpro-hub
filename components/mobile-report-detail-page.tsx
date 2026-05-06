@@ -58,14 +58,14 @@ export function MobileReportDetailPage({ reportId }: MobileReportDetailPageProps
 
   const handleValidate = () => {
     updateStatusMutation.mutate({
-      status: 'VALIDATED',
+      status: 'VALIDE',
       comment: coordinatorComment,
     });
   };
 
   const handleMarkAsSent = () => {
     updateStatusMutation.mutate({
-      status: 'SENT',
+      status: 'ENVOYE',
       comment: coordinatorComment,
     });
   };
@@ -105,8 +105,8 @@ export function MobileReportDetailPage({ reportId }: MobileReportDetailPageProps
     );
   }
 
-  const canValidate = report.status === 'SUBMITTED' || report.status === 'REVIEWED';
-  const canMarkAsSent = report.status === 'VALIDATED';
+  const canValidate = report.status === 'RECU' || report.status === 'EN_REVUE';
+  const canMarkAsSent = report.status === 'VALIDE';
 
   return (
     <div className="space-y-5 pb-20">
@@ -252,15 +252,14 @@ export function MobileReportDetailPage({ reportId }: MobileReportDetailPageProps
 }
 
 function StatusBadge({ status }: Readonly<{ status: ReportStatus }>) {
-  const statusConfig = {
-    SUBMITTED: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Soumis' },
-    REVIEWED: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Révisé' },
-    VALIDATED: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Validé' },
-    SENT: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Envoyé' },
-    PENDING: { bg: 'bg-slate-100', text: 'text-slate-700', label: 'En attente' },
+  const statusConfig: Record<ReportStatus, { bg: string; text: string; label: string }> = {
+    RECU: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Reçu' },
+    EN_REVUE: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'En revue' },
+    VALIDE: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Validé' },
+    ENVOYE: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Envoyé' },
   };
 
-  const config = statusConfig[status] || statusConfig.PENDING;
+  const config = statusConfig[status];
 
   return (
     <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${config.bg} ${config.text}`}>

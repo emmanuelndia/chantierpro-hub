@@ -1,21 +1,20 @@
+import { ClockInStatus, ClockInType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import type { NextRequest } from 'next/server';
-import {
+import { getOperationalSiteIds } from '@/lib/dashboard';
+import type {
   CoordinatorReportsResponse,
   PendingReport,
   ReceivedReport,
-  ReportStatus,
 } from '@/types/mobile-reports';
 
-export const GET = withAuth(async ({ user, request }) => {
-  if (user.role !== 'COORDINATOR') {
+export const GET = withAuth(async ({ user, req }) => {
+  if (user.role !== Role.COORDINATOR) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const filter = searchParams.get('filter') || 'all';
-  const siteId = searchParams.get('siteId');
+  const { searchParams } = new URL(req.url);
+  const selectedSiteId = searchParams.get('siteId');
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -23,139 +22,178 @@ export const GET = withAuth(async ({ user, request }) => {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   try {
-    // Récupérer les sites du coordinateur
-    const coordinatorSites = await prisma.site.findMany({
-      where: {
-        coordinatorId: user.id,
-      },
-      include: {
-        assignments: {
-          where: {
-            user: {
-              role: 'SUPERVISOR',
-            },
-          },
-          include: {
-            user: true,
-          },
+    const operationalSiteIds = await getOperationalSiteIds(prisma, user.id);
+    const siteIds =
+      selectedSiteId && operationalSiteIds.includes(selectedSiteId)
+        ? [selectedSiteId]
+        : operationalSiteIds;
+
+    if (siteIds.length === 0) {
+      const emptyResponse: CoordinatorReportsResponse = {
+        summary: {
+          totalExpected: 0,
+          totalReceived: 0,
+          pendingCount: 0,
+          receivedCount: 0,
+          progressPercentage: 0,
         },
-      },
-    });
+        pendingReports: [],
+        receivedReports: [],
+        sites: [],
+      };
 
-    const supervisorIds = coordinatorSites.flatMap(site => 
-      site.assignments.map(assignment => assignment.user.id)
-    );
-
-    // Sessions terminées aujourd'hui pour les superviseurs
-    const completedSessions = await prisma.clockInSession.findMany({
-      where: {
-        userId: {
-          in: supervisorIds,
-        },
-        departureAt: {
-          not: null,
-          gte: today,
-          lt: tomorrow,
-        },
-      },
-      include: {
-        user: true,
-        site: true,
-      },
-    });
-
-    // Rapports soumis aujourd'hui
-    const submittedReports = await prisma.report.findMany({
-      where: {
-        authorId: {
-          in: supervisorIds,
-        },
-        createdAt: {
-          gte: today,
-          lt: tomorrow,
-        },
-      },
-      include: {
-        author: true,
-        site: true,
-        photos: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    // Calculer les rapports en attente
-    const pendingReports: PendingReport[] = [];
-    for (const session of completedSessions) {
-      const existingReport = submittedReports.find(
-        report => report.authorId === session.userId && report.siteId === session.siteId
-      );
-
-      if (!existingReport) {
-        const sessionEnd = new Date(session.departureAt!);
-        const dueTime = new Date(sessionEnd.getTime() + 2 * 60 * 60 * 1000); // 2h après fin
-        const isOverdue = new Date() > dueTime;
-
-        pendingReports.push({
-          id: `pending-${session.id}`,
-          supervisorId: session.userId,
-          supervisorName: session.user.lastName,
-          supervisorFirstName: session.user.firstName,
-          siteId: session.siteId,
-          siteName: session.site.name,
-          siteAddress: session.site.address,
-          sessionEndedAt: session.departureAt!.toISOString(),
-          reportDueAt: dueTime.toISOString(),
-          isOverdue,
-        });
-      }
+      return Response.json(emptyResponse);
     }
 
-    // Formater les rapports reçus
-    const receivedReports: ReceivedReport[] = submittedReports.map(report => {
-      const session = completedSessions.find(
-        s => s.userId === report.authorId && s.siteId === report.siteId
-      );
+    const [sites, completedRecords, submittedReports] = await Promise.all([
+      prisma.site.findMany({
+        where: { id: { in: operationalSiteIds } },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+        },
+      }),
+      prisma.clockInRecord.findMany({
+        where: {
+          siteId: { in: siteIds },
+          clockInDate: today,
+          status: ClockInStatus.VALID,
+          type: ClockInType.DEPARTURE,
+          user: { role: Role.SUPERVISOR },
+        },
+        orderBy: [{ timestampLocal: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+        select: {
+          id: true,
+          userId: true,
+          siteId: true,
+          timestampLocal: true,
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+          site: {
+            select: {
+              name: true,
+              address: true,
+            },
+          },
+          report: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      }),
+      prisma.report.findMany({
+        where: {
+          siteId: { in: siteIds },
+          submittedAt: {
+            gte: today,
+            lt: tomorrow,
+          },
+        },
+        orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
+        select: {
+          id: true,
+          userId: true,
+          siteId: true,
+          content: true,
+          status: true,
+          submittedAt: true,
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+          site: {
+            select: {
+              name: true,
+            },
+          },
+          clockInRecord: {
+            select: {
+              timestampLocal: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const photoCounts = await prisma.photo.groupBy({
+      by: ['siteId', 'uploadedById'],
+      where: {
+        siteId: { in: siteIds },
+        isDeleted: false,
+        timestampLocal: {
+          gte: today,
+          lt: tomorrow,
+        },
+      },
+      _count: {
+        _all: true,
+      },
+    });
+
+    const pendingReports: PendingReport[] = completedRecords
+      .filter((record) => !record.report)
+      .map((record) => {
+        const reportDueAt = new Date(record.timestampLocal.getTime() + 2 * 60 * 60 * 1000);
+
+        return {
+          id: `pending-${record.id}`,
+          supervisorId: record.userId,
+          supervisorName: record.user.lastName,
+          supervisorFirstName: record.user.firstName,
+          siteId: record.siteId,
+          siteName: record.site.name,
+          siteAddress: record.site.address,
+          sessionEndedAt: record.timestampLocal.toISOString(),
+          reportDueAt: reportDueAt.toISOString(),
+          isOverdue: new Date() > reportDueAt,
+        };
+      });
+
+    const receivedReports: ReceivedReport[] = submittedReports.map((report) => {
+      const photoCount =
+        photoCounts.find(
+          (count) => count.siteId === report.siteId && count.uploadedById === report.userId,
+        )?._count._all ?? 0;
 
       return {
         id: report.id,
-        supervisorId: report.authorId,
-        supervisorName: report.author.lastName,
-        supervisorFirstName: report.author.firstName,
+        supervisorId: report.userId,
+        supervisorName: report.user.lastName,
+        supervisorFirstName: report.user.firstName,
         siteId: report.siteId,
         siteName: report.site.name,
-        submittedAt: report.createdAt.toISOString(),
-        content: report.content || '',
-        status: report.status as ReportStatus,
-        sessionDuration: session ? 
-          Math.floor((new Date(session.departureAt!).getTime() - new Date(session.arrivalAt).getTime()) / 1000) 
-          : undefined,
-        progressPercentage: 100, // Si rapport soumis, progression = 100%
-        photoCount: report.photos.length,
+        submittedAt: report.submittedAt.toISOString(),
+        content: report.content,
+        status: report.status,
+        progressPercentage: 100,
+        sessionDuration: Math.max(
+          0,
+          Math.floor(
+            (report.submittedAt.getTime() - report.clockInRecord.timestampLocal.getTime()) / 1000,
+          ),
+        ),
+        photoCount,
       };
     });
 
-    // Calculer le résumé
-    const totalExpected = completedSessions.length;
+    const totalExpected = completedRecords.length;
     const totalReceived = submittedReports.length;
-    const pendingCount = pendingReports.length;
-    const receivedCount = receivedReports.length;
-    const progressPercentage = totalExpected > 0 ? (totalReceived / totalExpected) * 100 : 0;
-
-    // Sites pour les filtres
-    const sites = coordinatorSites.map(site => ({
-      id: site.id,
-      name: site.name,
-    }));
 
     const response: CoordinatorReportsResponse = {
       summary: {
         totalExpected,
         totalReceived,
-        pendingCount,
-        receivedCount,
-        progressPercentage,
+        pendingCount: pendingReports.length,
+        receivedCount: receivedReports.length,
+        progressPercentage: totalExpected > 0 ? (totalReceived / totalExpected) * 100 : 0,
       },
       pendingReports,
       receivedReports,
@@ -167,7 +205,7 @@ export const GET = withAuth(async ({ user, request }) => {
     console.error('Coordinator reports error:', error);
     return Response.json(
       { code: 'INTERNAL_ERROR', message: 'Erreur lors du chargement des rapports' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

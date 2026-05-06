@@ -11,6 +11,7 @@ import type { MobileTeamDetailResponse } from '@/types/mobile-teams';
 type MobileTeamDetailPageProps = Readonly<{
   teamId: string;
 }>;
+type HttpStatusError = Error & { status?: number };
 
 export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
   const queryClient = useQueryClient();
@@ -25,8 +26,8 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
       const response = await authFetch(`/api/mobile/teams/${encodeURIComponent(teamId)}`);
       if (!response.ok) {
         // Lancer une erreur avec le statut pour une gestion spécifique
-        const error = new Error(`Team detail request failed with status ${response.status}`);
-        (error as any).status = response.status;
+        const error: HttpStatusError = new Error(`Team detail request failed with status ${response.status}`);
+        error.status = response.status;
         throw error;
       }
       return (await response.json()) as MobileTeamDetailResponse;
@@ -66,9 +67,9 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
         throw new Error(await getApiErrorMessage(response, 'Impossible de retirer ce membre.'));
       }
     },
-    onMutate: async (memberUserId) => {
+    onMutate: (memberUserId) => {
       // Mise à jour optimiste : retirer immédiatement le membre de la liste
-      const previousData = queryClient.getQueryData(['mobile-team-detail', teamId]) as MobileTeamDetailResponse;
+      const previousData = queryClient.getQueryData<MobileTeamDetailResponse>(['mobile-team-detail', teamId]);
       
       queryClient.setQueryData(['mobile-team-detail', teamId], (old: MobileTeamDetailResponse | undefined) => {
         if (!old) return old;
@@ -81,7 +82,7 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
       
       return { previousData };
     },
-    onSuccess: (_, memberUserId) => {
+    onSuccess: () => {
       // Afficher un toast de succès
       pushToast({
         title: 'Membre retiré',
@@ -92,7 +93,7 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
       // Rafraîchir les données pour s'assurer que tout est synchronisé
       void queryClient.invalidateQueries({ queryKey: ['mobile-team-detail', teamId] });
     },
-    onError: (error, memberUserId, context) => {
+    onError: (error, _memberUserId, context) => {
       // Restaurer les données précédentes en cas d'erreur
       if (context?.previousData) {
         queryClient.setQueryData(['mobile-team-detail', teamId], context.previousData);
@@ -114,7 +115,7 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
   if (detailQuery.isLoading) return <TeamDetailLoadingState />;
   if (detailQuery.isError || !detail) {
     // Déterminer le message d'erreur spécifique selon le statut
-    const error = detailQuery.error as any;
+    const error = detailQuery.error as HttpStatusError;
     let errorMessage = 'Impossible de charger cette équipe.';
     let errorDescription = 'Vérifiez votre accès puis réessayez.';
     

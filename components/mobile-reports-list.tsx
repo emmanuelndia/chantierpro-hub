@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-type ReportItem = {
+export type MobileReportsListItem = {
   id: string;
   site: { id: string; name: string };
   user?: { id: string; firstName: string; lastName: string; role: string };
@@ -15,7 +15,7 @@ type ReportItem = {
 };
 
 type MobileReportsListProps = Readonly<{
-  reports: ReportItem[];
+  reports: MobileReportsListItem[];
 }>;
 
 export function MobileReportsList({ reports }: MobileReportsListProps) {
