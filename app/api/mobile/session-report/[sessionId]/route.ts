@@ -81,6 +81,13 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
           filename: true,
           takenAt: true,
           description: true,
+          planningAssignmentId: true,
+          planningAssignment: {
+            select: {
+              action: true,
+              status: true,
+            },
+          },
         },
       }),
       prisma.report.findUnique({
@@ -155,6 +162,13 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
         filename: photo.filename,
         url: createInternalPhotoUrl(photo.id),
         takenAt: photo.takenAt.toISOString(),
+        planningAssignmentId: photo.planningAssignmentId,
+        ...(photo.planningAssignment
+          ? {
+              assignmentAction: photo.planningAssignment.action,
+              assignmentStatus: photo.planningAssignment.status,
+            }
+          : {}),
         ...(photo.description ? { description: photo.description } : {}),
         thumbnail: createInternalPhotoUrl(photo.id),
       })),

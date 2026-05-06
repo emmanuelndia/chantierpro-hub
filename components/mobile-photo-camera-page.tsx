@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { PlanningAssignmentStatus } from '@prisma/client';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch, getAccessToken } from '@/lib/auth/client-session';
 import {
@@ -13,6 +14,7 @@ import {
   type PendingMobilePhoto,
 } from '@/lib/mobile-photo-offline';
 import type { MobilePhotoSiteOption, MobilePhotoSitesResponse } from '@/types/mobile-photo';
+import type { SupervisorMyAssignment, SupervisorMyAssignmentsResponse } from '@/types/mobile-planning';
 
 type CameraState = 'loading' | 'ready' | 'denied';
 type FacingMode = 'environment' | 'user';
@@ -38,7 +40,9 @@ type CapturedPhoto = {
   latitude: number | null;
   longitude: number | null;
   site: MobilePhotoSiteOption;
+  planningAssignment: SupervisorMyAssignment | null;
 };
+type PhotoMode = 'site' | 'task';
 
 export function MobilePhotoCameraPage() {
   const searchParams = useSearchParams();
@@ -52,12 +56,16 @@ export function MobilePhotoCameraPage() {
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [gpsState, setGpsState] = useState<GpsState>({ status: 'loading' });
   const [selectedSiteId, setSelectedSiteId] = useState(requestedSiteId ?? '');
+  const [photoMode, setPhotoMode] = useState<PhotoMode>('site');
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
   const [siteSheetOpen, setSiteSheetOpen] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<CapturedPhoto | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [completingAssignment, setCompletingAssignment] = useState(false);
+  const todayKey = formatDateKey(new Date());
 
   const sitesQuery = useQuery({
     queryKey: ['mobile-photo-sites'],
@@ -73,9 +81,32 @@ export function MobilePhotoCameraPage() {
   });
 
   const sites = useMemo(() => sitesQuery.data?.items ?? [], [sitesQuery.data?.items]);
+  const assignmentsQuery = useQuery({
+    queryKey: ['mobile-planning-my-assignments', todayKey],
+    queryFn: async () => {
+      const response = await authFetch(`/api/mobile/planning/my-assignments?date=${encodeURIComponent(todayKey)}`);
+
+      if (!response.ok) {
+        throw new Error('Tâches assignées indisponibles.');
+      }
+
+      return (await response.json()) as SupervisorMyAssignmentsResponse;
+    },
+    enabled: photoMode === 'task',
+    staleTime: 30_000,
+  });
+  const assignments = useMemo(() => assignmentsQuery.data?.assignments ?? [], [assignmentsQuery.data?.assignments]);
   const selectedSite = useMemo(
     () => sites.find((site) => site.id === selectedSiteId) ?? sites.find((site) => site.hasOpenSession) ?? sites[0] ?? null,
     [selectedSiteId, sites],
+  );
+  const siteAssignments = useMemo(
+    () => assignments.filter((assignment) => assignment.siteId === selectedSite?.id),
+    [assignments, selectedSite?.id],
+  );
+  const selectedAssignment = useMemo(
+    () => siteAssignments.find((assignment) => assignment.id === selectedAssignmentId) ?? null,
+    [selectedAssignmentId, siteAssignments],
   );
 
   useEffect(() => {
@@ -83,6 +114,12 @@ export function MobilePhotoCameraPage() {
       setSelectedSiteId(selectedSite.id);
     }
   }, [selectedSite, selectedSiteId]);
+
+  useEffect(() => {
+    if (photoMode === 'task' && selectedAssignmentId && !siteAssignments.some((assignment) => assignment.id === selectedAssignmentId)) {
+      setSelectedAssignmentId('');
+    }
+  }, [photoMode, selectedAssignmentId, siteAssignments]);
 
   useEffect(() => {
     void startCamera();
@@ -308,6 +345,7 @@ export function MobilePhotoCameraPage() {
         latitude: gpsState.status === 'ready' ? gpsState.latitude : null,
         longitude: gpsState.status === 'ready' ? gpsState.longitude : null,
         site: selectedSite,
+        planningAssignment: photoMode === 'task' ? selectedAssignment : null,
       });
       setConfirmationMessage(null);
       setUploadProgress(0);
@@ -353,8 +391,12 @@ export function MobilePhotoCameraPage() {
 
     try {
       await uploadPhotoWithProgress(pendingPhoto, setUploadProgress);
-      setConfirmationMessage('Photo envoyee.');
-      setCapturedPhoto(null);
+      if (capturedPhoto.planningAssignment) {
+        setConfirmationMessage('Photo envoyée. Vous pouvez marquer la tâche terminée.');
+      } else {
+        setConfirmationMessage('Photo envoyée.');
+        setCapturedPhoto(null);
+      }
       await refreshPendingCount();
     } catch {
       await enqueuePendingMobilePhoto(pendingPhoto);
@@ -369,6 +411,35 @@ export function MobilePhotoCameraPage() {
     setPendingCount(await countPendingMobilePhotos());
   }
 
+  async function completeCapturedAssignment() {
+    const assignmentId = capturedPhoto?.planningAssignment?.id;
+    if (!assignmentId) {
+      return;
+    }
+
+    setCompletingAssignment(true);
+    try {
+      const response = await authFetch(`/api/mobile/planning/assignment/${assignmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: PlanningAssignmentStatus.COMPLETED }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Mise à jour refusée.');
+      }
+
+      setConfirmationMessage('Photo envoyée et tâche terminée.');
+      setCapturedPhoto(null);
+      setSelectedAssignmentId('');
+      void assignmentsQuery.refetch();
+    } catch {
+      setConfirmationMessage("Photo envoyée, mais la tâche n'a pas pu être marquée terminée.");
+    } finally {
+      setCompletingAssignment(false);
+    }
+  }
+
   if (capturedPhoto) {
     return (
       <PhotoConfirmation
@@ -380,10 +451,14 @@ export function MobilePhotoCameraPage() {
         onSend={() => {
           void sendPhoto();
         }}
+        onCompleteTask={() => {
+          void completeCapturedAssignment();
+        }}
         photo={capturedPhoto}
         pendingCount={pendingCount}
         progress={uploadProgress}
         uploading={uploading}
+        completingTask={completingAssignment}
       />
     );
   }
@@ -439,6 +514,19 @@ export function MobilePhotoCameraPage() {
               Synchronisation photo en attente : {pendingCount}
             </p>
           ) : null}
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-white/10 p-1">
+            <ModeButton active={photoMode === 'site'} label="Photo chantier" onClick={() => setPhotoMode('site')} />
+            <ModeButton active={photoMode === 'task'} label="Photo liée à une tâche" onClick={() => setPhotoMode('task')} />
+          </div>
+          {photoMode === 'task' ? (
+            <TaskSelector
+              assignments={siteAssignments}
+              error={assignmentsQuery.isError}
+              loading={assignmentsQuery.isLoading}
+              onSelect={setSelectedAssignmentId}
+              selectedAssignmentId={selectedAssignmentId}
+            />
+          ) : null}
         </div>
 
         <div className="absolute right-4 top-36 space-y-3">
@@ -460,7 +548,7 @@ export function MobilePhotoCameraPage() {
           <button
             aria-label="Declencher la photo"
             className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-white/20 disabled:opacity-40"
-            disabled={cameraState !== 'ready' || !selectedSite}
+            disabled={cameraState !== 'ready' || !selectedSite || (photoMode === 'task' && !selectedAssignment)}
             onClick={() => {
               void capturePhoto();
             }}
@@ -488,7 +576,9 @@ export function MobilePhotoCameraPage() {
 }
 
 function PhotoConfirmation({
+  completingTask,
   confirmationMessage,
+  onCompleteTask,
   onRetry,
   onSend,
   pendingCount,
@@ -496,7 +586,9 @@ function PhotoConfirmation({
   progress,
   uploading,
 }: Readonly<{
+  completingTask: boolean;
   confirmationMessage: string | null;
+  onCompleteTask: () => void;
   onRetry: () => void;
   onSend: () => void;
   pendingCount: number;
@@ -504,6 +596,8 @@ function PhotoConfirmation({
   progress: number;
   uploading: boolean;
 }>) {
+  const canCompleteTask = Boolean(photo.planningAssignment && confirmationMessage?.startsWith('Photo envoyée'));
+
   return (
     <div className="-mx-4 -my-4 min-h-[calc(100dvh-10rem)] bg-slate-950 text-white">
       <div className="relative min-h-[calc(100dvh-10rem)]">
@@ -516,6 +610,8 @@ function PhotoConfirmation({
         <div className="absolute inset-x-0 bottom-0 space-y-4 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
           <div className="rounded-lg bg-white/10 p-4 text-sm backdrop-blur">
             <SummaryRow label="Chantier" value={photo.site.name} />
+            <SummaryRow label="Type" value={photo.planningAssignment ? 'Photo liée à une tâche' : 'Photo chantier'} />
+            {photo.planningAssignment ? <SummaryRow label="Tâche" value={photo.planningAssignment.action} /> : null}
             <SummaryRow label="Heure" value={formatDateTime(photo.timestampLocal)} />
             <SummaryRow label="GPS" value={photo.latitude === null || photo.longitude === null ? 'Indisponible' : `${photo.latitude.toFixed(5)}, ${photo.longitude.toFixed(5)}`} />
           </div>
@@ -538,6 +634,16 @@ function PhotoConfirmation({
             >
               {uploading ? `Envoi ${progress}%` : 'Envoyer'}
             </button>
+            {canCompleteTask ? (
+              <button
+                className="flex min-h-14 w-full items-center justify-center rounded-lg bg-emerald-500 px-5 text-sm font-black text-white disabled:opacity-50"
+                disabled={completingTask}
+                onClick={onCompleteTask}
+                type="button"
+              >
+                {completingTask ? 'Mise à jour...' : 'Marquer la tâche terminée'}
+              </button>
+            ) : null}
             <div className="h-1 overflow-hidden rounded-full bg-white/20">
               <div className="h-full bg-white transition-all" style={{ width: `${progress}%` }} />
             </div>
@@ -614,6 +720,62 @@ function SiteBottomSheet({
   );
 }
 
+function ModeButton({ active, label, onClick }: Readonly<{ active: boolean; label: string; onClick: () => void }>) {
+  return (
+    <button
+      className={`min-h-11 rounded-md px-3 text-xs font-black ${active ? 'bg-white text-slate-950' : 'text-white/80'}`}
+      onClick={onClick}
+      type="button"
+    >
+      {label}
+    </button>
+  );
+}
+
+function TaskSelector({
+  assignments,
+  error,
+  loading,
+  onSelect,
+  selectedAssignmentId,
+}: Readonly<{
+  assignments: SupervisorMyAssignment[];
+  error: boolean;
+  loading: boolean;
+  onSelect: (assignmentId: string) => void;
+  selectedAssignmentId: string;
+}>) {
+  if (loading) {
+    return <p className="mt-3 rounded-lg bg-white/10 px-3 py-2 text-xs font-bold text-white/80">Chargement des tâches...</p>;
+  }
+
+  if (error) {
+    return <p className="mt-3 rounded-lg bg-red-500/90 px-3 py-2 text-xs font-bold text-white">Impossible de charger les tâches.</p>;
+  }
+
+  if (assignments.length === 0) {
+    return <p className="mt-3 rounded-lg bg-orange-500/90 px-3 py-2 text-xs font-bold text-white">Aucune tâche assignée pour ce chantier aujourd&apos;hui.</p>;
+  }
+
+  return (
+    <label className="mt-3 block rounded-lg bg-white/10 p-3 text-xs font-bold text-white/80">
+      Tâche
+      <select
+        className="mt-2 min-h-12 w-full rounded-lg border border-white/20 bg-slate-950/80 px-3 text-sm font-bold text-white outline-none"
+        onChange={(event) => onSelect(event.currentTarget.value)}
+        value={selectedAssignmentId}
+      >
+        <option value="">Choisir la tâche</option>
+        {assignments.map((assignment) => (
+          <option key={assignment.id} value={assignment.id}>
+            {assignment.action}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function StatusPill({ label, tone }: Readonly<{ label: string; tone: 'success' | 'warning' }>) {
   return (
     <div
@@ -667,6 +829,7 @@ function toPendingPhoto(photo: CapturedPhoto): PendingMobilePhoto {
     blob: photo.blob,
     filename: `photo-${photo.timestampLocal.replace(/[:.]/g, '-')}.jpg`,
     siteId: photo.site.id,
+    planningAssignmentId: photo.planningAssignment?.id ?? null,
     timestampLocal: photo.timestampLocal,
     latitude: photo.latitude,
     longitude: photo.longitude,
@@ -723,6 +886,10 @@ function formatDateTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function formatDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
 }
 
 function Spinner({ className }: Readonly<{ className: string }>) {

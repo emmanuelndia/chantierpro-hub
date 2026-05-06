@@ -23,13 +23,14 @@ export const GET = withAuth(
     }
 
     const where = buildUserListWhere(query);
+    const pageSize = query.limit ?? USERS_PAGE_SIZE;
 
     const [items, totalItems] = await prisma.$transaction([
       prisma.user.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip: (query.page - 1) * USERS_PAGE_SIZE,
-        take: USERS_PAGE_SIZE,
+        skip: (query.page - 1) * pageSize,
+        take: pageSize,
         select: userPublicSelect,
       }),
       prisma.user.count({ where }),
@@ -40,6 +41,7 @@ export const GET = withAuth(
         items,
         page: query.page,
         totalItems,
+        pageSize,
       }),
     );
   },

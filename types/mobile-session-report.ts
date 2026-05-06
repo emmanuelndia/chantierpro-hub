@@ -26,6 +26,9 @@ export type SessionPhoto = {
   filename: string;
   url: string;
   takenAt: string;
+  planningAssignmentId: string | null;
+  assignmentAction?: string | undefined;
+  assignmentStatus?: string | undefined;
   description?: string | undefined;
   thumbnail?: string | undefined;
 };

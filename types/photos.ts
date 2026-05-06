@@ -2,6 +2,7 @@ import type { PhotoCategory, Role } from '@prisma/client';
 
 export type CreatePhotoInput = {
   siteId: string;
+  planningAssignmentId: string | null;
   category: PhotoCategory;
   description: string;
   latitude: number | null;
@@ -21,6 +22,9 @@ export type PhotoItem = {
   siteId: string;
   siteName: string | null;
   uploadedById: string;
+  planningAssignmentId: string | null;
+  assignmentAction: string | null;
+  assignmentStatus: string | null;
   category: PhotoCategory;
   description: string;
   filename: string;
@@ -89,6 +93,9 @@ export type PhotoApiErrorCode =
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'SITE_INACTIVE'
+  | 'ASSIGNMENT_NOT_FOUND'
+  | 'ASSIGNMENT_SITE_MISMATCH'
+  | 'ASSIGNMENT_DATE_MISMATCH'
   | 'PAYLOAD_TOO_LARGE'
   | 'RATE_LIMITED'
   | 'STORAGE_NOT_CONFIGURED'

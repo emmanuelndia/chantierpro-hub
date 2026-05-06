@@ -1,10 +1,16 @@
+import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { canAccessMobilePlanning, deletePlanningAssignment, updatePlanningAssignment } from '@/lib/mobile-planning';
+import {
+  canAccessMobilePlanning,
+  deletePlanningAssignment,
+  updatePlanningAssignment,
+  updateSupervisorAssignmentStatus,
+} from '@/lib/mobile-planning';
 import type { UpdateAssignmentRequest } from '@/types/mobile-planning';
 
 export const PATCH = withAuth<{ id: string }>(async ({ req, user, params }) => {
-  if (!canAccessMobilePlanning(user.role)) {
+  if (!canAccessMobilePlanning(user.role) && user.role !== Role.SUPERVISOR) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
@@ -16,7 +22,10 @@ export const PATCH = withAuth<{ id: string }>(async ({ req, user, params }) => {
   }
 
   try {
-    const result = await updatePlanningAssignment(prisma, user, params.id, body);
+    const result =
+      user.role === Role.SUPERVISOR
+        ? await updateSupervisorAssignmentStatus(prisma, user, params.id, body)
+        : await updatePlanningAssignment(prisma, user, params.id, body);
     return result instanceof Response ? result : Response.json(result);
   } catch (error) {
     console.error('Mobile planning update assignment error:', error);

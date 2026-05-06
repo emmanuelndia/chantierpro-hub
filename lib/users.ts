@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import { Prisma, Role, type PrismaClient } from '@prisma/client';
 import { PASSWORD_RESET_DEFAULT } from '@/lib/auth/constants';
 import { hashPassword, isStrongPassword, verifyPassword } from '@/lib/auth/password';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import type {
   CreateUserResponse,
   PaginatedUsersResponse,
@@ -53,8 +54,10 @@ export type UpdateUserInput = {
 export type UserListQuery = {
   page: number;
   role: Role | null;
+  roles: Role[];
   status: 'active' | 'inactive' | 'all';
   search: string | null;
+  limit: number | null;
 };
 
 export type UpdateOwnProfileInput = {
@@ -110,13 +113,15 @@ export function serializePaginatedUsers(payload: {
   items: SerializableUser[];
   page: number;
   totalItems: number;
+  pageSize?: number;
 }): PaginatedUsersResponse {
+  const pageSize = payload.pageSize ?? USERS_PAGE_SIZE;
   return {
     items: payload.items.map(serializeUser),
     page: payload.page,
-    pageSize: USERS_PAGE_SIZE,
+    pageSize,
     totalItems: payload.totalItems,
-    totalPages: Math.max(1, Math.ceil(payload.totalItems / USERS_PAGE_SIZE)),
+    totalPages: Math.max(1, Math.ceil(payload.totalItems / pageSize)),
   };
 }
 
@@ -134,24 +139,28 @@ export function parsePage(searchParams: URLSearchParams) {
 export function parseUserListQuery(searchParams: URLSearchParams): UserListQuery | null {
   const page = parsePage(searchParams);
   const role = parseOptionalRole(searchParams.get('role'));
-  const status = parseUserStatus(searchParams.get('status'));
+  const roles = parseOptionalRoles(searchParams.get('roles'));
+  const status = parseUserStatus(searchParams.get('status'), searchParams.get('isActive'));
   const search = sanitizeOptionalString(searchParams.get('search'));
+  const limit = parseOptionalLimit(searchParams.get('limit'));
 
-  if (!page || role === undefined || status === null) {
+  if (!page || role === undefined || roles === null || status === null || limit === undefined) {
     return null;
   }
 
   return {
     page,
     role,
+    roles,
     status,
     search,
+    limit,
   };
 }
 
 export function buildUserListWhere(query: UserListQuery): Prisma.UserWhereInput {
   return {
-    ...(query.role ? { role: query.role } : {}),
+    ...(query.roles.length > 0 ? { role: { in: query.roles } } : query.role ? { role: query.role } : {}),
     ...(query.status === 'active' ? { isActive: true } : {}),
     ...(query.status === 'inactive' ? { isActive: false } : {}),
     ...(query.search
@@ -418,12 +427,63 @@ function parseOptionalRole(value: string | null) {
   return Object.values(Role).includes(value as Role) ? (value as Role) : undefined;
 }
 
-function parseUserStatus(value: string | null): UserListQuery['status'] | null {
-  if (!value || value === 'all') {
+function parseOptionalRoles(value: string | null) {
+  if (!value) {
+    return [];
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'terrain' || normalized === 'field') {
+    return [...FIELD_USER_ROLES];
+  }
+
+  const roles = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (roles.length === 0) {
+    return [];
+  }
+
+  const parsed = roles.map((role) => (Object.values(Role).includes(role as Role) ? (role as Role) : null));
+  return parsed.every((role): role is Role => role !== null) ? [...new Set(parsed)] : null;
+}
+
+function parseUserStatus(
+  value: string | null,
+  isActiveValue: string | null,
+): UserListQuery['status'] | null {
+  if (value) {
+    return value === 'active' || value === 'inactive' || value === 'all' ? value : null;
+  }
+
+  if (isActiveValue === null) {
     return 'all';
   }
 
-  return value === 'active' || value === 'inactive' ? value : null;
+  if (isActiveValue === 'true') {
+    return 'active';
+  }
+
+  if (isActiveValue === 'false') {
+    return 'inactive';
+  }
+
+  return null;
+}
+
+function parseOptionalLimit(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return undefined;
+  }
+
+  return Math.min(parsed, 200);
 }
 
 function sanitizeOptionalString(value: unknown) {

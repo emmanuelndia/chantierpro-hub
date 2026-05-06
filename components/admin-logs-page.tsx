@@ -43,7 +43,7 @@ export function AdminLogsPage() {
   const usersQuery = useQuery({
     queryKey: ['admin-log-users'],
     queryFn: async () => {
-      const response = await authFetch('/api/users?page=1&status=all');
+      const response = await authFetch('/api/users?page=1&status=all&limit=200');
       if (!response.ok) {
         throw new Error(`Users request failed with status ${response.status}`);
       }

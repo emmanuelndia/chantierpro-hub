@@ -1,4 +1,4 @@
-import { ClockInStatus, ClockInType, ReportStatus, Role } from '@prisma/client';
+import { ClockInStatus, ClockInType, PlanningAssignmentStatus, ReportStatus, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import type { ReportSubmissionResponse, SubmitReportRequest } from '@/types/mobile-session-report';
@@ -62,6 +62,46 @@ export const POST = withAuth(async ({ user, req }) => {
       );
     }
 
+    if (body.assignmentId) {
+      const assignment = await prisma.planningAssignment.findFirst({
+        where: {
+          id: body.assignmentId,
+          supervisorId: user.id,
+          siteId: clockInRecord.siteId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!assignment) {
+        return Response.json(
+          { code: 'ASSIGNMENT_NOT_FOUND', message: 'Assignation introuvable pour cette session' },
+          { status: 404 },
+        );
+      }
+    }
+
+    if (body.photoIds.length > 0) {
+      const photosCount = await prisma.photo.count({
+        where: {
+          id: { in: body.photoIds },
+          siteId: clockInRecord.siteId,
+          uploadedById: user.id,
+          isDeleted: false,
+          ...(body.assignmentId ? { OR: [{ planningAssignmentId: body.assignmentId }, { planningAssignmentId: null }] } : {}),
+        },
+      });
+
+      if (photosCount !== new Set(body.photoIds).size) {
+        return Response.json(
+          { code: 'PHOTO_SCOPE_INVALID', message: 'Une ou plusieurs photos sont hors périmètre' },
+          { status: 400 },
+        );
+      }
+    }
+
     const report = await prisma.report.create({
       data: {
         content,
@@ -76,6 +116,13 @@ export const POST = withAuth(async ({ user, req }) => {
         id: true,
       },
     });
+
+    if (body.assignmentId) {
+      await prisma.planningAssignment.update({
+        where: { id: body.assignmentId },
+        data: { status: PlanningAssignmentStatus.COMPLETED },
+      });
+    }
 
     const response: ReportSubmissionResponse = {
       success: true,

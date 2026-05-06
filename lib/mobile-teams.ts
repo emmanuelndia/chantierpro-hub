@@ -11,6 +11,7 @@ import {
   teamAccessWhere,
   teamPublicSelect,
 } from '@/lib/teams';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import type {
   MobileTeamDetailResponse,
   MobileTeamFormOptionsResponse,
@@ -413,28 +414,11 @@ async function listMobileAssignableUsers(
   }));
 }
 
-function mobileAssignableUserWhere(user: AuthLikeUser): Prisma.UserWhereInput {
-  const baseWhere: Prisma.UserWhereInput = {
+function mobileAssignableUserWhere(_user: AuthLikeUser): Prisma.UserWhereInput {
+  return {
     isActive: true,
     role: {
-      in: [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR],
-    },
-  };
-
-  if (user.role === Role.DIRECTION) {
-    return baseWhere;
-  }
-
-  return {
-    ...baseWhere,
-    teamMemberships: {
-      some: {
-        status: TeamMemberStatus.ACTIVE,
-        team: {
-          status: TeamStatus.ACTIVE,
-          site: mobileSiteWhereForTeams(user),
-        },
-      },
+      in: [...FIELD_USER_ROLES],
     },
   };
 }

@@ -122,6 +122,7 @@ export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) 
 
   const data = sessionQuery.data;
   const loading = sessionQuery.isLoading;
+  const taskPhotos = data?.photos.filter((photo) => photo.planningAssignmentId !== null) ?? [];
 
   useEffect(() => {
     if (data?.photos) {
@@ -346,6 +347,11 @@ export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) 
               {selectedPhotoIds.length}/{data.photos.length} sélectionnées
             </span>
           </div>
+          {taskPhotos.length > 0 ? (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs font-bold text-blue-800">
+              {taskPhotos.length} photo{taskPhotos.length > 1 ? 's' : ''} liée{taskPhotos.length > 1 ? 's' : ''} à une tâche de planning.
+            </div>
+          ) : null}
           <div className="grid grid-cols-3 gap-2">
             {data.photos.map((photo) => (
               <PhotoCard
@@ -423,6 +429,11 @@ function PhotoCard({
           <CheckIcon className="h-4 w-4 text-white" />
         </div>
       )}
+      {photo.planningAssignmentId ? (
+        <div className="absolute left-1 top-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-black text-white">
+          Tâche
+        </div>
+      ) : null}
       <div className="absolute bottom-0 left-0 right-0 bg-slate-950/70 px-1 py-0.5">
         <p className="text-[10px] text-white truncate">
           {new Date(photo.takenAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}

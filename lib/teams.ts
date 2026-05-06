@@ -6,6 +6,7 @@ import {
   TeamStatus,
   type PrismaClient,
 } from '@prisma/client';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import type {
   AddTeamMemberInput,
   CreateTeamInput,
@@ -21,11 +22,6 @@ const TEAM_MANAGE_ROLES: readonly Role[] = [
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,
-];
-const FIELD_MEMBER_ROLES: readonly Role[] = [
-  Role.SUPERVISOR,
-  Role.COORDINATOR,
-  Role.GENERAL_SUPERVISOR,
 ];
 
 export const teamMemberPublicSelect = {
@@ -222,7 +218,7 @@ export async function validateActiveTechnician(prisma: PrismaClient, userId: str
     },
   });
 
-  return Boolean(user && user.isActive && FIELD_MEMBER_ROLES.includes(user.role));
+  return Boolean(user && user.isActive && FIELD_USER_ROLES.includes(user.role));
 }
 
 export async function hasActiveMember(prisma: PrismaClient, teamId: string, userId: string) {
@@ -375,7 +371,7 @@ export async function listUnassignedTechnicians(
   const users = await prisma.user.findMany({
     where: {
       role: {
-        in: [...FIELD_MEMBER_ROLES],
+        in: [...FIELD_USER_ROLES],
       },
       isActive: true,
       NOT: {

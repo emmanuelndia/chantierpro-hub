@@ -48,6 +48,18 @@ export const POST = withAuth(async ({ req, user }) => {
     return jsonPhotoError('SITE_INACTIVE', 400, 'Ce chantier est inactif.');
   }
 
+  if (result.code === 'ASSIGNMENT_NOT_FOUND') {
+    return jsonPhotoError('ASSIGNMENT_NOT_FOUND', 404, 'Tâche assignée introuvable.');
+  }
+
+  if (result.code === 'ASSIGNMENT_SITE_MISMATCH') {
+    return jsonPhotoError('ASSIGNMENT_SITE_MISMATCH', 400, 'La tâche ne correspond pas au chantier sélectionné.');
+  }
+
+  if (result.code === 'ASSIGNMENT_DATE_MISMATCH') {
+    return jsonPhotoError('ASSIGNMENT_DATE_MISMATCH', 400, 'La tâche ne correspond pas à la date de la photo.');
+  }
+
   if (result.code === 'UPLOAD_FAILED') {
     return jsonPhotoError('UPLOAD_FAILED', 500, "L'upload prive de la photo a echoue.");
   }

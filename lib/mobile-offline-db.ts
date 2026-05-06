@@ -45,6 +45,7 @@ export type PendingMobilePhoto = {
   blob: Blob;
   filename: string;
   siteId: string;
+  planningAssignmentId?: string | null;
   timestampLocal: string;
   latitude: number | null;
   longitude: number | null;
@@ -196,6 +197,10 @@ export function buildPhotoFormData(photo: PendingMobilePhoto) {
   formData.set('category', 'PROGRESS');
   formData.set('description', '');
   formData.set('timestampLocal', photo.timestampLocal);
+
+  if (photo.planningAssignmentId) {
+    formData.set('planningAssignmentId', photo.planningAssignmentId);
+  }
 
   if (photo.latitude !== null) {
     formData.set('lat', String(photo.latitude));

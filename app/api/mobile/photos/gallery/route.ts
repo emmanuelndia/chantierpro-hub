@@ -8,6 +8,7 @@ const mobileGalleryPhotoSelect = {
   id: true,
   siteId: true,
   uploadedById: true,
+  planningAssignmentId: true,
   category: true,
   description: true,
   filename: true,
@@ -31,6 +32,12 @@ const mobileGalleryPhotoSelect = {
   site: {
     select: {
       name: true,
+    },
+  },
+  planningAssignment: {
+    select: {
+      action: true,
+      status: true,
     },
   },
 } satisfies Prisma.PhotoSelect;
@@ -68,6 +75,9 @@ function serializeMobileGalleryPhoto(photo: MobileGalleryPhoto) {
     siteId: photo.siteId,
     siteName: photo.site.name,
     uploadedById: photo.uploadedById,
+    planningAssignmentId: photo.planningAssignmentId,
+    assignmentAction: photo.planningAssignment?.action ?? null,
+    assignmentStatus: photo.planningAssignment?.status ?? null,
     category: photo.category,
     description: photo.description,
     filename: photo.filename,

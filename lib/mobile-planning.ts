@@ -17,7 +17,9 @@ import type {
   PlanningClockInStatus,
   PlanningDayResponse,
   UpdateAssignmentRequest,
+  SupervisorMyAssignmentsResponse,
 } from '@/types/mobile-planning';
+import { createInternalPhotoUrl } from '@/lib/photos';
 
 type AuthLikeUser = {
   id: string;
@@ -40,6 +42,10 @@ export function canAccessMobilePlanning(role: Role) {
   const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR];
 
   return allowedRoles.includes(role);
+}
+
+export function canAccessSupervisorPlanning(role: Role) {
+  return role === Role.SUPERVISOR;
 }
 
 export function operationalPlanningSiteWhere(user: AuthLikeUser, date?: Date): Prisma.SiteWhereInput {
@@ -261,6 +267,108 @@ export async function updatePlanningAssignment(
   return { assignment: serializePlanningAssignment(assignment, clockIns) };
 }
 
+export async function getSupervisorMyAssignments(
+  prisma: PrismaClient,
+  user: AuthLikeUser,
+  dateValue: string,
+): Promise<SupervisorMyAssignmentsResponse | Response> {
+  const parsedDate = parsePlanningDate(dateValue);
+  if (!parsedDate) {
+    return planningError('INVALID_DATE', 'Date invalide.', 400);
+  }
+
+  const assignments = await prisma.planningAssignment.findMany({
+    where: {
+      date: parsedDate,
+      supervisorId: user.id,
+      deletedAt: null,
+    },
+    orderBy: [{ site: { name: 'asc' } }, { id: 'asc' }],
+    select: {
+      id: true,
+      date: true,
+      siteId: true,
+      action: true,
+      targetProgress: true,
+      status: true,
+      site: {
+        select: {
+          name: true,
+          address: true,
+        },
+      },
+      photos: {
+        where: {
+          uploadedById: user.id,
+          isDeleted: false,
+        },
+        orderBy: [{ takenAt: 'desc' }, { id: 'desc' }],
+        select: {
+          id: true,
+          filename: true,
+          takenAt: true,
+        },
+      },
+    },
+  });
+
+  return {
+    date: formatPlanningDate(parsedDate),
+    assignments: assignments.map((assignment) => ({
+      id: assignment.id,
+      date: formatPlanningDate(assignment.date),
+      siteId: assignment.siteId,
+      siteName: assignment.site.name,
+      siteAddress: assignment.site.address,
+      action: assignment.action,
+      targetProgress: assignment.targetProgress,
+      status: assignment.status,
+      photos: assignment.photos.map((photo) => ({
+        id: photo.id,
+        filename: photo.filename,
+        takenAt: photo.takenAt.toISOString(),
+        url: createInternalPhotoUrl(photo.id),
+      })),
+    })),
+  };
+}
+
+export async function updateSupervisorAssignmentStatus(
+  prisma: PrismaClient,
+  user: AuthLikeUser,
+  assignmentId: string,
+  input: UpdateAssignmentRequest,
+) {
+  const status = normalizePlanningStatus(input.status);
+  if (!status || (status !== PlanningAssignmentStatus.IN_PROGRESS && status !== PlanningAssignmentStatus.COMPLETED)) {
+    return planningError('INVALID_STATUS', 'Statut de planning invalide.', 400);
+  }
+
+  const existing = await prisma.planningAssignment.findFirst({
+    where: {
+      id: assignmentId,
+      supervisorId: user.id,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existing) {
+    return planningError('NOT_FOUND', 'Assignation introuvable.', 404);
+  }
+
+  const assignment = await prisma.planningAssignment.update({
+    where: { id: existing.id },
+    data: { status },
+    select: planningAssignmentSelect,
+  });
+
+  const clockIns = await loadClockInsForAssignments(prisma, assignment.date, [assignment]);
+  return { assignment: serializePlanningAssignment(assignment, clockIns) };
+}
+
 export async function deletePlanningAssignment(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
   const existing = await getScopedPlanningAssignment(prisma, user, assignmentId);
   if (!existing) {
@@ -424,20 +532,11 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   };
 }
 
-async function getScopedSupervisorIds(prisma: PrismaClient, user: AuthLikeUser, date: Date) {
+async function getScopedSupervisorIds(prisma: PrismaClient, _user: AuthLikeUser, _date: Date) {
   const supervisors = await prisma.user.findMany({
     where: {
       role: Role.SUPERVISOR,
       isActive: true,
-      teamMemberships: {
-        some: {
-          status: TeamMemberStatus.ACTIVE,
-          team: {
-            status: TeamStatus.ACTIVE,
-            site: operationalPlanningSiteWhere(user, date),
-          },
-        },
-      },
     },
     select: { id: true },
   });

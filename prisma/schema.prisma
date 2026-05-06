@@ -275,6 +275,7 @@ model PlanningAssignment {
   supervisor     User                     @relation("PlanningAssignmentSupervisor", fields: [supervisorId], references: [id])
   site           Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   createdBy      User                     @relation("PlanningAssignmentCreator", fields: [createdById], references: [id])
+  photos         Photo[]
 
   @@index([date])
   @@index([siteId])
@@ -287,6 +288,7 @@ model Photo {
   id          String             @id @default(cuid())
   siteId      String
   uploadedById String
+  planningAssignmentId String?
   category    PhotoCategory
   description String
   filename    String
@@ -304,11 +306,13 @@ model Photo {
   createdAt   DateTime           @default(now())
   site        Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
   uploadedBy  User               @relation("PhotoUploader", fields: [uploadedById], references: [id])
+  planningAssignment PlanningAssignment? @relation(fields: [planningAssignmentId], references: [id], onDelete: SetNull)
   deletedBy   User?              @relation("PhotoDeleter", fields: [deletedById], references: [id])
   deletionLogs PhotoDeletionLog[]
 
   @@index([siteId])
   @@index([uploadedById])
+  @@index([planningAssignmentId])
   @@index([deletedById])
   @@index([siteId, isDeleted])
 }

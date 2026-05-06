@@ -55,4 +55,7 @@ Pour ces erreurs de gps et de camera cherchent et résout le problème ou dis mo
 
 
 Quand un utilisateur rôle SUPERVISOR est crée il est crée comme chef de chantier automatiquement c'est pas normal 
+Dans l'état actuel pour qu'un GENERAL_SUPERVISOR puisse faire un planning il faut qu'il soit dans une équipe active rattachée à un chantier mais quand le manager veut créer des équipes on ne voit pas les GENERAL_SUPERVISOR dans le champ de selection je ne sais pas si c'est une erreur ou c'est comme ça
+Et aussi actuellement y'a que deux utilisateur qu'on peut affecter à des équipes qui sont le superviseur et le coordinateur crée au début avec le seeder pourtant j'ai crée d'autres utilisateur superviseur mais je ne les vois pas dans le champ de sélection je vois que ces deux la 
+
 

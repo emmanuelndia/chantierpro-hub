@@ -82,3 +82,27 @@ export type DuplicateAssignmentsResponse = {
   skippedCount: number;
   assignments: PlanningAssignment[];
 };
+
+export type SupervisorTaskPhoto = {
+  id: string;
+  filename: string;
+  takenAt: string;
+  url: string;
+};
+
+export type SupervisorMyAssignment = {
+  id: string;
+  date: string;
+  siteId: string;
+  siteName: string;
+  siteAddress: string;
+  action: string;
+  targetProgress: number | null;
+  status: PlanningAssignmentStatus;
+  photos: SupervisorTaskPhoto[];
+};
+
+export type SupervisorMyAssignmentsResponse = {
+  date: string;
+  assignments: SupervisorMyAssignment[];
+};

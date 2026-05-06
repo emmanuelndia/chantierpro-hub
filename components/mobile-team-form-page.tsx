@@ -57,7 +57,7 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
       return (await response.json()) as MobileTeamFormOptionsResponse;
     },
     enabled: mode === 'create',
-    staleTime: 300_000,
+    staleTime: 0,
   });
 
   const editQuery = useQuery({
@@ -68,7 +68,7 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
       return (await response.json()) as MobileTeamFormResponse;
     },
     enabled: mode === 'edit' && Boolean(teamId),
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   const options = mode === 'edit' ? editQuery.data?.options : optionsQuery.data;
@@ -237,6 +237,9 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
               </option>
             ))}
           </select>
+          {options.teamLeads.length === 0 ? (
+            <p className="mt-2 text-xs font-semibold text-orange-700">Aucun utilisateur terrain actif disponible.</p>
+          ) : null}
         </Field>
         <Field label="Statut" error={errors.status}>
           <select

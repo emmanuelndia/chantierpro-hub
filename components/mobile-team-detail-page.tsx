@@ -203,6 +203,9 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
               </option>
             ))}
           </select>
+          {detail.availableMembers.length === 0 ? (
+            <p className="text-xs font-semibold text-orange-700">Aucun utilisateur terrain actif disponible pour ce chantier.</p>
+          ) : null}
           <select
             className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900"
             onChange={(event) => setTeamRole(event.target.value as TeamRole)}

@@ -60,6 +60,7 @@ export const photoSelect = {
   id: true,
   siteId: true,
   uploadedById: true,
+  planningAssignmentId: true,
   category: true,
   description: true,
   filename: true,
@@ -79,6 +80,12 @@ export const photoSelect = {
       firstName: true,
       lastName: true,
       role: true,
+    },
+  },
+  planningAssignment: {
+    select: {
+      action: true,
+      status: true,
     },
   },
 } satisfies Prisma.PhotoSelect;
@@ -226,6 +233,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
   const formData = await request.formData();
   const file = formData.get('file');
   const siteId = sanitizeString(formData.get('siteId'));
+  const planningAssignmentId = sanitizeString(formData.get('planningAssignmentId'));
   const category = parsePhotoCategory(formData.get('category'));
   const descriptionValue = formData.get('description');
   const description =
@@ -262,6 +270,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
     file,
     input: {
       siteId,
+      planningAssignmentId,
       category,
       description,
       latitude,
@@ -480,6 +489,38 @@ export async function createPhoto(
     return { code: 'SITE_INACTIVE' as const, photo: null };
   }
 
+  const timestampLocal = new Date(payload.input.timestampLocal);
+  if (payload.input.planningAssignmentId) {
+    if (payload.user.role !== Role.SUPERVISOR) {
+      return { code: 'ASSIGNMENT_NOT_FOUND' as const, photo: null };
+    }
+
+    const assignment = await prisma.planningAssignment.findFirst({
+      where: {
+        id: payload.input.planningAssignmentId,
+        supervisorId: payload.user.id,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        siteId: true,
+        date: true,
+      },
+    });
+
+    if (!assignment) {
+      return { code: 'ASSIGNMENT_NOT_FOUND' as const, photo: null };
+    }
+
+    if (assignment.siteId !== site.id) {
+      return { code: 'ASSIGNMENT_SITE_MISMATCH' as const, photo: null };
+    }
+
+    if (formatDateKey(assignment.date) !== formatDateKey(timestampLocal)) {
+      return { code: 'ASSIGNMENT_DATE_MISMATCH' as const, photo: null };
+    }
+  }
+
   const prepared = await preparePhotoUpload(payload.file);
   const storageKey = generatePhotoStorageKey({
     siteId: site.id,
@@ -498,11 +539,11 @@ export async function createPhoto(
     return { code: 'UPLOAD_FAILED' as const, photo: null };
   }
 
-  const timestampLocal = new Date(payload.input.timestampLocal);
   const created = await prisma.photo.create({
     data: {
       siteId: site.id,
       uploadedById: payload.user.id,
+      planningAssignmentId: payload.input.planningAssignmentId,
       category: payload.input.category,
       description: payload.input.description,
       filename: prepared.filename,
@@ -1002,6 +1043,9 @@ export function serializePhoto(
     siteId: photo.siteId,
     siteName: null,
     uploadedById: photo.uploadedById,
+    planningAssignmentId: photo.planningAssignmentId,
+    assignmentAction: photo.planningAssignment?.action ?? null,
+    assignmentStatus: photo.planningAssignment?.status ?? null,
     category: photo.category,
     description: photo.description,
     filename: photo.filename,
@@ -1168,6 +1212,10 @@ function sanitizeString(value: unknown) {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function formatDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
 }
 
 function sanitizeOptionalNumber(value: FormDataEntryValue | null) {
