@@ -2,9 +2,9 @@ import {
   ClockInStatus,
   ClockInType,
   PlanningAssignmentStatus,
+  Prisma,
   Role,
   SiteStatus,
-  type Prisma,
   type PrismaClient,
 } from '@prisma/client';
 import type {
@@ -38,7 +38,7 @@ type ClockInRow = {
 };
 
 export function canAccessMobilePlanning(role: Role) {
-  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR];
+  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, Role.PROJECT_MANAGER];
 
   return allowedRoles.includes(role);
 }
@@ -47,9 +47,16 @@ export function canAccessSupervisorPlanning(role: Role) {
   return FIELD_USER_ROLES.includes(role);
 }
 
-export function operationalPlanningSiteWhere(_user: AuthLikeUser, _date?: Date): Prisma.SiteWhereInput {
+export function operationalPlanningSiteWhere(user: AuthLikeUser, _date?: Date): Prisma.SiteWhereInput {
   return {
     status: SiteStatus.ACTIVE,
+    ...(user.role === Role.PROJECT_MANAGER
+      ? {
+          project: {
+            projectManagerId: user.id,
+          },
+        }
+      : {}),
   };
 }
 
@@ -196,18 +203,31 @@ export async function createPlanningAssignment(
     return planningError('ASSIGNMENT_CONFLICT', 'Cette ressource a deja une assignation active sur ce chantier pour cette date.', 409);
   }
 
-  const assignment = await prisma.planningAssignment.create({
-    data: {
-      date: normalized.date,
-      supervisorId: normalized.supervisorId,
-      siteId: normalized.siteId,
-      action: normalized.action,
-      targetProgress: normalized.targetProgress,
-      status: PlanningAssignmentStatus.ASSIGNED,
-      createdById: user.id,
-    },
-    select: planningAssignmentSelect,
-  });
+  let assignment: PlanningAssignmentRow;
+  try {
+    assignment = await prisma.planningAssignment.create({
+      data: {
+        date: normalized.date,
+        supervisorId: normalized.supervisorId,
+        siteId: normalized.siteId,
+        action: normalized.action,
+        targetProgress: normalized.targetProgress,
+        status: PlanningAssignmentStatus.ASSIGNED,
+        createdById: user.id,
+      },
+      select: planningAssignmentSelect,
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return planningError(
+        'ASSIGNMENT_CONFLICT',
+        'Cette ressource a deja une assignation active sur ce chantier pour cette date.',
+        409,
+      );
+    }
+
+    throw error;
+  }
 
   return { assignment: serializePlanningAssignment(assignment, []) };
 }
@@ -396,7 +416,7 @@ export async function duplicatePlanningAssignments(
 
   const sourceSiteWhere = operationalPlanningSiteWhere(user, sourceDate);
   const targetSiteWhere = operationalPlanningSiteWhere(user, targetDate);
-  const [sourceAssignments, targetCount, validTargetSites, validSupervisorIds] = await Promise.all([
+  const [sourceAssignments, existingTargetAssignments, validTargetSites, validSupervisorIds] = await Promise.all([
     prisma.planningAssignment.findMany({
       where: {
         date: sourceDate,
@@ -406,11 +426,15 @@ export async function duplicatePlanningAssignments(
       orderBy: [{ site: { name: 'asc' } }, { supervisor: { firstName: 'asc' } }, { id: 'asc' }],
       select: planningAssignmentSelect,
     }),
-    prisma.planningAssignment.count({
+    prisma.planningAssignment.findMany({
       where: {
         date: targetDate,
         deletedAt: null,
         site: targetSiteWhere,
+      },
+      select: {
+        supervisorId: true,
+        siteId: true,
       },
     }),
     prisma.site.findMany({ where: targetSiteWhere, select: { id: true } }),
@@ -421,14 +445,16 @@ export async function duplicatePlanningAssignments(
     return planningError('NO_ASSIGNMENTS', 'Aucune assignation à dupliquer pour la date source.', 404);
   }
 
-  if (targetCount > 0) {
-    return planningError('TARGET_HAS_ASSIGNMENTS', 'La date cible contient déjà des assignations.', 409);
-  }
-
   const targetSiteIds = new Set(validTargetSites.map((site) => site.id));
   const targetSupervisorIds = new Set(validSupervisorIds);
+  const existingTargetKeys = new Set(
+    existingTargetAssignments.map((assignment) => buildAssignmentKey(assignment.supervisorId, assignment.siteId)),
+  );
   const validAssignments = sourceAssignments.filter(
-    (assignment) => targetSiteIds.has(assignment.siteId) && targetSupervisorIds.has(assignment.supervisorId),
+    (assignment) =>
+      targetSiteIds.has(assignment.siteId) &&
+      targetSupervisorIds.has(assignment.supervisorId) &&
+      !existingTargetKeys.has(buildAssignmentKey(assignment.supervisorId, assignment.siteId)),
   );
 
   if (validAssignments.length === 0) {
@@ -565,6 +591,14 @@ async function getAssignedSupervisorIdsForDay(
 function getSupervisorAvailabilityLabel(supervisorId: string, assignedSupervisorIds: Map<string, string>) {
   const siteName = assignedSupervisorIds.get(supervisorId);
   return siteName ? `Assigne sur ${siteName}` : 'Disponible';
+}
+
+function buildAssignmentKey(supervisorId: string, siteId: string) {
+  return `${supervisorId}:${siteId}`;
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
 
 async function loadClockInsForAssignments(

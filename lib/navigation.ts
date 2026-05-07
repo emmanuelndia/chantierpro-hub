@@ -187,7 +187,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/planning',
     label: 'Planning',
     icon: 'calendar',
-    roles: ['GENERAL_SUPERVISOR'],
+    roles: ['GENERAL_SUPERVISOR', 'PROJECT_MANAGER'],
   },
   {
     href: '/mobile/history',
