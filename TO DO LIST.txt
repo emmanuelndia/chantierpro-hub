@@ -59,3 +59,4 @@ Dans l'état actuel pour qu'un GENERAL_SUPERVISOR puisse faire un planning il fa
 Et aussi actuellement y'a que deux utilisateur qu'on peut affecter à des équipes qui sont le superviseur et le coordinateur crée au début avec le seeder pourtant j'ai crée d'autres utilisateur superviseur mais je ne les vois pas dans le champ de sélection je vois que ces deux la 
 
 
+J'ai retirer un membre dans une equipe il est passé inactif mais quand j'ajoute le même membre plutard, le membre est affiché inactif + le même membre est affiché actif donc on se retrouve avec deux fois le même membre mais avec des statuts différents

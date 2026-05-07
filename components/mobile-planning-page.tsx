@@ -365,7 +365,10 @@ function AssignmentCard({
             Action du jour
             <textarea
               value={editData.action ?? ''}
-              onChange={(event) => setEditData((prev) => ({ ...prev, action: event.currentTarget.value }))}
+              onChange={(event) => {
+                const action = event.currentTarget.value;
+                setEditData((prev) => ({ ...prev, action }));
+              }}
               rows={3}
               className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
             />
@@ -378,12 +381,13 @@ function AssignmentCard({
               min="0"
               max="100"
               value={editData.targetProgress ?? ''}
-              onChange={(event) =>
+              onChange={(event) => {
+                const targetProgress = event.currentTarget.value;
                 setEditData((prev) => ({
                   ...prev,
-                  targetProgress: event.currentTarget.value === '' ? null : Number(event.currentTarget.value),
-                }))
-              }
+                  targetProgress: targetProgress === '' ? null : Number(targetProgress),
+                }));
+              }}
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
               placeholder="0-100"
             />
@@ -393,7 +397,10 @@ function AssignmentCard({
             Statut
             <select
               value={editData.status ?? PlanningAssignmentStatus.ASSIGNED}
-              onChange={(event) => setEditData((prev) => ({ ...prev, status: event.currentTarget.value as PlanningAssignmentStatus }))}
+              onChange={(event) => {
+                const status = event.currentTarget.value as PlanningAssignmentStatus;
+                setEditData((prev) => ({ ...prev, status }));
+              }}
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
             >
               {Object.values(PlanningAssignmentStatus).map((status) => (
@@ -558,7 +565,10 @@ function AssignmentBottomSheet({
             Superviseur
             <select
               value={formData.supervisorId}
-              onChange={(event) => setFormData((prev) => ({ ...prev, supervisorId: event.currentTarget.value }))}
+              onChange={(event) => {
+                const supervisorId = event.currentTarget.value;
+                setFormData((prev) => ({ ...prev, supervisorId }));
+              }}
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
             >
               <option value="">Sélectionner un superviseur</option>
@@ -574,7 +584,10 @@ function AssignmentBottomSheet({
             Chantier
             <select
               value={formData.siteId}
-              onChange={(event) => setFormData((prev) => ({ ...prev, siteId: event.currentTarget.value }))}
+              onChange={(event) => {
+                const siteId = event.currentTarget.value;
+                setFormData((prev) => ({ ...prev, siteId }));
+              }}
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
             >
               <option value="">Sélectionner un chantier</option>
@@ -590,7 +603,10 @@ function AssignmentBottomSheet({
             Action du jour
             <textarea
               value={formData.action}
-              onChange={(event) => setFormData((prev) => ({ ...prev, action: event.currentTarget.value }))}
+              onChange={(event) => {
+                const action = event.currentTarget.value;
+                setFormData((prev) => ({ ...prev, action }));
+              }}
               rows={3}
               className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
               placeholder="Décrire l'action à réaliser..."
@@ -604,12 +620,13 @@ function AssignmentBottomSheet({
               min="0"
               max="100"
               value={formData.targetProgress ?? ''}
-              onChange={(event) =>
+              onChange={(event) => {
+                const targetProgress = event.currentTarget.value;
                 setFormData((prev) => ({
                   ...prev,
-                  targetProgress: event.currentTarget.value === '' ? null : Number(event.currentTarget.value),
-                }))
-              }
+                  targetProgress: targetProgress === '' ? null : Number(targetProgress),
+                }));
+              }}
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
               placeholder="0-100"
             />
