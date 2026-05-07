@@ -262,10 +262,12 @@ export function MobileClockInPage() {
   });
 
   const sessionStatus = sessionStatusQuery.data;
-  const hasOpenSession = Boolean(sessionStatus?.sessionOpen ?? activeSession);
+  const selectedSiteSessionLoaded = sessionStatus !== undefined || sessionStatusQuery.isError;
+  const hasOpenSession = selectedSite ? Boolean(sessionStatus?.sessionOpen) : Boolean(activeSession);
   const pauseActive = Boolean(sessionStatus?.pauseActive);
   const pauseSeconds = pauseActive ? elapsedSeconds(null, now, sessionStatus?.pauseDuration) : 0;
-  const currentIntent = pauseActive && selectedIntent === 'pause-start' ? 'pause-end' : selectedIntent;
+  const siteIntent = selectedSite && !sessionStatus?.sessionOpen ? 'arrival' : selectedIntent;
+  const currentIntent = pauseActive && siteIntent === 'pause-start' ? 'pause-end' : siteIntent;
   const currentType = intentToType[currentIntent];
   const selectedDistance = selectedSite?.distanceKm ?? null;
   const outsideRadius = currentType === 'ARRIVAL' && selectedDistance !== null && selectedSite ? selectedDistance > selectedSite.radiusKm : false;
@@ -561,7 +563,11 @@ export function MobileClockInPage() {
 
       {selectedSite ? (
         <section className="space-y-3">
-          {hasOpenSession ? (
+          {!selectedSiteSessionLoaded ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center text-sm font-bold text-slate-600">
+              Verification de la session du chantier...
+            </div>
+          ) : hasOpenSession ? (
             <>
               <ActionButton
                 busy={clockInMutation.isPending && currentType === 'DEPARTURE'}

@@ -361,6 +361,7 @@ export async function getAccessibleSiteForPhoto(
   prisma: PrismaClient,
   siteId: string,
   user: AuthLikeUser,
+  options: { date?: Date } = {},
 ) {
   if (user.role === Role.DIRECTION || user.role === Role.ADMIN) {
     return prisma.site.findUnique({
@@ -399,20 +400,18 @@ export async function getAccessibleSiteForPhoto(
     });
   }
 
+  const assignmentDate = options.date ? formatDateKey(options.date) : null;
+
   return prisma.site.findFirst({
     where: {
       id: siteId,
       OR: [
         {
-          teams: {
+          planningAssignments: {
             some: {
-              status: TeamStatus.ACTIVE,
-              members: {
-                some: {
-                  userId: user.id,
-                  status: TeamMemberStatus.ACTIVE,
-                },
-              },
+              supervisorId: user.id,
+              deletedAt: null,
+              ...(assignmentDate ? { date: new Date(`${assignmentDate}T00:00:00.000Z`) } : {}),
             },
           },
         },
@@ -480,7 +479,10 @@ export async function createPhoto(
     file: File;
   },
 ) {
-  const site = await getAccessibleSiteForPhoto(prisma, payload.input.siteId, payload.user);
+  const timestampLocal = new Date(payload.input.timestampLocal);
+  const site = await getAccessibleSiteForPhoto(prisma, payload.input.siteId, payload.user, {
+    date: timestampLocal,
+  });
 
   if (!site) {
     return { code: 'FORBIDDEN' as const, photo: null };
@@ -490,7 +492,6 @@ export async function createPhoto(
     return { code: 'SITE_INACTIVE' as const, photo: null };
   }
 
-  const timestampLocal = new Date(payload.input.timestampLocal);
   if (payload.input.planningAssignmentId) {
     if (!FIELD_USER_ROLES.includes(payload.user.role)) {
       return { code: 'ASSIGNMENT_NOT_FOUND' as const, photo: null };

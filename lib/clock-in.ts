@@ -244,20 +244,18 @@ export async function getAccessibleClockInSite(
   siteId: string,
   userId: string,
 ) {
+  const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
+
   return prisma.site.findFirst({
     where: {
       id: siteId,
       OR: [
         {
-          teams: {
+          planningAssignments: {
             some: {
-              status: TeamStatus.ACTIVE,
-              members: {
-                some: {
-                  userId,
-                  status: TeamMemberStatus.ACTIVE,
-                },
-              },
+              supervisorId: userId,
+              date: today,
+              deletedAt: null,
             },
           },
         },
@@ -265,6 +263,7 @@ export async function getAccessibleClockInSite(
           clockInRecords: {
             some: {
               userId,
+              clockInDate: today,
             },
           },
         },

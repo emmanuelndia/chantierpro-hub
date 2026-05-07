@@ -18,6 +18,10 @@ import type { SupervisorMyAssignment, SupervisorMyAssignmentsResponse } from '@/
 
 type CameraState = 'loading' | 'ready' | 'denied';
 type FacingMode = 'environment' | 'user';
+type PhotoUploadError = Error & {
+  network?: boolean;
+  status?: number;
+};
 type LegacyGetUserMedia = (
   constraints: MediaStreamConstraints,
   successCallback: (stream: MediaStream) => void,
@@ -398,10 +402,14 @@ export function MobilePhotoCameraPage() {
         setCapturedPhoto(null);
       }
       await refreshPendingCount();
-    } catch {
-      await enqueuePendingMobilePhoto(pendingPhoto);
-      await refreshPendingCount();
-      setConfirmationMessage('Photo stockee hors ligne, synchronisation au retour reseau.');
+    } catch (error) {
+      if (isNetworkPhotoUploadError(error)) {
+        await enqueuePendingMobilePhoto(pendingPhoto);
+        await refreshPendingCount();
+        setConfirmationMessage('Photo stockee hors ligne, synchronisation au retour reseau.');
+      } else {
+        setConfirmationMessage(getPhotoUploadErrorMessage(error));
+      }
     } finally {
       setUploading(false);
     }
@@ -860,12 +868,35 @@ function uploadPhotoWithProgress(photo: PendingMobilePhoto, onProgress: (value: 
         return;
       }
 
-      reject(new Error('Upload photo refuse.'));
+      const error: PhotoUploadError = new Error(readPhotoUploadResponseMessage(request));
+      error.status = request.status;
+      reject(error);
     };
 
-    request.onerror = () => reject(new Error('Upload photo impossible.'));
+    request.onerror = () => {
+      const error: PhotoUploadError = new Error('Upload photo impossible.');
+      error.network = true;
+      reject(error);
+    };
     request.send(buildPhotoFormData(photo));
   });
+}
+
+function isNetworkPhotoUploadError(error: unknown) {
+  return error instanceof Error && (error as PhotoUploadError).network === true;
+}
+
+function getPhotoUploadErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Upload photo refuse.';
+}
+
+function readPhotoUploadResponseMessage(request: XMLHttpRequest) {
+  try {
+    const payload = JSON.parse(request.responseText) as { message?: string; error?: string };
+    return payload.message ?? payload.error ?? 'Upload photo refuse.';
+  } catch {
+    return 'Upload photo refuse.';
+  }
 }
 
 function canUseTorch(stream: MediaStream) {
