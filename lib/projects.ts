@@ -630,19 +630,33 @@ export function serializeTodaySiteItems(
     radiusKm: Prisma.Decimal;
     status: SiteStatus;
     hasOpenSession: boolean;
+    assignmentIds?: string[];
+    source?: TodaySiteItem['source'];
   }[],
 ): TodaySiteItem[] {
-  return sites.map((site) => ({
-    id: site.id,
-    projectId: site.projectId,
-    name: site.name,
-    address: site.address,
-    latitude: site.latitude.toNumber(),
-    longitude: site.longitude.toNumber(),
-    radiusKm: site.radiusKm.toNumber(),
-    status: site.status,
-    hasOpenSession: site.hasOpenSession,
-  }));
+  return sites.map((site) => {
+    const item: TodaySiteItem = {
+      id: site.id,
+      projectId: site.projectId,
+      name: site.name,
+      address: site.address,
+      latitude: site.latitude.toNumber(),
+      longitude: site.longitude.toNumber(),
+      radiusKm: site.radiusKm.toNumber(),
+      status: site.status,
+      hasOpenSession: site.hasOpenSession,
+    };
+
+    if (site.assignmentIds) {
+      item.assignmentIds = site.assignmentIds;
+    }
+
+    if (site.source) {
+      item.source = site.source;
+    }
+
+    return item;
+  });
 }
 
 function sanitizeProjectName(value: unknown) {

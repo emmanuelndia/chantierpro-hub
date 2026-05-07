@@ -136,6 +136,8 @@ export type TodaySiteItem = {
   radiusKm: number;
   status: SiteStatus;
   hasOpenSession: boolean;
+  assignmentIds?: string[];
+  source?: 'PLANNING' | 'OPEN_SESSION';
 };
 
 export type SitePresenceRowStatus = 'COMPLETE' | 'INCOMPLETE' | 'ANOMALY';

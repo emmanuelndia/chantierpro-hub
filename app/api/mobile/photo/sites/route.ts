@@ -1,10 +1,10 @@
-import { ClockInStatus, ClockInType, Role, SiteStatus, TeamMemberStatus, TeamStatus } from '@prisma/client';
+import { ClockInStatus, ClockInType, Role, SiteStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { canUploadPhotos, jsonPhotoError } from '@/lib/photos';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import type { MobilePhotoSiteOption } from '@/types/mobile-photo';
 
-const fieldRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
 const mobilePhotoSiteRoles: readonly Role[] = [
   Role.SUPERVISOR,
   Role.COORDINATOR,
@@ -18,8 +18,9 @@ export const GET = withAuth(async ({ user }) => {
     return jsonPhotoError('FORBIDDEN', 403, 'Accès refusé aux sites photo mobile.');
   }
 
+  const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
   const sites = await prisma.site.findMany({
-    where: getSiteWhere(user),
+    where: getSiteWhere(user, today),
     select: {
       id: true,
       name: true,
@@ -29,13 +30,21 @@ export const GET = withAuth(async ({ user }) => {
           name: true,
         },
       },
+      planningAssignments: {
+        where: {
+          supervisorId: user.id,
+          date: today,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+        },
+      },
       clockInRecords: {
         where: {
           userId: user.id,
+          clockInDate: today,
           status: ClockInStatus.VALID,
-          type: {
-            in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE],
-          },
         },
         orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
         select: {
@@ -46,32 +55,49 @@ export const GET = withAuth(async ({ user }) => {
     orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
   });
 
-  const items: MobilePhotoSiteOption[] = sites.map((site) => ({
-    id: site.id,
-    name: site.name,
-    address: site.address,
-    projectName: site.project.name,
-    hasOpenSession: hasOpenSession(site.clockInRecords),
-  }));
+  const items: MobilePhotoSiteOption[] = sites.flatMap((site) => {
+    const hasOpen = hasOpenSession(site.clockInRecords);
+
+    if (FIELD_USER_ROLES.includes(user.role) && site.planningAssignments.length === 0 && !hasOpen) {
+      return [];
+    }
+
+    return [{
+      id: site.id,
+      name: site.name,
+      address: site.address,
+      projectName: site.project.name,
+      hasOpenSession: hasOpen,
+    }];
+  });
 
   return Response.json({ items });
 });
 
-function getSiteWhere(user: { id: string; role: Role }) {
-  if (fieldRoles.includes(user.role)) {
+function getSiteWhere(user: { id: string; role: Role }, today: Date) {
+  if (FIELD_USER_ROLES.includes(user.role)) {
     return {
-      status: SiteStatus.ACTIVE,
-      teams: {
-        some: {
-          status: TeamStatus.ACTIVE,
-          members: {
+      OR: [
+        {
+          status: SiteStatus.ACTIVE,
+          planningAssignments: {
             some: {
-              userId: user.id,
-              status: TeamMemberStatus.ACTIVE,
+              supervisorId: user.id,
+              date: today,
+              deletedAt: null,
             },
           },
         },
-      },
+        {
+          clockInRecords: {
+            some: {
+              userId: user.id,
+              clockInDate: today,
+              status: ClockInStatus.VALID,
+            },
+          },
+        },
+      ],
     };
   }
 
@@ -93,14 +119,12 @@ function hasOpenSession(records: { type: ClockInType }[]) {
   let open = false;
 
   for (const record of records) {
-    if (record.type === ClockInType.ARRIVAL) {
-      open = true;
+    if (record.type === ClockInType.DEPARTURE) {
+      open = false;
       continue;
     }
 
-    if (record.type === ClockInType.DEPARTURE) {
-      open = false;
-    }
+    open = true;
   }
 
   return open;

@@ -1,3 +1,4 @@
+import { ClockInStatus, ClockInType, SiteStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { isTechnician } from '@/lib/clock-in';
@@ -17,27 +18,26 @@ export const GET = withAuth(async ({ user }) => {
   }
 
   const today = toDateOnly(new Date());
+  const todayDate = new Date(`${today}T00:00:00.000Z`);
   const sites = await prisma.site.findMany({
     where: {
       OR: [
         {
-          clockInRecords: {
+          status: SiteStatus.ACTIVE,
+          planningAssignments: {
             some: {
-              userId: user.id,
-              clockInDate: new Date(`${today}T00:00:00.000Z`),
-              status: 'VALID',
+              supervisorId: user.id,
+              date: todayDate,
+              deletedAt: null,
             },
           },
         },
         {
-          teams: {
+          clockInRecords: {
             some: {
-              members: {
-                some: {
-                  userId: user.id,
-                  status: 'ACTIVE',
-                },
-              },
+              userId: user.id,
+              clockInDate: todayDate,
+              status: ClockInStatus.VALID,
             },
           },
         },
@@ -52,37 +52,41 @@ export const GET = withAuth(async ({ user }) => {
       longitude: true,
       radiusKm: true,
       status: true,
+      planningAssignments: {
+        where: {
+          supervisorId: user.id,
+          date: todayDate,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+        },
+      },
       clockInRecords: {
         where: {
           userId: user.id,
-          clockInDate: new Date(`${today}T00:00:00.000Z`),
-          status: 'VALID',
+          clockInDate: todayDate,
+          status: ClockInStatus.VALID,
         },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
         select: {
           type: true,
         },
       },
     },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
   });
 
   const items = serializeTodaySiteItems(
-    sites.map((site) => {
-      let hasOpenSession = false;
+    sites.flatMap((site) => {
+      const hasOpenSession = hasOpenClockInSession(site.clockInRecords);
+      const assignmentIds = site.planningAssignments.map((assignment) => assignment.id);
 
-      for (const record of site.clockInRecords) {
-        if (record.type === 'ARRIVAL' || record.type === 'INTERMEDIATE') {
-          hasOpenSession = true;
-          continue;
-        }
-
-        if (record.type === 'DEPARTURE') {
-          hasOpenSession = false;
-        }
+      if (assignmentIds.length === 0 && !hasOpenSession) {
+        return [];
       }
 
-      return {
+      return [{
         id: site.id,
         projectId: site.projectId,
         name: site.name,
@@ -92,7 +96,9 @@ export const GET = withAuth(async ({ user }) => {
         radiusKm: site.radiusKm,
         status: site.status,
         hasOpenSession,
-      };
+        assignmentIds,
+        source: assignmentIds.length > 0 ? 'PLANNING' : 'OPEN_SESSION',
+      }];
     }),
   );
 
@@ -101,3 +107,18 @@ export const GET = withAuth(async ({ user }) => {
     items,
   });
 });
+
+function hasOpenClockInSession(records: { type: ClockInType }[]) {
+  let hasOpenSession = false;
+
+  for (const record of records) {
+    if (record.type === ClockInType.DEPARTURE) {
+      hasOpenSession = false;
+      continue;
+    }
+
+    hasOpenSession = true;
+  }
+
+  return hasOpenSession;
+}
