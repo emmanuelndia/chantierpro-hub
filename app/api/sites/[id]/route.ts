@@ -59,13 +59,16 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return geofencingError;
   }
 
-  const radiusKm = input.radiusKmProvided ? input.radiusKm : existingSite.radiusKm.toNumber();
+  const radiusKm = input.radiusKmProvided && input.radiusKm !== undefined ? input.radiusKm : existingSite.radiusKm.toNumber();
+  const startDate = input.startDate ?? existingSite.startDate.toISOString();
+  const endDate = input.endDate !== undefined ? input.endDate : existingSite.endDate?.toISOString() ?? null;
+  const siteManagerId = input.siteManagerId ?? existingSite.siteManagerId;
 
   if (!validateRadius(radiusKm)) {
     return jsonProjectError('INVALID_RADIUS', 400, 'Le rayon du chantier doit etre compris entre 0.5 et 10 km.');
   }
 
-  if (!validateDateRange(input.startDate, input.endDate)) {
+  if (!validateDateRange(startDate, endDate)) {
     return jsonProjectError(
       'INVALID_DATE_RANGE',
       400,
@@ -73,7 +76,7 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     );
   }
 
-  const siteManagerIsValid = await validateSiteManager(prisma, input.siteManagerId);
+  const siteManagerIsValid = siteManagerId === existingSite.siteManagerId || (await validateSiteManager(prisma, siteManagerId));
 
   if (!siteManagerIsValid) {
     return jsonProjectError('INVALID_SITE_MANAGER', 400, 'Le responsable de chantier est invalide.');
@@ -83,17 +86,17 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     const site = await prisma.site.update({
       where: { id: params.id },
       data: {
-        name: input.name,
-        address: input.address,
-        latitude: new Prisma.Decimal(input.latitude),
-        longitude: new Prisma.Decimal(input.longitude),
+        name: input.name ?? existingSite.name,
+        address: input.address ?? existingSite.address,
+        latitude: new Prisma.Decimal(input.latitude ?? existingSite.latitude.toNumber()),
+        longitude: new Prisma.Decimal(input.longitude ?? existingSite.longitude.toNumber()),
         radiusKm: new Prisma.Decimal(radiusKm),
-        description: input.description,
-        status: input.status,
-        area: new Prisma.Decimal(input.area),
-        startDate: new Date(input.startDate),
-        endDate: input.endDate ? new Date(input.endDate) : null,
-        siteManagerId: input.siteManagerId,
+        description: input.description ?? existingSite.description,
+        status: input.status ?? existingSite.status,
+        area: new Prisma.Decimal(input.area ?? existingSite.area.toNumber()),
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        siteManagerId,
       },
       select: sitePublicSelect,
     });

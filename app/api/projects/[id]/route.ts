@@ -49,7 +49,11 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonProjectError('BAD_REQUEST', 400, 'Le payload projet est invalide.');
   }
 
-  if (!validateDateRange(input.startDate, input.endDate)) {
+  const startDate = input.startDate ?? existingProject.startDate.toISOString();
+  const endDate = input.endDate !== undefined ? input.endDate : existingProject.endDate?.toISOString() ?? null;
+  const projectManagerId = input.projectManagerId ?? existingProject.projectManagerId;
+
+  if (!validateDateRange(startDate, endDate)) {
     return jsonProjectError(
       'INVALID_DATE_RANGE',
       400,
@@ -57,7 +61,9 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     );
   }
 
-  const projectManagerIsValid = await validateProjectManager(prisma, input.projectManagerId, user);
+  const projectManagerIsValid =
+    projectManagerId === existingProject.projectManagerId ||
+    (await validateProjectManager(prisma, projectManagerId, user));
 
   if (!projectManagerIsValid) {
     return jsonProjectError(
@@ -71,14 +77,14 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     const project = await prisma.project.update({
       where: { id: params.id },
       data: {
-        name: input.name,
-        description: input.description,
-        address: input.address,
-        city: input.city,
-        startDate: new Date(input.startDate),
-        endDate: input.endDate ? new Date(input.endDate) : null,
-        projectManagerId: input.projectManagerId,
-        status: input.status,
+        name: input.name ?? existingProject.name,
+        description: input.description ?? existingProject.description,
+        address: input.address ?? existingProject.address,
+        city: input.city ?? existingProject.city,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        projectManagerId,
+        status: input.status ?? existingProject.status,
       },
       select: projectDetailSelect,
     });

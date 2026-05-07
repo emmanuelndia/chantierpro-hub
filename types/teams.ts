@@ -35,7 +35,7 @@ export type CreateTeamInput = {
   status: TeamStatus;
 };
 
-export type UpdateTeamInput = CreateTeamInput;
+export type UpdateTeamInput = Partial<CreateTeamInput>;
 
 export type AddTeamMemberInput = {
   userId: string;

@@ -197,7 +197,31 @@ export function parseCreateTeamInput(body: unknown): CreateTeamInput | null {
 }
 
 export function parseUpdateTeamInput(body: unknown): UpdateTeamInput | null {
-  return parseCreateTeamInput(body);
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const input: UpdateTeamInput = {};
+
+  if ('name' in body) {
+    const name = sanitizeName(body.name);
+    if (!name) return null;
+    input.name = name;
+  }
+
+  if ('teamLeadId' in body) {
+    const teamLeadId = sanitizeString(body.teamLeadId);
+    if (!teamLeadId) return null;
+    input.teamLeadId = teamLeadId;
+  }
+
+  if ('status' in body) {
+    const status = parseTeamStatus(body.status);
+    if (!status) return null;
+    input.status = status;
+  }
+
+  return Object.keys(input).length > 0 ? input : null;
 }
 
 export function parseAddTeamMemberInput(body: unknown): AddTeamMemberInput | null {

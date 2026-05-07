@@ -280,7 +280,61 @@ export function parseCreateProjectInput(body: unknown): CreateProjectInput | nul
 }
 
 export function parseUpdateProjectInput(body: unknown): UpdateProjectInput | null {
-  return parseCreateProjectInput(body);
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const input: UpdateProjectInput = {};
+
+  if ('name' in body) {
+    const name = sanitizeProjectName(body.name);
+    if (!name) return null;
+    input.name = name;
+  }
+
+  if ('description' in body) {
+    const description = sanitizeString(body.description);
+    if (!description) return null;
+    input.description = description;
+  }
+
+  if ('address' in body) {
+    const address = sanitizeString(body.address);
+    if (!address) return null;
+    input.address = address;
+  }
+
+  if ('city' in body) {
+    const city = sanitizeString(body.city);
+    if (!city) return null;
+    input.city = city;
+  }
+
+  if ('projectManagerId' in body) {
+    const projectManagerId = sanitizeString(body.projectManagerId);
+    if (!projectManagerId) return null;
+    input.projectManagerId = projectManagerId;
+  }
+
+  if ('status' in body) {
+    const status = parseProjectStatus(body.status);
+    if (!status) return null;
+    input.status = status;
+  }
+
+  if ('startDate' in body) {
+    const startDate = sanitizeDateString(body.startDate);
+    if (!startDate) return null;
+    input.startDate = startDate;
+  }
+
+  if ('endDate' in body) {
+    const endDate = body.endDate === null || body.endDate === undefined ? null : sanitizeDateString(body.endDate);
+    if (endDate === null && body.endDate !== null && body.endDate !== undefined) return null;
+    input.endDate = endDate;
+  }
+
+  return hasUpdateFields(input) ? input : null;
 }
 
 export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
@@ -338,7 +392,82 @@ export function parseUpdateSiteInput(body: unknown): UpdateSiteInput | null {
     return null;
   }
 
-  return parseCreateSiteInput(body);
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const input: UpdateSiteInput = {
+    radiusKmProvided: false,
+  };
+
+  if ('name' in body) {
+    const name = sanitizeProjectName(body.name);
+    if (!name) return null;
+    input.name = name;
+  }
+
+  if ('address' in body) {
+    const address = sanitizeString(body.address);
+    if (!address) return null;
+    input.address = address;
+  }
+
+  if ('description' in body) {
+    const description = sanitizeString(body.description);
+    if (!description) return null;
+    input.description = description;
+  }
+
+  if ('siteManagerId' in body) {
+    const siteManagerId = sanitizeString(body.siteManagerId);
+    if (!siteManagerId) return null;
+    input.siteManagerId = siteManagerId;
+  }
+
+  if ('startDate' in body) {
+    const startDate = sanitizeDateString(body.startDate);
+    if (!startDate) return null;
+    input.startDate = startDate;
+  }
+
+  if ('endDate' in body) {
+    const endDate = body.endDate === null || body.endDate === undefined ? null : sanitizeDateString(body.endDate);
+    if (endDate === null && body.endDate !== null && body.endDate !== undefined) return null;
+    input.endDate = endDate;
+  }
+
+  if ('status' in body) {
+    const status = parseSiteStatus(body.status);
+    if (!status) return null;
+    input.status = status;
+  }
+
+  if ('latitude' in body) {
+    const latitude = sanitizeNumber(body.latitude);
+    if (latitude === null) return null;
+    input.latitude = latitude;
+  }
+
+  if ('longitude' in body) {
+    const longitude = sanitizeNumber(body.longitude);
+    if (longitude === null) return null;
+    input.longitude = longitude;
+  }
+
+  if ('area' in body) {
+    const area = sanitizeNumber(body.area);
+    if (area === null) return null;
+    input.area = area;
+  }
+
+  if ('radiusKm' in body) {
+    const radiusKm = sanitizeNumber(body.radiusKm);
+    if (radiusKm === null) return null;
+    input.radiusKm = radiusKm;
+    input.radiusKmProvided = true;
+  }
+
+  return hasUpdateFields(input) ? input : null;
 }
 
 export function validateDateRange(startDate: string, endDate: string | null) {
@@ -370,7 +499,7 @@ export function assertUpdateSiteRadiusAllowed(
   existingRadiusKm: number,
   input: UpdateSiteInput,
 ) {
-  const nextRadiusKm = input.radiusKmProvided ? input.radiusKm : existingRadiusKm;
+  const nextRadiusKm = input.radiusKmProvided && input.radiusKm !== undefined ? input.radiusKm : existingRadiusKm;
 
   if (!canManageGeofencing(user.role) && Math.abs(nextRadiusKm - existingRadiusKm) > Number.EPSILON) {
     return jsonProjectError(
@@ -571,4 +700,8 @@ function parseSiteStatus(value: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function hasUpdateFields(input: Record<string, unknown>) {
+  return Object.keys(input).some((key) => key !== 'radiusKmProvided');
 }

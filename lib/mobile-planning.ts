@@ -218,7 +218,16 @@ export async function createPlanningAssignment(
       select: planningAssignmentSelect,
     });
   } catch (error) {
-    if (isUniqueConstraintError(error)) {
+    const uniqueTarget = getUniqueConstraintTarget(error);
+    if (uniqueTarget) {
+      if (isOldSupervisorDateConstraint(uniqueTarget)) {
+        return planningError(
+          'PLANNING_TURNOVER_MIGRATION_REQUIRED',
+          "La base de donnees bloque encore les assignations multi-chantiers. Executez `npx prisma migrate deploy` pour appliquer la migration planning_turnover_unique_scope.",
+          409,
+        );
+      }
+
       return planningError(
         'ASSIGNMENT_CONFLICT',
         'Cette ressource a deja une assignation active sur ce chantier pour cette date.',
@@ -511,7 +520,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   const targetProgress = normalizeTargetProgress(input.targetProgress);
 
   if (!supervisorId || !siteId || !action) {
-    return planningError('INVALID_REQUEST', 'Superviseur, chantier et action sont requis.', 400);
+    return planningError('INVALID_REQUEST', 'Ressource terrain, chantier et action sont requis.', 400);
   }
 
   if (targetProgress instanceof Response) return targetProgress;
@@ -532,7 +541,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   }
 
   if (!supervisorIds.includes(supervisorId)) {
-    return planningError('SUPERVISOR_NOT_FOUND', 'Superviseur introuvable dans votre périmètre.', 404);
+    return planningError('SUPERVISOR_NOT_FOUND', 'Ressource terrain introuvable.', 404);
   }
 
   return {
@@ -597,8 +606,31 @@ function buildAssignmentKey(supervisorId: string, siteId: string) {
   return `${supervisorId}:${siteId}`;
 }
 
-function isUniqueConstraintError(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+function getUniqueConstraintTarget(error: unknown) {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+    return null;
+  }
+
+  const target = error.meta?.target;
+  if (Array.isArray(target)) {
+    return target.filter((item): item is string => typeof item === 'string');
+  }
+
+  if (typeof target === 'string') {
+    return [target];
+  }
+
+  return [];
+}
+
+function isOldSupervisorDateConstraint(target: string[]) {
+  const normalized = target.join(' ').toLowerCase();
+  return (
+    (normalized.includes('supervisorid') || normalized.includes('supervisor_date')) &&
+    normalized.includes('date') &&
+    !normalized.includes('siteid') &&
+    !normalized.includes('date_site')
+  );
 }
 
 async function loadClockInsForAssignments(

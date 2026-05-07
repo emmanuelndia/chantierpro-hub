@@ -137,8 +137,8 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
   const data = planningQuery.data;
   const selectedDateObject = parseDateKey(selectedDate);
   const hasAvailableSites = (data?.availableSites.length ?? 0) > 0;
-  const hasAvailableSupervisors = (data?.unassignedSupervisors.length ?? 0) > 0;
-  const canOpenCreateForm = hasAvailableSites && hasAvailableSupervisors;
+  const hasAssignableResources = (data?.unassignedSupervisors.length ?? 0) > 0;
+  const canOpenCreateForm = hasAvailableSites && hasAssignableResources;
   const mutationError =
     getMutationError(createAssignmentMutation.error) ??
     getMutationError(updateAssignmentMutation.error) ??
@@ -160,7 +160,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
   }
 
   function openCreateForm(supervisorId?: string) {
-    if (!hasAvailableSites || (!supervisorId && !hasAvailableSupervisors)) {
+    if (!hasAvailableSites || (!supervisorId && !hasAssignableResources)) {
       return;
     }
 
@@ -251,7 +251,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
 
           <section className="grid grid-cols-2 gap-3">
             <StatTile label="Assignations" value={data.assignments.length} />
-            <StatTile label="Disponibles" value={data.unassignedSupervisors.length} />
+            <StatTile label="Ressources" value={data.unassignedSupervisors.length} />
             <StatTile label="Chantiers" value={data.availableSites.length} />
             <StatTile label="Date" value={formatShortDate(selectedDateObject)} />
           </section>
@@ -280,7 +280,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
 
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <SectionTitle label="Superviseurs disponibles" count={data.unassignedSupervisors.length} />
+              <SectionTitle label="Ressources assignables" count={data.unassignedSupervisors.length} />
               <button
                 type="button"
                 onClick={() => openCreateForm()}
@@ -298,7 +298,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
                 ))}
               </div>
             ) : (
-              <EmptyState title="Aucun superviseur disponible" description={getSupervisorEmptyDescription(data.availableSites.length, data.assignments.length)} />
+              <EmptyState title="Aucune ressource terrain active disponible" description={getResourceEmptyDescription(data.availableSites.length)} />
             )}
           </section>
         </>
@@ -505,6 +505,7 @@ function UnassignedSupervisorCard({ supervisor, onAssign }: Readonly<{ superviso
           <h3 className="truncate text-sm font-bold text-slate-950">
             {supervisor.firstName} {supervisor.name}
           </h3>
+          <p className="truncate text-xs font-semibold text-sky-700">{supervisor.availabilityLabel}</p>
           <p className="truncate text-xs text-slate-500">{supervisor.email}</p>
         </div>
       </div>
@@ -568,13 +569,13 @@ function AssignmentBottomSheet({
 
         {hasAvailableSites && !hasAvailableSupervisors ? (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-            Aucun superviseur disponible pour cette date.
+            Aucune ressource terrain active disponible.
           </div>
         ) : null}
 
         <div className="mt-4 space-y-4">
           <label className="block text-sm font-semibold text-slate-700">
-            Superviseur
+            Ressource terrain
             <select
               value={formData.supervisorId}
               onChange={(event) => {
@@ -583,7 +584,7 @@ function AssignmentBottomSheet({
               }}
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
             >
-              <option value="">Sélectionner un superviseur</option>
+              <option value="">Sélectionner une ressource</option>
               {availableSupervisors.map((supervisor) => (
                 <option key={supervisor.id} value={supervisor.id}>
                   {supervisor.firstName} {supervisor.name} ({supervisor.availabilityLabel})
@@ -816,16 +817,12 @@ function getMutationError(error: unknown) {
   return error instanceof Error ? error.message : null;
 }
 
-function getSupervisorEmptyDescription(siteCount: number, assignmentCount: number) {
+function getResourceEmptyDescription(siteCount: number) {
   if (siteCount === 0) {
     return "Aucun chantier actif n'est disponible pour créer une assignation.";
   }
 
-  if (assignmentCount > 0) {
-    return 'Tous les superviseurs sont déjà assignés pour cette date.';
-  }
-
-  return "Aucun superviseur actif n'est rattaché aux équipes actives de vos chantiers.";
+  return "Aucune ressource terrain active n'est disponible pour créer une assignation.";
 }
 
 function baseIcon(className: string, children: ReactNode) {

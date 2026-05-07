@@ -185,7 +185,7 @@ export type CreateProjectInput = {
   status: ProjectStatus;
 };
 
-export type UpdateProjectInput = CreateProjectInput;
+export type UpdateProjectInput = Partial<CreateProjectInput>;
 
 export type CreateSiteInput = {
   name: string;
@@ -202,7 +202,10 @@ export type CreateSiteInput = {
   siteManagerId: string;
 };
 
-export type UpdateSiteInput = CreateSiteInput;
+export type UpdateSiteInput = Partial<Omit<CreateSiteInput, 'radiusKm' | 'radiusKmProvided'>> & {
+  radiusKm?: number;
+  radiusKmProvided: boolean;
+};
 
 export type ProjectApiErrorCode =
   | 'BAD_REQUEST'

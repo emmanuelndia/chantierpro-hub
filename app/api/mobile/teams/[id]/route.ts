@@ -48,9 +48,10 @@ export const PATCH = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonTeamError('BAD_REQUEST', 400, "Le payload d'équipe est invalide.");
   }
 
+  const teamLeadId = input.teamLeadId ?? existingTeam.teamLeadId;
   const leaderIsValid =
-    input.teamLeadId === existingTeam.teamLeadId ||
-    (await validateMobileAssignableUserForSite(prisma, user, existingTeam.siteId, input.teamLeadId));
+    teamLeadId === existingTeam.teamLeadId ||
+    (await validateMobileAssignableUserForSite(prisma, user, existingTeam.siteId, teamLeadId));
 
   if (!leaderIsValid) {
     return jsonTeamError('INVALID_TEAM_LEAD', 400, "Le chef d'équipe sélectionné doit être actif, disponible et dans votre périmètre.");
@@ -60,17 +61,19 @@ export const PATCH = withAuth<{ id: string }>(async ({ params, req, user }) => {
     await tx.team.update({
       where: { id: params.id },
       data: {
-        name: input.name,
-        teamLeadId: input.teamLeadId,
-        status: input.status,
+        name: input.name ?? existingTeam.name,
+        teamLeadId,
+        status: input.status ?? existingTeam.status,
       },
     });
 
-    await syncTeamLeadMembership(tx, {
-      teamId: params.id,
-      teamLeadId: input.teamLeadId,
-      createdById: user.id,
-    });
+    if (teamLeadId !== existingTeam.teamLeadId) {
+      await syncTeamLeadMembership(tx, {
+        teamId: params.id,
+        teamLeadId,
+        createdById: user.id,
+      });
+    }
 
     return tx.team.findUniqueOrThrow({
       where: { id: params.id },

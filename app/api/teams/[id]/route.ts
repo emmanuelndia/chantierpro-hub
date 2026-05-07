@@ -31,7 +31,8 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonTeamError('BAD_REQUEST', 400, "Le payload d'equipe est invalide.");
   }
 
-  const leaderIsValid = await validateActiveTechnician(prisma, input.teamLeadId);
+  const teamLeadId = input.teamLeadId ?? existingTeam.teamLeadId;
+  const leaderIsValid = teamLeadId === existingTeam.teamLeadId || (await validateActiveTechnician(prisma, teamLeadId));
 
   if (!leaderIsValid) {
     return jsonTeamError(
@@ -45,17 +46,19 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     await tx.team.update({
       where: { id: params.id },
       data: {
-        name: input.name,
-        teamLeadId: input.teamLeadId,
-        status: input.status,
+        name: input.name ?? existingTeam.name,
+        teamLeadId,
+        status: input.status ?? existingTeam.status,
       },
     });
 
-    await syncTeamLeadMembership(tx, {
-      teamId: params.id,
-      teamLeadId: input.teamLeadId,
-      createdById: user.id,
-    });
+    if (teamLeadId !== existingTeam.teamLeadId) {
+      await syncTeamLeadMembership(tx, {
+        teamId: params.id,
+        teamLeadId,
+        createdById: user.id,
+      });
+    }
 
     return tx.team.findUniqueOrThrow({
       where: { id: params.id },
