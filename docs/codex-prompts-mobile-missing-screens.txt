@@ -759,7 +759,7 @@ PLEASE IMPLEMENT THIS PLAN:
   - `SUPERVISOR` voit ses tâches assignées du jour;
   - peut marquer une tâche `COMPLETED` si autorisé;
   - peut joindre une photo comme preuve de fin de tâche.
-- Côté rapports :
+- Côté rapports : 
   - afficher les photos liées aux tâches dans le détail rapport/session si elles existent.
 - Garder les photos chantier classiques inchangées.
 
