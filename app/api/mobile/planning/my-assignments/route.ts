@@ -1,10 +1,10 @@
-import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { getSupervisorMyAssignments } from '@/lib/mobile-planning';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 
 export const GET = withAuth(async ({ req, user }) => {
-  if (user.role !== Role.SUPERVISOR) {
+  if (!FIELD_USER_ROLES.includes(user.role)) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 

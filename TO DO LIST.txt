@@ -60,3 +60,5 @@ Et aussi actuellement y'a que deux utilisateur qu'on peut affecter à des équip
 
 
 J'ai retirer un membre dans une equipe il est passé inactif mais quand j'ajoute le même membre plutard, le membre est affiché inactif + le même membre est affiché actif donc on se retrouve avec deux fois le même membre mais avec des statuts différents
+Le GENERAL_SUPERVISOR il a plusieurs chantiers qui lui sont rattachée mais quand il veut assigner les superviseurs à ces chantiers dans le champ de selection chantier il y'a qu'un seul chantier affiché
+Faut noter que les ressources sont tournantes un superviseur d'un chef de projet A peut se retrouver chez un chef de projet B, un superviseur general peut tourner aussi il faut avoir cette flexibilité la dans l'application

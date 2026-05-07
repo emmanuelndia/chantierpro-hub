@@ -16,6 +16,7 @@ import {
   removePrivatePhotoObject,
   uploadPrivatePhotoObject,
 } from '@/lib/photo-storage';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import type {
   AdminDeletionLogItem,
   AdminLogsApiErrorCode,
@@ -491,7 +492,7 @@ export async function createPhoto(
 
   const timestampLocal = new Date(payload.input.timestampLocal);
   if (payload.input.planningAssignmentId) {
-    if (payload.user.role !== Role.SUPERVISOR) {
+    if (!FIELD_USER_ROLES.includes(payload.user.role)) {
       return { code: 'ASSIGNMENT_NOT_FOUND' as const, photo: null };
     }
 

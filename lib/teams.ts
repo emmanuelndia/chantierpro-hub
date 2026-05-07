@@ -75,6 +75,16 @@ type SerializableUnassignedUser = Prisma.UserGetPayload<{
   select: typeof unassignedUserSelect;
 }>;
 
+type UpsertActiveTeamMemberResult =
+  | {
+      status: 'active_exists';
+      member: SerializableTeamMember;
+    }
+  | {
+      status: 'created' | 'reactivated' | 'updated';
+      member: SerializableTeamMember;
+    };
+
 type AuthLikeUser = {
   id: string;
   role: Role;
@@ -236,6 +246,81 @@ export async function hasActiveMember(prisma: PrismaClient, teamId: string, user
   return Boolean(existing);
 }
 
+export async function upsertActiveTeamMember(
+  tx: Prisma.TransactionClient,
+  payload: {
+    teamId: string;
+    userId: string;
+    teamRole: TeamRole;
+    createdById: string;
+    assignmentDate?: Date;
+    activeMode?: 'conflict' | 'updateRole';
+  },
+): Promise<UpsertActiveTeamMemberResult> {
+  const assignmentDate = payload.assignmentDate ?? toDateOnlyDate(new Date());
+  const activeMember = await tx.teamMember.findFirst({
+    where: {
+      teamId: payload.teamId,
+      userId: payload.userId,
+      status: TeamMemberStatus.ACTIVE,
+    },
+    select: teamMemberPublicSelect,
+  });
+
+  if (activeMember) {
+    if (payload.activeMode === 'updateRole' && activeMember.teamRole !== payload.teamRole) {
+      const updated = await tx.teamMember.update({
+        where: { id: activeMember.id },
+        data: { teamRole: payload.teamRole },
+        select: teamMemberPublicSelect,
+      });
+
+      return { status: 'updated', member: updated };
+    }
+
+    return { status: 'active_exists', member: activeMember };
+  }
+
+  const inactiveMember = await tx.teamMember.findFirst({
+    where: {
+      teamId: payload.teamId,
+      userId: payload.userId,
+      status: TeamMemberStatus.INACTIVE,
+    },
+    orderBy: [{ endDate: 'desc' }, { assignmentDate: 'desc' }, { id: 'desc' }],
+    select: { id: true },
+  });
+
+  if (inactiveMember) {
+    const reactivated = await tx.teamMember.update({
+      where: { id: inactiveMember.id },
+      data: {
+        status: TeamMemberStatus.ACTIVE,
+        endDate: null,
+        assignmentDate,
+        teamRole: payload.teamRole,
+      },
+      select: teamMemberPublicSelect,
+    });
+
+    return { status: 'reactivated', member: reactivated };
+  }
+
+  const created = await tx.teamMember.create({
+    data: {
+      teamId: payload.teamId,
+      userId: payload.userId,
+      teamRole: payload.teamRole,
+      assignmentDate,
+      status: TeamMemberStatus.ACTIVE,
+      createdById: payload.createdById,
+    },
+    select: teamMemberPublicSelect,
+  });
+
+  return { status: 'created', member: created };
+}
+
 export async function syncTeamLeadMembership(
   tx: Prisma.TransactionClient,
   payload: {
@@ -261,38 +346,13 @@ export async function syncTeamLeadMembership(
     },
   });
 
-  const activeMembership = await tx.teamMember.findFirst({
-    where: {
-      teamId: payload.teamId,
-      userId: payload.teamLeadId,
-      status: TeamMemberStatus.ACTIVE,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (activeMembership) {
-    await tx.teamMember.update({
-      where: {
-        id: activeMembership.id,
-      },
-      data: {
-        teamRole: TeamRole.TEAM_LEAD,
-      },
-    });
-    return;
-  }
-
-  await tx.teamMember.create({
-    data: {
-      teamId: payload.teamId,
-      userId: payload.teamLeadId,
-      teamRole: TeamRole.TEAM_LEAD,
-      assignmentDate: today,
-      status: TeamMemberStatus.ACTIVE,
-      createdById: payload.createdById,
-    },
+  await upsertActiveTeamMember(tx, {
+    teamId: payload.teamId,
+    userId: payload.teamLeadId,
+    teamRole: TeamRole.TEAM_LEAD,
+    assignmentDate: today,
+    createdById: payload.createdById,
+    activeMode: 'updateRole',
   });
 }
 
@@ -366,7 +426,7 @@ export function serializeUnassignedUser(user: SerializableUnassignedUser): Unass
 
 export async function listUnassignedTechnicians(
   prisma: PrismaClient,
-  siteId: string,
+  _siteId: string,
 ): Promise<UnassignedUserItem[]> {
   const users = await prisma.user.findMany({
     where: {
@@ -374,17 +434,6 @@ export async function listUnassignedTechnicians(
         in: [...FIELD_USER_ROLES],
       },
       isActive: true,
-      NOT: {
-        teamMemberships: {
-          some: {
-            status: TeamMemberStatus.ACTIVE,
-            team: {
-              siteId,
-              status: TeamStatus.ACTIVE,
-            },
-          },
-        },
-      },
     },
     orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
     select: unassignedUserSelect,

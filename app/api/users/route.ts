@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Prisma, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import {
   USERS_PAGE_SIZE,
   buildUserListWhere,
@@ -10,16 +11,22 @@ import {
   parseJsonBody,
   parseUserListQuery,
   serializePaginatedUsers,
+  serializeUserWithAvailability,
   userPublicSelect,
 } from '@/lib/users';
 import { withAuth } from '@/lib/auth/with-auth';
+import type { UserAvailability } from '@/types/users';
 
 export const GET = withAuth(
-  async ({ req }) => {
+  async ({ req, user }) => {
     const query = parseUserListQuery(req.nextUrl.searchParams);
 
     if (!query) {
       return jsonUserError('BAD_REQUEST', 400, 'Les filtres utilisateurs sont invalides.');
+    }
+
+    if (!canReadUserList(user.role, query.role, query.roles, query.status)) {
+      return jsonUserError('INVALID_ROLE', 403, 'Acces aux utilisateurs refuse pour ce filtre.');
     }
 
     const where = buildUserListWhere(query);
@@ -36,6 +43,23 @@ export const GET = withAuth(
       prisma.user.count({ where }),
     ]);
 
+    if (query.withAvailability) {
+      const targetDate = query.availabilityDate ?? new Date().toISOString().slice(0, 10);
+      const availability = await loadUserAvailability(targetDate, items.map((item) => item.id));
+
+      return NextResponse.json({
+        ...serializePaginatedUsers({
+          items: [],
+          page: query.page,
+          totalItems,
+          pageSize,
+        }),
+        items: items.map((item) =>
+          serializeUserWithAvailability(item, availability.get(item.id) ?? buildAvailableUserAvailability(targetDate)),
+        ),
+      });
+    }
+
     return NextResponse.json(
       serializePaginatedUsers({
         items,
@@ -45,7 +69,7 @@ export const GET = withAuth(
       }),
     );
   },
-  [Role.ADMIN],
+  [Role.ADMIN, Role.DIRECTION, Role.GENERAL_SUPERVISOR, Role.PROJECT_MANAGER, Role.COORDINATOR],
 );
 
 export const POST = withAuth(
@@ -82,3 +106,88 @@ export const POST = withAuth(
   },
   [Role.ADMIN],
 );
+
+function canReadUserList(
+  userRole: Role,
+  roleFilter: Role | null,
+  rolesFilter: Role[],
+  status: 'active' | 'inactive' | 'all',
+) {
+  if (userRole === Role.ADMIN) {
+    return true;
+  }
+
+  if (status !== 'active') {
+    return false;
+  }
+
+  if (rolesFilter.length > 0) {
+    return rolesFilter.every((role) => FIELD_USER_ROLES.includes(role));
+  }
+
+  return Boolean(roleFilter && FIELD_USER_ROLES.includes(roleFilter));
+}
+
+async function loadUserAvailability(dateValue: string, userIds: string[]) {
+  const availability = new Map<string, UserAvailability>();
+
+  if (userIds.length === 0) {
+    return availability;
+  }
+
+  const date = new Date(`${dateValue}T00:00:00.000Z`);
+  const assignments = await prisma.planningAssignment.findMany({
+    where: {
+      date,
+      deletedAt: null,
+      supervisorId: {
+        in: userIds,
+      },
+    },
+    orderBy: [{ site: { name: 'asc' } }, { id: 'asc' }],
+    select: {
+      id: true,
+      supervisorId: true,
+      siteId: true,
+      site: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+
+  for (const assignment of assignments) {
+    if (availability.has(assignment.supervisorId)) {
+      continue;
+    }
+
+    availability.set(assignment.supervisorId, {
+      status: 'ASSIGNED',
+      label: `Assigne sur ${assignment.site.name}`,
+      date: dateValue,
+      assignmentId: assignment.id,
+      siteId: assignment.siteId,
+      siteName: assignment.site.name,
+    });
+  }
+
+  for (const userId of userIds) {
+    if (!availability.has(userId)) {
+      availability.set(userId, buildAvailableUserAvailability(dateValue));
+    }
+  }
+
+  return availability;
+}
+
+function buildAvailableUserAvailability(dateValue: string | null): UserAvailability {
+  return {
+    status: 'AVAILABLE',
+    label: 'Disponible',
+    date: dateValue,
+    assignmentId: null,
+    siteId: null,
+    siteName: null,
+  };
+}

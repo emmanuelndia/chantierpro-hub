@@ -306,8 +306,8 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
 
       {data?.availableSites.length === 0 && !planningQuery.isLoading ? (
         <EmptyState
-          title="Aucun chantier dans votre périmètre"
-          description="Votre compte doit être membre actif d'une équipe active rattachée à un chantier actif pour afficher le planning."
+          title="Aucun chantier actif disponible"
+          description="Aucun chantier actif n'est disponible pour créer une assignation."
         />
       ) : null}
 
@@ -534,9 +534,21 @@ function AssignmentBottomSheet({
   onCancel: () => void;
   isSubmitting: boolean;
 }>) {
+  const [siteSearch, setSiteSearch] = useState('');
   const hasAvailableSites = availableSites.length > 0;
   const hasAvailableSupervisors = availableSupervisors.length > 0;
   const canSubmit = Boolean(formData.supervisorId && formData.siteId && formData.action.trim() && hasAvailableSites && hasAvailableSupervisors);
+  const normalizedSiteSearch = siteSearch.trim().toLowerCase();
+  const filteredSites = normalizedSiteSearch
+    ? availableSites.filter((site) =>
+        `${site.project.name} ${site.name} ${site.address}`.toLowerCase().includes(normalizedSiteSearch),
+      )
+    : availableSites;
+  const selectedSite = availableSites.find((site) => site.id === formData.siteId);
+  const displayedSites =
+    selectedSite && !filteredSites.some((site) => site.id === selectedSite.id)
+      ? [selectedSite, ...filteredSites]
+      : filteredSites;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/50">
@@ -550,7 +562,7 @@ function AssignmentBottomSheet({
 
         {!hasAvailableSites ? (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-            Aucun chantier dans votre périmètre.
+            Aucun chantier actif disponible.
           </div>
         ) : null}
 
@@ -574,7 +586,7 @@ function AssignmentBottomSheet({
               <option value="">Sélectionner un superviseur</option>
               {availableSupervisors.map((supervisor) => (
                 <option key={supervisor.id} value={supervisor.id}>
-                  {supervisor.firstName} {supervisor.name}
+                  {supervisor.firstName} {supervisor.name} ({supervisor.availabilityLabel})
                 </option>
               ))}
             </select>
@@ -582,6 +594,17 @@ function AssignmentBottomSheet({
 
           <label className="block text-sm font-semibold text-slate-700">
             Chantier
+            {availableSites.length > 1 ? (
+              <input
+                type="search"
+                value={siteSearch}
+                onChange={(event) => {
+                  setSiteSearch(event.currentTarget.value);
+                }}
+                className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                placeholder="Rechercher un chantier..."
+              />
+            ) : null}
             <select
               value={formData.siteId}
               onChange={(event) => {
@@ -591,9 +614,14 @@ function AssignmentBottomSheet({
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
             >
               <option value="">Sélectionner un chantier</option>
-              {availableSites.map((site) => (
+              {displayedSites.length === 0 ? (
+                <option value="" disabled>
+                  Aucun chantier ne correspond à la recherche
+                </option>
+              ) : null}
+              {displayedSites.map((site) => (
                 <option key={site.id} value={site.id}>
-                  {site.name} - {site.project.name}
+                  {site.project.name} — {site.name}
                 </option>
               ))}
             </select>
@@ -790,7 +818,7 @@ function getMutationError(error: unknown) {
 
 function getSupervisorEmptyDescription(siteCount: number, assignmentCount: number) {
   if (siteCount === 0) {
-    return "Aucun chantier n'est rattaché à votre périmètre opérationnel.";
+    return "Aucun chantier actif n'est disponible pour créer une assignation.";
   }
 
   if (assignmentCount > 0) {

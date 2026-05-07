@@ -6,6 +6,7 @@ import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import type {
   CreateUserResponse,
   PaginatedUsersResponse,
+  UserAvailability,
   UserApiErrorCode,
   UserDetail,
   UserListItem,
@@ -58,6 +59,8 @@ export type UserListQuery = {
   status: 'active' | 'inactive' | 'all';
   search: string | null;
   limit: number | null;
+  withAvailability: boolean;
+  availabilityDate: string | null;
 };
 
 export type UpdateOwnProfileInput = {
@@ -109,6 +112,16 @@ export function serializeUserDetail(user: SerializableUser): UserDetail {
   return serializeUser(user);
 }
 
+export function serializeUserWithAvailability(
+  user: SerializableUser,
+  availability: UserAvailability,
+): UserListItem {
+  return {
+    ...serializeUser(user),
+    availability,
+  };
+}
+
 export function serializePaginatedUsers(payload: {
   items: SerializableUser[];
   page: number;
@@ -143,8 +156,18 @@ export function parseUserListQuery(searchParams: URLSearchParams): UserListQuery
   const status = parseUserStatus(searchParams.get('status'), searchParams.get('isActive'));
   const search = sanitizeOptionalString(searchParams.get('search'));
   const limit = parseOptionalLimit(searchParams.get('limit'));
+  const withAvailability = parseBoolean(searchParams.get('withAvailability'));
+  const availabilityDate = parseDateOnly(searchParams.get('date'));
 
-  if (!page || role === undefined || roles === null || status === null || limit === undefined) {
+  if (
+    !page ||
+    role === undefined ||
+    roles === null ||
+    status === null ||
+    limit === undefined ||
+    withAvailability === null ||
+    availabilityDate === undefined
+  ) {
     return null;
   }
 
@@ -155,6 +178,8 @@ export function parseUserListQuery(searchParams: URLSearchParams): UserListQuery
     status,
     search,
     limit,
+    withAvailability,
+    availabilityDate,
   };
 }
 
@@ -484,6 +509,31 @@ function parseOptionalLimit(value: string | null) {
   }
 
   return Math.min(parsed, 200);
+}
+
+function parseBoolean(value: string | null) {
+  if (value === null) {
+    return false;
+  }
+
+  if (value === 'true' || value === '1') {
+    return true;
+  }
+
+  if (value === 'false' || value === '0') {
+    return false;
+  }
+
+  return null;
+}
+
+function parseDateOnly(value: string | null) {
+  if (value === null || value.trim() === '') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : undefined;
 }
 
 function sanitizeOptionalString(value: unknown) {

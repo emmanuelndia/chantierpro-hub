@@ -4,8 +4,6 @@ import {
   PlanningAssignmentStatus,
   Role,
   SiteStatus,
-  TeamMemberStatus,
-  TeamStatus,
   type Prisma,
   type PrismaClient,
 } from '@prisma/client';
@@ -20,6 +18,7 @@ import type {
   SupervisorMyAssignmentsResponse,
 } from '@/types/mobile-planning';
 import { createInternalPhotoUrl } from '@/lib/photos';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 
 type AuthLikeUser = {
   id: string;
@@ -45,31 +44,13 @@ export function canAccessMobilePlanning(role: Role) {
 }
 
 export function canAccessSupervisorPlanning(role: Role) {
-  return role === Role.SUPERVISOR;
+  return FIELD_USER_ROLES.includes(role);
 }
 
-export function operationalPlanningSiteWhere(user: AuthLikeUser, date?: Date): Prisma.SiteWhereInput {
-  const where: Prisma.SiteWhereInput = {
+export function operationalPlanningSiteWhere(_user: AuthLikeUser, _date?: Date): Prisma.SiteWhereInput {
+  return {
     status: SiteStatus.ACTIVE,
-    teams: {
-      some: {
-        status: TeamStatus.ACTIVE,
-        members: {
-          some: {
-            userId: user.id,
-            status: TeamMemberStatus.ACTIVE,
-          },
-        },
-      },
-    },
   };
-
-  if (date) {
-    where.startDate = { lte: date };
-    where.OR = [{ endDate: null }, { endDate: { gte: date } }];
-  }
-
-  return where;
 }
 
 export async function getPlanningDay(
@@ -138,8 +119,10 @@ export async function getPlanningDay(
   const [supervisors, clockIns, yesterdayCount] = await Promise.all([
     prisma.user.findMany({
       where: {
-        id: { in: scopedSupervisorIds.filter((supervisorId) => !assignedSupervisorIds.has(supervisorId)) },
-        role: Role.SUPERVISOR,
+        id: { in: scopedSupervisorIds },
+        role: {
+          in: [...FIELD_USER_ROLES],
+        },
         isActive: true,
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
@@ -173,6 +156,8 @@ export async function getPlanningDay(
       email: supervisor.email,
       contact: supervisor.contact,
       isActive: supervisor.isActive,
+      availabilityLabel: getSupervisorAvailabilityLabel(supervisor.id, assignedSupervisorIds),
+      assignedSiteName: assignedSupervisorIds.get(supervisor.id) ?? null,
     })),
     availableSites: sites.map((site) => ({
       id: site.id,
@@ -201,13 +186,14 @@ export async function createPlanningAssignment(
     where: {
       date: normalized.date,
       supervisorId: normalized.supervisorId,
+      siteId: normalized.siteId,
       deletedAt: null,
     },
     select: { id: true },
   });
 
   if (existing) {
-    return planningError('ASSIGNMENT_CONFLICT', 'Ce superviseur a déjà une assignation active pour cette date.', 409);
+    return planningError('ASSIGNMENT_CONFLICT', 'Cette ressource a deja une assignation active sur ce chantier pour cette date.', 409);
   }
 
   const assignment = await prisma.planningAssignment.create({
@@ -535,7 +521,9 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
 async function getScopedSupervisorIds(prisma: PrismaClient, _user: AuthLikeUser, _date: Date) {
   const supervisors = await prisma.user.findMany({
     where: {
-      role: Role.SUPERVISOR,
+      role: {
+        in: [...FIELD_USER_ROLES],
+      },
       isActive: true,
     },
     select: { id: true },
@@ -550,7 +538,7 @@ async function getAssignedSupervisorIdsForDay(
   supervisorIds: string[],
 ) {
   if (supervisorIds.length === 0) {
-    return new Set<string>();
+    return new Map<string, string>();
   }
 
   const assignments = await prisma.planningAssignment.findMany({
@@ -563,10 +551,20 @@ async function getAssignedSupervisorIdsForDay(
     },
     select: {
       supervisorId: true,
+      site: {
+        select: {
+          name: true,
+        },
+      },
     },
   });
 
-  return new Set(assignments.map((assignment) => assignment.supervisorId));
+  return new Map(assignments.map((assignment) => [assignment.supervisorId, assignment.site.name]));
+}
+
+function getSupervisorAvailabilityLabel(supervisorId: string, assignedSupervisorIds: Map<string, string>) {
+  const siteName = assignedSupervisorIds.get(supervisorId);
+  return siteName ? `Assigne sur ${siteName}` : 'Disponible';
 }
 
 async function loadClockInsForAssignments(

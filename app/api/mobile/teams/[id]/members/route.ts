@@ -3,24 +3,24 @@ import { withAuth } from '@/lib/auth/with-auth';
 import { canMutateMobileTeams, getScopedMobileTeamById, validateMobileAssignableUserForSite } from '@/lib/mobile-teams';
 import { prisma } from '@/lib/prisma';
 import {
-  hasActiveMember,
   jsonTeamError,
   parseAddTeamMemberInput,
   parseJsonBody,
   serializeTeamMember,
   syncTeamLeadMembership,
   teamMemberPublicSelect,
+  upsertActiveTeamMember,
 } from '@/lib/teams';
 
 export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
   if (!canMutateMobileTeams(user.role)) {
-    return jsonTeamError('FORBIDDEN', 403, "Accès refusé à l'ajout de membre.");
+    return jsonTeamError('FORBIDDEN', 403, "Acces refuse a l'ajout de membre.");
   }
 
   const team = await getScopedMobileTeamById(prisma, params.id, user);
 
   if (!team) {
-    return jsonTeamError('NOT_FOUND', 404, 'Équipe introuvable.');
+    return jsonTeamError('NOT_FOUND', 404, 'Equipe introuvable.');
   }
 
   const body = await parseJsonBody<unknown>(req);
@@ -33,28 +33,27 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
   const memberIsValid = await validateMobileAssignableUserForSite(prisma, user, team.siteId, input.userId);
 
   if (!memberIsValid) {
-    return jsonTeamError('INVALID_MEMBER', 400, 'Le membre sélectionné doit être actif, disponible et dans votre périmètre.');
+    return jsonTeamError(
+      'INVALID_MEMBER',
+      400,
+      'Le membre selectionne doit etre actif, disponible et dans votre perimetre.',
+    );
   }
 
-  if (await hasActiveMember(prisma, team.id, input.userId)) {
-    return jsonTeamError('CONFLICT', 409, 'Cet utilisateur est déjà membre actif de cette équipe.');
-  }
-
-  const member = await prisma.$transaction(async (tx) => {
-    const created = await tx.teamMember.create({
-      data: {
-        teamId: team.id,
-        userId: input.userId,
-        teamRole: input.teamRole,
-        assignmentDate: new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`),
-        status: TeamMemberStatus.ACTIVE,
-        createdById: user.id,
-      },
-      select: teamMemberPublicSelect,
+  const result = await prisma.$transaction(async (tx) => {
+    const upserted = await upsertActiveTeamMember(tx, {
+      teamId: team.id,
+      userId: input.userId,
+      teamRole: input.teamRole,
+      createdById: user.id,
     });
 
+    if (upserted.status === 'active_exists') {
+      return upserted;
+    }
+
     if (input.teamRole !== TeamRole.TEAM_LEAD) {
-      return created;
+      return upserted;
     }
 
     await tx.team.update({
@@ -68,7 +67,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
       createdById: user.id,
     });
 
-    return tx.teamMember.findFirstOrThrow({
+    const member = await tx.teamMember.findFirstOrThrow({
       where: {
         teamId: team.id,
         userId: input.userId,
@@ -77,7 +76,16 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
       orderBy: [{ assignmentDate: 'desc' }, { id: 'desc' }],
       select: teamMemberPublicSelect,
     });
+
+    return { ...upserted, member };
   });
 
-  return Response.json({ member: serializeTeamMember(member) }, { status: 201 });
+  if (result.status === 'active_exists') {
+    return jsonTeamError('CONFLICT', 409, 'Cet utilisateur est deja membre actif de cette equipe.');
+  }
+
+  return Response.json(
+    { member: serializeTeamMember(result.member) },
+    { status: result.status === 'created' ? 201 : 200 },
+  );
 });

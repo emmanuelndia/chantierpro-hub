@@ -1,8 +1,8 @@
-import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import {
   canAccessMobilePlanning,
+  canAccessSupervisorPlanning,
   deletePlanningAssignment,
   updatePlanningAssignment,
   updateSupervisorAssignmentStatus,
@@ -10,7 +10,7 @@ import {
 import type { UpdateAssignmentRequest } from '@/types/mobile-planning';
 
 export const PATCH = withAuth<{ id: string }>(async ({ req, user, params }) => {
-  if (!canAccessMobilePlanning(user.role) && user.role !== Role.SUPERVISOR) {
+  if (!canAccessMobilePlanning(user.role) && !canAccessSupervisorPlanning(user.role)) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
@@ -23,7 +23,7 @@ export const PATCH = withAuth<{ id: string }>(async ({ req, user, params }) => {
 
   try {
     const result =
-      user.role === Role.SUPERVISOR
+      canAccessSupervisorPlanning(user.role) && !canAccessMobilePlanning(user.role)
         ? await updateSupervisorAssignmentStatus(prisma, user, params.id, body)
         : await updatePlanningAssignment(prisma, user, params.id, body);
     return result instanceof Response ? result : Response.json(result);

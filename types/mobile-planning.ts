@@ -31,6 +31,8 @@ export type UnassignedSupervisor = {
   email: string;
   contact: string;
   isActive: boolean;
+  availabilityLabel: string;
+  assignedSiteName: string | null;
 };
 
 export type AvailableSite = {

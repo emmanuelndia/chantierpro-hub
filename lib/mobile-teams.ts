@@ -254,7 +254,7 @@ export async function getMobileTeamDetail(
     canMutate: canMutateMobileTeams(user.role),
     team: serializeManagementTeam(team),
     members: team.members.map(serializeMember),
-    availableMembers: canMutateMobileTeams(user.role) ? await listMobileAssignableUsers(prisma, user, team.siteId) : [],
+    availableMembers: canMutateMobileTeams(user.role) ? await listMobileAssignableUsers(prisma, user, team.id) : [],
   };
 }
 
@@ -345,7 +345,7 @@ export async function getScopedMobileTeamById(
 export async function validateMobileAssignableUserForSite(
   prisma: PrismaClient,
   user: AuthLikeUser,
-  siteId: string,
+  _siteId: string,
   candidateUserId: string,
 ) {
   const candidate = await prisma.user.findFirst({
@@ -356,29 +356,13 @@ export async function validateMobileAssignableUserForSite(
     select: { id: true },
   });
 
-  if (!candidate) {
-    return false;
-  }
-
-  const activeOnSite = await prisma.teamMember.findFirst({
-    where: {
-      userId: candidateUserId,
-      status: TeamMemberStatus.ACTIVE,
-      team: {
-        siteId,
-        status: TeamStatus.ACTIVE,
-      },
-    },
-    select: { id: true },
-  });
-
-  return !activeOnSite;
+  return Boolean(candidate);
 }
 
 async function listMobileAssignableUsers(
   prisma: PrismaClient,
   user: AuthLikeUser,
-  siteId: string,
+  teamId: string,
 ): Promise<UnassignedUserItem[]> {
   const users = await prisma.user.findMany({
     where: {
@@ -386,11 +370,8 @@ async function listMobileAssignableUsers(
       NOT: {
         teamMemberships: {
           some: {
+            teamId,
             status: TeamMemberStatus.ACTIVE,
-            team: {
-              siteId,
-              status: TeamStatus.ACTIVE,
-            },
           },
         },
       },
@@ -467,6 +448,9 @@ const teamManagementSelect = {
     },
   },
   members: {
+    where: {
+      status: TeamMemberStatus.ACTIVE,
+    },
     orderBy: [{ status: 'asc' }, { assignmentDate: 'asc' }, { id: 'asc' }],
     select: {
       id: true,

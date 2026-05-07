@@ -1,5 +1,14 @@
 import type { Role } from '@prisma/client';
 
+export type UserAvailability = {
+  status: 'AVAILABLE' | 'ASSIGNED';
+  label: string;
+  date: string | null;
+  assignmentId: string | null;
+  siteId: string | null;
+  siteName: string | null;
+};
+
 export type UserListItem = {
   id: string;
   email: string;
@@ -11,6 +20,7 @@ export type UserListItem = {
   mustChangePassword: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+  availability?: UserAvailability;
 };
 
 export type UserDetail = UserListItem;

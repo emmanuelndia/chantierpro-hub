@@ -5,13 +5,13 @@ import { withAuth } from '@/lib/auth/with-auth';
 import {
   canManageTeams,
   getScopedTeamById,
-  hasActiveMember,
   jsonTeamError,
   parseAddTeamMemberInput,
   parseJsonBody,
   serializeTeamMember,
   syncTeamLeadMembership,
   teamMemberPublicSelect,
+  upsertActiveTeamMember,
   validateActiveTechnician,
 } from '@/lib/teams';
 
@@ -43,28 +43,17 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     );
   }
 
-  const alreadyActive = await hasActiveMember(prisma, team.id, input.userId);
-
-  if (alreadyActive) {
-    return jsonTeamError(
-      'CONFLICT',
-      409,
-      'Cet utilisateur est deja membre actif de cette equipe.',
-    );
-  }
-
-  const member = await prisma.$transaction(async (tx) => {
-    const created = await tx.teamMember.create({
-      data: {
-        teamId: team.id,
-        userId: input.userId,
-        teamRole: input.teamRole,
-        assignmentDate: new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`),
-        status: TeamMemberStatus.ACTIVE,
-        createdById: user.id,
-      },
-      select: teamMemberPublicSelect,
+  const result = await prisma.$transaction(async (tx) => {
+    const upserted = await upsertActiveTeamMember(tx, {
+      teamId: team.id,
+      userId: input.userId,
+      teamRole: input.teamRole,
+      createdById: user.id,
     });
+
+    if (upserted.status === 'active_exists') {
+      return upserted;
+    }
 
     if (input.teamRole === TeamRole.TEAM_LEAD) {
       await tx.team.update({
@@ -88,11 +77,22 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
         },
         orderBy: [{ assignmentDate: 'desc' }, { id: 'desc' }],
         select: teamMemberPublicSelect,
-      });
+      }).then((member) => ({ ...upserted, member }));
     }
 
-    return created;
+    return upserted;
   });
 
-  return NextResponse.json({ member: serializeTeamMember(member) }, { status: 201 });
+  if (result.status === 'active_exists') {
+    return jsonTeamError(
+      'CONFLICT',
+      409,
+      'Cet utilisateur est deja membre actif de cette equipe.',
+    );
+  }
+
+  return NextResponse.json(
+    { member: serializeTeamMember(result.member) },
+    { status: result.status === 'created' ? 201 : 200 },
+  );
 });
