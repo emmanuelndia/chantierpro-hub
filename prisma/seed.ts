@@ -134,7 +134,7 @@ async function main() {
       create: {
         email: 'superviseur@chantierpro.local',
         firstName: 'Jean',
-        lastName: 'Kouame',
+        lastName: 'Kouame', 
         role: Role.SUPERVISOR,
         contact: '0700000004',
         isActive: true,

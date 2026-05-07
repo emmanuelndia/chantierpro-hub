@@ -6,6 +6,7 @@
     "dev": "next dev",
     "dev:clean": "npm run clean && next dev",
     "clean": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path .next) { Remove-Item -LiteralPath .next -Recurse -Force }\"",
+    "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
