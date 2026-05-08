@@ -37,7 +37,7 @@ export const PUT = withAuth<{ id: string }>(
       );
     }
 
-    const input = parseUpdateUserInput(body);
+    const input = parseUpdateUserInput(body); 
 
     if (!input) {
       return jsonUserError('BAD_REQUEST', 400, 'Le payload utilisateur est invalide.');
