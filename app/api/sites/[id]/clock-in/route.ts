@@ -1,4 +1,4 @@
-import { ClockInStatus } from '@prisma/client';
+import { ClockInStatus, ClockInType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import {
@@ -115,17 +115,30 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const distanceKm = calculateDistanceToSite(site, input);
   const withinRadius = isWithinSiteRadius(site, distanceKm);
-  const status = withinRadius ? ClockInStatus.VALID : ClockInStatus.REJECTED;
+  const remoteDepartureAllowed =
+    input.type === ClockInType.DEPARTURE &&
+    !withinRadius &&
+    (await canCloseSessionRemotely(site.id, user.id, input.timestampLocal));
+  const status = withinRadius || remoteDepartureAllowed ? ClockInStatus.VALID : ClockInStatus.REJECTED;
+  const recordInput = remoteDepartureAllowed
+    ? {
+        ...input,
+        comment: appendClockInComment(
+          input.comment,
+          'Sortie distante autorisee - ressource deplacee vers un autre chantier assigne.',
+        ),
+      }
+    : input;
 
   const record = await createClockInRecord(prisma, {
     siteId: site.id,
     userId: user.id,
-    input,
+    input: recordInput,
     distanceKm,
     status,
   });
 
-  if (!withinRadius) {
+  if (!withinRadius && !remoteDepartureAllowed) {
     return jsonClockInError(
       'OUTSIDE_RADIUS',
       400,
@@ -139,3 +152,60 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   return Response.json({ record }, { status: 201 });
 });
+
+async function canCloseSessionRemotely(siteId: string, userId: string, timestampLocal: string) {
+  const clockInDate = new Date(`${new Date(timestampLocal).toISOString().slice(0, 10)}T00:00:00.000Z`);
+  const [otherAssignment, otherRecords] = await Promise.all([
+    prisma.planningAssignment.findFirst({
+      where: {
+        supervisorId: userId,
+        date: clockInDate,
+        deletedAt: null,
+        siteId: {
+          not: siteId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    }),
+    prisma.clockInRecord.findMany({
+      where: {
+        userId,
+        clockInDate,
+        status: ClockInStatus.VALID,
+        siteId: {
+          not: siteId,
+        },
+      },
+      orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        siteId: true,
+        type: true,
+      },
+    }),
+  ]);
+
+  if (otherAssignment) {
+    return true;
+  }
+
+  const openSites = new Set<string>();
+  for (const record of otherRecords) {
+    if (record.type === ClockInType.ARRIVAL) {
+      openSites.add(record.siteId);
+      continue;
+    }
+
+    if (record.type === ClockInType.DEPARTURE) {
+      openSites.delete(record.siteId);
+    }
+  }
+
+  return openSites.size > 0;
+}
+
+function appendClockInComment(existing: string | null | undefined, note: string) {
+  const trimmed = existing?.trim();
+  return trimmed ? `${note}\n${trimmed}` : note;
+}

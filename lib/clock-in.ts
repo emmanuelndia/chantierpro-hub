@@ -521,6 +521,7 @@ export async function updateClockInComment(
     select: {
       id: true,
       userId: true,
+      comment: true,
     },
   });
 
@@ -537,7 +538,7 @@ export async function updateClockInComment(
       id: payload.recordId,
     },
     data: {
-      comment: payload.comment,
+      comment: existing.comment ? `${existing.comment}\n${payload.comment}` : payload.comment,
     },
     select: clockInRecordSelect,
   });

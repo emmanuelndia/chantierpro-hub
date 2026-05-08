@@ -271,6 +271,12 @@ export function MobileClockInPage() {
   const currentType = intentToType[currentIntent];
   const selectedDistance = selectedSite?.distanceKm ?? null;
   const outsideRadius = currentType === 'ARRIVAL' && selectedDistance !== null && selectedSite ? selectedDistance > selectedSite.radiusKm : false;
+  const remoteDeparture =
+    currentType === 'DEPARTURE' &&
+    hasOpenSession &&
+    selectedDistance !== null &&
+    selectedSite !== null &&
+    selectedDistance > selectedSite.radiusKm;
 
   const clockInMutation = useMutation({
     mutationFn: submitClockIn,
@@ -569,10 +575,15 @@ export function MobileClockInPage() {
             </div>
           ) : hasOpenSession ? (
             <>
+              {remoteDeparture ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+                  Vous etes hors du chantier. La sortie sera enregistree avec votre position actuelle.
+                </div>
+              ) : null}
               <ActionButton
                 busy={clockInMutation.isPending && currentType === 'DEPARTURE'}
                 disabled={geoState.status !== 'ready' || clockInMutation.isPending}
-                label="POINTER SORTIE"
+                label={remoteDeparture ? 'FERMER SESSION A DISTANCE' : 'POINTER SORTIE'}
                 onClick={() => {
                   setSelectedIntent('departure');
                   clockInMutation.mutate('departure');
