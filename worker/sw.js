@@ -1,17 +1,40 @@
-const PRECACHE_NAME = 'chantierpro-precache-v2';
-const STATIC_CACHE_NAME = 'chantierpro-static-v2';
+const PRECACHE_NAME = 'chantierpro-precache-v3';
+const STATIC_CACHE_NAME = 'chantierpro-static-v3';
+const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v3';
+const OFFLINE_FALLBACK_URL = '/mobile/offline';
+const ESSENTIAL_MOBILE_ROUTES = [
+  '/mobile/home',
+  '/mobile/clock-in',
+  '/mobile/photo',
+  '/mobile/planning',
+  '/mobile/sync',
+  '/mobile/history',
+  OFFLINE_FALLBACK_URL,
+];
 const PRECACHE_URLS = [
   ...self.__WB_MANIFEST.map((entry) => entry.url),
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  ...ESSENTIAL_MOBILE_ROUTES,
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(PRECACHE_NAME)
-      .then((cache) => cache.addAll([...new Set(PRECACHE_URLS)]))
+      .then((cache) =>
+        Promise.allSettled(
+          [...new Set(PRECACHE_URLS)].map((url) =>
+            fetch(url, { credentials: 'include' }).then((response) => {
+              if (response.ok) {
+                return cache.put(url, response);
+              }
+              return undefined;
+            }),
+          ),
+        ),
+      )
       .then(() => self.skipWaiting()),
   );
 });
@@ -23,7 +46,7 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) =>
         Promise.all(
           cacheNames
-            .filter((cacheName) => ![PRECACHE_NAME, STATIC_CACHE_NAME].includes(cacheName))
+            .filter((cacheName) => ![PRECACHE_NAME, STATIC_CACHE_NAME, MOBILE_PAGE_CACHE_NAME].includes(cacheName))
             .map((cacheName) => caches.delete(cacheName)),
         ),
       )
@@ -46,6 +69,11 @@ self.addEventListener('fetch', (event) => {
 
   if (isStaticAsset(url.pathname)) {
     event.respondWith(cacheFirst(request));
+    return;
+  }
+
+  if (request.mode === 'navigate' && url.pathname.startsWith('/mobile/')) {
+    event.respondWith(networkFirstMobilePage(request));
   }
 });
 
@@ -72,4 +100,36 @@ async function cacheFirst(request) {
   }
 
   return response;
+}
+
+async function networkFirstMobilePage(request) {
+  const cache = await caches.open(MOBILE_PAGE_CACHE_NAME);
+
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cachedResponse = await cache.match(request, { ignoreSearch: true });
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    const precachedResponse = await caches.match(request, { ignoreSearch: true });
+    if (precachedResponse) {
+      return precachedResponse;
+    }
+
+    const fallbackResponse = await cache.match(OFFLINE_FALLBACK_URL) ?? await caches.match(OFFLINE_FALLBACK_URL);
+    if (fallbackResponse) {
+      return fallbackResponse;
+    }
+
+    return new Response('ChantierPro offline', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
 }

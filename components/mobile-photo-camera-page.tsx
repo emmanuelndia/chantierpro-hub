@@ -13,6 +13,7 @@ import {
   syncPendingMobilePhotos,
   type PendingMobilePhoto,
 } from '@/lib/mobile-photo-offline';
+import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import type { MobilePhotoSiteOption, MobilePhotoSitesResponse } from '@/types/mobile-photo';
 import type { SupervisorMyAssignment, SupervisorMyAssignmentsResponse } from '@/types/mobile-planning';
 
@@ -69,18 +70,39 @@ export function MobilePhotoCameraPage() {
   const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [completingAssignment, setCompletingAssignment] = useState(false);
+  const [usingOfflinePhotoData, setUsingOfflinePhotoData] = useState(false);
   const todayKey = formatDateKey(new Date());
 
   const sitesQuery = useQuery({
     queryKey: ['mobile-photo-sites'],
     queryFn: async () => {
-      const response = await authFetch('/api/mobile/photo/sites');
+      let response: Response;
+      try {
+        response = await authFetch('/api/mobile/photo/sites');
+      } catch {
+        const cached = await getMobileOfflineCache<MobilePhotoSitesResponse>('mobile-photo-sites');
+        if (cached) {
+          setUsingOfflinePhotoData(true);
+          return cached.payload;
+        }
 
-      if (!response.ok) {
         throw new Error('Sites photo indisponibles.');
       }
 
-      return (await response.json()) as MobilePhotoSitesResponse;
+      if (!response.ok) {
+        const cached = await getMobileOfflineCache<MobilePhotoSitesResponse>('mobile-photo-sites');
+        if (cached) {
+          setUsingOfflinePhotoData(true);
+          return cached.payload;
+        }
+
+        throw new Error('Sites photo indisponibles.');
+      }
+
+      const payload = (await response.json()) as MobilePhotoSitesResponse;
+      setUsingOfflinePhotoData(false);
+      await setMobileOfflineCache('mobile-photo-sites', payload, 24 * 60 * 60 * 1000);
+      return payload;
     },
   });
 
@@ -88,13 +110,32 @@ export function MobilePhotoCameraPage() {
   const assignmentsQuery = useQuery({
     queryKey: ['mobile-planning-my-assignments', todayKey],
     queryFn: async () => {
-      const response = await authFetch(`/api/mobile/planning/my-assignments?date=${encodeURIComponent(todayKey)}`);
+      let response: Response;
+      try {
+        response = await authFetch(`/api/mobile/planning/my-assignments?date=${encodeURIComponent(todayKey)}`);
+      } catch {
+        const cached = await getMobileOfflineCache<SupervisorMyAssignmentsResponse>(`mobile-planning-my-assignments-${todayKey}`);
+        if (cached) {
+          setUsingOfflinePhotoData(true);
+          return cached.payload;
+        }
 
-      if (!response.ok) {
-        throw new Error('Tâches assignées indisponibles.');
+        throw new Error('Taches assignees indisponibles.');
       }
 
-      return (await response.json()) as SupervisorMyAssignmentsResponse;
+      if (!response.ok) {
+        const cached = await getMobileOfflineCache<SupervisorMyAssignmentsResponse>(`mobile-planning-my-assignments-${todayKey}`);
+        if (cached) {
+          setUsingOfflinePhotoData(true);
+          return cached.payload;
+        }
+
+        throw new Error('Taches assignees indisponibles.');
+      }
+
+      const payload = (await response.json()) as SupervisorMyAssignmentsResponse;
+      await setMobileOfflineCache(`mobile-planning-my-assignments-${todayKey}`, payload, 24 * 60 * 60 * 1000);
+      return payload;
     },
     enabled: photoMode === 'task',
     staleTime: 30_000,
@@ -520,6 +561,11 @@ export function MobilePhotoCameraPage() {
           {pendingCount > 0 ? (
             <p className="mt-3 rounded-lg bg-orange-500/90 px-3 py-2 text-xs font-bold">
               Synchronisation photo en attente : {pendingCount}
+            </p>
+          ) : null}
+          {usingOfflinePhotoData ? (
+            <p className="mt-3 rounded-lg bg-amber-500/90 px-3 py-2 text-xs font-bold">
+              Donnees hors ligne. Les photos seront synchronisees au retour reseau.
             </p>
           ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-white/10 p-1">

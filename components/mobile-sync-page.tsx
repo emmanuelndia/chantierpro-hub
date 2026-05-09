@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import {
+  getMobileOfflineCache,
   getMobileOfflinePendingCounts,
   getMobileOfflineSyncLogs,
   syncMobileOfflineQueue,
   type MobileOfflinePendingCounts,
   type MobileOfflineSyncLog,
 } from '@/lib/mobile-offline-db';
+import { prepareMobileOfflineMode, type MobileOfflinePreparationResult } from '@/lib/mobile-offline-prepare';
 import { useMobileNetworkState } from '@/hooks/use-mobile-network-state';
 
 const emptyCounts: MobileOfflinePendingCounts = {
@@ -22,18 +24,22 @@ export function MobileSyncPage() {
   const [counts, setCounts] = useState<MobileOfflinePendingCounts>(emptyCounts);
   const [logs, setLogs] = useState<MobileOfflineSyncLog[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [preparation, setPreparation] = useState<MobileOfflinePreparationResult | null>(null);
 
   useEffect(() => {
     void refresh();
   }, []);
 
   async function refresh() {
-    const [nextCounts, nextLogs] = await Promise.all([
+    const [nextCounts, nextLogs, preparationMeta] = await Promise.all([
       getMobileOfflinePendingCounts(),
       getMobileOfflineSyncLogs(),
+      getMobileOfflineCache<MobileOfflinePreparationResult>('offline-preparation-meta'),
     ]);
     setCounts(nextCounts);
     setLogs(nextLogs);
+    setPreparation(preparationMeta?.payload ?? null);
   }
 
   async function syncNow() {
@@ -47,7 +53,20 @@ export function MobileSyncPage() {
     }
   }
 
+  async function prepareOffline() {
+    setPreparing(true);
+
+    try {
+      const result = await prepareMobileOfflineMode();
+      setPreparation(result);
+      await refresh();
+    } finally {
+      setPreparing(false);
+    }
+  }
+
   const canSync = networkState !== 'offline' && !syncing;
+  const canPrepare = networkState !== 'offline' && !preparing;
   const totalPending = counts.clockIns + counts.comments + counts.photos + counts.reports;
 
   return (
@@ -78,6 +97,50 @@ export function MobileSyncPage() {
       >
         {syncing ? <Spinner className="h-5 w-5" /> : 'Synchroniser maintenant'}
       </button>
+
+      <section className="rounded-lg border border-sky-200 bg-sky-50 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-black text-slate-950">Preparation hors ligne</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-600">
+              Prepare les ecrans et les donnees du jour avant une zone sans reseau.
+            </p>
+          </div>
+          {preparation ? (
+            <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700">
+              Pret
+            </span>
+          ) : null}
+        </div>
+
+        {preparation ? (
+          <p className="mt-3 text-xs font-semibold text-slate-600">
+            Derniere preparation : {formatDateTime(preparation.preparedAt)} - {preparation.routesPrepared} pages,
+            {' '}{preparation.dataPrepared.length} jeux de donnees.
+          </p>
+        ) : null}
+
+        {preparation?.errors.length ? (
+          <div className="mt-3 space-y-1">
+            {preparation.errors.slice(0, 3).map((error) => (
+              <p className="text-xs font-semibold text-orange-700" key={error}>
+                {error}
+              </p>
+            ))}
+          </div>
+        ) : null}
+
+        <button
+          className="mt-4 flex min-h-12 w-full items-center justify-center rounded-lg bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:opacity-45"
+          disabled={!canPrepare}
+          onClick={() => {
+            void prepareOffline();
+          }}
+          type="button"
+        >
+          {preparing ? <Spinner className="h-5 w-5" /> : 'Preparer le mode hors ligne'}
+        </button>
+      </section>
 
       {networkState === 'offline' ? (
         <p className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm font-bold text-orange-800">

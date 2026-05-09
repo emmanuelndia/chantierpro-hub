@@ -21,6 +21,7 @@ import type {
 } from '@/types/clock-in';
 import { getMobileOfflineCache, setMobileOfflineCache, syncMobileOfflineQueue } from '@/lib/mobile-offline-db';
 import { useGeolocation } from '@/lib/hooks/useGeolocation';
+import { useMobileNetworkState } from '@/hooks/use-mobile-network-state';
 import type { TodaySiteItem } from '@/types/projects';
 import type { NearbySiteItem } from '@/types/reports';
 
@@ -82,6 +83,7 @@ export function MobileClockInPage() {
   const queryClient = useQueryClient();
   const requestedSiteId = searchParams.get('siteId');
   const requestedIntent = parseIntent(searchParams.get('intent'));
+  const networkState = useMobileNetworkState();
   
   // Utiliser le nouveau hook de géolocalisation
   const geolocation = useGeolocation({
@@ -149,13 +151,30 @@ export function MobileClockInPage() {
   const todayQuery = useQuery({
     queryKey: ['mobile-clock-in-today'],
     queryFn: async () => {
-      const response = await authFetch('/api/users/me/clock-in');
+      let response: Response;
+      try {
+        response = await authFetch('/api/users/me/clock-in');
+      } catch {
+        const cached = await getMobileOfflineCache<TodayClockInView>('clock-in-today');
+        if (cached) {
+          return cached.payload;
+        }
 
-      if (!response.ok) {
         throw new Error('Clock-in status failed');
       }
 
-      return (await response.json()) as TodayClockInView;
+      if (!response.ok) {
+        const cached = await getMobileOfflineCache<TodayClockInView>('clock-in-today');
+        if (cached) {
+          return cached.payload;
+        }
+
+        throw new Error('Clock-in status failed');
+      }
+
+      const payload = (await response.json()) as TodayClockInView;
+      await setMobileOfflineCache('clock-in-today', payload, 30 * 60 * 1000);
+      return payload;
     },
     refetchInterval: 30_000,
     staleTime: 30_000,
@@ -164,7 +183,18 @@ export function MobileClockInPage() {
   const todaySitesQuery = useQuery({
     queryKey: ['mobile-sites-today'],
     queryFn: async () => {
-      const response = await authFetch('/api/users/me/sites/today');
+      let response: Response;
+      try {
+        response = await authFetch('/api/users/me/sites/today');
+      } catch {
+        const cached = await getMobileOfflineCache<TodaySitesResponse>('sites-today');
+
+        if (cached) {
+          return cached.payload;
+        }
+
+        throw new Error('Today sites failed');
+      }
 
       if (!response.ok) {
         const cached = await getMobileOfflineCache<TodaySitesResponse>('sites-today');
@@ -180,7 +210,7 @@ export function MobileClockInPage() {
       await setMobileOfflineCache('sites-today', payload, 24 * 60 * 60 * 1000);
       return payload;
     },
-    enabled: manualMode || Boolean(requestedSiteId) || Boolean(todayQuery.data?.activeSession),
+    enabled: manualMode || networkState === 'offline' || Boolean(requestedSiteId) || Boolean(todayQuery.data?.activeSession),
     staleTime: 300_000,
   });
 

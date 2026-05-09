@@ -19,6 +19,7 @@ export const GET = withAuth<{ id: string }>(
     if (!user) {
       return jsonUserError('NOT_FOUND', 404, 'Utilisateur introuvable.');
     }
+    
 
     return NextResponse.json({ user: serializeUserDetail(user) });
   },
