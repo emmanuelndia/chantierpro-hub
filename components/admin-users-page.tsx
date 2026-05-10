@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Role } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +12,7 @@ import { authFetch } from '@/lib/auth/client-session';
 import type { PaginatedUsersResponse, UserDetail, UserListItem } from '@/types/users';
 
 const ROLE_OPTIONS = Object.values(Role);
+const HISTORY_RESOURCE_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
 
 type UserFormValues = {
   email: string;
@@ -280,6 +282,14 @@ export function AdminUsersPage() {
                     <td className="px-5 py-4 text-slate-600">{formatDate(user.createdAt)}</td>
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-2">
+                        {HISTORY_RESOURCE_ROLES.includes(user.role) ? (
+                          <Link
+                            className="rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                            href={`/web/users/${encodeURIComponent(user.id)}/assignments-history`}
+                          >
+                            Historique
+                          </Link>
+                        ) : null}
                         <button
                           className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                           onClick={() => {

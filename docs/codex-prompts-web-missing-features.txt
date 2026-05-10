@@ -1,0 +1,304 @@
+# Prompts Codex - Fonctionnalités Web Manquantes ChantierPro
+
+Contexte commun :
+- Application : ChantierPro, gestion BTP.
+- Surface cible : version web desktop/tablette.
+- La version web doit reprendre les fonctionnalités de gestion, consultation et pilotage de la version mobile.
+- Exclure les fonctionnalités terrain propres au mobile :
+  - pointage GPS;
+  - prise de photo caméra;
+  - mode offline PWA;
+  - synchronisation offline.
+- Garder les règles métier actuelles :
+  - ressources terrain globales et tournantes;
+  - un utilisateur terrain peut être assigné sur plusieurs chantiers le même jour;
+  - `PROJECT_MANAGER` gère ses projets/chantiers;
+  - `GENERAL_SUPERVISOR` planifie uniquement les sites qui lui sont confiés;
+  - `DIRECTION`/`ADMIN` ont une vue globale selon les règles existantes.
+- Vérification attendue pour chaque ticket :
+  - `npm run lint`
+  - `npm run build`
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# WEB-1 Rapports Terrain Web Réels
+
+## Summary
+- Remplacer le placeholder `/web/reports` par un vrai écran de rapports web.
+- Le web doit permettre aux rôles autorisés de consulter, filtrer, ouvrir, valider/télécharger et exporter les rapports, sans logique terrain mobile.
+
+## Key Changes
+- Inspecter les routes et helpers existants :
+  - `app/(web)/web/(dashboard)/reports/page.tsx`
+  - `components/web-stub-page.tsx`
+  - `lib/reports.ts`
+  - `components/report-detail-page.tsx`
+  - `app/api/reports/*`
+  - `components/mobile-*-reports-page.tsx`
+- Créer un composant web `ReportsWebPage`.
+- Charger les rapports via les endpoints existants ou créer un endpoint web dédié si nécessaire.
+- Rôles :
+  - `SUPERVISOR` non ciblé web desktop;
+  - `COORDINATOR` : rapports de son périmètre;
+  - `GENERAL_SUPERVISOR` : rapports des sites confiés ou des sites dans son périmètre opérationnel;
+  - `PROJECT_MANAGER` : rapports des projets dont il est chef;
+  - `DIRECTION`/`ADMIN` : global.
+- Ajouter filtres :
+  - période;
+  - projet;
+  - chantier;
+  - ressource;
+  - statut rapport;
+  - validation client.
+- Ajouter actions :
+  - ouvrir détail;
+  - télécharger PDF/TXT selon l’existant;
+  - exporter CSV/XLSX si disponible;
+  - valider pour client pour les rôles autorisés.
+- Ne pas exposer `storageKey` ni URL signée Supabase; les photos de rapport doivent passer par `/api/photos/[id]/content`.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester `/web/reports` pour `COORDINATOR`, `GENERAL_SUPERVISOR`, `PROJECT_MANAGER`, `DIRECTION`, `ADMIN`.
+- Vérifier qu’un rapport hors périmètre retourne `404` ou n’apparaît pas.
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# WEB-2 Planning Web Pour Chefs De Projet Et Superviseurs Généraux
+
+## Summary
+- Ajouter une vraie page web de planning.
+- Le web doit permettre de créer, modifier, supprimer, dupliquer et consulter les assignations, comme `/mobile/planning`, mais avec une interface desktop.
+
+## Key Changes
+- Ajouter `/web/planning`.
+- Réutiliser la logique de `lib/mobile-planning.ts` ou extraire un helper commun `lib/planning.ts`.
+- Rôles :
+  - `PROJECT_MANAGER` : sites actifs de ses projets;
+  - `GENERAL_SUPERVISOR` : sites explicitement confiés via `GeneralSupervisorSiteScope`;
+  - `DIRECTION`/`ADMIN` : lecture globale optionnelle, pas mutation si non voulu.
+- Garder les ressources assignables globales :
+  - `SUPERVISOR`, `COORDINATOR`, `GENERAL_SUPERVISOR` actifs.
+- Ne jamais bloquer une ressource parce qu’elle est déjà assignée ailleurs le même jour.
+- Bloquer uniquement :
+  - même ressource + même date + même site actif.
+- UI desktop attendue :
+  - vue journée/semaine;
+  - filtres projet/chantier/ressource;
+  - tableau ou grille par chantier;
+  - drawer/modal de création/édition;
+  - indication de disponibilité : “Disponible” ou “Assigné sur <chantier>”.
+- Ajouter l’entrée navigation web “Planning” pour `PROJECT_MANAGER` et `GENERAL_SUPERVISOR`.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester création d’assignation sur deux chantiers différents le même jour pour la même ressource.
+- Tester qu’un GS ne voit que les sites confiés.
+- Tester qu’un chef de projet ne peut pas assigner sur un chantier hors de ses projets.
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# WEB-3 Gestion Web Des Périmètres Des Superviseurs Généraux
+
+## Summary
+- Porter sur web la gestion actuellement mobile `/mobile/supervisor-scopes`.
+- Les chefs de projet doivent pouvoir confier des sites à des superviseurs généraux depuis un écran desktop.
+
+## Key Changes
+- Ajouter `/web/supervisor-scopes`.
+- Réutiliser :
+  - `lib/general-supervisor-scopes.ts`;
+  - `/api/mobile/general-supervisor-scopes` ou créer `/api/general-supervisor-scopes` si séparation web/mobile souhaitée.
+- UI desktop :
+  - tableau des périmètres actifs/inactifs;
+  - filtres projet, chantier, superviseur général, statut;
+  - formulaire de création;
+  - modification dates début/fin;
+  - désactivation d’un périmètre.
+- Rôles :
+  - `PROJECT_MANAGER` : seulement les sites de ses projets;
+  - `DIRECTION`/`ADMIN` : global;
+  - `GENERAL_SUPERVISOR` : lecture seule optionnelle de ses propres périmètres.
+- Ajouter une entrée navigation web “Périmètres GS”.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester qu’un chef de projet ne peut pas confier un site d’un autre chef de projet.
+- Tester que plusieurs GS peuvent être actifs sur le même site.
+- Tester qu’un GS peut avoir plusieurs sites venant de plusieurs chefs de projets.
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# WEB-4 Gestion Web Des Équipes
+
+## Summary
+- Ajouter une interface web complète pour les équipes.
+- La version mobile a déjà la gestion équipes; la version web doit permettre la même administration sans actions terrain.
+
+## Key Changes
+- Ajouter routes web :
+  - `/web/teams`
+  - `/web/teams/new`
+  - `/web/teams/[id]`
+  - `/web/teams/[id]/edit`
+- Réutiliser ou extraire la logique existante :
+  - `lib/teams.ts`
+  - `lib/mobile-teams.ts`
+  - `app/api/teams/*`
+  - `app/api/mobile/teams/*`
+- Règles métier :
+  - ressources terrain globales;
+  - une ressource peut être membre active de plusieurs équipes;
+  - bloquer uniquement le doublon actif dans la même équipe;
+  - réactiver une ancienne ligne `INACTIVE` au lieu de créer un doublon;
+  - `GENERAL_SUPERVISOR` peut être chef ou membre d’équipe.
+- UI desktop :
+  - liste avec filtres projet/chantier/statut;
+  - création équipe;
+  - détail équipe;
+  - ajout/retrait membre;
+  - changement chef d’équipe;
+  - historique des membres inactifs dans une section séparée, non mélangée aux membres courants.
+- Navigation web :
+  - `PROJECT_MANAGER`, `GENERAL_SUPERVISOR`, `DIRECTION`, `ADMIN`.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester ajout, retrait, réactivation membre.
+- Tester `GENERAL_SUPERVISOR` comme chef d’équipe.
+- Tester qu’un membre inactif ne s’affiche pas comme membre courant.
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# WEB-5 Gestion Web Des Chantiers
+
+## Summary
+- La version mobile a une gestion dédiée des chantiers (`/mobile/sites`), mais le web semble surtout gérer les chantiers depuis le détail projet.
+- Ajouter une page web dédiée pour rechercher, filtrer, créer et modifier les chantiers plus efficacement.
+
+## Key Changes
+- Ajouter `/web/sites`.
+- Réutiliser :
+  - `lib/mobile-sites.ts`
+  - `lib/projects.ts`
+  - `app/api/mobile/sites/*`
+  - `app/api/sites/[id]`
+- Rôles :
+  - `PROJECT_MANAGER` : ses projets/chantiers;
+  - `DIRECTION`/`ADMIN` : global;
+  - `GENERAL_SUPERVISOR` : lecture des sites confiés optionnelle.
+- UI desktop :
+  - tableau des sites;
+  - filtres projet/statut/recherche;
+  - création chantier;
+  - édition partielle d’un chantier;
+  - accès détail projet, présences chantier, photos chantier, équipes.
+- Corriger/garantir l’édition partielle :
+  - modifier seulement les coordonnées GPS doit fonctionner;
+  - ne pas exiger tout le payload si un seul champ change.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester modification uniquement latitude/longitude/rayon.
+- Tester que le chef de projet ne voit que ses chantiers.
+- Tester que la direction/admin voit tout.
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# WEB-6 Vue Ressource Et Historique Des Affectations
+
+## Summary
+- Ajouter une vue web pour comprendre où une ressource terrain a été affectée.
+- Cette vue doit exploiter l’historique équipes + planning déjà prévu pour les ressources tournantes.
+
+## Key Changes
+- Ajouter `/web/users/[id]/assignments-history` ou intégrer l’historique dans `/admin/users` / `/web/users`.
+- Réutiliser :
+  - `GET /api/users/[id]/assignments-history`
+  - `FIELD_USER_ROLES`
+- UI desktop :
+  - profil ressource;
+  - historique équipes actives/inactives;
+  - historique planning;
+  - affectations du jour;
+  - filtres période/projet/chantier.
+- Rôles :
+  - `ADMIN`, `DIRECTION`, `GENERAL_SUPERVISOR`, `PROJECT_MANAGER`;
+  - `PROJECT_MANAGER` voit seulement l’historique lié à ses chantiers.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester une ressource affectée à plusieurs chantiers le même jour.
+- Tester un ancien membre équipe `INACTIVE`.
+- Tester le filtrage de visibilité chef de projet.
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# WEB-7 Tableau De Bord Web Aligné Avec Les Nouveaux Scopes
+
+## Summary
+- Mettre à jour les dashboards web pour respecter la nouvelle logique :
+  - `GENERAL_SUPERVISOR` voit les sites confiés;
+  - `PROJECT_MANAGER` voit ses projets;
+  - les ressources restent globales.
+
+## Key Changes
+- Inspecter :
+  - `lib/dashboard.ts`
+  - `components/dashboard-page.tsx`
+  - `app/api/dashboard/route.ts`
+  - `lib/general-supervisor-scopes.ts`
+- Remplacer les anciens scopes basés sur équipe quand il s’agit de pilotage planning/rapports par le scope site confié.
+- Garder les équipes comme information organisationnelle, pas comme source du travail du jour.
+- Ajouter widgets utiles :
+  - sites confiés;
+  - assignations du jour;
+  - ressources déjà assignées ailleurs;
+  - rapports reçus par site confié;
+  - alertes sites confiés sans rapport/présence.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester dashboard `GENERAL_SUPERVISOR` avec 0, 1 et plusieurs sites confiés.
+- Vérifier qu’un site seulement membre équipe mais non confié ne pollue pas le dashboard planning.
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# WEB-8 Navigation Et Cohérence Des Accès Web
+
+## Summary
+- Ajouter les nouvelles pages web dans la navigation et vérifier les permissions.
+- Retirer les placeholders quand les écrans réels sont branchés.
+
+## Key Changes
+- Mettre à jour `lib/navigation.ts`.
+- Ajouter entrées web :
+  - Planning;
+  - Périmètres GS;
+  - Équipes;
+  - Chantiers;
+  - Historique ressources si implémenté.
+- Vérifier `lib/auth/constants.ts` pour les routes protégées.
+- Garantir que les rôles non autorisés reçoivent `403` ou redirection profil.
+- Remplacer `WebStubPage` pour les routes devenues réelles.
+
+## Test Plan
+- `npm run lint`
+- `npm run build`
+- Tester les menus pour `PROJECT_MANAGER`, `GENERAL_SUPERVISOR`, `DIRECTION`, `ADMIN`, `HR`, `COORDINATOR`.
+- Vérifier qu’aucune action terrain mobile n’apparaît sur le web.

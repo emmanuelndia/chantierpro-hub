@@ -15,6 +15,7 @@ export type WebNavIcon =
   | 'consolidated'
   | 'photos'
   | 'reports'
+  | 'planning'
   | 'logs'
   | 'users'
   | 'profile'

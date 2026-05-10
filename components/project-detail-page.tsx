@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ProjectStatus, Role, SiteStatus } from '@prisma/client';
@@ -41,9 +42,24 @@ type SiteFormValues = {
   siteManagerId: string;
 };
 
+type SiteMutationBody = Partial<{
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  description: string;
+  status: SiteStatus;
+  area: number;
+  startDate: string;
+  endDate: string | null;
+  siteManagerId: string;
+}>;
+
 export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps) {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'sites' | 'team' | 'presences' | 'photos'>('sites');
   const [siteDrawerOpen, setSiteDrawerOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<ProjectSiteItem | null>(null);
@@ -95,18 +111,9 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
 
   const saveSiteMutation = useMutation({
     mutationFn: async (values: SiteFormValues) => {
-      const body = {
-        ...values,
-        latitude: Number(values.latitude),
-        longitude: Number(values.longitude),
-        area: Number(values.area),
-        endDate: values.endDate || null,
-        ...(canManageRadius || editingSite
-          ? {
-              radiusKm: values.radiusKm,
-            }
-          : {}),
-      };
+      const body = editingSite
+        ? buildPartialSiteMutationBody(values, editingSite, canManageRadius)
+        : buildCreateSiteMutationBody(values, canManageRadius);
 
       const response = await authFetch(editingSite ? `/api/sites/${editingSite.id}` : `/api/projects/${projectId}/sites`, {
         method: editingSite ? 'PUT' : 'POST',
@@ -171,6 +178,13 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
   const project = projectQuery.data;
   const canManageRadius = viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
 
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab === 'sites' || requestedTab === 'team' || requestedTab === 'presences' || requestedTab === 'photos') {
+      setActiveTab(requestedTab);
+    }
+  }, [searchParams]);
+
   const tabs = useMemo(
     () => [
       { id: 'sites', label: 'Sites' },
@@ -222,8 +236,14 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
               }}
               type="button"
             >
-              Nouveau chantier
+              Créer chantier
             </button>
+            <Link
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              href={`/web/teams/new?projectId=${encodeURIComponent(projectId)}`}
+            >
+              Créer équipe
+            </Link>
             <button
               className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
               onClick={() => setArchiveOpen(true)}
@@ -278,9 +298,27 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                   <div className="flex flex-wrap gap-2">
                     <Link
                       className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      href={`/web/projects/${projectId}?tab=photos&siteId=${encodeURIComponent(site.id)}`}
+                    >
+                      Photos
+                    </Link>
+                    <Link
+                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       href={`/web/sites/${site.id}/presences`}
                     >
-                      Voir presences
+                      Présences
+                    </Link>
+                    <Link
+                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      href={`/web/teams?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`}
+                    >
+                      Équipes
+                    </Link>
+                    <Link
+                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      href={`/web/teams/new?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`}
+                    >
+                      Créer équipe
                     </Link>
                     <button
                       className="rounded-full border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100"
@@ -315,9 +353,12 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                   <article key={item.userId} className="rounded-3xl border border-slate-200 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-slate-950">
+                        <Link
+                          className="font-semibold text-slate-950 underline-offset-4 hover:text-orange-700 hover:underline"
+                          href={`/web/users/${encodeURIComponent(item.userId)}/assignments-history`}
+                        >
                           {item.firstName} {item.lastName}
-                        </p>
+                        </Link>
                         <p className="text-sm text-slate-500">
                           {item.role} • {item.email}
                         </p>
@@ -711,6 +752,70 @@ function buildInitialSiteFormValues(site: ProjectSiteItem | null): SiteFormValue
     endDate: '',
     siteManagerId: '',
   };
+}
+
+function buildCreateSiteMutationBody(values: SiteFormValues, canManageRadius: boolean): SiteMutationBody {
+  return {
+    name: values.name,
+    address: values.address,
+    latitude: Number(values.latitude),
+    longitude: Number(values.longitude),
+    description: values.description,
+    status: values.status,
+    area: Number(values.area),
+    startDate: values.startDate,
+    endDate: values.endDate || null,
+    siteManagerId: values.siteManagerId,
+    ...(canManageRadius ? { radiusKm: values.radiusKm } : {}),
+  };
+}
+
+function buildPartialSiteMutationBody(values: SiteFormValues, initialSite: ProjectSiteItem, canManageRadius: boolean): SiteMutationBody {
+  const body: SiteMutationBody = {};
+  setStringChange(body, 'name', values.name, initialSite.name);
+  setStringChange(body, 'address', values.address, initialSite.address);
+  setNumberChange(body, 'latitude', Number(values.latitude), initialSite.latitude);
+  setNumberChange(body, 'longitude', Number(values.longitude), initialSite.longitude);
+  setStringChange(body, 'description', values.description, initialSite.description);
+  setStringChange(body, 'status', values.status, initialSite.status);
+  setNumberChange(body, 'area', Number(values.area), initialSite.area);
+  setStringChange(body, 'startDate', values.startDate, initialSite.startDate.slice(0, 10));
+
+  const nextEndDate = values.endDate || null;
+  const previousEndDate = initialSite.endDate?.slice(0, 10) ?? null;
+  if (nextEndDate !== previousEndDate) {
+    body.endDate = nextEndDate;
+  }
+
+  setStringChange(body, 'siteManagerId', values.siteManagerId, initialSite.siteManagerId);
+
+  if (canManageRadius) {
+    setNumberChange(body, 'radiusKm', values.radiusKm, initialSite.radiusKm);
+  }
+
+  return Object.keys(body).length ? body : { name: values.name };
+}
+
+function setStringChange<T extends keyof SiteMutationBody>(
+  body: SiteMutationBody,
+  key: T,
+  nextValue: string,
+  previousValue: string,
+) {
+  if (nextValue !== previousValue) {
+    body[key] = nextValue as SiteMutationBody[T];
+  }
+}
+
+function setNumberChange<T extends keyof SiteMutationBody>(
+  body: SiteMutationBody,
+  key: T,
+  nextValue: number,
+  previousValue: number,
+) {
+  if (Number.isFinite(nextValue) && Math.abs(nextValue - previousValue) > Number.EPSILON) {
+    body[key] = nextValue as SiteMutationBody[T];
+  }
 }
 
 function canSubmitSiteForm(values: SiteFormValues) {

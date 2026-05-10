@@ -12,6 +12,12 @@ type AuthLikeUser = {
 };
 
 const SCOPE_MANAGEMENT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
+const SCOPE_WEB_READ_ROLES: readonly Role[] = [
+  Role.PROJECT_MANAGER,
+  Role.DIRECTION,
+  Role.ADMIN,
+  Role.GENERAL_SUPERVISOR,
+];
 
 const scopeSelect = {
   id: true,
@@ -59,6 +65,10 @@ export function canManageGeneralSupervisorScopes(role: Role) {
   return SCOPE_MANAGEMENT_ROLES.includes(role);
 }
 
+export function canReadGeneralSupervisorScopes(role: Role) {
+  return SCOPE_WEB_READ_ROLES.includes(role);
+}
+
 export function generalSupervisorPlanningSiteWhere(user: AuthLikeUser, date: Date): Prisma.SiteWhereInput {
   return {
     status: SiteStatus.ACTIVE,
@@ -79,16 +89,17 @@ export async function getGeneralSupervisorScopes(
   prisma: PrismaClient,
   user: AuthLikeUser,
 ): Promise<GeneralSupervisorScopesResponse | Response> {
-  if (!canManageGeneralSupervisorScopes(user.role)) {
+  if (!canReadGeneralSupervisorScopes(user.role)) {
     return jsonScopeError('FORBIDDEN', 'Acces refuse a la gestion des perimetres.', 403);
   }
 
-  const siteWhere = buildManageableSiteWhere(user);
+  const siteWhere = buildReadableSiteWhere(user);
 
   const [scopes, generalSupervisors, sites] = await Promise.all([
     prisma.generalSupervisorSiteScope.findMany({
       where: {
         site: siteWhere,
+        ...(user.role === Role.GENERAL_SUPERVISOR ? { generalSupervisorId: user.id } : {}),
       },
       orderBy: [{ status: 'asc' }, { site: { project: { name: 'asc' } } }, { site: { name: 'asc' } }, { startDate: 'desc' }],
       select: scopeSelect,
@@ -97,6 +108,7 @@ export async function getGeneralSupervisorScopes(
       where: {
         role: Role.GENERAL_SUPERVISOR,
         isActive: true,
+        ...(user.role === Role.GENERAL_SUPERVISOR ? { id: user.id } : {}),
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
       select: {
@@ -319,6 +331,21 @@ function buildManageableSiteWhere(user: AuthLikeUser): Prisma.SiteWhereInput {
         }
       : {}),
   };
+}
+
+function buildReadableSiteWhere(user: AuthLikeUser): Prisma.SiteWhereInput {
+  if (user.role === Role.GENERAL_SUPERVISOR) {
+    return {
+      status: SiteStatus.ACTIVE,
+      generalSupervisorScopes: {
+        some: {
+          generalSupervisorId: user.id,
+        },
+      },
+    };
+  }
+
+  return buildManageableSiteWhere(user);
 }
 
 function parseCreateScopeInput(body: unknown): CreateGeneralSupervisorScopeRequest | null {

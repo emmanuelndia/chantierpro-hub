@@ -37,8 +37,8 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
   return (
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-        <Link className="text-sm font-semibold text-orange-600 transition hover:text-orange-700" href="/dashboard">
-          Retour au dashboard
+        <Link className="text-sm font-semibold text-orange-600 transition hover:text-orange-700" href="/web/reports">
+          Retour aux rapports
         </Link>
         <div className="mt-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
@@ -46,7 +46,9 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
               {report.author.firstName} {report.author.lastName}
             </h1>
-            <p className="mt-3 text-sm text-slate-500">Soumis le {formatDateTime(report.submittedAt)}</p>
+            <p className="mt-3 text-sm text-slate-500">
+              {report.projectName} - {report.siteName} - soumis le {formatDateTime(report.submittedAt)}
+            </p>
           </div>
           <Badge tone={report.validationStatus === 'VALIDATED_FOR_CLIENT' ? 'success' : 'warning'}>
             {report.validationStatus === 'VALIDATED_FOR_CLIENT' ? 'Valide client' : 'En attente validation'}
@@ -59,8 +61,13 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
           <h2 className="text-xl font-semibold text-slate-950">Informations</h2>
           <dl className="mt-5 space-y-4 text-sm">
             <InfoRow label="Rapport ID" value={report.id} />
-            <InfoRow label="Chantier" value={report.siteId} />
+            <InfoRow label="Projet" value={report.projectName} />
+            <InfoRow label="Chantier" value={report.siteName} />
             <InfoRow label="Session" value={`${report.session.type} - ${report.session.date} ${report.session.time}`} />
+            <InfoRow label="Distance site" value={`${report.session.distanceToSite.toFixed(2)} km`} />
+            <InfoRow label="Progression" value={report.progression === null ? 'n/a' : `${report.progression}%`} />
+            <InfoRow label="Statut" value={report.status} />
+            <InfoRow label="Blocage" value={report.blocage ?? 'Aucun'} />
             <InfoRow label="Auteur" value={`${report.author.firstName} ${report.author.lastName} (${report.author.role})`} />
             <InfoRow
               label="Validation"
@@ -76,7 +83,35 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
         <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
           <h2 className="text-xl font-semibold text-slate-950">Contenu du rapport</h2>
           <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-700">{report.content}</p>
+          {report.session.comment ? (
+            <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Commentaire session</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{report.session.comment}</p>
+            </div>
+          ) : null}
         </article>
+      </section>
+
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+        <h2 className="text-xl font-semibold text-slate-950">Photos liees</h2>
+        {report.photos.length === 0 ? (
+          <p className="mt-5 rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+            Aucune photo rattachee a ce rapport.
+          </p>
+        ) : (
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {report.photos.map((photo) => (
+              <article key={photo.id} className="overflow-hidden rounded-3xl border border-slate-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img alt={photo.filename} className="h-40 w-full object-cover" src={photo.url} />
+                <div className="p-4">
+                  <p className="truncate text-sm font-semibold text-slate-900">{photo.filename}</p>
+                  <p className="mt-1 text-xs text-slate-500">{formatDateTime(photo.takenAt)}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

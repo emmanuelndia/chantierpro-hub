@@ -59,6 +59,20 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Rapports terrain'],
   },
   {
+    href: '/web/planning',
+    label: 'Planning',
+    icon: 'planning',
+    roles: ['GENERAL_SUPERVISOR', 'PROJECT_MANAGER'],
+    breadcrumb: ['Planning'],
+  },
+  {
+    href: '/web/supervisor-scopes',
+    label: 'Perimetres GS',
+    icon: 'users',
+    roles: ['GENERAL_SUPERVISOR', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    breadcrumb: ['Perimetres GS'],
+  },
+  {
     href: '/presences/equipe',
     label: 'Presences equipe',
     icon: 'rh',
@@ -270,6 +284,34 @@ export function getWebBreadcrumbs(pathname: string) {
 
   if (pathname === '/presences/equipe') {
     return ['Presences', 'Equipe'];
+  }
+
+  if (pathname === '/web/planning') {
+    return ['Planning'];
+  }
+
+  if (pathname === '/web/supervisor-scopes') {
+    return ['Perimetres GS'];
+  }
+
+  if (pathname === '/web/teams') {
+    return ['Equipes'];
+  }
+
+  if (pathname === '/web/teams/new') {
+    return ['Equipes', 'Nouvelle equipe'];
+  }
+
+  if (/^\/web\/teams\/[^/]+\/edit$/.test(pathname)) {
+    return ['Equipes', 'Modifier'];
+  }
+
+  if (/^\/web\/teams\/[^/]+$/.test(pathname)) {
+    return ['Equipes', 'Detail equipe'];
+  }
+
+  if (/^\/web\/users\/[^/]+\/assignments-history$/.test(pathname)) {
+    return ['Ressources', 'Historique affectations'];
   }
 
   return pathname

@@ -224,6 +224,8 @@ function NavigationIcon({
       return <CameraIcon className={className} />;
     case 'reports':
       return <ReportIcon className={className} />;
+    case 'planning':
+      return <CalendarIcon className={className} />;
     case 'logs':
       return <HistoryIcon className={className} />;
     case 'users':
@@ -318,6 +320,17 @@ function ReportIcon({ className }: Readonly<{ className: string }>) {
       <path d="M7 4h7l4 4v12H7V4Z" stroke="currentColor" strokeWidth="1.8" />
       <path d="M14 4v4h4" stroke="currentColor" strokeWidth="1.8" />
       <path d="M10 12h5M10 16h5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function CalendarIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path d="M8 14h3M13 14h3M8 17h3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
     </>,
   );
 }

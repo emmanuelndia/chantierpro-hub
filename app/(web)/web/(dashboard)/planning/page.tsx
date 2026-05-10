@@ -1,11 +1,11 @@
-import { ReportsWebPage } from '@/components/reports-web-page';
+import { PlanningWebPage } from '@/components/planning-web-page';
 import { getRequiredWebSession } from '@/lib/auth/web-session';
 
-export default async function WebReportsPage() {
+export default async function WebPlanningPage() {
   const session = await getRequiredWebSession();
 
   return (
-    <ReportsWebPage
+    <PlanningWebPage
       viewer={{
         role: session.role,
       }}

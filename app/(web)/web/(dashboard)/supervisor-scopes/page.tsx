@@ -1,11 +1,11 @@
-import { ReportsWebPage } from '@/components/reports-web-page';
+import { GeneralSupervisorScopesWebPage } from '@/components/general-supervisor-scopes-web-page';
 import { getRequiredWebSession } from '@/lib/auth/web-session';
 
-export default async function WebReportsPage() {
+export default async function WebSupervisorScopesPage() {
   const session = await getRequiredWebSession();
 
   return (
-    <ReportsWebPage
+    <GeneralSupervisorScopesWebPage
       viewer={{
         role: session.role,
       }}

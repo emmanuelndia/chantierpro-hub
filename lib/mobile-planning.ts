@@ -45,6 +45,23 @@ export function canAccessMobilePlanning(role: Role) {
   return allowedRoles.includes(role);
 }
 
+export function canAccessWebPlanning(role: Role) {
+  const allowedRoles: readonly Role[] = [
+    Role.GENERAL_SUPERVISOR,
+    Role.PROJECT_MANAGER,
+    Role.DIRECTION,
+    Role.ADMIN,
+  ];
+
+  return allowedRoles.includes(role);
+}
+
+export function canMutateWebPlanning(role: Role) {
+  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, Role.PROJECT_MANAGER];
+
+  return allowedRoles.includes(role);
+}
+
 export function canAccessSupervisorPlanning(role: Role) {
   return FIELD_USER_ROLES.includes(role);
 }
