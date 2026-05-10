@@ -10,6 +10,9 @@ export type AdminLogActor = {
 export type AdminDeletionLogItem = {
   id: string;
   photoId: string;
+  photoLabel: string;
+  photoFilename: string;
+  photoTakenAt: string;
   site: {
     id: string;
     name: string;

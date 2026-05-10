@@ -37,7 +37,8 @@ function generateTextReport(report: ReportDetail) {
 RAPPORT DE CHANTIER - ChantierPro
 ===================================
 Superviseur : ${report.author.firstName} ${report.author.lastName}
-Chantier : ${report.siteId}
+Projet : ${report.projectName}
+Chantier : ${report.siteName}
 Date : ${submittedAt.toLocaleDateString('fr-FR')}
 Session : ${report.session.date} ${report.session.time}
 ---
@@ -50,7 +51,7 @@ Statut : ${getStatusLabel(report.validationStatus)}
   return new Response(content, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Content-Disposition': `attachment; filename="rapport_${report.id}.txt"`,
+      'Content-Disposition': `attachment; filename="${buildReportFileName(report, 'txt')}"`,
     },
   });
 }
@@ -70,7 +71,9 @@ function generatePDFReport(report: ReportDetail) {
   pdf.setFontSize(12);
   pdf.text(`Superviseur : ${report.author.firstName} ${report.author.lastName}`, margin, y);
   y += 8;
-  pdf.text(`Chantier : ${report.siteId}`, margin, y);
+  pdf.text(`Projet : ${report.projectName}`, margin, y);
+  y += 8;
+  pdf.text(`Chantier : ${report.siteName}`, margin, y);
   y += 8;
   pdf.text(`Date : ${submittedAt.toLocaleDateString('fr-FR')}`, margin, y);
   y += 8;
@@ -99,10 +102,27 @@ function generatePDFReport(report: ReportDetail) {
   return new Response(pdfBytes, {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="rapport_${report.id}.pdf"`,
+      'Content-Disposition': `attachment; filename="${buildReportFileName(report, 'pdf')}"`,
       'Content-Length': pdfBytes.byteLength.toString(),
     },
   });
+}
+
+function buildReportFileName(report: ReportDetail, extension: 'pdf' | 'txt') {
+  const date = report.submittedAt.slice(0, 10);
+  const site = slugify(report.siteName) || 'chantier';
+  const author = slugify(`${report.author.firstName}-${report.author.lastName}`) || 'ressource';
+  return `rapport_${date}_${site}_${author}.${extension}`;
+}
+
+function slugify(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
 }
 
 function getStatusLabel(status: ReportDetail['validationStatus']): string {

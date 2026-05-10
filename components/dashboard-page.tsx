@@ -14,6 +14,10 @@ import type {
   DashboardPhotoItem,
   DashboardReportItem,
   DashboardResponse,
+  GeneralSupervisorAssignmentDashboardItem,
+  GeneralSupervisorReportBySiteItem,
+  GeneralSupervisorResourceElsewhereItem,
+  GeneralSupervisorSiteDashboardItem,
 } from '@/types/dashboard';
 import type { AdminDeletionLogItem } from '@/types/admin-logs';
 import type { DirectionConsolidatedProjectItem } from '@/types/direction';
@@ -128,13 +132,19 @@ function DashboardContent({ data }: Readonly<{ data: DashboardResponse }>) {
     case 'GENERAL_SUPERVISOR':
       return (
         <DashboardFrame
-          title="Coordination terrain"
-          description="Lecture rapide des affectations, equipes actives et alertes de coordination."
+          title="Coordination sites confies"
+          description="Pilotage des chantiers confies, des assignations du jour et des remontees attendues."
         >
           <StatsGrid stats={data.stats} />
+          <GeneralSupervisorSitesPanel items={data.entrustedSites} />
+          <TwoColumnLayout
+            left={<GeneralSupervisorAssignmentsPanel items={data.assignmentsToday} />}
+            right={<GeneralSupervisorResourcesElsewherePanel items={data.resourcesAssignedElsewhere} />}
+          />
+          <GeneralSupervisorReportsBySitePanel items={data.reportsBySite} />
           <TwoColumnLayout
             left={<ReportsPanel reports={data.recentReports} title="Rapports recents" />}
-            right={<AlertsPanel alerts={data.alerts} title="Alertes coordination terrain" />}
+            right={<AlertsPanel alerts={data.alerts} title="Alertes sites confies" />}
           />
         </DashboardFrame>
       );
@@ -284,6 +294,123 @@ function AlertsPanel({ alerts, title }: Readonly<{ alerts: DashboardAlertItem[];
                 <h3 className="font-semibold text-slate-900">{alert.title}</h3>
               </div>
               <p className="mt-3 text-sm leading-6 text-slate-600">{alert.description}</p>
+            </article>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function GeneralSupervisorSitesPanel({ items }: Readonly<{ items: GeneralSupervisorSiteDashboardItem[] }>) {
+  return (
+    <SectionCard title="Sites confies" subtitle="Perimetre actif aujourd'hui pour le pilotage planning et rapports.">
+      {items.length === 0 ? (
+        <CompactEmptyState message="Aucun chantier confie actif aujourd'hui." />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {items.map((site) => (
+            <article key={site.id} className="rounded-3xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">{site.name}</p>
+                  <p className="mt-1 text-sm text-slate-500">{site.projectName}</p>
+                </div>
+                <Badge tone={site.presentToday ? 'success' : 'warning'}>
+                  {site.presentToday ? 'Presence' : 'Sans presence'}
+                </Badge>
+              </div>
+              <p className="mt-3 line-clamp-2 text-sm text-slate-500">{site.address}</p>
+              <div className="mt-4 flex flex-wrap gap-2 text-sm">
+                <Badge tone="info">{site.assignmentsToday} assignation(s)</Badge>
+                <Badge tone={site.reportsToday > 0 ? 'success' : 'neutral'}>{site.reportsToday} rapport(s)</Badge>
+                <Badge tone="neutral">{site.activeTeams} equipe(s)</Badge>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function GeneralSupervisorAssignmentsPanel({
+  items,
+}: Readonly<{ items: GeneralSupervisorAssignmentDashboardItem[] }>) {
+  return (
+    <SectionCard title="Assignations du jour" subtitle="Travail planifie sur les sites confies.">
+      {items.length === 0 ? (
+        <CompactEmptyState message="Aucune assignation prevue aujourd'hui sur les sites confies." />
+      ) : (
+        <div className="space-y-4">
+          {items.map((assignment) => (
+            <article key={assignment.id} className="rounded-3xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">{assignment.supervisorName}</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {assignment.siteName} - {assignment.projectName}
+                  </p>
+                </div>
+                <Badge tone={planningStatusTone(assignment.status)}>{planningStatusLabel(assignment.status)}</Badge>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{assignment.action}</p>
+              <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Objectif {assignment.targetProgress ?? 0} %
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function GeneralSupervisorResourcesElsewherePanel({
+  items,
+}: Readonly<{ items: GeneralSupervisorResourceElsewhereItem[] }>) {
+  return (
+    <SectionCard title="Ressources deja ailleurs" subtitle="Ressources terrain globales deja planifiees sur d'autres chantiers.">
+      {items.length === 0 ? (
+        <CompactEmptyState message="Aucune ressource terrain deja assignee ailleurs aujourd'hui." />
+      ) : (
+        <div className="space-y-4">
+          {items.map((resource) => (
+            <article key={resource.id} className="rounded-3xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">{resource.name}</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {resource.siteName} - {resource.projectName}
+                  </p>
+                </div>
+                <Badge tone="warning">{planningStatusLabel(resource.status)}</Badge>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function GeneralSupervisorReportsBySitePanel({ items }: Readonly<{ items: GeneralSupervisorReportBySiteItem[] }>) {
+  return (
+    <SectionCard title="Rapports par site confie" subtitle="Rapports recus aujourd'hui sur le perimetre actif.">
+      {items.length === 0 ? (
+        <CompactEmptyState message="Aucun chantier confie pour consolider les rapports." />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {items.map((item) => (
+            <article key={item.siteId} className="rounded-3xl border border-slate-200 p-4">
+              <p className="font-semibold text-slate-900">{item.siteName}</p>
+              <p className="mt-1 text-sm text-slate-500">{item.projectName}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge tone={item.submittedToday > 0 ? 'success' : 'neutral'}>{item.submittedToday} recu(s)</Badge>
+                <Badge tone={item.validatedForClientToday > 0 ? 'info' : 'neutral'}>
+                  {item.validatedForClientToday} valide(s)
+                </Badge>
+              </div>
             </article>
           ))}
         </div>
@@ -626,6 +753,34 @@ function projectStatusTone(status: DirectionConsolidatedProjectItem['projectStat
       return 'neutral' as const;
     case 'ARCHIVED':
       return 'info' as const;
+    default:
+      return 'neutral' as const;
+  }
+}
+
+function planningStatusLabel(status: string) {
+  switch (status) {
+    case 'ASSIGNED':
+      return 'Non demarre';
+    case 'IN_PROGRESS':
+      return 'En cours';
+    case 'COMPLETED':
+      return 'Termine';
+    case 'CANCELLED':
+      return 'Annule';
+    default:
+      return status;
+  }
+}
+
+function planningStatusTone(status: string) {
+  switch (status) {
+    case 'IN_PROGRESS':
+      return 'info' as const;
+    case 'COMPLETED':
+      return 'success' as const;
+    case 'CANCELLED':
+      return 'error' as const;
     default:
       return 'neutral' as const;
   }

@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import { getDirectionAlerts, getDirectionKpis, getDirectionProjectsConsolidated } from '@/lib/direction';
+import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 import { listAdminDeletionLogs } from '@/lib/photos';
 import { getRhExportHistory, getMonthlyRhPresences } from '@/lib/rh';
 import type {
@@ -672,80 +673,118 @@ async function getCoordinatorDashboard(prisma: PrismaClient, userId: string): Pr
 
 async function getGeneralSupervisorDashboard(prisma: PrismaClient, userId: string): Promise<DashboardResponse> {
   const now = new Date();
-  const siteScope = await getOperationalSiteIds(prisma, userId);
-  const [activeTeams, assignedFieldUsers, activeFieldUsers, recentReports, directionAlerts] =
+  const today = dayRange(now);
+  const todayDate = today.from;
+  const siteWhere = generalSupervisorPlanningSiteWhere({ id: userId, role: Role.GENERAL_SUPERVISOR }, todayDate);
+  const entrustedSites = await prisma.site.findMany({
+    where: siteWhere,
+    orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      project: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+  const siteScope = entrustedSites.map((site) => site.id);
+
+  const [
+    assignmentsToday,
+    reportsToday,
+    activeTeamRows,
+    presentSiteRecords,
+    recentReports,
+    directionAlerts,
+    resourcesAssignedElsewhere,
+  ] =
     await Promise.all([
-      prisma.team.count({
+      prisma.planningAssignment.findMany({
+        where: {
+          date: todayDate,
+          deletedAt: null,
+          siteId: {
+            in: siteScope,
+          },
+        },
+        orderBy: [
+          { site: { project: { name: 'asc' } } },
+          { site: { name: 'asc' } },
+          { supervisor: { firstName: 'asc' } },
+          { supervisor: { lastName: 'asc' } },
+          { id: 'asc' },
+        ],
+        select: {
+          id: true,
+          supervisorId: true,
+          action: true,
+          targetProgress: true,
+          status: true,
+          supervisor: {
+            select: {
+              firstName: true,
+              lastName: true,
+              role: true,
+            },
+          },
+          site: {
+            select: {
+              id: true,
+              name: true,
+              project: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.report.findMany({
+        where: {
+          siteId: {
+            in: siteScope,
+          },
+          submittedAt: {
+            gte: today.from,
+            lte: today.to,
+          },
+        },
+        select: {
+          id: true,
+          siteId: true,
+          userId: true,
+          validationStatus: true,
+        },
+      }),
+      prisma.team.findMany({
         where: {
           status: TeamStatus.ACTIVE,
           siteId: {
             in: siteScope,
           },
         },
-      }),
-      prisma.teamMember.findMany({
-        where: {
-          status: TeamMemberStatus.ACTIVE,
-          team: {
-            status: TeamStatus.ACTIVE,
-            siteId: {
-              in: siteScope,
-            },
-          },
-          user: {
-            role: {
-              in: [...FIELD_ROLES],
-            },
-            isActive: true,
-          },
-        },
-        distinct: ['userId'],
         select: {
-          userId: true,
+          siteId: true,
         },
       }),
-      prisma.user.findMany({
+      prisma.clockInRecord.findMany({
         where: {
-          isActive: true,
-          role: {
-            in: [...FIELD_ROLES],
+          status: ClockInStatus.VALID,
+          timestampLocal: {
+            gte: today.from,
+            lte: today.to,
           },
-          OR: [
-            {
-              teamMemberships: {
-                some: {
-                  status: TeamMemberStatus.ACTIVE,
-                  team: {
-                    status: TeamStatus.ACTIVE,
-                    siteId: {
-                      in: siteScope,
-                    },
-                  },
-                },
-              },
-            },
-            {
-              clockInRecords: {
-                some: {
-                  siteId: {
-                    in: siteScope,
-                  },
-                },
-              },
-            },
-            {
-              reports: {
-                some: {
-                  siteId: {
-                    in: siteScope,
-                  },
-                },
-              },
-            },
-          ],
+          siteId: {
+            in: siteScope,
+          },
         },
+        distinct: ['siteId'],
         select: {
-          id: true,
+          siteId: true,
         },
       }),
       prisma.report.findMany({
@@ -775,15 +814,82 @@ async function getGeneralSupervisorDashboard(prisma: PrismaClient, userId: strin
         },
       }),
       getDirectionAlerts(prisma),
+      siteScope.length === 0
+        ? Promise.resolve([])
+        : prisma.planningAssignment.findMany({
+            where: {
+              date: todayDate,
+              deletedAt: null,
+              siteId: {
+                notIn: siteScope,
+              },
+              supervisor: {
+                isActive: true,
+                role: {
+                  in: [...FIELD_ROLES],
+                },
+              },
+            },
+            distinct: ['supervisorId'],
+            orderBy: [{ supervisor: { firstName: 'asc' } }, { supervisor: { lastName: 'asc' } }, { id: 'asc' }],
+            take: 8,
+            select: {
+              id: true,
+              status: true,
+              supervisor: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  role: true,
+                },
+              },
+              site: {
+                select: {
+                  name: true,
+                  project: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          }),
     ]);
 
-  const assignedFieldIds = new Set(assignedFieldUsers.map((item) => item.userId));
-  const unassignedFieldUsers = activeFieldUsers.filter((user) => !assignedFieldIds.has(user.id)).length;
+  const assignmentsBySite = countBy(assignmentsToday.map((assignment) => assignment.site.id));
+  const reportsBySite = countBy(reportsToday.map((report) => report.siteId));
+  const activeTeamsBySite = countBy(activeTeamRows.map((team) => team.siteId));
+  const validatedReportsBySite = countBy(
+    reportsToday
+      .filter((report) => report.validationStatus === ReportValidationStatus.VALIDATED_FOR_CLIENT)
+      .map((report) => report.siteId),
+  );
+  const presentSiteIds = new Set(presentSiteRecords.map((record) => record.siteId));
+  const reportBySiteAndUser = new Set(reportsToday.map((report) => `${report.siteId}:${report.userId}`));
   const relevantSiteAlerts = directionAlerts.sitesWithoutPresence.filter((item) => siteScope.includes(item.siteId));
   const relevantIncompleteSessions = directionAlerts.incompleteSessions.filter((item) => siteScope.includes(item.siteId));
+  const assignmentMissingReportAlerts = assignmentsToday
+    .filter((assignment) => !reportBySiteAndUser.has(`${assignment.site.id}:${assignment.supervisorId}`))
+    .slice(0, 4);
+  const sitesWithoutPresenceToday = entrustedSites.filter((site) => !presentSiteIds.has(site.id)).slice(0, 4);
 
   const alerts: DashboardAlertItem[] = [
-    ...relevantSiteAlerts.slice(0, 3).map<DashboardAlertItem>((item) => ({
+    ...sitesWithoutPresenceToday.map<DashboardAlertItem>((site) => ({
+      id: `today-presence:${site.id}`,
+      level: 'warning',
+      title: site.name,
+      description: "Aucune presence valide enregistree aujourd'hui sur ce chantier confie.",
+      badge: 'Presence',
+    })),
+    ...assignmentMissingReportAlerts.map<DashboardAlertItem>((assignment) => ({
+      id: `report-missing:${assignment.id}`,
+      level: 'info',
+      title: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`,
+      description: `Aucun rapport soumis aujourd'hui pour ${assignment.site.name}.`,
+      badge: 'Rapport',
+    })),
+    ...relevantSiteAlerts.slice(0, 2).map<DashboardAlertItem>((item) => ({
       id: `site:${item.siteId}`,
       level: 'error',
       title: item.siteName,
@@ -799,13 +905,13 @@ async function getGeneralSupervisorDashboard(prisma: PrismaClient, userId: strin
     })),
   ];
 
-  if (unassignedFieldUsers > 0) {
+  if (siteScope.length === 0) {
     alerts.push({
-      id: 'unassigned-resources',
+      id: 'no-entrusted-sites',
       level: 'info',
-      title: 'Ressources a affecter',
-      description: `${unassignedFieldUsers} ressource(s) terrain actives ne sont rattachees a aucune equipe en scope.`,
-      badge: 'Planning',
+      title: 'Aucun chantier confie',
+      description: "Aucun perimetre actif aujourd'hui. Les widgets planning et rapports restent donc vides.",
+      badge: 'Scope',
     });
   }
 
@@ -813,11 +919,46 @@ async function getGeneralSupervisorDashboard(prisma: PrismaClient, userId: strin
     role: Role.GENERAL_SUPERVISOR,
     generatedAt: now.toISOString(),
     stats: [
-      createStat('planning', 'Sites en coordination', siteScope.length, 'primary'),
-      createStat('users', 'Equipes actives', activeTeams, 'success'),
-      createStat('users', 'Ressources affectees', assignedFieldIds.size, 'neutral'),
-      createStat('alerts', 'Ressources non affectees', unassignedFieldUsers, 'warning'),
+      createStat('sites', 'Sites confies', entrustedSites.length, 'primary'),
+      createStat('planning', "Assignations aujourd'hui", assignmentsToday.length, 'success'),
+      createStat('reports', "Rapports recus aujourd'hui", reportsToday.length, 'neutral'),
+      createStat('users', 'Ressources ailleurs', resourcesAssignedElsewhere.length, 'warning'),
     ],
+    entrustedSites: entrustedSites.map((site) => ({
+      id: site.id,
+      name: site.name,
+      address: site.address,
+      projectName: site.project.name,
+      assignmentsToday: assignmentsBySite.get(site.id) ?? 0,
+      reportsToday: reportsBySite.get(site.id) ?? 0,
+      activeTeams: activeTeamsBySite.get(site.id) ?? 0,
+      presentToday: presentSiteIds.has(site.id),
+    })),
+    assignmentsToday: assignmentsToday.map((assignment) => ({
+      id: assignment.id,
+      supervisorName: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`,
+      supervisorRole: assignment.supervisor.role,
+      siteName: assignment.site.name,
+      projectName: assignment.site.project.name,
+      action: assignment.action,
+      targetProgress: assignment.targetProgress,
+      status: assignment.status,
+    })),
+    resourcesAssignedElsewhere: resourcesAssignedElsewhere.map((assignment) => ({
+      id: assignment.id,
+      name: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`,
+      role: assignment.supervisor.role,
+      siteName: assignment.site.name,
+      projectName: assignment.site.project.name,
+      status: assignment.status,
+    })),
+    reportsBySite: entrustedSites.map((site) => ({
+      siteId: site.id,
+      siteName: site.name,
+      projectName: site.project.name,
+      submittedToday: reportsBySite.get(site.id) ?? 0,
+      validatedForClientToday: validatedReportsBySite.get(site.id) ?? 0,
+    })),
     recentReports: recentReports.map(serializeDashboardReport),
     alerts,
   };
@@ -1041,6 +1182,16 @@ function buildTokenCounts(tokens: { userId: string }[]) {
 
   for (const token of tokens) {
     counts.set(token.userId, (counts.get(token.userId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function countBy(values: string[]) {
+  const counts = new Map<string, number>();
+
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
   }
 
   return counts;

@@ -132,6 +132,8 @@ const adminPhotoDeletionLogSelect = {
   photo: {
     select: {
       id: true,
+      filename: true,
+      takenAt: true,
       site: {
         select: {
           id: true,
@@ -1004,7 +1006,7 @@ export async function buildAdminDeletionLogsCsv(
 
   const lines = [
     [
-      'Photo ID',
+      'Photo',
       'Chantier',
       'Supprime par',
       'Role suppresseur',
@@ -1014,7 +1016,7 @@ export async function buildAdminDeletionLogsCsv(
     ].join(','),
     ...logs.map((log) =>
       [
-        log.photoId,
+        buildAdminPhotoLabel(log),
         log.photo.site.name,
         `${log.deletedBy.firstName} ${log.deletedBy.lastName}`,
         log.deletedBy.role,
@@ -1115,6 +1117,9 @@ export function serializeAdminDeletionLog(log: SerializableAdminPhotoDeletionLog
   return {
     id: log.id,
     photoId: log.photoId,
+    photoLabel: buildAdminPhotoLabel(log),
+    photoFilename: log.photo.filename,
+    photoTakenAt: log.photo.takenAt.toISOString(),
     site: {
       id: log.photo.site.id,
       name: log.photo.site.name,
@@ -1134,6 +1139,15 @@ export function serializeAdminDeletionLog(log: SerializableAdminPhotoDeletionLog
       role: log.originalAuthor.role,
     },
   };
+}
+
+function buildAdminPhotoLabel(log: SerializableAdminPhotoDeletionLog) {
+  const takenAt = new Intl.DateTimeFormat('fr-FR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'UTC',
+  }).format(log.photo.takenAt);
+  return `${log.photo.filename} - ${takenAt}`;
 }
 
 export function getPhotoSignedUrlTtlSeconds() {

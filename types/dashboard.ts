@@ -86,6 +86,45 @@ export type CoordinatorSupervisorWithoutReportItem = {
   pushTokenCount: number;
 };
 
+export type GeneralSupervisorSiteDashboardItem = {
+  id: string;
+  name: string;
+  address: string;
+  projectName: string;
+  assignmentsToday: number;
+  reportsToday: number;
+  activeTeams: number;
+  presentToday: boolean;
+};
+
+export type GeneralSupervisorAssignmentDashboardItem = {
+  id: string;
+  supervisorName: string;
+  supervisorRole: Role;
+  siteName: string;
+  projectName: string;
+  action: string;
+  targetProgress: number | null;
+  status: string;
+};
+
+export type GeneralSupervisorResourceElsewhereItem = {
+  id: string;
+  name: string;
+  role: Role;
+  siteName: string;
+  projectName: string;
+  status: string;
+};
+
+export type GeneralSupervisorReportBySiteItem = {
+  siteId: string;
+  siteName: string;
+  projectName: string;
+  submittedToday: number;
+  validatedForClientToday: number;
+};
+
 export type DashboardPhotoItem = {
   id: string;
   siteId: string;
@@ -153,6 +192,10 @@ export type GeneralSupervisorDashboardData = {
   role: 'GENERAL_SUPERVISOR';
   generatedAt: string;
   stats: DashboardStat[];
+  entrustedSites: GeneralSupervisorSiteDashboardItem[];
+  assignmentsToday: GeneralSupervisorAssignmentDashboardItem[];
+  resourcesAssignedElsewhere: GeneralSupervisorResourceElsewhereItem[];
+  reportsBySite: GeneralSupervisorReportBySiteItem[];
   recentReports: DashboardReportItem[];
   alerts: DashboardAlertItem[];
 };

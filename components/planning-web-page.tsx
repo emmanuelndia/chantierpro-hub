@@ -426,7 +426,7 @@ function DayPlanningTable({
                     >
                       {assignment.supervisorFirstName} {assignment.supervisorName}
                     </Link>
-                    <p className="text-xs text-slate-500">{assignment.supervisorId}</p>
+                    <p className="text-xs text-slate-500">Ressource terrain</p>
                   </td>
                   <td className="px-4 py-4 text-slate-700">Ressource terrain</td>
                   <td className="px-4 py-4 text-slate-700">{site?.project.name ?? '-'}</td>

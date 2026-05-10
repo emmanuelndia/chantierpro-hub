@@ -153,7 +153,7 @@ export function MobileProjectFormPage({ mode, user, projectId }: MobileProjectFo
       if (!projectId || typeof projectId !== 'string') {
         console.error('Invalid project ID in response:', data);
         setErrors({
-          form: 'Erreur lors de la création du projet. ID invalide reçu.',
+          form: 'Erreur lors de la création du projet. Réessayez dans un instant.',
         });
         return;
       }

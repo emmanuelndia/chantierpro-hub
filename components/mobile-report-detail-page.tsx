@@ -82,7 +82,7 @@ export function MobileReportDetailPage({ reportId }: MobileReportDetailPageProps
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `rapport_${id}.${format}`;
+      a.download = extractFileName(response.headers.get('content-disposition')) ?? `rapport_${formatDateForFile(report?.submittedAt)}.${format}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -249,6 +249,14 @@ export function MobileReportDetailPage({ reportId }: MobileReportDetailPageProps
       </section>
     </div>
   );
+}
+
+function extractFileName(contentDisposition: string | null) {
+  return contentDisposition?.match(/filename="([^"]+)"/)?.[1] ?? null;
+}
+
+function formatDateForFile(value: string | undefined) {
+  return value?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
 }
 
 function StatusBadge({ status }: Readonly<{ status: ReportStatus }>) {

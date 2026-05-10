@@ -164,7 +164,7 @@ export function AdminLogsPage() {
           <table className="min-w-[1000px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
-                <th className="px-5 py-4 font-semibold">Photo ID</th>
+                <th className="px-5 py-4 font-semibold">Photo supprimée</th>
                 <th className="px-5 py-4 font-semibold">Site</th>
                 <th className="px-5 py-4 font-semibold">Supprime par</th>
                 <th className="px-5 py-4 font-semibold">Date / Heure</th>
@@ -194,7 +194,10 @@ export function AdminLogsPage() {
               ) : (
                 logsQuery.data?.items.map((log) => (
                   <tr key={log.id} className="align-top hover:bg-slate-50">
-                    <td className="px-5 py-4 font-mono text-xs text-slate-700">{log.photoId}</td>
+                    <td className="px-5 py-4 text-slate-700">
+                      <p className="font-semibold text-slate-950">{log.photoFilename}</p>
+                      <p className="mt-1 text-xs text-slate-500">{formatDateTime(log.photoTakenAt)}</p>
+                    </td>
                     <td className="px-5 py-4 font-semibold text-slate-950">{log.site.name}</td>
                     <td className="px-5 py-4 text-slate-700">
                       <div className="space-y-1">

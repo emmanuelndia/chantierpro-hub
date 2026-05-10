@@ -122,7 +122,7 @@ export function SitePresencesPage({ siteId, viewer }: SitePresencesPageProps) {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `site-presences-${siteId}.csv`;
+      anchor.download = `presences-${slugifyFilePart(siteQuery.data?.name ?? 'chantier')}.csv`;
       anchor.click();
       URL.revokeObjectURL(url);
 
@@ -415,4 +415,14 @@ function formatDuration(totalMinutes: number) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return `${hours}h ${String(minutes).padStart(2, '0')}`;
+}
+
+function slugifyFilePart(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'chantier';
 }
