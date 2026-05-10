@@ -1,6 +1,7 @@
 import {
   ClockInStatus,
   ClockInType,
+  GeneralSupervisorSiteScopeStatus,
   PlanningAssignmentStatus,
   Prisma,
   Role,
@@ -19,6 +20,7 @@ import type {
 } from '@/types/mobile-planning';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 
 type AuthLikeUser = {
   id: string;
@@ -48,6 +50,22 @@ export function canAccessSupervisorPlanning(role: Role) {
 }
 
 export function operationalPlanningSiteWhere(user: AuthLikeUser, _date?: Date): Prisma.SiteWhereInput {
+  if (user.role === Role.GENERAL_SUPERVISOR) {
+    if (!_date) {
+      return {
+        status: SiteStatus.ACTIVE,
+        generalSupervisorScopes: {
+          some: {
+            generalSupervisorId: user.id,
+            status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+          },
+        },
+      };
+    }
+
+    return generalSupervisorPlanningSiteWhere(user, _date);
+  }
+
   return {
     status: SiteStatus.ACTIVE,
     ...(user.role === Role.PROJECT_MANAGER

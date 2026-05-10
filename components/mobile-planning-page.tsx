@@ -306,8 +306,12 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
 
       {data?.availableSites.length === 0 && !planningQuery.isLoading ? (
         <EmptyState
-          title="Aucun chantier actif disponible"
-          description="Aucun chantier actif n'est disponible pour créer une assignation."
+          title={user.role === 'GENERAL_SUPERVISOR' ? 'Aucun chantier confié' : 'Aucun chantier actif disponible'}
+          description={
+            user.role === 'GENERAL_SUPERVISOR'
+              ? 'Aucun chantier ne vous a été confié pour cette période.'
+              : "Aucun chantier actif n'est disponible pour créer une assignation."
+          }
         />
       ) : null}
 

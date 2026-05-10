@@ -190,6 +190,12 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     roles: ['GENERAL_SUPERVISOR', 'PROJECT_MANAGER'],
   },
   {
+    href: '/mobile/supervisor-scopes',
+    label: 'Périmètres',
+    icon: 'teams',
+    roles: ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+  },
+  {
     href: '/mobile/history',
     label: 'Historique',
     icon: 'history',

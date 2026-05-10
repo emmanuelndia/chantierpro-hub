@@ -89,6 +89,11 @@ enum PlanningAssignmentStatus {
   CANCELLED
 }
 
+enum GeneralSupervisorSiteScopeStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model User {
   id                 String              @id @default(cuid())
   email              String              @unique
@@ -122,6 +127,8 @@ model User {
   loginAttempts      LoginAttempt[]
   planningAssignments        PlanningAssignment[] @relation("PlanningAssignmentSupervisor")
   createdPlanningAssignments PlanningAssignment[] @relation("PlanningAssignmentCreator")
+  generalSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeGeneralSupervisor")
+  managedGeneralSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeProjectManager")
 }
 
 model Project {
@@ -168,6 +175,7 @@ model Site {
   photos         Photo[]
   reports        Report[]
   planningAssignments PlanningAssignment[]
+  generalSupervisorScopes GeneralSupervisorSiteScope[]
 
   @@index([projectId])
   @@index([siteManagerId])
@@ -282,6 +290,26 @@ model PlanningAssignment {
   @@index([supervisorId])
   @@index([createdById])
   @@index([deletedAt])
+}
+
+model GeneralSupervisorSiteScope {
+  id                  String                           @id @default(cuid())
+  generalSupervisorId String
+  projectManagerId    String
+  siteId              String
+  startDate           DateTime                         @db.Date
+  endDate             DateTime?                        @db.Date
+  status              GeneralSupervisorSiteScopeStatus @default(ACTIVE)
+  createdAt           DateTime                         @default(now())
+  generalSupervisor   User                             @relation("GeneralSupervisorSiteScopeGeneralSupervisor", fields: [generalSupervisorId], references: [id])
+  projectManager      User                             @relation("GeneralSupervisorSiteScopeProjectManager", fields: [projectManagerId], references: [id])
+  site                Site                             @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([generalSupervisorId, status])
+  @@index([projectManagerId, status])
+  @@index([siteId, status])
+  @@index([startDate])
+  @@index([endDate])
 }
 
 model Photo {
