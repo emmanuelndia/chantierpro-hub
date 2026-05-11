@@ -224,18 +224,18 @@ export async function createPlanningAssignment(
   const normalized = await validateAssignmentInput(prisma, user, input);
   if (normalized instanceof Response) return normalized;
 
-  const existing = await prisma.planningAssignment.findFirst({
+  const existingTasks = await prisma.planningAssignment.findMany({
     where: {
       date: normalized.date,
       supervisorId: normalized.supervisorId,
       siteId: normalized.siteId,
       deletedAt: null,
     },
-    select: { id: true },
+    select: { id: true, action: true, targetProgress: true },
   });
 
-  if (existing) {
-    return planningError('ASSIGNMENT_CONFLICT', 'Cette ressource a deja une assignation active sur ce chantier pour cette date.', 409);
+  if (existingTasks.some((task) => isSameTask(task, normalized))) {
+    return planningError('TASK_DUPLICATE', 'Cette tache existe deja pour cette ressource sur ce chantier.', 409);
   }
 
   let assignment: PlanningAssignmentRow;
@@ -257,17 +257,21 @@ export async function createPlanningAssignment(
     if (uniqueTarget) {
       if (isOldSupervisorDateConstraint(uniqueTarget)) {
         return planningError(
-          'PLANNING_TURNOVER_MIGRATION_REQUIRED',
-          "La base de donnees bloque encore les assignations multi-chantiers. Executez `npx prisma migrate deploy` pour appliquer la migration planning_turnover_unique_scope.",
+          'PLANNING_TASKS_MIGRATION_REQUIRED',
+          "La base de donnees bloque encore les assignations multi-taches. Executez `npx prisma migrate deploy` pour appliquer la migration planning_multiple_tasks_per_site.",
           409,
         );
       }
 
-      return planningError(
-        'ASSIGNMENT_CONFLICT',
-        'Cette ressource a deja une assignation active sur ce chantier pour cette date.',
-        409,
-      );
+      if (isSupervisorDateSiteConstraint(uniqueTarget)) {
+        return planningError(
+          'PLANNING_TASKS_MIGRATION_REQUIRED',
+          "La base de donnees bloque encore les assignations multi-taches sur un meme chantier. Executez `npx prisma migrate deploy` pour appliquer la migration planning_multiple_tasks_per_site.",
+          409,
+        );
+      }
+
+      return planningError('TASK_DUPLICATE', 'Cette tache existe deja pour cette ressource sur ce chantier.', 409);
     }
 
     throw error;
@@ -479,6 +483,8 @@ export async function duplicatePlanningAssignments(
       select: {
         supervisorId: true,
         siteId: true,
+        action: true,
+        targetProgress: true,
       },
     }),
     prisma.site.findMany({ where: targetSiteWhere, select: { id: true } }),
@@ -492,14 +498,22 @@ export async function duplicatePlanningAssignments(
   const targetSiteIds = new Set(validTargetSites.map((site) => site.id));
   const targetSupervisorIds = new Set(validSupervisorIds);
   const existingTargetKeys = new Set(
-    existingTargetAssignments.map((assignment) => buildAssignmentKey(assignment.supervisorId, assignment.siteId)),
+    existingTargetAssignments.map((assignment) =>
+      buildTaskKey(assignment.supervisorId, assignment.siteId, assignment.action, assignment.targetProgress),
+    ),
   );
-  const validAssignments = sourceAssignments.filter(
-    (assignment) =>
-      targetSiteIds.has(assignment.siteId) &&
-      targetSupervisorIds.has(assignment.supervisorId) &&
-      !existingTargetKeys.has(buildAssignmentKey(assignment.supervisorId, assignment.siteId)),
-  );
+  const validAssignments: PlanningAssignmentRow[] = [];
+
+  for (const assignment of sourceAssignments) {
+    const key = buildTaskKey(assignment.supervisorId, assignment.siteId, assignment.action, assignment.targetProgress);
+
+    if (!targetSiteIds.has(assignment.siteId) || !targetSupervisorIds.has(assignment.supervisorId) || existingTargetKeys.has(key)) {
+      continue;
+    }
+
+    existingTargetKeys.add(key);
+    validAssignments.push(assignment);
+  }
 
   if (validAssignments.length === 0) {
     return planningError('NO_VALID_ASSIGNMENTS', 'Aucune assignation valide à dupliquer.', 400);
@@ -629,7 +643,20 @@ async function getAssignedSupervisorIdsForDay(
     },
   });
 
-  return new Map(assignments.map((assignment) => [assignment.supervisorId, assignment.site.name]));
+  const sitesBySupervisor = new Map<string, Set<string>>();
+
+  for (const assignment of assignments) {
+    const siteNames = sitesBySupervisor.get(assignment.supervisorId) ?? new Set<string>();
+    siteNames.add(assignment.site.name);
+    sitesBySupervisor.set(assignment.supervisorId, siteNames);
+  }
+
+  return new Map(
+    [...sitesBySupervisor.entries()].map(([supervisorId, siteNames]) => [
+      supervisorId,
+      [...siteNames].join(', '),
+    ]),
+  );
 }
 
 function getSupervisorAvailabilityLabel(supervisorId: string, assignedSupervisorIds: Map<string, string>) {
@@ -637,8 +664,22 @@ function getSupervisorAvailabilityLabel(supervisorId: string, assignedSupervisor
   return siteName ? `Assigne sur ${siteName}` : 'Disponible';
 }
 
-function buildAssignmentKey(supervisorId: string, siteId: string) {
-  return `${supervisorId}:${siteId}`;
+function buildTaskKey(supervisorId: string, siteId: string, action: string, targetProgress: number | null) {
+  return `${supervisorId}:${siteId}:${normalizeTaskActionKey(action)}:${targetProgress ?? 'null'}`;
+}
+
+function normalizeTaskActionKey(action: string) {
+  return action.trim().replace(/\s+/g, ' ').toLocaleLowerCase('fr-FR');
+}
+
+function isSameTask(
+  existing: { action: string; targetProgress: number | null },
+  normalized: { action: string; targetProgress: number | null },
+) {
+  return (
+    normalizeTaskActionKey(existing.action) === normalizeTaskActionKey(normalized.action) &&
+    existing.targetProgress === normalized.targetProgress
+  );
 }
 
 function getUniqueConstraintTarget(error: unknown) {
@@ -665,6 +706,15 @@ function isOldSupervisorDateConstraint(target: string[]) {
     normalized.includes('date') &&
     !normalized.includes('siteid') &&
     !normalized.includes('date_site')
+  );
+}
+
+function isSupervisorDateSiteConstraint(target: string[]) {
+  const normalized = target.join(' ').toLowerCase();
+  return (
+    (normalized.includes('supervisorid') || normalized.includes('supervisor_date')) &&
+    normalized.includes('date') &&
+    (normalized.includes('siteid') || normalized.includes('date_site'))
   );
 }
 

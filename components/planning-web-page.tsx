@@ -83,7 +83,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const createMutation = useMutation({
     mutationFn: createAssignment,
     onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Assignation creee' });
+      pushToast({ type: 'success', title: 'Tâche créée' });
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -93,7 +93,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PlanningWebUpdateRequest }) => updateAssignment(id, data),
     onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Assignation modifiee' });
+      pushToast({ type: 'success', title: 'Tâche modifiée' });
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -103,7 +103,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const deleteMutation = useMutation({
     mutationFn: deleteAssignment,
     onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Assignation supprimee' });
+      pushToast({ type: 'success', title: 'Tâche supprimée' });
       setDeleteTarget(null);
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -116,7 +116,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       pushToast({
         type: 'success',
         title: 'Planning duplique',
-        message: `${payload.createdCount} assignation(s) creee(s), ${payload.skippedCount} ignoree(s).`,
+        message: `${payload.createdCount} tâche(s) créée(s), ${payload.skippedCount} ignorée(s).`,
       });
       setSelectedDate(variables.targetDate);
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
@@ -222,7 +222,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Planning terrain</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Assignations journalieres</h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Tâches journalières</h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
               Planifie les ressources terrain par chantier, avec consultation jour ou semaine.
             </p>
@@ -304,7 +304,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
 
       {data ? (
         <section className="grid gap-4 md:grid-cols-4">
-          <MetricCard label="Assignations" value={data.assignments.length} />
+          <MetricCard label="Tâches" value={data.assignments.length} />
           <MetricCard label="Ressources actives" value={data.unassignedSupervisors.length} />
           <MetricCard label="Chantiers accessibles" value={data.availableSites.length} />
           <MetricCard label="Affichees" value={filteredAssignments.length} />
@@ -315,11 +315,11 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Actions planning</h2>
-            <p className="mt-1 text-sm text-slate-600">Cree une assignation ou copie le planning vers demain.</p>
+            <p className="mt-1 text-sm text-slate-600">Crée une tâche ou copie le planning vers demain.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" disabled={isMutating} onClick={() => openCreate()} type="button">
-              Ajouter une assignation
+              Ajouter une tâche
             </button>
             <button className={buttonClassName} disabled={isMutating || data.assignments.length === 0} onClick={duplicateToTomorrow} type="button">
               {duplicateMutation.isPending ? 'Duplication...' : 'Dupliquer vers demain'}
@@ -395,7 +395,7 @@ function DayPlanningTable({
   onDelete: (assignment: PlanningWebAssignment) => void;
 }>) {
   if (assignments.length === 0) {
-    return <EmptyState title="Aucune assignation" description="Aucune ligne ne correspond aux filtres selectionnes." />;
+    return <EmptyState title="Aucune tâche" description="Aucune ligne ne correspond aux filtres sélectionnés." />;
   }
 
   return (
@@ -408,7 +408,7 @@ function DayPlanningTable({
               <th className="px-4 py-4">Poste</th>
               <th className="px-4 py-4">Projet</th>
               <th className="px-4 py-4">Chantier</th>
-              <th className="px-4 py-4">Action du jour</th>
+              <th className="px-4 py-4">Tâche</th>
               <th className="px-4 py-4">Progression</th>
               <th className="px-4 py-4">Statut</th>
               {canMutate ? <th className="px-4 py-4">Actions</th> : null}
@@ -497,7 +497,7 @@ function WeekPlanningGrid({
                   <p className="truncate text-xs text-slate-600">{assignment.siteName}</p>
                 </div>
               ))}
-              {!query.isLoading && assignments.length === 0 ? <p className="text-sm text-slate-500">Aucune assignation</p> : null}
+              {!query.isLoading && assignments.length === 0 ? <p className="text-sm text-slate-500">Aucune tâche</p> : null}
               {assignments.length > 4 ? <p className="text-xs font-semibold text-slate-500">+{assignments.length - 4} autre(s)</p> : null}
             </div>
           </article>
@@ -586,7 +586,7 @@ function AssignmentDrawer({
       <aside className="fixed inset-y-0 right-0 flex w-full max-w-xl flex-col bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
         <div className="border-b border-slate-200 p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">
-            {mode === 'create' ? 'Nouvelle assignation' : 'Modifier assignation'}
+            {mode === 'create' ? 'Nouvelle tâche' : 'Modifier tâche'}
           </p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-950">Planning terrain</h2>
         </div>
@@ -645,7 +645,7 @@ function AssignmentDrawer({
               ))}
             </select>
           </Field>
-          <Field label="Action du jour">
+          <Field label="Tâche à réaliser">
             <textarea
               className={`${filterClassName} min-h-32`}
               onChange={(event) => onChange({ ...form, action: event.target.value })}
@@ -711,9 +711,9 @@ function ConfirmDeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
       <section className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-panel">
-        <h2 className="text-xl font-semibold text-slate-950">Supprimer cette assignation ?</h2>
+        <h2 className="text-xl font-semibold text-slate-950">Supprimer cette tâche ?</h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          {assignment.supervisorFirstName} {assignment.supervisorName} ne sera plus assigne sur {assignment.siteName}.
+          La tâche de {assignment.supervisorFirstName} {assignment.supervisorName} sur {assignment.siteName} sera retirée.
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button className={buttonClassName} onClick={onCancel} type="button">
@@ -802,7 +802,7 @@ async function createAssignment(data: PlanningWebCreateRequest) {
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(await getApiErrorMessage(response, "Impossible de creer l'assignation."));
+    throw new Error(await getApiErrorMessage(response, 'Impossible de créer la tâche.'));
   }
   return (await response.json()) as PlanningWebMutationResponse;
 }
@@ -814,7 +814,7 @@ async function updateAssignment(id: string, data: PlanningWebUpdateRequest) {
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(await getApiErrorMessage(response, "Impossible de modifier l'assignation."));
+    throw new Error(await getApiErrorMessage(response, 'Impossible de modifier la tâche.'));
   }
   return (await response.json()) as PlanningWebMutationResponse;
 }
@@ -822,7 +822,7 @@ async function updateAssignment(id: string, data: PlanningWebUpdateRequest) {
 async function deleteAssignment(id: string) {
   const response = await authFetch(`/api/planning/assignments/${id}`, { method: 'DELETE' });
   if (!response.ok) {
-    throw new Error(await getApiErrorMessage(response, "Impossible de supprimer l'assignation."));
+    throw new Error(await getApiErrorMessage(response, 'Impossible de supprimer la tâche.'));
   }
 }
 

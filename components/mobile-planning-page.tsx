@@ -70,7 +70,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
       });
 
       if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, "Impossible de créer l'assignation."));
+        throw new Error(await getApiErrorMessage(response, 'Impossible de créer la tâche.'));
       }
 
       return (await response.json()) as PlanningAssignmentMutationResponse;
@@ -91,7 +91,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
       });
 
       if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, "Impossible de modifier l'assignation."));
+        throw new Error(await getApiErrorMessage(response, 'Impossible de modifier la tâche.'));
       }
 
       return (await response.json()) as PlanningAssignmentMutationResponse;
@@ -106,7 +106,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
     mutationFn: async (id: string) => {
       const response = await authFetch(`/api/mobile/planning/assignment/${id}`, { method: 'DELETE' });
       if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, "Impossible de retirer l'assignation."));
+        throw new Error(await getApiErrorMessage(response, 'Impossible de retirer la tâche.'));
       }
     },
     onSuccess: () => {
@@ -189,7 +189,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
     <div className="space-y-5 pb-20">
       <section className="rounded-lg border border-sky-200 bg-sky-50 p-4">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">Planning terrain</p>
-        <h1 className="mt-1 text-xl font-black text-slate-950">Assignations du jour</h1>
+        <h1 className="mt-1 text-xl font-black text-slate-950">Tâches du jour</h1>
         <p className="mt-1 text-sm text-slate-600">
           {user.firstName} {user.lastName}
         </p>
@@ -250,7 +250,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
           ) : null}
 
           <section className="grid grid-cols-2 gap-3">
-            <StatTile label="Assignations" value={data.assignments.length} />
+            <StatTile label="Tâches" value={data.assignments.length} />
             <StatTile label="Ressources" value={data.unassignedSupervisors.length} />
             <StatTile label="Chantiers" value={data.availableSites.length} />
             <StatTile label="Date" value={formatShortDate(selectedDateObject)} />
@@ -258,7 +258,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
 
           {data.assignments.length > 0 ? (
             <section className="space-y-3">
-              <SectionTitle label="Assignations" count={data.assignments.length} />
+              <SectionTitle label="Tâches assignées" count={data.assignments.length} />
               {data.assignments.map((assignment) => (
                 <AssignmentCard
                   key={assignment.id}
@@ -269,7 +269,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
                   onCancelEdit={() => setEditingAssignmentId(null)}
                   onUpdate={(updateData) => updateAssignmentMutation.mutate({ id: assignment.id, data: updateData })}
                   onDelete={() => {
-                    if (window.confirm('Retirer cette assignation du planning ?')) {
+                    if (window.confirm('Retirer cette tâche du planning ?')) {
                       deleteAssignmentMutation.mutate(assignment.id);
                     }
                   }}
@@ -310,14 +310,14 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
           description={
             user.role === 'GENERAL_SUPERVISOR'
               ? 'Aucun chantier ne vous a été confié pour cette période.'
-              : "Aucun chantier actif n'est disponible pour créer une assignation."
+              : "Aucun chantier actif n'est disponible pour créer une tâche."
           }
         />
       ) : null}
 
       {showAddAssignment && data ? (
         <AssignmentBottomSheet
-          title="Nouvelle assignation"
+          title="Nouvelle tâche"
           formData={formData}
           setFormData={setFormData}
           availableSupervisors={data.unassignedSupervisors}
@@ -366,7 +366,7 @@ function AssignmentCard({
         <AssignmentIdentity assignment={assignment} initials={initials} />
         <div className="mt-4 space-y-3">
           <label className="block text-sm font-semibold text-slate-700">
-            Action du jour
+            Tâche à réaliser
             <textarea
               value={editData.action ?? ''}
               onChange={(event) => {
@@ -438,7 +438,7 @@ function AssignmentCard({
             disabled={isMutating}
             className="min-h-12 w-full rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 disabled:opacity-60"
           >
-            Retirer l&apos;assignation
+            Retirer la tâche
           </button>
         </div>
       </div>
@@ -633,7 +633,7 @@ function AssignmentBottomSheet({
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
-            Action du jour
+            Tâche à réaliser
             <textarea
               value={formData.action}
               onChange={(event) => {
@@ -642,7 +642,7 @@ function AssignmentBottomSheet({
               }}
               rows={3}
               className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-              placeholder="Décrire l'action à réaliser..."
+              placeholder="Décrire la tâche à réaliser..."
             />
           </label>
 
@@ -823,10 +823,10 @@ function getMutationError(error: unknown) {
 
 function getResourceEmptyDescription(siteCount: number) {
   if (siteCount === 0) {
-    return "Aucun chantier actif n'est disponible pour créer une assignation.";
+    return "Aucun chantier actif n'est disponible pour créer une tâche.";
   }
 
-  return "Aucune ressource terrain active n'est disponible pour créer une assignation.";
+  return "Aucune ressource terrain active n'est disponible pour créer une tâche.";
 }
 
 function baseIcon(className: string, children: ReactNode) {

@@ -288,6 +288,7 @@ model PlanningAssignment {
   @@index([date])
   @@index([siteId])
   @@index([supervisorId])
+  @@index([supervisorId, date, siteId])
   @@index([createdById])
   @@index([deletedAt])
 }
