@@ -1,10 +1,11 @@
-ChantierPro - Memo systeme photo + configuration Supabase Storage
+ChantierPro - Memo systeme photo + configuration Cloudflare R2
 
 1. Ce que fait le systeme photo
 
 Le module photo backend ajoute :
 - POST /api/photos
 - GET /api/photos/:id
+- GET /api/photos/:id/content
 - GET /api/sites/:id/photos
 - DELETE /api/photos/:id
 - GET /api/photos/logs
@@ -12,9 +13,9 @@ Le module photo backend ajoute :
 
 Fonctionnement :
 - upload en multipart/form-data
-- stockage prive dans Supabase Storage
+- stockage prive dans Cloudflare R2
 - aucune URL publique permanente
-- lecture via URL signee valable 15 minutes
+- lecture via /api/photos/:id/content ou URL R2 presignee interne valable 15 minutes
 - suppression logique uniquement
 - creation automatique d'un PhotoDeletionLog immuable
 
@@ -36,7 +37,7 @@ Roles autorises a supprimer une photo :
 
 Visibilite :
 - SUPERVISOR voit uniquement ses propres photos
-- COORDINATOR, GENERAL_SUPERVISOR, PROJECT_MANAGER, DIRECTION voient toutes les photos du site
+- COORDINATOR, GENERAL_SUPERVISOR, PROJECT_MANAGER, DIRECTION voient toutes les photos du site selon leur perimetre
 - ADMIN est autorise
 
 Suppression :
@@ -70,6 +71,7 @@ Champs optionnels :
 - description
 - lat
 - lng
+- planningAssignmentId
 
 Exemple :
 - file = <IMAGE_FILE>
@@ -85,9 +87,11 @@ Exemple :
 
 - taille max photo : 10 Mo
 - si > 10 Mo : reponse 413
-- si > 5 Mo : compression automatique qualite 80%
+- si > 5 Mo : compression automatique serveur qualite 80%
+- capture mobile deja encodee en JPEG
 - storageKey jamais expose au client
-- URL signee expire apres 15 minutes
+- URL R2 presignee expire apres 15 minutes
+- affichage canonique via /api/photos/:id/content
 
 
 5. Ce qui est stocke en base
@@ -95,6 +99,7 @@ Exemple :
 Modele Photo :
 - siteId
 - uploadedById
+- planningAssignmentId
 - category
 - description
 - filename
@@ -114,48 +119,77 @@ Modele Photo :
 Important :
 - storageKey et url restent internes
 - les reponses API ne doivent jamais exposer storageKey
+- url peut contenir une valeur interne de type r2://bucket/key
 
 
-6. Configuration Supabase Storage a faire
+6. Configuration Cloudflare R2 a faire
 
 Tu dois creer :
-- un bucket prive Supabase Storage
-- utiliser la service role key du projet
+- un bucket prive Cloudflare R2
+- une cle API R2 avec droits Object Read/Write sur ce bucket
 
-Variables d'environnement a ajouter dans .env.local :
+Variables d'environnement a ajouter dans .env.local et Vercel :
 
 STORAGE_URL=https://storage.example.com/chantierpro
-SUPABASE_URL=https://ton-projet.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=ta-service-role-key
-SUPABASE_STORAGE_BUCKET=chantierpro-photos
+R2_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+R2_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+R2_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+R2_BUCKET=chantierpro-photos
+
+Variable optionnelle :
+
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 
 Description :
-- STORAGE_URL : valeur de secours / base interne utilisee par le helper mock
-- SUPABASE_URL : URL du projet Supabase
-- SUPABASE_SERVICE_ROLE_KEY : cle service role backend
-- SUPABASE_STORAGE_BUCKET : nom exact du bucket prive
+- STORAGE_URL : valeur de secours pour le mode mock local
+- R2_ACCOUNT_ID : Account ID Cloudflare
+- R2_ACCESS_KEY_ID : Access Key ID R2
+- R2_SECRET_ACCESS_KEY : Secret Access Key R2
+- R2_BUCKET : nom exact du bucket prive
+- R2_ENDPOINT : endpoint S3 R2; si absent, l'application le derive depuis R2_ACCOUNT_ID
 
 Important :
 - le bucket doit rester prive
 - ne jamais servir d'URL publique permanente
-- toute lecture doit passer par une URL signee
+- toute lecture applicative doit passer par /api/photos/:id/content
 
 
-7. Etapes de configuration Supabase Storage
+7. Etapes de configuration Cloudflare R2
 
-1. Ouvrir le dashboard Supabase
-2. Aller dans Storage
+1. Ouvrir le dashboard Cloudflare
+2. Aller dans R2 Object Storage
 3. Creer un bucket prive, par exemple :
    chantierpro-photos
-4. Verifier qu'il est prive
-5. Copier :
-   - Project URL
-   - service_role key
-6. Ajouter ces valeurs dans .env.local
-7. Redemarrer l'application
+4. Aller dans Manage R2 API Tokens
+5. Creer une cle avec acces au bucket :
+   - Object Read
+   - Object Write
+6. Copier :
+   - Account ID
+   - Access Key ID
+   - Secret Access Key
+   - Bucket name
+7. Ajouter ces valeurs dans .env.local et dans Vercel
+8. Redemarrer l'application
 
 
-8. Comptes de test utiles
+8. Migration depuis Supabase Storage
+
+Le code priorise R2 si les variables R2 sont configurees.
+Si R2 n'est pas configure, le fallback Supabase reste disponible temporairement.
+
+Les nouvelles photos seront stockees dans R2.
+Les anciennes photos stockees dans Supabase peuvent rester lisibles tant que les variables Supabase restent presentes.
+
+Pour une migration complete des anciens objets :
+1. Exporter les objets Supabase Storage.
+2. Les uploader dans R2 en conservant exactement le meme storageKey.
+3. Conserver les lignes Photo en base.
+4. Verifier que /api/photos/:id/content retourne 200.
+5. Retirer les variables Supabase uniquement quand toutes les anciennes photos sont migrees.
+
+
+9. Comptes de test utiles
 
 ADMIN
 - email : admin@chantierpro.local
@@ -186,7 +220,7 @@ GENERAL_SUPERVISOR
 - password : ChantierPro#2026
 
 
-9. Checklist Postman
+10. Checklist Postman
 
 Login :
 - POST /api/auth/login
@@ -198,7 +232,7 @@ Upload photo :
 - Authorization: Bearer <ACCESS_TOKEN>
 
 Lire une photo :
-- GET /api/photos/<PHOTO_ID>
+- GET /api/photos/<PHOTO_ID>/content
 
 Lister les photos d'un site :
 - GET /api/sites/<SITE_ID>/photos?page=1
@@ -218,37 +252,29 @@ Tester l'immuabilite :
 - attendu : 403
 
 
-10. Cas de validation a tester
+11. Cas de validation a tester
 
 - SUPERVISOR upload une photo valide -> 201
 - PROJECT_MANAGER upload une photo -> 201
 - fichier > 10 Mo -> 413
 - fichier entre 5 Mo et 10 Mo -> compression automatique
-- GET /api/photos/:id -> URL signee
-- URL signee expire apres 15 minutes
+- GET /api/photos/:id/content -> 200
 - SUPERVISOR ne voit que ses propres photos
 - SUPERVISOR tente DELETE /api/photos/:id -> 403
 - PROJECT_MANAGER supprime une photo avec raison -> PhotoDeletionLog cree
 - DELETE /api/photos/logs/:id -> 403 pour tous
+- Sans variables R2, fallback Supabase/mock fonctionne encore en local
 
 
-11. Fichiers du projet lies a cette fonctionnalite
+12. Fichiers du projet lies a cette fonctionnalite
 
-- docs/api-routes.txt
-- docs/api-test-payloads.txt
 - prisma/schema.prisma
+- lib/storage.ts
 - lib/photo-storage.ts
 - lib/photos.ts
 - app/api/photos/route.ts
 - app/api/photos/[id]/route.ts
+- app/api/photos/[id]/content/route.ts
 - app/api/photos/logs/route.ts
 - app/api/photos/logs/[id]/route.ts
 - app/api/sites/[id]/photos/route.ts
-
-
-12. Notes utiles
-
-- Si les variables Supabase Storage ne sont pas configurees, le helper utilise un mode de secours pour faciliter les tests backend.
-- Pour un vrai usage production, il faut configurer Supabase Storage avec la service role key.
-- Les routes photo sont protegees par JWT.
-- Pour les routes photo, utiliser form-data et non raw JSON.

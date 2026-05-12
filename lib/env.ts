@@ -3,9 +3,10 @@ type RequiredVariable =
   | 'JWT_SECRET'
   | 'JWT_REFRESH_SECRET'
   | 'STORAGE_URL'
-  | 'SUPABASE_URL'
-  | 'SUPABASE_SERVICE_ROLE_KEY'
-  | 'SUPABASE_STORAGE_BUCKET';
+  | 'R2_ACCOUNT_ID'
+  | 'R2_ACCESS_KEY_ID'
+  | 'R2_SECRET_ACCESS_KEY'
+  | 'R2_BUCKET';
 
 function readEnv(name: RequiredVariable) {
   const value = process.env[name];
@@ -22,7 +23,9 @@ export const env = {
   JWT_SECRET: readEnv('JWT_SECRET'),
   JWT_REFRESH_SECRET: readEnv('JWT_REFRESH_SECRET'),
   STORAGE_URL: readEnv('STORAGE_URL'),
-  SUPABASE_URL: readEnv('SUPABASE_URL'),
-  SUPABASE_SERVICE_ROLE_KEY: readEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  SUPABASE_STORAGE_BUCKET: readEnv('SUPABASE_STORAGE_BUCKET'),
+  R2_ACCOUNT_ID: readEnv('R2_ACCOUNT_ID'),
+  R2_ACCESS_KEY_ID: readEnv('R2_ACCESS_KEY_ID'),
+  R2_SECRET_ACCESS_KEY: readEnv('R2_SECRET_ACCESS_KEY'),
+  R2_BUCKET: readEnv('R2_BUCKET'),
+  R2_ENDPOINT: process.env.R2_ENDPOINT,
 };

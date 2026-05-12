@@ -1,0 +1,197 @@
+# User Stories - Cartes Des Chantiers ChantierPro
+
+## Epic 1 - Visualiser Un Chantier Sur Carte
+
+### US-1.1 - Voir la position d’un chantier
+En tant que chef de projet,
+je veux voir la position d’un chantier sur une carte,
+afin de vérifier rapidement où il se trouve.
+
+Critères d’acceptation :
+- Le détail chantier affiche une carte.
+- Le marqueur est placé selon latitude/longitude.
+- Le nom du chantier apparaît dans le popup.
+- Les coordonnées restent visibles en texte si la carte ne charge pas.
+
+### US-1.2 - Voir le rayon de pointage
+En tant que superviseur général,
+je veux voir le rayon de pointage autour du chantier,
+afin de comprendre la zone acceptée pour les entrées/sorties.
+
+Critères d’acceptation :
+- Le rayon `radiusKm` est affiché sur la carte.
+- Le rayon est aussi affiché en texte.
+- Une valeur invalide affiche un message clair.
+
+### US-1.3 - Ouvrir l’itinéraire
+En tant qu’utilisateur mobile,
+je veux ouvrir l’itinéraire vers un chantier,
+afin de m’y rendre facilement.
+
+Critères d’acceptation :
+- Un bouton “Itinéraire” ouvre une URL externe de navigation.
+- Le bouton utilise les coordonnées GPS du chantier.
+- Le bouton n’apparaît pas si les coordonnées sont invalides.
+
+## Epic 2 - Cartes Dans La Gestion Des Chantiers
+
+### US-2.1 - Prévisualiser un chantier pendant la création
+En tant que chef de projet,
+je veux voir sur une carte les coordonnées que je saisis,
+afin d’éviter de créer un chantier mal positionné.
+
+Critères d’acceptation :
+- Le formulaire chantier affiche une carte de prévisualisation.
+- Modifier latitude/longitude déplace le marqueur.
+- Modifier le rayon met à jour le cercle.
+- Le formulaire reste utilisable même si la carte ne charge pas.
+
+### US-2.2 - Cliquer sur la carte pour choisir les coordonnées
+En tant que chef de projet,
+je veux cliquer sur la carte pour définir latitude/longitude,
+afin de renseigner plus facilement la position du chantier.
+
+Critères d’acceptation :
+- Un clic sur la carte remplit latitude et longitude.
+- Le marqueur se déplace à l’endroit cliqué.
+- Les champs restent modifiables manuellement.
+
+### US-2.3 - Corriger uniquement les coordonnées GPS
+En tant que chef de projet,
+je veux modifier uniquement les coordonnées GPS d’un chantier,
+afin de corriger une position sans devoir ressaisir tout le chantier.
+
+Critères d’acceptation :
+- L’édition partielle du chantier fonctionne.
+- Modifier seulement latitude/longitude/rayon ne retourne pas “payload chantier invalide”.
+- Les autres champs restent inchangés.
+
+## Epic 3 - Carte Globale Des Chantiers
+
+### US-3.1 - Voir tous mes chantiers sur une carte
+En tant que chef de projet,
+je veux voir mes chantiers sur une carte globale,
+afin d’avoir une vue géographique de mes projets.
+
+Critères d’acceptation :
+- La carte affiche seulement les chantiers de mes projets.
+- Les marqueurs affichent projet, chantier, adresse et statut.
+- Les filtres projet/statut/recherche mettent à jour la carte.
+
+### US-3.2 - Voir tous les chantiers actifs
+En tant que direction,
+je veux voir tous les chantiers actifs sur une carte,
+afin de piloter l’activité globale.
+
+Critères d’acceptation :
+- La direction voit tous les chantiers actifs.
+- Les chantiers terminés ou en pause peuvent être filtrés.
+- Les marqueurs ont des couleurs selon le statut.
+
+### US-3.3 - Voir les sites confiés
+En tant que superviseur général,
+je veux voir sur carte les sites qui me sont confiés,
+afin de comprendre mon périmètre de supervision.
+
+Critères d’acceptation :
+- Le GS ne voit que les sites confiés explicitement.
+- Les sites où il est seulement assigné comme ressource ne donnent pas de droit planning.
+- Les sites confiés affichent projet, chef de projet et période du périmètre si disponible.
+
+## Epic 4 - Carte Des Chantiers Du Jour
+
+### US-4.1 - Voir mes chantiers du jour sur carte
+En tant que ressource terrain,
+je veux voir mes chantiers du jour sur une carte,
+afin de visualiser mes déplacements prévus.
+
+Critères d’acceptation :
+- Les chantiers viennent des `PlanningAssignment` du jour.
+- Un chantier apparaît une seule fois même si plusieurs tâches y sont assignées.
+- Les équipes ne sont pas utilisées comme source principale.
+
+### US-4.2 - Voir les tâches par chantier
+En tant que ressource terrain,
+je veux ouvrir un chantier sur la carte et voir les tâches liées,
+afin de savoir quoi faire sur place.
+
+Critères d’acceptation :
+- Le popup du chantier affiche le nombre de tâches.
+- La liste des tâches reste accessible hors carte.
+- Plusieurs tâches sur le même chantier sont affichées séparément.
+
+## Epic 5 - Photos Et Présences Sur Carte
+
+### US-5.1 - Voir les photos géolocalisées d’un chantier
+En tant que chef de projet,
+je veux voir les photos géolocalisées sur la carte du chantier,
+afin de comprendre où les preuves terrain ont été prises.
+
+Critères d’acceptation :
+- Seules les photos avec latitude/longitude sont affichées sur la carte.
+- Cliquer sur une photo ouvre l’image via `/api/photos/[id]/content`.
+- Aucune URL Supabase signée ni `storageKey` n’est exposé.
+
+### US-5.2 - Voir les ressources présentes sur chantier
+En tant que chef de projet,
+je veux voir les ressources actuellement pointées sur un chantier,
+afin de suivre la présence opérationnelle.
+
+Critères d’acceptation :
+- Les ressources présentes viennent des pointages valides.
+- Les statuts présent/en pause sont distingués.
+- Aucune géolocalisation temps réel non enregistrée n’est affichée.
+
+## Epic 6 - Permissions Et Sécurité
+
+### US-6.1 - Respecter le périmètre projet
+En tant que chef de projet,
+je ne veux voir que les chantiers de mes projets,
+afin de respecter les responsabilités métier.
+
+Critères d’acceptation :
+- Les APIs filtrent côté serveur.
+- Un chantier hors périmètre n’apparaît pas.
+- Une requête directe hors périmètre retourne `404` ou `403`.
+
+### US-6.2 - Respecter le périmètre GS
+En tant que superviseur général,
+je ne veux voir en gestion planning que les sites qui me sont confiés,
+afin de ne pas modifier le planning d’un autre périmètre.
+
+Critères d’acceptation :
+- La carte planning du GS utilise `GeneralSupervisorSiteScope`.
+- Être assigné comme ressource ne donne pas accès planning.
+- Les ressources assignables restent globales.
+
+### US-6.3 - Garder le web sans actions terrain
+En tant qu’administrateur,
+je veux que le web reste une interface de gestion,
+afin d’éviter les pointages ou captures terrain depuis desktop.
+
+Critères d’acceptation :
+- Pas de bouton “Pointer” sur la version web.
+- Pas de capture caméra terrain sur la version web.
+- Les photos sont consultables, pas prises depuis le web.
+
+## Epic 7 - Robustesse Et Fallback
+
+### US-7.1 - Continuer sans carte si le provider échoue
+En tant qu’utilisateur,
+je veux continuer à lire les informations du chantier même si la carte ne charge pas,
+afin de ne pas être bloqué.
+
+Critères d’acceptation :
+- Un message fallback est affiché.
+- Les coordonnées GPS restent visibles.
+- Les actions principales de gestion restent disponibles.
+
+### US-7.2 - Utiliser les données offline préparées sur mobile
+En tant qu’utilisateur mobile,
+je veux voir au moins les coordonnées des chantiers hors ligne,
+afin de conserver une aide minimale sans réseau.
+
+Critères d’acceptation :
+- Les données préparées offline incluent latitude/longitude/rayon.
+- Si la carte en ligne ne charge pas, l’écran affiche les coordonnées.
+- Le pointage offline ne dépend pas du chargement de la carte.

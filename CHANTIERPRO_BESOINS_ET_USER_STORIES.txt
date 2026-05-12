@@ -1,0 +1,282 @@
+CHANTIERPRO - BESOINS ET USER STORIES COMPLETS
+================================================
+
+GÉNÉRAL
+--------
+ChantierPro est une application mobile de gestion de chantiers destinée aux équipes de construction,
+permettant la gestion des présences, des rapports, des photos, et de la planification.
+
+ROLES UTILISATEURS
+------------------
+1. SUPERVISOR : Superviseur de chantier
+2. COORDINATOR : Coordinateur de chantier  
+3. GENERAL_SUPERVISOR : Superviseur général
+4. PROJECT_MANAGER : Chef de projet
+5. DIRECTION : Direction
+6. ADMIN : Administrateur système
+7. HR : Ressources humaines
+
+MODULES FONCTIONNELS
+-------------------
+
+1. AUTHENTIFICATION ET GESTION UTILISATEURS
+==========================================
+
+BESOINS:
+- Système d'authentification sécurisé
+- Gestion des rôles et permissions
+- Profil utilisateur
+- Réinitialisation mot de passe
+
+USER STORIES:
+- En tant qu'utilisateur, je veux me connecter avec mon email et mot de passe
+- En tant qu'administrateur, je veux gérer les comptes utilisateurs et leurs rôles
+- En tant qu'utilisateur, je veux modifier mon profil et mon mot de passe
+- En tant qu'utilisateur, je veux réinitialiser mon mot de passe en cas d'oubli
+
+2. GESTION DES PROJETS ET CHANTIERS
+==================================
+
+BESOINS:
+- Création et gestion de projets
+- Gestion des chantiers par projet
+- Statuts des chantiers (ACTIF, TERMINÉ, EN ATTENTE)
+- Affectation des équipes aux chantiers
+
+USER STORIES:
+- En tant que chef de projet, je veux créer un nouveau projet et définir ses caractéristiques
+- En tant que chef de projet, je veux créer des chantiers rattachés à mes projets
+- En tant que coordinateur, je veux voir les chantiers dont je suis responsable
+- En tant que superviseur, je veux voir les chantiers où je suis affecté
+- En tant que direction, je veux avoir une vue globale de tous les projets et chantiers
+
+3. GESTION DES ÉQUIPES
+====================
+
+BESOINS:
+- Création et gestion d'équipes
+- Affectation des membres aux équipes
+- Statuts des équipes et membres
+- Gestion des rôles au sein des équipes
+
+USER STORIES:
+- En tant que coordinateur, je veux créer des équipes et affecter des membres
+- En tant que superviseur, je veux voir l'équipe à laquelle j'appartiens
+- En tant que chef de projet, je veux voir les équipes affectées à mes chantiers
+- En tant que direction, je veux avoir une vue globale des équipes de l'entreprise
+
+4. POINTAGE ET PRÉSENCES
+========================
+
+BESOINS:
+- Pointage d'arrivée et de départ
+- Gestion des pauses
+- Historique des pointages
+- Statuts des pointages (VALIDE, REJETÉ, ANOMALIE)
+- Calcul des heures de travail
+
+USER STORIES:
+- En tant que superviseur, je veux pointer mon arrivée et mon départ sur le chantier
+- En tant que superviseur, je veux gérer mes pauses durant ma journée de travail
+- En tant que coordinateur, je veux voir les pointages de mon équipe
+- En tant que direction, je veux consulter les historiques de présence
+- En tant que RH, je veux exporter les données de présence pour la paie
+
+5. RAPPORTS DE CHANTIER
+=======================
+
+BESOINS:
+- Création de rapports journaliers
+- Contenu des rapports (description, progression, blocages)
+- Statuts des rapports (SOUMIS, RÉVISÉ, VALIDÉ, ENVOYÉ)
+- Validation des rapports par le coordinateur
+- Export des rapports (PDF, texte)
+- Photos jointes aux rapports
+
+USER STORIES:
+- En tant que superviseur, je veux rédiger un rapport quotidien de mes activités
+- En tant que superviseur, je veux joindre des photos à mes rapports pour illustrer l'avancement
+- En tant que coordinateur, je veux valider les rapports soumis par mes superviseurs
+- En tant que coordinateur, je veux envoyer des rappels aux superviseurs qui n'ont pas soumis leurs rapports
+- En tant que direction, je veux consulter tous les rapports des chantiers
+- En tant que superviseur, je veux télécharger mes rapports au format PDF ou texte
+- En tant que coordinateur, je veux exporter tous les rapports d'une journée
+
+6. GESTION PHOTOGRAPHIQUE
+==========================
+
+BESOINS:
+- Prise de photos depuis l'application mobile
+- Stockage sécurisé des photos (Supabase Storage)
+- Galerie photo par chantier/projet
+- Catégorisation des photos (PROGRESSION, INCIDENT, AUTRE)
+- Géolocalisation des photos
+- Suppression des photos avec traçabilité
+
+USER STORIES:
+- En tant que superviseur, je veux prendre des photos pour documenter l'avancement du chantier
+- En tant que superviseur, je veux catégoriser mes photos (progrès, incident, etc.)
+- En tant que coordinateur, je veux consulter la galerie photo de mes chantiers
+- En tant que chef de projet, je veux voir toutes les photos de mes projets
+- En tant que direction, je veux accéder à toutes les photos de l'entreprise
+- En tant qu'administrateur, je veux pouvoir supprimer des photos inappropriées
+
+7. PLANIFICATION ET AFFECTATIONS
+===============================
+
+BESOINS:
+- Planification des affectations des équipes
+- Gestion des plannings par date
+- Visualisation des disponibilités
+- Duplication de plannings
+- Statuts des affectations (ASSIGNÉ, EN COURS, TERMINÉ, ANNULÉ)
+
+USER STORIES:
+- En tant que superviseur général, je veux planifier les affectations des équipes sur les chantiers
+- En tant que chef de projet, je veux voir les plannings de mes chantiers
+- En tant que coordinateur, je veux consulter les affectations de mes équipes
+- En tant que superviseur, je veux voir où je suis affecté chaque jour
+- En tant que superviseur général, je veux dupliquer les plannings d'une semaine à l'autre
+
+8. EXPORTS ET RAPPORTS ADMINISTRATIFS
+====================================
+
+BESOINS:
+- Export des données de présence (CSV, XLSX)
+- Rapports de suppression de photos
+- Journaux d'activités administratives
+- Statistiques et KPIs
+- Export des rapports de chantier
+
+USER STORIES:
+- En tant que RH, je veux exporter les données de présence pour le traitement de la paie
+- En tant qu'administrateur, je veux consulter les journaux de suppressions
+- En tant que direction, je veux voir des statistiques sur l'activité des chantiers
+- En tant que chef de projet, je veux exporter les rapports de mes projets
+
+9. MOBILE FIRST DESIGN
+======================
+
+BESOINS:
+- Interface optimisée pour mobile
+- Navigation intuitive
+- Performance rapide
+- Support hors ligne limité
+- Notifications push
+
+USER STORIES:
+- En tant qu'utilisateur mobile, je veux une interface simple et intuitive
+- En tant qu'utilisateur mobile, je veux accéder rapidement aux fonctionnalités principales
+- En tant qu'utilisateur mobile, je veux pouvoir continuer à travailler partiellement hors connexion
+- En tant qu'utilisateur mobile, je veux recevoir des notifications importantes
+
+10. SÉCURITÉ ET PERMISSIONS
+===========================
+
+BESOINS:
+- Contrôle d'accès basé sur les rôles (RBAC)
+- Authentification sécurisée
+- Logs d'activités
+- Gestion des permissions fines
+- Protection des données sensibles
+
+USER STORIES:
+- En tant qu'administrateur, je veux définir des permissions précises par rôle
+- En tant qu'utilisateur, je veux n'accéder qu'aux informations qui me concernent
+- En tant qu'administrateur, je veux tracer toutes les activités sensibles
+- En tant que direction, je veux m'assurer que les données sont sécurisées
+
+DÉTAILS DES PERMISSIONS PAR RÔLE
+================================
+
+SUPERVISOR:
+- Voir ses chantiers assignés
+- Pointer ses présences
+- Rédiger et soumettre des rapports
+- Prendre et gérer ses photos
+- Voir ses affectations
+
+COORDINATOR:
+- Voir les chantiers dont il est coordinateur
+- Gérer les équipes de ses chantiers
+- Valider les rapports des superviseurs
+- Envoyer des rappels
+- Voir toutes les photos de ses chantiers
+- Consulter les présences de son équipe
+
+GENERAL_SUPERVISOR:
+- Voir tous les chantiers
+- Planifier les affectations
+- Voir tous les rapports et photos
+- Accès aux statistiques globales
+- Gestion des plannings
+
+PROJECT_MANAGER:
+- Voir ses projets et chantiers
+- Gérer les équipes de ses projets
+- Accès aux rapports et photos de ses projets
+- Statistiques sur ses projets
+- Export des données de ses projets
+
+DIRECTION:
+- Vue globale de tous les projets et chantiers
+- Accès à tous les rapports et photos
+- Statistiques globales de l'entreprise
+- Journaux administratifs
+- Gestion des utilisateurs (limité)
+
+ADMIN:
+- Gestion complète de l'application
+- Gestion des utilisateurs et rôles
+- Configuration système
+- Journaux et audits complets
+- Maintenance technique
+
+HR:
+- Accès aux données de présence
+- Export pour la paie
+- Gestion des informations employés
+- Statistiques RH
+
+EXIGENCES NON FONCTIONNELLES
+===========================
+
+Performance:
+- Temps de chargement < 3 secondes
+- Support de 1000+ utilisateurs simultanés
+- Optimisation mobile first
+
+Sécurité:
+- Chiffrement des données sensibles
+- Authentification multi-facteurs (optionnel)
+- Backup régulier des données
+- Conformité RGPD
+
+Disponibilité:
+- Uptime 99.5%
+- Maintenance planifiée
+- Support hors connexion limité
+
+Scalabilité:
+- Architecture microservices
+- Base de données scalable
+- CDN pour les médias
+
+ÉVOLUTION FUTURE
+===============
+
+Fonctionnalités à considérer:
+- Module de gestion des matériels
+- Intégration avec des systèmes externes (ERP, paie)
+- Tableaux de bord avancés avec analytics
+- Module de communication interne
+- Gestion des documents et plans
+- Intégration IoT (capteurs, objets connectés)
+- Module de gestion de la sécurité
+- Prévisions météo pour les chantiers
+- Gestion des sous-traitants
+- Module de facturation et devis
+
+================================================
+FIN DU DOCUMENT - BESOINS ET USER STORIES CHANTIERPRO
+================================================

@@ -1,0 +1,106 @@
+# Besoins - Cartes Des Chantiers ChantierPro
+
+## Objectif
+Ajouter des cartes interactives pour visualiser les chantiers, leurs coordonnées GPS, leur rayon de pointage et leur contexte opérationnel.
+
+La fonctionnalité doit aider les chefs de projet, la direction, les superviseurs généraux et les équipes terrain à mieux situer les chantiers et comprendre les zones d’intervention.
+
+## Besoins Fonctionnels
+
+1. Afficher un chantier sur une carte
+- Voir la position exacte d’un chantier depuis sa latitude/longitude.
+- Afficher un marqueur avec le nom du chantier.
+- Afficher le rayon de pointage autour du chantier.
+- Afficher les informations principales : projet, adresse, statut, rayon, responsable.
+
+2. Afficher plusieurs chantiers sur une même carte
+- Vue globale pour `DIRECTION` et `ADMIN`.
+- Vue limitée aux projets du `PROJECT_MANAGER`.
+- Vue limitée aux sites confiés pour le `GENERAL_SUPERVISOR`.
+- Vue limitée aux chantiers du jour pour les ressources terrain.
+
+3. Intégrer la carte aux écrans existants
+- Détail chantier web.
+- Détail chantier mobile.
+- Liste des chantiers web/mobile.
+- Planning web/mobile, pour situer les sites assignés.
+- Présences, pour comprendre où les ressources sont pointées.
+
+4. Aider à vérifier les coordonnées GPS
+- Lors de la création ou modification d’un chantier, afficher la carte de la position saisie.
+- Permettre de prévisualiser le rayon de pointage.
+- Option utile : cliquer sur la carte pour remplir latitude/longitude.
+- Afficher un avertissement si les coordonnées semblent invalides ou vides.
+
+5. Visualiser les ressources présentes
+- Sur une carte de chantier, afficher les ressources actuellement pointées si les données existent.
+- Distinguer les statuts : présent, en pause, sorti.
+- Ne pas afficher de position personnelle en temps réel si elle n’est pas enregistrée par le pointage.
+
+6. Visualiser les photos géolocalisées
+- Si une photo a latitude/longitude, afficher son emplacement sur la carte du chantier.
+- Distinguer photo chantier et photo liée à une tâche.
+- Ouvrir l’image via `/api/photos/[id]/content`, jamais via URL Supabase signée exposée.
+
+7. Respecter les permissions
+- `PROJECT_MANAGER` voit les chantiers de ses projets.
+- `GENERAL_SUPERVISOR` voit les sites confiés et les sites où il est assigné comme ressource selon le contexte.
+- `DIRECTION` et `ADMIN` voient tout.
+- Ressources terrain voient seulement leurs chantiers du jour.
+- `HR` ne doit pas accéder aux cartes opérationnelles hors besoin RH explicite.
+
+8. Fonctionner sur web et mobile
+- Web : carte plus large, filtres, tableau + carte.
+- Mobile : carte compacte, centrée sur le chantier sélectionné.
+- La carte ne doit pas remplacer les listes, seulement les compléter.
+
+9. Mode hors ligne mobile
+- Si les données du chantier ont été préparées offline, afficher au minimum une carte statique ou un fallback avec coordonnées.
+- Ne pas dépendre de la carte en ligne pour autoriser le pointage offline.
+- Le GPS reste la source du pointage; la carte est seulement une aide visuelle.
+
+10. Performance et sécurité
+- Ne pas charger tous les chantiers pour tous les rôles.
+- Charger seulement les sites du périmètre autorisé.
+- Ne pas exposer de données sensibles dans le client.
+- Prévoir un fallback si le provider de carte ne charge pas.
+
+## Besoins Techniques
+
+1. Choix du provider de carte
+- Option recommandée : Leaflet + OpenStreetMap pour éviter les clés API payantes.
+- Alternative : Mapbox ou Google Maps si un compte/API key est disponible.
+
+2. Composants réutilisables
+- `SiteMap`
+- `SitesMap`
+- `SiteRadiusOverlay`
+- `MapMarkerPopup`
+
+3. Données nécessaires
+- `site.id`
+- `site.name`
+- `site.address`
+- `site.latitude`
+- `site.longitude`
+- `site.radiusKm`
+- `site.status`
+- `site.project.name`
+
+4. APIs possibles
+- Réutiliser les payloads existants si latitude/longitude/radiusKm sont déjà présents.
+- Ajouter seulement les champs manquants aux endpoints web/mobile existants.
+- Éviter une nouvelle API si les données sont déjà disponibles.
+
+5. Accessibilité
+- Afficher les coordonnées en texte.
+- Prévoir un lien “ouvrir dans Google Maps” ou “itinéraire”.
+- Ne pas rendre la carte indispensable pour comprendre l’écran.
+
+## Priorité Proposée
+
+1. Carte sur détail chantier web/mobile.
+2. Carte dans formulaire création/édition chantier avec prévisualisation rayon.
+3. Carte globale des chantiers web.
+4. Carte des chantiers du jour mobile.
+5. Photos géolocalisées et présences sur carte.
