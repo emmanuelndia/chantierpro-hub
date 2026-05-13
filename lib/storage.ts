@@ -51,7 +51,7 @@ function getR2StorageConfig(): R2StorageConfig | null {
 
   return {
     provider: 'r2',
-    endpoint: endpoint.replace(/\/+$/, ''),
+    endpoint: normalizeR2Endpoint(endpoint, bucket),
     bucket,
     accessKeyId,
     secretAccessKey,
@@ -396,6 +396,15 @@ function signR2HeaderRequest(
 
 function buildR2ObjectUrl(config: R2StorageConfig, storageKey: string) {
   return `${config.endpoint}/${encodePathSegment(config.bucket)}/${encodeStorageKey(storageKey)}`;
+}
+
+function normalizeR2Endpoint(endpoint: string, bucket: string) {
+  const normalized = endpoint.replace(/\/+$/, '');
+  const bucketSuffix = `/${bucket}`;
+
+  return normalized.endsWith(bucketSuffix)
+    ? normalized.slice(0, -bucketSuffix.length)
+    : normalized;
 }
 
 function buildCredentialScope(shortDate: string) {

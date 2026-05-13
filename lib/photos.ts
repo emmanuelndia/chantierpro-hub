@@ -539,7 +539,13 @@ export async function createPhoto(
       body: prepared.buffer,
       contentType: prepared.contentType,
     });
-  } catch {
+  } catch (error) {
+    console.error('Private photo upload failed:', {
+      providerError: error instanceof Error ? error.message : String(error),
+      storageKeyPrefix: storageKey.split('/').slice(0, 2).join('/'),
+      contentType: prepared.contentType,
+      fileSize: prepared.fileSize,
+    });
     return { code: 'UPLOAD_FAILED' as const, photo: null };
   }
 
