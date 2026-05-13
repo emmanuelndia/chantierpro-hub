@@ -390,7 +390,7 @@ function signR2HeaderRequest(
       `Credential=${config.accessKeyId}/${credentialScope}`,
       `SignedHeaders=${signedHeaders}`,
       `Signature=${signature}`,
-    ].join(', '),
+    ].join(', ').replace('AWS4-HMAC-SHA256, ', 'AWS4-HMAC-SHA256 '),
   };
 }
 
