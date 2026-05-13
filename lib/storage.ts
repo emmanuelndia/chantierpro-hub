@@ -192,6 +192,30 @@ export async function createSignedStorageUrl(storageKey: string) {
   return data.signedUrl;
 }
 
+export async function fetchPrivateStorageObject(storageKey: string) {
+  const config = getStorageConfig();
+
+  if (!config) {
+    return fetch(await createSignedStorageUrl(storageKey), { cache: 'no-store' });
+  }
+
+  if (config.provider === 'r2') {
+    const url = buildR2ObjectUrl(config, storageKey);
+    const headers = signR2HeaderRequest(config, {
+      method: 'GET',
+      url,
+      payloadHash: EMPTY_PAYLOAD_HASH,
+    });
+
+    return fetch(url, {
+      cache: 'no-store',
+      headers,
+    });
+  }
+
+  return fetch(await createSignedStorageUrl(storageKey), { cache: 'no-store' });
+}
+
 export async function removePrivateStorageObject(storageKey: string) {
   const config = getStorageConfig();
 
@@ -305,7 +329,7 @@ function createPresignedR2Url(config: R2StorageConfig, storageKey: string, expir
 function signR2HeaderRequest(
   config: R2StorageConfig,
   payload: {
-    method: 'PUT' | 'DELETE';
+    method: 'GET' | 'PUT' | 'DELETE';
     url: string;
     payloadHash: string;
     contentType?: string;

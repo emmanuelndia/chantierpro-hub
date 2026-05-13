@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthUserFromRequest } from '@/lib/auth/request-user';
-import { createSignedStorageUrl } from '@/lib/storage';
+import { fetchPrivateStorageObject } from '@/lib/storage';
 import { getAccessiblePhotoStorageById, jsonPhotoError } from '@/lib/photos';
 
 export async function GET(
@@ -26,23 +26,15 @@ export async function GET(
     return jsonPhotoError('NOT_FOUND', 404, 'Photo introuvable.');
   }
 
-  let signedUrl: string;
-
   try {
-    signedUrl = await createSignedStorageUrl(photo.storageKey);
-  } catch (error) {
-    console.error('Unable to create signed photo URL:', params.id, error);
-    return jsonPhotoError(
-      'STORAGE_SIGNED_URL_FAILED',
-      500,
-      "Impossible de générer l'URL de la photo.",
-    );
-  }
-
-  try {
-    const response = await fetch(signedUrl, { cache: 'no-store' });
+    const response = await fetchPrivateStorageObject(photo.storageKey);
 
     if (!response.ok || !response.body) {
+      console.error('Unable to load private photo object:', {
+        photoId: params.id,
+        storageStatus: response.status,
+        storageContentType: response.headers.get('content-type'),
+      });
       return jsonPhotoError('STORAGE_SIGNED_URL_FAILED', 502, 'Impossible de charger la photo.');
     }
 
@@ -54,7 +46,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Unable to stream signed photo:', params.id, error);
+    console.error('Unable to stream private photo:', params.id, error);
     return jsonPhotoError('STORAGE_SIGNED_URL_FAILED', 502, 'Impossible de charger la photo.');
   }
 }
