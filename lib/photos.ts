@@ -1174,6 +1174,7 @@ export async function getAccessiblePhotoStorageById(
       siteId: true,
       uploadedById: true,
       storageKey: true,
+      url: true,
       isDeleted: true,
       site: {
         select: {

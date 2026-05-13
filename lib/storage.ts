@@ -126,6 +126,10 @@ export async function uploadPrivateStorageObject(payload: {
   const config = getStorageConfig();
 
   if (!config) {
+    if (!canUseMockStorage()) {
+      throw new Error('Private storage provider is not configured');
+    }
+
     return {
       url: `mock-storage://${payload.storageKey}`,
     };
@@ -165,6 +169,10 @@ export async function createSignedStorageUrl(storageKey: string) {
   const config = getStorageConfig();
 
   if (!config) {
+    if (!canUseMockStorage()) {
+      throw new Error('Private storage provider is not configured');
+    }
+
     const expiresAt = Math.floor(Date.now() / 1000) + STORAGE_SIGNED_URL_TTL_SECONDS;
     const pathname = `${MOCK_STORAGE_BASE_URL}/${encodeURIComponent(storageKey)}`;
     const signature = signMockUrl(pathname, expiresAt);
@@ -196,6 +204,10 @@ export async function fetchPrivateStorageObject(storageKey: string) {
   const config = getStorageConfig();
 
   if (!config) {
+    if (!canUseMockStorage()) {
+      throw new Error('Private storage provider is not configured');
+    }
+
     return fetch(await createSignedStorageUrl(storageKey), { cache: 'no-store' });
   }
 
@@ -441,6 +453,10 @@ function getMockSigningSecret() {
     process.env.JWT_SECRET ??
     'chantierpro-photo-mock-signature-secret'
   );
+}
+
+function canUseMockStorage() {
+  return process.env.NODE_ENV !== 'production' || process.env.ALLOW_MOCK_STORAGE === 'true';
 }
 
 function signMockUrl(pathname: string, expiresAt: number) {

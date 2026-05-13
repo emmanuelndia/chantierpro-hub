@@ -26,6 +26,13 @@ export async function GET(
     return jsonPhotoError('NOT_FOUND', 404, 'Photo introuvable.');
   }
 
+  if (photo.url.startsWith('mock-storage://')) {
+    console.error('Photo was saved with mock storage and cannot be streamed:', {
+      photoId: params.id,
+    });
+    return jsonPhotoError('STORAGE_SIGNED_URL_FAILED', 502, 'Photo non stockee dans R2.');
+  }
+
   try {
     const response = await fetchPrivateStorageObject(photo.storageKey);
 
