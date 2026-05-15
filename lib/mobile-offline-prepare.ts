@@ -18,7 +18,7 @@ const OFFLINE_ROUTE_URLS = [
   '/mobile/login',
   '/rapport-session',
 ];
-const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v4';
+const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v5';
 
 const DAY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const WEEK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -32,6 +32,7 @@ export type MobileOfflinePreparationResult = {
   date: string;
   preparedAt: string;
   routesPrepared: number;
+  missingRoutes: string[];
   dataPrepared: string[];
   errors: string[];
   status: 'ready' | 'incomplete';
@@ -42,7 +43,8 @@ export async function prepareMobileOfflineMode() {
   const preparedAt = new Date().toISOString();
   const errors: string[] = [];
   const dataPrepared: string[] = [];
-  const routesPrepared = await warmMobileRoutes(errors);
+  await warmMobileRoutes(errors);
+  const missingRoutes = await getMissingPreparedRoutes();
 
   await cacheJson<TodaySitesResponse>('/api/users/me/sites/today', 'sites-today', DAY_CACHE_TTL_MS, dataPrepared, errors);
   await cacheJson<MobilePhotoSitesResponse>('/api/mobile/photo/sites', 'mobile-photo-sites', DAY_CACHE_TTL_MS, dataPrepared, errors);
@@ -67,10 +69,11 @@ export async function prepareMobileOfflineMode() {
   const result: MobileOfflinePreparationResult = {
     date: todayKey,
     preparedAt,
-    routesPrepared,
+    routesPrepared: OFFLINE_ROUTE_URLS.length - missingRoutes.length,
+    missingRoutes,
     dataPrepared,
     errors,
-    status: errors.length === 0 ? 'ready' : 'incomplete',
+    status: errors.length === 0 && missingRoutes.length === 0 ? 'ready' : 'incomplete',
   };
 
   await setMobileOfflineCache('offline-preparation-meta', result, null);
@@ -96,7 +99,6 @@ export async function getMobileOfflinePreparationState() {
 }
 
 async function warmMobileRoutes(errors: string[]) {
-  let prepared = 0;
   const pageCache = await caches.open(MOBILE_PAGE_CACHE_NAME);
 
   await Promise.all(
@@ -112,7 +114,6 @@ async function warmMobileRoutes(errors: string[]) {
         const response = await fetch(request);
         if (response.ok) {
           await pageCache.put(url, response.clone());
-          prepared += 1;
         } else {
           errors.push(`${url}: ${response.status}`);
         }
@@ -122,7 +123,18 @@ async function warmMobileRoutes(errors: string[]) {
     }),
   );
 
-  return prepared;
+}
+
+async function getMissingPreparedRoutes() {
+  const pageCache = await caches.open(MOBILE_PAGE_CACHE_NAME);
+  const matches = await Promise.all(
+    OFFLINE_ROUTE_URLS.map(async (url) => ({
+      url,
+      response: await pageCache.match(url, { ignoreSearch: true }),
+    })),
+  );
+
+  return matches.filter((match) => !match.response).map((match) => match.url);
 }
 
 async function cacheJson<T>(

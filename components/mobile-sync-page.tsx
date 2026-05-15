@@ -117,8 +117,14 @@ export function MobileSyncPage() {
             </p>
           </div>
           {preparation ? (
-            <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700">
-              Pret
+            <span
+              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-black ${
+                preparation.status === 'ready'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {preparation.status === 'ready' ? 'Pret' : 'Incomplet'}
             </span>
           ) : null}
         </div>
@@ -138,6 +144,12 @@ export function MobileSyncPage() {
               </p>
             ))}
           </div>
+        ) : null}
+
+        {preparation?.missingRoutes?.length ? (
+          <p className="mt-3 text-xs font-semibold text-orange-700">
+            {preparation.missingRoutes.length} page(s) encore absente(s) du cache de navigation.
+          </p>
         ) : null}
 
         <button

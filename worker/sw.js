@@ -1,6 +1,6 @@
-const PRECACHE_NAME = 'chantierpro-precache-v4';
-const STATIC_CACHE_NAME = 'chantierpro-static-v4';
-const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v4';
+const PRECACHE_NAME = 'chantierpro-precache-v5';
+const STATIC_CACHE_NAME = 'chantierpro-static-v5';
+const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v5';
 const OFFLINE_FALLBACK_URL = '/mobile/offline';
 const ESSENTIAL_MOBILE_ROUTES = [
   '/mobile/home',

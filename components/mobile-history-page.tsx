@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { SignedImage } from '@/components/mobile/SignedImage';
+import { MobileOfflineLink } from '@/components/mobile-offline-link';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
   MobileHistoryPeriod,
@@ -395,12 +395,12 @@ function SessionDetail({
             <p className="mt-2 text-sm leading-6 text-amber-900">
               Cette session est terminee sans rapport. Vous pouvez encore le soumettre maintenant.
             </p>
-            <Link
+            <MobileOfflineLink
               className="mt-4 inline-flex min-h-12 items-center justify-center rounded-lg bg-amber-600 px-4 text-sm font-black text-white"
               href={`/rapport-session?sessionId=${encodeURIComponent(session.departureRecordId)}`}
             >
               Rediger le rapport
-            </Link>
+            </MobileOfflineLink>
           </section>
         ) : null}
 

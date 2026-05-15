@@ -1,12 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import { haversineDistanceKm } from '@/lib/haversine';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import { MobilePendingReportsAlert } from '@/components/mobile-pending-reports-alert';
+import { MobileOfflineLink } from '@/components/mobile-offline-link';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { SessionStatus, TodayClockInView } from '@/types/clock-in';
 import type { TodaySiteItem } from '@/types/projects';
@@ -332,12 +332,12 @@ function PrimaryActionButton({
   }[tone];
 
   return (
-    <Link
+    <MobileOfflineLink
       className={`flex min-h-20 w-full items-center justify-center rounded-lg px-5 text-center text-base font-black tracking-[0.08em] shadow-lg transition active:scale-[0.98] ${toneClassName}`}
       href={`/mobile/clock-in?siteId=${encodeURIComponent(siteId)}&intent=${intent}`}
     >
       {label}
-    </Link>
+    </MobileOfflineLink>
   );
 }
 

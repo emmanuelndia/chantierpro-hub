@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { MobileOfflineLink } from '@/components/mobile-offline-link';
 import { authFetch } from '@/lib/auth/client-session';
 import type { PendingSessionReportsResponse } from '@/types/mobile-session-report';
 
@@ -40,12 +40,12 @@ export function MobilePendingReportsAlert() {
             Derniere : {latest.siteName} - {formatDateTime(latest.endedAt)}
           </p>
         </div>
-        <Link
+        <MobileOfflineLink
           className="shrink-0 rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white"
           href={`/rapport-session?sessionId=${encodeURIComponent(latest.departureRecordId)}`}
         >
           Rediger
-        </Link>
+        </MobileOfflineLink>
       </div>
     </section>
   );

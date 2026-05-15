@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { MobileOfflineLink } from '@/components/mobile-offline-link';
 import type { getMobileNavigationForRole } from '@/lib/navigation';
 import type { MobileTabIcon } from '@/types/navigation';
 
@@ -31,7 +31,7 @@ export function BottomTabBar({
           const showHistoryBadge = tab.href === '/mobile/history' && incompleteSessionCount > 0;
 
           return (
-            <Link
+            <MobileOfflineLink
               key={tab.href}
               className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-semibold transition ${
                 active
@@ -52,7 +52,7 @@ export function BottomTabBar({
                 ) : null}
               </span>
               <span className="max-w-full truncate">{tab.label}</span>
-            </Link>
+            </MobileOfflineLink>
           );
         })}
       </div>
