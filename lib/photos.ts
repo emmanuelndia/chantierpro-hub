@@ -44,7 +44,7 @@ const PHOTO_UPLOAD_ROLES: readonly Role[] = [
 ];
 const PHOTO_DELETE_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
 const PHOTO_LOG_ROLES: readonly Role[] = [Role.DIRECTION, Role.ADMIN];
-const ADMIN_LOG_ROLES: readonly Role[] = [Role.ADMIN];
+const ADMIN_LOG_ROLES: readonly Role[] = [Role.DIRECTION, Role.ADMIN];
 const PHOTO_SITE_FULL_VIEW_ROLES: readonly Role[] = [
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,

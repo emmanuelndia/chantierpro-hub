@@ -38,13 +38,6 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Presences / RH'],
   },
   {
-    href: '/web/consolidated',
-    label: 'Vue consolidee',
-    icon: 'consolidated',
-    roles: ['DIRECTION', 'ADMIN'],
-    breadcrumb: ['Vue consolidee'],
-  },
-  {
     href: '/web/photos',
     label: 'Galerie photos',
     icon: 'photos',
@@ -69,7 +62,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/web/supervisor-scopes',
     label: 'Perimetres GS',
     icon: 'users',
-    roles: ['GENERAL_SUPERVISOR', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    roles: ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
     breadcrumb: ['Perimetres GS'],
   },
   {
