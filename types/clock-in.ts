@@ -61,6 +61,8 @@ export type ClockInInput = {
   longitude: number;
   accuracy: number | null;
   timestampLocal: string;
+  gpsCapturedAt?: string;
+  gpsSource?: 'LIVE' | 'CACHED';
   comment?: string | null;
 };
 

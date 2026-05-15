@@ -1,0 +1,256 @@
+CHANTIERPRO - PLAN DE RECETTE FINALE
+====================================
+
+Objectif
+--------
+Valider que ChantierPro repond aux besoins metier avant ouverture a de vrais utilisateurs.
+La recette doit etre executee sur l'environnement de production ou sur un environnement miroir tres proche.
+
+
+1. PREPARATION DE LA RECETTE
+----------------------------
+Jeux de donnees minimaux :
+- 1 ADMIN ;
+- 1 DIRECTION ;
+- 2 PROJECT_MANAGER ;
+- 2 GENERAL_SUPERVISOR ;
+- 1 COORDINATOR ;
+- plusieurs SUPERVISOR ;
+- plusieurs projets ;
+- plusieurs sites par projet ;
+- plusieurs equipes ;
+- plusieurs ressources deja affectees et non affectees.
+
+Materiel :
+- 1 ordinateur pour la version web ;
+- au moins 2 telephones reels pour la version mobile ;
+- 1 scenario avec reseau stable ;
+- 1 scenario avec coupure reseau ;
+- 1 scenario GPS reel si possible.
+
+
+2. AUTHENTIFICATION
+-------------------
+Cas a tester :
+1. Connexion role valide.
+2. Mauvais mot de passe.
+3. Compte inactif.
+4. Expiration access token puis refresh.
+5. Navigation directe vers une route protegee.
+6. Deconnexion.
+
+Resultats attendus :
+- session valide conservee ;
+- aucune erreur 401 injustifiee ;
+- utilisateurs inactifs bloques ;
+- routes protegees non accessibles sans session.
+
+
+3. ADMINISTRATION UTILISATEURS
+------------------------------
+Cas a tester :
+1. Creer un utilisateur SUPERVISOR.
+2. Creer un utilisateur GENERAL_SUPERVISOR.
+3. Modifier un utilisateur.
+4. Desactiver puis reactiver un utilisateur.
+5. Verifier presence des nouveaux utilisateurs dans les selecteurs terrain.
+
+Resultats attendus :
+- les nouveaux utilisateurs sont actifs si prevu ;
+- ils apparaissent dans les selecteurs equipes / planning ;
+- HR n'apparait pas dans les selecteurs terrain ;
+- la pagination admin reste correcte.
+
+
+4. PROJETS, CHANTIERS, EQUIPES
+------------------------------
+Cas a tester :
+1. Creer un projet.
+2. Creer plusieurs chantiers dans un projet.
+3. Modifier uniquement les coordonnees GPS d'un chantier.
+4. Modifier uniquement un champ projet.
+5. Creer une equipe.
+6. Ajouter plusieurs membres.
+7. Retirer un membre.
+8. Reajouter le meme membre.
+
+Resultats attendus :
+- les modifications partielles fonctionnent ;
+- le membre retire puis reajoute ne cree pas de doublon ;
+- les membres inactifs ne polluent pas les listes operationnelles ;
+- une ressource peut appartenir a plusieurs equipes si les regles le permettent.
+
+
+5. PERIMETRES DES SUPERVISEURS GENERAUX
+---------------------------------------
+Cas a tester :
+1. Un chef de projet confie le site A a GS1.
+2. Le meme chef confie le site B a GS1.
+3. Le site A est aussi confie a GS2.
+4. GS1 ouvre son planning.
+5. GS1 est assigne comme ressource sur un autre site non confie.
+
+Resultats attendus :
+- GS1 voit A et B dans son planning ;
+- GS1 ne voit pas les sites non confies ;
+- GS2 peut aussi gerer A ;
+- une assignation comme ressource ne donne pas automatiquement des droits de planification.
+
+
+6. PLANNING
+-----------
+Cas a tester :
+1. PROJECT_MANAGER assigne une ressource sur un de ses sites.
+2. GENERAL_SUPERVISOR assigne une ressource sur un site confie.
+3. Meme ressource sur plusieurs chantiers le meme jour.
+4. Plusieurs taches differentes pour la meme ressource sur le meme chantier.
+5. Tentative de doublon exact de tache.
+6. Duplication depuis hier.
+7. Modification d'une tache.
+8. Suppression logique d'une tache.
+
+Resultats attendus :
+- une meme ressource peut tourner entre plusieurs chantiers ;
+- plusieurs taches d'un meme chantier apparaissent dans une seule carte groupee ;
+- le doublon exact est refuse ;
+- les permissions planning sont respectees.
+
+
+7. CHANTIERS DU JOUR
+--------------------
+Cas a tester :
+1. Une ressource est assignee aux sites A et B.
+2. Elle est membre d'une equipe sur le site C sans assignation du jour.
+3. Elle ouvre l'accueil terrain.
+
+Resultats attendus :
+- A et B apparaissent ;
+- C n'apparait pas ;
+- les chantiers du jour viennent du planning et non de l'equipe.
+
+
+8. POINTAGE
+-----------
+Cas a tester :
+1. Entree dans le rayon du site A.
+2. Pause puis reprise.
+3. Entree refusee hors rayon.
+4. Deplacement vers le site B.
+5. Entree dans B pendant que A est encore ouvert.
+6. Fermeture distante de A.
+7. Tentative de sortie distante sans justification.
+
+Resultats attendus :
+- entree geolocalisee obligatoire ;
+- pause liee a la session ouverte ;
+- plusieurs sessions possibles si la ressource est deplacee ;
+- sortie distante autorisee seulement dans le scenario prevu ;
+- latitude, longitude et distance reelles sont conservees.
+
+
+9. PHOTOS
+---------
+Cas a tester :
+1. Photo chantier simple.
+2. Photo liee a une tache.
+3. Affichage galerie.
+4. Affichage historique.
+5. Affichage session report.
+6. Photo sur chantier A puis chantier B.
+7. Upload apres coupure reseau.
+
+Resultats attendus :
+- stockage dans R2 ;
+- affichage via /api/photos/:id/content ;
+- aucune URL signee exposee ;
+- les photos de tache restent liees a la bonne assignation.
+
+
+10. RAPPORTS
+------------
+Cas a tester :
+1. Soumettre le rapport juste apres la sortie.
+2. Cliquer sur Passer apres la sortie.
+3. Verifier l'alerte "Rapports a completer".
+4. Ouvrir l'historique et rediger plus tard.
+5. Tenter de renvoyer un rapport deja soumis.
+6. Consulter les rapports par role.
+7. Telecharger les rapports autorises.
+
+Resultats attendus :
+- rattrapage tardif possible ;
+- rapport unique par session ;
+- rapports accessibles aux roles prevus ;
+- aucun 401 injustifie.
+
+
+11. OFFLINE
+-----------
+Cas a tester :
+1. Se connecter avec internet.
+2. Preparer le mode hors ligne.
+3. Couper internet.
+4. Naviguer entre les ecrans essentiels.
+5. Pointer offline.
+6. Prendre une photo offline.
+7. Verifier les files d'attente.
+8. Retablir internet.
+9. Synchroniser.
+
+Resultats attendus :
+- navigation possible sur les routes preparees ;
+- donnees cachees affichees comme hors ligne ;
+- actions stockees localement ;
+- synchronisation au retour reseau ;
+- les refus serveur restent visibles si la donnee est devenue invalide.
+
+
+12. VERSION WEB
+---------------
+Cas a tester :
+1. Dashboard.
+2. Projets.
+3. Mes projets.
+4. Rapports terrain.
+5. Presences RH.
+6. Galerie photo.
+7. Perimetres GS.
+8. Actions via menus modernes.
+
+Resultats attendus :
+- pages lisibles ;
+- filtres fonctionnels ;
+- actions accessibles ;
+- aucun debordement visuel ;
+- role et perimetre respectes.
+
+
+13. SECURITE ET AUTORISATIONS
+-----------------------------
+Cas a tester :
+1. Sans session.
+2. Role interdit.
+3. Ressource hors perimetre.
+4. Acces direct URL API.
+5. Telechargement direct.
+6. Image directe.
+
+Resultats attendus :
+- 401 seulement si non connecte ;
+- 403 si role interdit ;
+- 404 ou 403 pour hors scope selon convention ;
+- cookie + Bearer supportes selon type de route ;
+- aucune fuite de secret.
+
+
+14. CRITERES DE VALIDATION
+--------------------------
+Recette acceptee si :
+- tous les parcours critiques sont verts ;
+- aucun bug bloquant connu ;
+- aucun probleme de stockage photo ;
+- aucun probleme de migration ;
+- aucune anomalie de permission ;
+- offline et sync valides sur telephone reel ;
+- pilotes metier valident les flux.
+

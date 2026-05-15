@@ -15,6 +15,7 @@ const OFFLINE_ROUTE_URLS = [
   '/mobile/sync',
   '/mobile/history',
   '/mobile/offline',
+  '/rapport-session',
 ];
 
 const DAY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -26,10 +27,12 @@ type TodaySitesResponse = {
 };
 
 export type MobileOfflinePreparationResult = {
+  date: string;
   preparedAt: string;
   routesPrepared: number;
   dataPrepared: string[];
   errors: string[];
+  status: 'ready' | 'incomplete';
 };
 
 export async function prepareMobileOfflineMode() {
@@ -59,14 +62,34 @@ export async function prepareMobileOfflineMode() {
   await cacheJson<TodayClockInView>('/api/users/me/clock-in', 'clock-in-today', 30 * 60 * 1000, dataPrepared, errors);
 
   const result: MobileOfflinePreparationResult = {
+    date: todayKey,
     preparedAt,
     routesPrepared,
     dataPrepared,
     errors,
+    status: errors.length === 0 ? 'ready' : 'incomplete',
   };
 
   await setMobileOfflineCache('offline-preparation-meta', result, null);
+  window.dispatchEvent(new Event('mobile-offline-prepared'));
   return result;
+}
+
+export async function getMobileOfflinePreparationState() {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const { getMobileOfflineCache } = await import('@/lib/mobile-offline-db');
+  const cached = await getMobileOfflineCache<MobileOfflinePreparationResult>('offline-preparation-meta');
+  const payload = cached?.payload ?? null;
+
+  if (!payload) {
+    return { status: 'missing' as const, preparation: null };
+  }
+
+  if (payload.date !== todayKey) {
+    return { status: 'obsolete' as const, preparation: payload };
+  }
+
+  return { status: payload.status ?? (payload.errors.length === 0 ? 'ready' : 'incomplete'), preparation: payload };
 }
 
 async function warmMobileRoutes(errors: string[]) {

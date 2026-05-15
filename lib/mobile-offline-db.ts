@@ -3,7 +3,7 @@ import { authFetch } from '@/lib/auth/client-session';
 import type { BatchSyncItemInput, BatchSyncItemResult } from '@/types/clock-in';
 
 const DB_NAME = 'chantierpro-mobile-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const LEGACY_CLOCK_IN_STORAGE_KEY = 'chantierpro:mobile-clock-in-offline:v1';
 const LEGACY_MIGRATION_KEY = 'chantierpro:mobile-offline:migrated-clock-ins:v1';
 const LEGACY_PHOTO_DB_NAME = 'chantierpro-mobile-photo';
@@ -17,6 +17,8 @@ type StoreName =
   | 'comments'
   | 'photos'
   | 'reports'
+  | 'sessionReports'
+  | 'taskUpdates'
   | 'cache'
   | 'syncLogs'
   | 'clientMappings';
@@ -37,6 +39,24 @@ export type OfflineReportItem = {
   content: string;
   clockInRecordId?: string;
   clockInClientId?: string;
+  timestampLocal: string;
+};
+
+export type OfflineSessionReportItem = {
+  clientId: string;
+  clockInRecordId: string;
+  content: string;
+  progressPercentage: number;
+  blockageNote?: string;
+  assignmentId?: string;
+  photoIds: string[];
+  timestampLocal: string;
+};
+
+export type OfflineTaskUpdateItem = {
+  id: string;
+  assignmentId: string;
+  status: 'COMPLETED';
   timestampLocal: string;
 };
 
@@ -73,6 +93,8 @@ export type MobileOfflinePendingCounts = {
   comments: number;
   photos: number;
   reports: number;
+  sessionReports: number;
+  taskUpdates: number;
 };
 
 type ClientMapping = {
@@ -117,6 +139,18 @@ export async function enqueueOfflineReport(item: OfflineReportItem) {
   db.close();
 }
 
+export async function enqueueOfflineSessionReport(item: OfflineSessionReportItem) {
+  const db = await openDb();
+  await storeRequest(db, 'sessionReports', 'readwrite', (store) => store.put(item));
+  db.close();
+}
+
+export async function enqueueOfflineTaskUpdate(item: OfflineTaskUpdateItem) {
+  const db = await openDb();
+  await storeRequest(db, 'taskUpdates', 'readwrite', (store) => store.put(item));
+  db.close();
+}
+
 export async function enqueuePendingMobilePhoto(photo: PendingMobilePhoto) {
   const db = await openDb();
   await storeRequest(db, 'photos', 'readwrite', (store) => store.put(photo));
@@ -127,14 +161,16 @@ export async function getMobileOfflinePendingCounts(): Promise<MobileOfflinePend
   await migrateLegacyClockInQueue();
   await migrateLegacyPhotoQueue();
   const db = await openDb();
-  const [clockIns, comments, photos, reports] = await Promise.all([
+  const [clockIns, comments, photos, reports, sessionReports, taskUpdates] = await Promise.all([
     storeRequest<number>(db, 'clockIns', 'readonly', (store) => store.count()),
     storeRequest<number>(db, 'comments', 'readonly', (store) => store.count()),
     storeRequest<number>(db, 'photos', 'readonly', (store) => store.count()),
     storeRequest<number>(db, 'reports', 'readonly', (store) => store.count()),
+    storeRequest<number>(db, 'sessionReports', 'readonly', (store) => store.count()),
+    storeRequest<number>(db, 'taskUpdates', 'readonly', (store) => store.count()),
   ]);
   db.close();
-  return { clockIns, comments, photos, reports };
+  return { clockIns, comments, photos, reports, sessionReports, taskUpdates };
 }
 
 export async function countPendingMobilePhotos() {
@@ -225,12 +261,20 @@ async function runSync(mode: 'auto' | 'manual'): Promise<MobileOfflineSyncLog> {
     await syncClockIns(errors);
     await syncReports(errors);
     await syncPhotos(errors);
+    await syncSessionReports(errors);
+    await syncTaskUpdates(errors);
   } catch (error) {
     errors.push(error instanceof Error ? error.message : 'Synchronisation interrompue.');
   }
 
   const countsAfter = await getMobileOfflinePendingCounts();
-  const pendingAfter = countsAfter.clockIns + countsAfter.comments + countsAfter.photos + countsAfter.reports;
+  const pendingAfter =
+    countsAfter.clockIns +
+    countsAfter.comments +
+    countsAfter.photos +
+    countsAfter.reports +
+    countsAfter.sessionReports +
+    countsAfter.taskUpdates;
   const status: MobileOfflineSyncLog['status'] =
     errors.length === 0 && pendingAfter === 0 ? 'success' : errors.length > 0 ? 'error' : 'partial';
 
@@ -376,6 +420,50 @@ async function syncPhotos(errors: string[]) {
   }
 }
 
+async function syncSessionReports(errors: string[]) {
+  const db = await openDb();
+  const reports = await getAll<OfflineSessionReportItem>(db, 'sessionReports');
+  db.close();
+
+  for (const report of reports.sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal))) {
+    const response = await authFetch('/api/mobile/session-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(report),
+    });
+
+    if (response.ok || response.status === 409) {
+      const nextDb = await openDb();
+      await storeRequest(nextDb, 'sessionReports', 'readwrite', (store) => store.delete(report.clientId));
+      nextDb.close();
+    } else {
+      errors.push('Rapport de session en attente non synchronise.');
+    }
+  }
+}
+
+async function syncTaskUpdates(errors: string[]) {
+  const db = await openDb();
+  const updates = await getAll<OfflineTaskUpdateItem>(db, 'taskUpdates');
+  db.close();
+
+  for (const update of updates.sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal))) {
+    const response = await authFetch(`/api/mobile/planning/assignment/${update.assignmentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: update.status }),
+    });
+
+    if (response.ok) {
+      const nextDb = await openDb();
+      await storeRequest(nextDb, 'taskUpdates', 'readwrite', (store) => store.delete(update.id));
+      nextDb.close();
+    } else {
+      errors.push('Mise a jour de tache en attente non synchronisee.');
+    }
+  }
+}
+
 async function appendSyncLog(log: MobileOfflineSyncLog) {
   const db = await openDb();
   await storeRequest(db, 'syncLogs', 'readwrite', (store) => store.put(log));
@@ -471,6 +559,8 @@ function openDb() {
       ensureStore(db, 'comments', 'clientId');
       ensureStore(db, 'photos', 'id');
       ensureStore(db, 'reports', 'clientId');
+      ensureStore(db, 'sessionReports', 'clientId');
+      ensureStore(db, 'taskUpdates', 'id');
       ensureStore(db, 'cache', 'key');
       ensureStore(db, 'syncLogs', 'id');
       ensureStore(db, 'clientMappings', 'clockInClientId');

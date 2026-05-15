@@ -1,0 +1,252 @@
+CHANTIERPRO - PROCEDURE ROLLBACK ET INCIDENT
+============================================
+
+Objectif
+--------
+Permettre de reagir vite si un incident apparait apres mise en production :
+- panne applicative ;
+- echec photo ;
+- migration incorrecte ;
+- bug de pointage ;
+- probleme d'authentification ;
+- regression bloquante.
+
+
+1. ROLES ET RESPONSABILITES
+---------------------------
+Responsable technique principal :
+- Nom :
+- Contact :
+
+Responsable metier :
+- Nom :
+- Contact :
+
+Responsable base de donnees / sauvegardes :
+- Nom :
+- Contact :
+
+Canal d'incident :
+- Exemple : groupe WhatsApp / Teams / Slack / email
+
+
+2. CLASSIFICATION DES INCIDENTS
+-------------------------------
+SEV-1 - Critique
+- application inaccessible ;
+- connexion impossible pour la majorite ;
+- photos inutilisables globalement ;
+- base de donnees indisponible ;
+- perte ou corruption de donnees ;
+- pointage impossible pour tous.
+
+SEV-2 - Majeur
+- une fonction importante casse pour un role ;
+- rapports impossibles ;
+- synchronisation offline bloquee ;
+- erreurs 500 frequentes ;
+- probleme sur une partie importante des utilisateurs.
+
+SEV-3 - Mineur
+- anomalie visuelle ;
+- bug de confort ;
+- erreur isolee avec contournement simple.
+
+
+3. PREMIERES ACTIONS EN CAS D'INCIDENT
+--------------------------------------
+1. Noter :
+   - heure ;
+   - environnement ;
+   - URL concernee ;
+   - role utilisateur ;
+   - action effectuee ;
+   - message affiche ;
+   - captures / logs disponibles.
+
+2. Verifier rapidement :
+   - Vercel logs ;
+   - dernier deploiement ;
+   - variables modifiees recemment ;
+   - migrations recemment appliquees ;
+   - disponibilite Neon ;
+   - disponibilite R2.
+
+3. Qualifier :
+   - bug isole ;
+   - regression apres release ;
+   - incident infra ;
+   - erreur de configuration ;
+   - probleme de donnees.
+
+4. Informer les personnes concernees si SEV-1 ou SEV-2.
+
+
+4. PROCEDURE DE ROLLBACK APPLICATION
+------------------------------------
+Utiliser quand :
+- la version courante provoque une regression forte ;
+- l'ancienne version fonctionnait ;
+- aucune migration irreversible ne bloque le retour.
+
+Etapes :
+1. Identifier le dernier deploiement stable sur Vercel.
+2. Comparer rapidement :
+   - commit courant ;
+   - commit stable precedent ;
+   - migrations associees.
+3. Dans Vercel :
+   - promouvoir le deploiement stable precedent ;
+   - ou redeployer le tag / commit stable.
+4. Verifier apres rollback :
+   - login ;
+   - home mobile ;
+   - pointage ;
+   - photo ;
+   - rapport ;
+   - pages critiques web.
+5. Informer les utilisateurs pilotes ou responsables metier.
+6. Ouvrir un ticket correctif avant toute nouvelle release.
+
+
+5. PROCEDURE BASE DE DONNEES
+----------------------------
+Principe :
+- ne jamais improviser sur la base de production ;
+- toujours faire une sauvegarde avant une action risquee ;
+- preferer une correction forward compatible a un rollback destructif.
+
+Avant migration :
+1. Verifier la sauvegarde recente.
+2. Verifier les fichiers prisma/migrations.
+3. Executer :
+   npx prisma migrate deploy
+4. Controler les index / colonnes attendus.
+
+Si migration problematique :
+1. Evaluer si le code peut etre corrige sans rollback schema.
+2. Si restauration necessaire :
+   - figer l'application ;
+   - sauvegarder l'etat courant ;
+   - restaurer depuis backup valide ;
+   - redeployer une version compatible ;
+   - verifier les parcours critiques.
+
+Important :
+- ne jamais utiliser prisma migrate reset en production ;
+- ne jamais utiliser db push en production comme correction improvisee.
+
+
+6. INCIDENTS PHOTOS / R2
+------------------------
+Symptomes possibles :
+- upload echoue ;
+- photos 502 ;
+- anciennes photos visibles mais nouvelles non ;
+- erreur de signature R2 ;
+- objets introuvables.
+
+Verification :
+1. Variables R2 de production.
+2. Endpoint R2.
+3. Type de cle utilisee :
+   - access key id ;
+   - secret access key ;
+   - signature AWS4-HMAC-SHA256.
+4. Logs de POST /api/photos.
+5. Logs de GET /api/photos/:id/content.
+6. Existence de l'objet dans le bucket.
+
+Mesures :
+- si mauvaise configuration recente : corriger variables puis redeployer ;
+- si stockage incomplet : bloquer nouvelles photos si necessaire et corriger avant reprise ;
+- si besoin, migrer les anciens objets vers R2 selon procedure documentee.
+
+
+7. INCIDENTS AUTHENTIFICATION
+-----------------------------
+Symptomes :
+- 401 generalises ;
+- utilisateurs ejectes ;
+- images ou telechargements impossibles ;
+- refresh token non pris en compte.
+
+Verification :
+1. Secrets JWT / refresh.
+2. Cookie :
+   - Secure ;
+   - SameSite=Lax ;
+   - httpOnly ;
+   - path=/.
+3. Variables AUTH_COOKIE_SECURE.
+4. Routes hybrides cookie + Bearer.
+5. Heure systeme / expiration token.
+
+Mesures :
+- corriger config ;
+- redeployer ;
+- forcer reconnexion seulement si necessaire ;
+- verifier images / downloads apres correctif.
+
+
+8. INCIDENTS POINTAGE / OFFLINE
+-------------------------------
+Symptomes :
+- GPS refuse ;
+- session impossible a fermer ;
+- sync bloquee ;
+- actions offline perdues.
+
+Verification :
+1. Permission localisation navigateur.
+2. Chantiers du jour de l'utilisateur.
+3. Assignations planning.
+4. Files IndexedDB en attente.
+5. Endpoint de sync.
+6. Logs serveur au retour reseau.
+
+Mesures :
+- verifier si le probleme est metier, GPS ou reseau ;
+- ne pas supprimer les files offline sans sauvegarde ;
+- conserver les erreurs de sync visibles pour diagnostic.
+
+
+9. COMMUNICATION INCIDENT
+-------------------------
+Message initial recommande :
+"Nous avons identifie un probleme sur [fonction]. L'equipe analyse actuellement l'incident. Prochaine mise a jour a [heure]."
+
+Message de resolution :
+"Le probleme sur [fonction] est corrige depuis [heure]. Merci de signaler tout comportement encore anormal."
+
+Toujours communiquer :
+- ce qui est touche ;
+- ce qui ne l'est pas ;
+- contournement eventuel ;
+- prochaine mise a jour.
+
+
+10. APRES INCIDENT
+------------------
+Dans les 48 heures :
+1. Rediger un bref compte rendu :
+   - cause ;
+   - impact ;
+   - duree ;
+   - resolution ;
+   - prevention.
+2. Ajouter un test ou une verification pour eviter la repetition.
+3. Mettre a jour cette procedure si elle a montre une faiblesse.
+
+
+11. CHECKLIST EXPRESS AVANT CHAQUE RELEASE
+------------------------------------------
+[ ] Sauvegarde recente disponible.
+[ ] Migrations relues.
+[ ] Variables production verifiees.
+[ ] npm run lint OK.
+[ ] npm run build OK.
+[ ] Scenarios critiques testes.
+[ ] Rollback precedent identifie.
+[ ] Personne responsable disponible apres deploiement.
+

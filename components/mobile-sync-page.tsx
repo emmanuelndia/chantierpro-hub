@@ -17,6 +17,8 @@ const emptyCounts: MobileOfflinePendingCounts = {
   comments: 0,
   photos: 0,
   reports: 0,
+  sessionReports: 0,
+  taskUpdates: 0,
 };
 
 export function MobileSyncPage() {
@@ -67,7 +69,13 @@ export function MobileSyncPage() {
 
   const canSync = networkState !== 'offline' && !syncing;
   const canPrepare = networkState !== 'offline' && !preparing;
-  const totalPending = counts.clockIns + counts.comments + counts.photos + counts.reports;
+  const totalPending =
+    counts.clockIns +
+    counts.comments +
+    counts.photos +
+    counts.reports +
+    counts.sessionReports +
+    counts.taskUpdates;
 
   return (
     <div className="space-y-5">
@@ -85,6 +93,8 @@ export function MobileSyncPage() {
         <CountCard label="Photos" value={counts.photos} />
         <CountCard label="Rapports" value={counts.reports} />
         <CountCard label="Commentaires" value={counts.comments} />
+        <CountCard label="Rapports session" value={counts.sessionReports} />
+        <CountCard label="Taches" value={counts.taskUpdates} />
       </section>
 
       <button
@@ -166,7 +176,7 @@ export function MobileSyncPage() {
                   <SyncStatusBadge status={log.status} />
                 </div>
                 <p className="mt-2 text-xs font-semibold text-slate-500">
-                  {log.counts.clockIns} pointages, {log.counts.photos} photos, {log.counts.reports} rapports
+                  {log.counts.clockIns} pointages, {log.counts.photos} photos, {log.counts.reports + log.counts.sessionReports} rapports
                 </p>
                 {log.errors.length > 0 ? (
                   <div className="mt-2 space-y-1">

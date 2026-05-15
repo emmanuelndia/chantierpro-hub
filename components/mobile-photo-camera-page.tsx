@@ -13,9 +13,15 @@ import {
   syncPendingMobilePhotos,
   type PendingMobilePhoto,
 } from '@/lib/mobile-photo-offline';
-import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
+import {
+  createOfflineId,
+  enqueueOfflineTaskUpdate,
+  getMobileOfflineCache,
+  setMobileOfflineCache,
+} from '@/lib/mobile-offline-db';
 import type { MobilePhotoSiteOption, MobilePhotoSitesResponse } from '@/types/mobile-photo';
 import type { SupervisorMyAssignment, SupervisorMyAssignmentsResponse } from '@/types/mobile-planning';
+import { getRecentMobileGpsPosition, rememberMobileGpsPosition } from '@/lib/mobile-geolocation';
 
 type CameraState = 'loading' | 'ready' | 'denied';
 type FacingMode = 'environment' | 'user';
@@ -325,6 +331,12 @@ export function MobilePhotoCameraPage() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        void rememberMobileGpsPosition({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
+          capturedAt: new Date(position.timestamp).toISOString(),
+        });
         setGpsState({
           status: 'ready',
           latitude: position.coords.latitude,
@@ -332,7 +344,21 @@ export function MobilePhotoCameraPage() {
           accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
         });
       },
-      () => setGpsState({ status: 'unavailable' }),
+      () => {
+        void getRecentMobileGpsPosition().then((cachedPosition) => {
+          if (!cachedPosition) {
+            setGpsState({ status: 'unavailable' });
+            return;
+          }
+
+          setGpsState({
+            status: 'ready',
+            latitude: cachedPosition.latitude,
+            longitude: cachedPosition.longitude,
+            accuracy: cachedPosition.accuracy,
+          });
+        });
+      },
       {
         enableHighAccuracy: true,
         maximumAge: 60_000,
@@ -468,6 +494,19 @@ export function MobilePhotoCameraPage() {
 
     setCompletingAssignment(true);
     try {
+      if (!navigator.onLine) {
+        await enqueueOfflineTaskUpdate({
+          id: createOfflineId(),
+          assignmentId,
+          status: 'COMPLETED',
+          timestampLocal: new Date().toISOString(),
+        });
+        setConfirmationMessage('Photo en attente et tache a terminer a la synchronisation.');
+        setCapturedPhoto(null);
+        setSelectedAssignmentId('');
+        return;
+      }
+
       const response = await authFetch(`/api/mobile/planning/assignment/${assignmentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

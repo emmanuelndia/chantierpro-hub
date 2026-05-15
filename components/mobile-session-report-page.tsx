@@ -5,7 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import { SignedImage } from './mobile/SignedImage';
-import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
+import {
+  createOfflineId,
+  enqueueOfflineSessionReport,
+  getMobileOfflineCache,
+  setMobileOfflineCache,
+} from '@/lib/mobile-offline-db';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type {
   SessionPhoto,
@@ -19,7 +24,7 @@ type MobileSessionReportPageProps = Readonly<{
   user: WebSessionUser;
 }>;
 
-export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) {
+export function MobileSessionReportPage({ user: _user }: MobileSessionReportPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -83,22 +88,16 @@ export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) 
         console.error('Report submission error:', error);
         
         // Si échec, sauvegarder en offline
-        const offlineReport = {
+        const clientId = createOfflineId();
+        await enqueueOfflineSessionReport({
+          clientId,
           ...data,
-          id: `offline-${Date.now()}`,
-          createdAt: new Date().toISOString(),
-          userId: user.id,
-          isOffline: true,
-        };
-
-        // Sauvegarder dans IndexedDB
-        const existingOffline = await getMobileOfflineCache<typeof offlineReport[]>('offline-reports');
-        const nextOfflineReports = [...(existingOffline?.payload ?? []), offlineReport];
-        await setMobileOfflineCache('offline-reports', nextOfflineReports, 7 * 24 * 60 * 60 * 1000); // 7 jours
+          timestampLocal: new Date().toISOString(),
+        });
 
         return {
           success: true,
-          reportId: offlineReport.id,
+          reportId: clientId,
           message: 'Rapport sauvegardé hors ligne',
           isOffline: true,
         };

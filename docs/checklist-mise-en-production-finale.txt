@@ -1,0 +1,179 @@
+CHANTIERPRO - CHECKLIST DE MISE EN PRODUCTION FINALE
+====================================================
+
+Objectif
+--------
+Cette checklist sert de garde-fou avant l'ouverture de ChantierPro a de vrais utilisateurs.
+Une case non validee ne signifie pas toujours "interdiction de lancer", mais toute exception doit etre expliquee et acceptee.
+
+
+1. VERSION A METTRE EN PRODUCTION
+---------------------------------
+[ ] La branche de production est identifiee.
+[ ] Le commit exact a deployer est identifie.
+[ ] Les fonctionnalites nouvelles sont gelees pendant la recette finale.
+[ ] Les bugs bloquants connus sont listes.
+[ ] Les migrations Prisma attendues sont commitees dans prisma/migrations.
+[ ] Le changelog de la version est prepare.
+
+
+2. SECRETS ET VARIABLES D'ENVIRONNEMENT
+---------------------------------------
+[ ] Les secrets deja exposes ou partages ont ete regeneres.
+[ ] DATABASE_URL de production validee.
+[ ] Secrets JWT / refresh valides.
+[ ] Variables R2 valides :
+    - R2_ACCOUNT_ID
+    - R2_ACCESS_KEY_ID
+    - R2_SECRET_ACCESS_KEY
+    - R2_BUCKET_NAME
+    - R2_ENDPOINT
+[ ] Les anciennes variables Supabase inutiles ont ete supprimees de Vercel.
+[ ] Les variables sont configurees dans l'environnement Production de Vercel.
+[ ] Un redeploiement a ete lance apres modification des variables.
+[ ] .env.local reste ignore par Git.
+[ ] Aucun secret n'est present dans le code source ou les fichiers versionnes.
+
+
+3. BASE DE DONNEES
+------------------
+[ ] Une sauvegarde recente de la base de production existe.
+[ ] Les migrations locales attendues sont presentes.
+[ ] La commande suivante a ete executee sur la base de production :
+    npx prisma migrate deploy
+[ ] Les migrations critiques recentes sont appliquees :
+    - scopes des superviseurs generaux ;
+    - relation photos / taches ;
+    - regles planning ressources tournantes ;
+    - multi-taches par ressource et chantier.
+[ ] Les donnees seed de demonstration ne polluent pas la production.
+[ ] Les doublons historiques connus ont ete nettoyes si necessaire.
+
+
+4. STOCKAGE PHOTO R2
+--------------------
+[ ] Une nouvelle photo est bien stockee dans R2.
+[ ] Aucune nouvelle photo ne part encore vers Supabase.
+[ ] /api/photos/:id/content repond correctement sur les nouvelles photos.
+[ ] Les miniatures galerie s'affichent.
+[ ] Les photos des historiques et rapports s'affichent.
+[ ] Le bucket R2 reste prive.
+[ ] Les clefs R2 ont les permissions minimales necessaires.
+[ ] La strategie pour les anciennes photos Supabase / mock-storage est documentee.
+
+
+5. AUTHENTIFICATION ET SECURITE
+-------------------------------
+[ ] Connexion valide sur web et mobile.
+[ ] Rotation refresh token validee.
+[ ] Cookies production verifies :
+    - httpOnly ;
+    - Secure ;
+    - SameSite=Lax ;
+    - path=/.
+[ ] Les routes images / telechargements fonctionnent avec cookie valide.
+[ ] Sans session valide, les routes protegees retournent 401.
+[ ] Avec role interdit, les routes protegee retournent 403.
+[ ] Les ressources hors perimetre retournent 404 ou 403 selon convention.
+[ ] Aucun token, cookie, storageKey ou URL signee n'apparait dans les logs ou JSON frontend.
+[ ] Les headers de securite Next.js sont actifs en production.
+
+
+6. RECETTE FONCTIONNELLE OBLIGATOIRE
+------------------------------------
+[ ] Creation, modification, activation et desactivation utilisateur.
+[ ] Les nouveaux utilisateurs apparaissent dans les selecteurs.
+[ ] Creation projet.
+[ ] Creation chantier.
+[ ] Modification partielle projet / chantier / equipe.
+[ ] Creation equipe.
+[ ] Retrait puis reactivation membre sans doublon.
+[ ] Ressources terrain tournantes entre plusieurs projets / equipes.
+[ ] Attribution des perimetres GS par site.
+[ ] Planning par PROJECT_MANAGER.
+[ ] Planning par GENERAL_SUPERVISOR sur ses sites confies.
+[ ] Plusieurs chantiers le meme jour pour une ressource.
+[ ] Plusieurs taches sur le meme chantier pour une ressource.
+[ ] Pointage entree, pause, reprise, sortie.
+[ ] Sortie distante apres deplacement inter-chantier.
+[ ] Chantiers du jour deduits du planning.
+[ ] Photo chantier classique.
+[ ] Photo liee a une tache.
+[ ] Rapport immediat apres sortie.
+[ ] Rapport tardif apres "Passer".
+[ ] Rapports telechargeables par les roles autorises.
+[ ] Mode offline prepare, navigation offline, pointage offline, photo offline, synchronisation retour reseau.
+
+
+7. RECETTE PAR ROLE
+-------------------
+[ ] ADMIN
+[ ] DIRECTION
+[ ] PROJECT_MANAGER
+[ ] GENERAL_SUPERVISOR
+[ ] COORDINATOR
+[ ] SUPERVISOR
+
+Pour chaque role :
+[ ] Les ecrans autorises sont visibles.
+[ ] Les ecrans interdits ne sont pas visibles.
+[ ] Les actions autorisees fonctionnent.
+[ ] Les actions interdites sont bloquees.
+[ ] Les donnees visibles respectent le perimetre attendu.
+
+
+8. QUALITE TECHNIQUE
+--------------------
+[ ] npm run lint passe.
+[ ] npm run build passe dans l'environnement cible.
+[ ] Aucun 500 recurrent dans les logs Vercel.
+[ ] Aucun 401 injustifie recurrent.
+[ ] Aucun echec R2 recurrent.
+[ ] Aucun message de migration manquante en production.
+[ ] Les temps de chargement des ecrans critiques sont acceptables.
+[ ] Le service worker PWA est coherent avec la version de l'application.
+[ ] Les tests sur telephone reel sont effectues.
+
+
+9. OBSERVABILITE ET EXPLOITATION
+-------------------------------
+[ ] Logs Vercel consultables.
+[ ] Une personne responsable des incidents est identifiee.
+[ ] Une procedure de rollback est prete.
+[ ] Une procedure de restauration base est prete.
+[ ] Les sauvegardes base sont verifiees.
+[ ] Les couts Vercel / Neon / R2 sont surveilles.
+[ ] Les alertes d'erreur prioritaires sont definies.
+[ ] Les utilisateurs savent comment remonter un probleme.
+
+
+10. DOMAINE ET LANCEMENT
+------------------------
+[ ] Domaine final configure.
+[ ] HTTPS valide.
+[ ] Les URLs de production sont correctes.
+[ ] Les previews restent protegees.
+[ ] Le plan pilote est defini.
+[ ] Les utilisateurs pilotes sont identifies.
+[ ] Les donnees de demonstration inutiles sont retirees ou isolees.
+[ ] La date de lancement est validee.
+
+
+DECISION FINALE
+---------------
+GO si :
+- aucune anomalie bloquante ;
+- stockage photo stable ;
+- migrations appliquees ;
+- sauvegarde disponible ;
+- recette critique validee ;
+- rollback prepare.
+
+NO-GO si :
+- photos instables ;
+- migrations incertaines ;
+- secrets non renouvelles ;
+- pointage / rapports / offline non fiables ;
+- roles ou perimetres non valides ;
+- absence de sauvegarde ou de rollback.
+

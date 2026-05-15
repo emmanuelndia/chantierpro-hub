@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { getRecentMobileGpsPosition, rememberMobileGpsPosition, type MobileGpsPosition } from '@/lib/mobile-geolocation';
 
 type GeolocationState = {
   latitude: number | null;
@@ -9,6 +10,8 @@ type GeolocationState = {
   loading: boolean;
   error: string | null;
   permissionState: 'prompt' | 'granted' | 'denied' | 'unsupported';
+  source: MobileGpsPosition['source'] | null;
+  capturedAt: string | null;
 };
 
 const ERROR_MESSAGES: Record<number, string> = {
@@ -35,7 +38,38 @@ export function useGeolocation(options: {
     loading: true,
     error: null,
     permissionState: 'prompt',
+    source: null,
+    capturedAt: null,
   });
+
+  const handleLocationError = useCallback(async (error: GeolocationPositionError) => {
+    const cachedPosition = await getRecentMobileGpsPosition();
+    if (cachedPosition) {
+      setState({
+        latitude: cachedPosition.latitude,
+        longitude: cachedPosition.longitude,
+        accuracy: cachedPosition.accuracy,
+        loading: false,
+        error: null,
+        permissionState: error.code === 1 ? 'denied' : 'prompt',
+        source: 'CACHED',
+        capturedAt: cachedPosition.capturedAt,
+      });
+      return;
+    }
+
+    const errorMessage = ERROR_MESSAGES[error.code] ?? 'Erreur de localisation inconnue.';
+    const permissionState = error.code === 1 ? 'denied' : 'prompt';
+
+    setState(prev => ({
+      ...prev,
+      loading: false,
+      error: errorMessage,
+      permissionState,
+      source: null,
+      capturedAt: null,
+    }));
+  }, []);
 
   const requestLocation = useCallback(() => {
     setState(prev => ({ ...prev, loading: true, error: null }));
@@ -54,6 +88,13 @@ export function useGeolocation(options: {
     // Tenter d'obtenir la position
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        const capturedAt = new Date(position.timestamp).toISOString();
+        void rememberMobileGpsPosition({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          capturedAt,
+        });
         setState({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -61,18 +102,12 @@ export function useGeolocation(options: {
           loading: false,
           error: null,
           permissionState: 'granted',
+          source: 'LIVE',
+          capturedAt,
         });
       },
       (error) => {
-        const errorMessage = ERROR_MESSAGES[error.code] ?? 'Erreur de localisation inconnue.';
-        const permissionState = error.code === 1 ? 'denied' : 'prompt';
-
-        setState(prev => ({
-          ...prev,
-          loading: false,
-          error: errorMessage,
-          permissionState,
-        }));
+        void handleLocationError(error);
       },
       {
         enableHighAccuracy,
@@ -80,7 +115,7 @@ export function useGeolocation(options: {
         maximumAge,
       }
     );
-  }, [enableHighAccuracy, timeout, maximumAge]);
+  }, [enableHighAccuracy, handleLocationError, timeout, maximumAge]);
 
   // Demander la localisation au montage du composant
   useEffect(() => {

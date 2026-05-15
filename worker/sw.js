@@ -10,6 +10,7 @@ const ESSENTIAL_MOBILE_ROUTES = [
   '/mobile/sync',
   '/mobile/history',
   OFFLINE_FALLBACK_URL,
+  '/rapport-session',
 ];
 const PRECACHE_URLS = [
   ...self.__WB_MANIFEST.map((entry) => entry.url),
@@ -72,7 +73,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (request.mode === 'navigate' && url.pathname.startsWith('/mobile/')) {
+  if (request.mode === 'navigate' && (url.pathname.startsWith('/mobile/') || url.pathname === '/rapport-session')) {
     event.respondWith(networkFirstMobilePage(request));
   }
 });

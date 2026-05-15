@@ -22,6 +22,7 @@ import type {
 import { getMobileOfflineCache, setMobileOfflineCache, syncMobileOfflineQueue } from '@/lib/mobile-offline-db';
 import { useGeolocation } from '@/lib/hooks/useGeolocation';
 import { useMobileNetworkState } from '@/hooks/use-mobile-network-state';
+import { getMobileOfflinePreparationState } from '@/lib/mobile-offline-prepare';
 import type { TodaySiteItem } from '@/types/projects';
 import type { NearbySiteItem } from '@/types/reports';
 
@@ -30,7 +31,7 @@ type Step = 'clock-in' | 'comment' | 'report' | 'confirmation';
 
 type GeoState =
   | { status: 'loading' }
-  | { status: 'ready'; latitude: number; longitude: number; accuracy: number | null }
+  | { status: 'ready'; latitude: number; longitude: number; accuracy: number | null; source: 'LIVE' | 'CACHED'; capturedAt: string }
   | { status: 'unavailable'; message: string };
 
 type SelectableSite = {
@@ -107,8 +108,10 @@ export function MobileClockInPage() {
       latitude: geolocation.latitude,
       longitude: geolocation.longitude,
       accuracy: geolocation.accuracy,
+      source: geolocation.source ?? 'LIVE',
+      capturedAt: geolocation.capturedAt ?? new Date().toISOString(),
     };
-  }, [geolocation.accuracy, geolocation.error, geolocation.latitude, geolocation.loading, geolocation.longitude]);
+  }, [geolocation.accuracy, geolocation.capturedAt, geolocation.error, geolocation.latitude, geolocation.loading, geolocation.longitude, geolocation.source]);
 
   const [manualMode, setManualMode] = useState(Boolean(requestedSiteId));
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(requestedSiteId);
@@ -120,6 +123,13 @@ export function MobileClockInPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const [offlineReadyToday, setOfflineReadyToday] = useState(true);
+
+  useEffect(() => {
+    void getMobileOfflinePreparationState().then((preparation) => {
+      setOfflineReadyToday(preparation.status === 'ready' || preparation.status === 'incomplete');
+    });
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
@@ -278,13 +288,17 @@ export function MobileClockInPage() {
         return null;
       }
 
-      const response = await authFetch(`/api/sites/${selectedSite.id}/clock-in/session-status`);
+      try {
+        const response = await authFetch(`/api/sites/${selectedSite.id}/clock-in/session-status`);
 
-      if (!response.ok) {
-        return null;
+        if (!response.ok) {
+          return buildOfflineSessionStatus(selectedSite.id, activeSession);
+        }
+
+        return (await response.json()) as SessionStatus;
+      } catch {
+        return buildOfflineSessionStatus(selectedSite.id, activeSession);
       }
-
-      return (await response.json()) as SessionStatus;
     },
     enabled: Boolean(selectedSite),
     refetchInterval: 15_000,
@@ -396,6 +410,7 @@ export function MobileClockInPage() {
     Boolean(selectedSite) &&
     geoState.status === 'ready' &&
     !outsideRadius &&
+    (networkState !== 'offline' || offlineReadyToday) &&
     !clockInMutation.isPending;
 
   useEffect(() => {
@@ -432,6 +447,8 @@ export function MobileClockInPage() {
       longitude: geoState.longitude,
       accuracy: geoState.accuracy,
       timestampLocal,
+      gpsCapturedAt: geoState.capturedAt,
+      gpsSource: geoState.source,
     };
 
     if (!navigator.onLine) {
@@ -534,6 +551,11 @@ export function MobileClockInPage() {
 
   return (
     <div className="space-y-5">
+      {networkState === 'offline' && !offlineReadyToday ? (
+        <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm font-semibold text-orange-800">
+          Donnees offline du jour manquantes. Reconnectez-vous pour preparer les actions terrain.
+        </div>
+      ) : null}
       {pendingCount > 0 ? (
         <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm font-semibold text-orange-800">
           Synchronisation en attente : {pendingCount}
@@ -559,6 +581,11 @@ export function MobileClockInPage() {
       {geoState.status === 'ready' && geoState.accuracy !== null && geoState.accuracy > 100 ? (
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm font-semibold text-yellow-900">
           Precision GPS faible ({Math.round(geoState.accuracy)} m). Vous pouvez continuer, mais le serveur verifiera la position.
+        </div>
+      ) : null}
+      {geoState.status === 'ready' && geoState.source === 'CACHED' ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+          Derniere position recente utilisee ({formatTime(geoState.capturedAt)}).
         </div>
       ) : null}
 
@@ -958,6 +985,26 @@ function fromNearbySite(site: NearbySiteItem): SelectableSite {
     radiusKm: site.radiusKm,
     distanceKm: site.distance,
   };
+}
+
+function buildOfflineSessionStatus(siteId: string, activeSession: TodayClockInView['activeSession']) {
+  if (activeSession?.siteId !== siteId) {
+    return {
+      sessionOpen: false,
+      arrivalTime: null,
+      duration: null,
+      pauseActive: false,
+      pauseDuration: 0,
+    } satisfies SessionStatus;
+  }
+
+  return {
+    sessionOpen: true,
+    arrivalTime: activeSession.arrivalAt,
+    duration: activeSession.durationSeconds,
+    pauseActive: false,
+    pauseDuration: 0,
+  } satisfies SessionStatus;
 }
 
 async function readApiMessage(response: Response, fallback: string) {
