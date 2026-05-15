@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Role } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Ellipsis, History, KeyRound, Pencil, UserRoundCheck, UserRoundX } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { ConfirmModal } from '@/components/confirm-modal';
 import { EmptyState } from '@/components/empty-state';
@@ -281,40 +282,15 @@ export function AdminUsersPage() {
                     <td className="px-5 py-4 text-slate-600">{user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '-'}</td>
                     <td className="px-5 py-4 text-slate-600">{formatDate(user.createdAt)}</td>
                     <td className="px-5 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        {HISTORY_RESOURCE_ROLES.includes(user.role) ? (
-                          <Link
-                            className="rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                            href={`/web/users/${encodeURIComponent(user.id)}/assignments-history`}
-                          >
-                            Historique
-                          </Link>
-                        ) : null}
-                        <button
-                          className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                          onClick={() => {
-                            setEditingUser(user);
-                            setDrawerMode('edit');
-                          }}
-                          type="button"
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          className="rounded-full border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100"
-                          onClick={() => setResetTarget(user)}
-                          type="button"
-                        >
-                          Reset MDP
-                        </button>
-                        <button
-                          className="rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
-                          onClick={() => setStatusTarget(user)}
-                          type="button"
-                        >
-                          {user.isActive ? 'Desactiver' : 'Reactiver'}
-                        </button>
-                      </div>
+                      <UserActionsMenu
+                        onEdit={() => {
+                          setEditingUser(user);
+                          setDrawerMode('edit');
+                        }}
+                        onResetPassword={() => setResetTarget(user)}
+                        onToggleStatus={() => setStatusTarget(user)}
+                        user={user}
+                      />
                     </td>
                   </tr>
                 ))
@@ -373,6 +349,116 @@ export function AdminUsersPage() {
         open={Boolean(resetTarget)}
         title="Reinitialiser le mot de passe ?"
       />
+    </div>
+  );
+}
+
+function UserActionsMenu({
+  user,
+  onEdit,
+  onResetPassword,
+  onToggleStatus,
+}: Readonly<{
+  user: UserListItem;
+  onEdit: () => void;
+  onResetPassword: () => void;
+  onToggleStatus: () => void;
+}>) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={menuRef} className="relative inline-flex">
+      <button
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
+        onClick={() => setOpen((current) => !current)}
+        title="Actions"
+        type="button"
+      >
+        <Ellipsis className="h-4 w-4" />
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-12 z-20 min-w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl" role="menu">
+          {HISTORY_RESOURCE_ROLES.includes(user.role) ? (
+            <Link
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              href={`/web/users/${encodeURIComponent(user.id)}/assignments-history`}
+              onClick={() => setOpen(false)}
+              role="menuitem"
+            >
+              <History className="h-4 w-4 text-blue-600" />
+              Historique
+            </Link>
+          ) : null}
+          <button
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+            role="menuitem"
+            type="button"
+          >
+            <Pencil className="h-4 w-4" />
+            Modifier
+          </button>
+          <button
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-orange-700 transition hover:bg-orange-50"
+            onClick={() => {
+              setOpen(false);
+              onResetPassword();
+            }}
+            role="menuitem"
+            type="button"
+          >
+            <KeyRound className="h-4 w-4" />
+            Reset MDP
+          </button>
+          <button
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${
+              user.isActive ? 'text-red-700 hover:bg-red-50' : 'text-emerald-700 hover:bg-emerald-50'
+            }`}
+            onClick={() => {
+              setOpen(false);
+              onToggleStatus();
+            }}
+            role="menuitem"
+            type="button"
+          >
+            {user.isActive ? <UserRoundX className="h-4 w-4" /> : <UserRoundCheck className="h-4 w-4" />}
+            {user.isActive ? 'Desactiver' : 'Reactiver'}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
