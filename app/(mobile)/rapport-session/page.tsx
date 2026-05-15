@@ -7,7 +7,7 @@ export default async function MobileSessionReportPageWrapper() {
   const session = await getCurrentWebSession();
 
   if (!session) {
-    redirect('/mobile/login?next=/mobile/rapport-session');
+    redirect('/mobile/login?next=/rapport-session');
   }
 
   // Rôles autorisés à soumettre des rapports

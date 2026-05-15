@@ -397,7 +397,7 @@ function SessionDetail({
             </p>
             <Link
               className="mt-4 inline-flex min-h-12 items-center justify-center rounded-lg bg-amber-600 px-4 text-sm font-black text-white"
-              href={`/mobile/rapport-session?sessionId=${encodeURIComponent(session.departureRecordId)}`}
+              href={`/rapport-session?sessionId=${encodeURIComponent(session.departureRecordId)}`}
             >
               Rediger le rapport
             </Link>

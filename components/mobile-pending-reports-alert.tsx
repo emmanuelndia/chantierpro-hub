@@ -42,7 +42,7 @@ export function MobilePendingReportsAlert() {
         </div>
         <Link
           className="shrink-0 rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white"
-          href={`/mobile/rapport-session?sessionId=${encodeURIComponent(latest.departureRecordId)}`}
+          href={`/rapport-session?sessionId=${encodeURIComponent(latest.departureRecordId)}`}
         >
           Rediger
         </Link>
