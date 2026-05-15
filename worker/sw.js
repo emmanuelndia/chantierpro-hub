@@ -10,6 +10,7 @@ const ESSENTIAL_MOBILE_ROUTES = [
   '/mobile/sync',
   '/mobile/history',
   OFFLINE_FALLBACK_URL,
+  '/mobile/login',
   '/rapport-session',
 ];
 const PRECACHE_URLS = [

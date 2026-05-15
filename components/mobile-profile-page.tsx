@@ -148,8 +148,9 @@ export function MobileProfilePage() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const response = await authFetch('/api/auth/logout', {
+      const response = await fetch('/api/auth/logout', {
         method: 'POST',
+        credentials: 'include',
       });
 
       if (!response.ok) {

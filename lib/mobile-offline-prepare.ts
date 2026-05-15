@@ -15,6 +15,7 @@ const OFFLINE_ROUTE_URLS = [
   '/mobile/sync',
   '/mobile/history',
   '/mobile/offline',
+  '/mobile/login',
   '/rapport-session',
 ];
 
@@ -57,6 +58,7 @@ export async function prepareMobileOfflineMode() {
     DAY_CACHE_TTL_MS,
     dataPrepared,
     errors,
+    false,
   );
   await cacheJson<{ items: unknown[] }>('/api/users/me/clock-in/history', 'clock-in-history-7d', WEEK_CACHE_TTL_MS, dataPrepared, errors);
   await cacheJson<TodayClockInView>('/api/users/me/clock-in', 'clock-in-today', 30 * 60 * 1000, dataPrepared, errors);
@@ -122,11 +124,14 @@ async function cacheJson<T>(
   ttlMs: number,
   dataPrepared: string[],
   errors: string[],
+  required = true,
 ) {
   try {
     const response = await authFetch(url, { cache: 'no-store' });
     if (!response.ok) {
-      errors.push(`${cacheKey}: ${response.status}`);
+      if (required) {
+        errors.push(`${cacheKey}: ${response.status}`);
+      }
       return;
     }
 
@@ -134,6 +139,8 @@ async function cacheJson<T>(
     await setMobileOfflineCache(cacheKey, payload, ttlMs);
     dataPrepared.push(cacheKey);
   } catch {
-    errors.push(`${cacheKey}: donnees indisponibles`);
+    if (required) {
+      errors.push(`${cacheKey}: donnees indisponibles`);
+    }
   }
 }
