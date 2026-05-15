@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
-import { SignedImage } from './mobile/SignedImage';
 import {
   createOfflineId,
   enqueueOfflineSessionReport,
@@ -13,7 +12,6 @@ import {
 } from '@/lib/mobile-offline-db';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type {
-  SessionPhoto,
   SubmitReportRequest,
   ReportSubmissionResponse,
   SessionReportData,
@@ -32,7 +30,6 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   const [content, setContent] = useState('');
   const [progressPercentage, setProgressPercentage] = useState(50);
   const [blockageNote, setBlockageNote] = useState('');
-  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
 
   // Récupérer l'ID de session depuis les paramètres URL
   const sessionId = searchParams.get('sessionId');
@@ -94,7 +91,6 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
           clockInRecordId: data.clockInRecordId,
           content: data.content,
           progressPercentage: data.progressPercentage,
-          photoIds: data.photoIds,
           ...(data.blockageNote !== undefined ? { blockageNote: data.blockageNote } : {}),
           ...(data.assignmentId !== undefined ? { assignmentId: data.assignmentId } : {}),
           timestampLocal: new Date().toISOString(),
@@ -128,14 +124,6 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
 
   const data = sessionQuery.data;
   const loading = sessionQuery.isLoading;
-  const taskPhotos = data?.photos.filter((photo) => photo.planningAssignmentId !== null) ?? [];
-
-  useEffect(() => {
-    if (data?.photos) {
-      // Sélectionner toutes les photos par défaut
-      setSelectedPhotoIds(data.photos.map(photo => photo.id));
-    }
-  }, [data?.photos]);
 
   const handleSubmit = () => {
     if (!data || !sessionId) return;
@@ -146,7 +134,6 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
       progressPercentage,
       blockageNote: blockageNote.trim() || undefined,
       assignmentId: data.assignment?.id,
-      photoIds: selectedPhotoIds,
     };
 
     submitMutation.mutate(reportData);
@@ -368,41 +355,6 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
         </div>
       </section>
 
-      {/* Photos de la session */}
-      {data.photos.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-              Photos de la session
-            </h3>
-            <span className="text-xs font-semibold text-slate-400">
-              {selectedPhotoIds.length}/{data.photos.length} sélectionnées
-            </span>
-          </div>
-          {taskPhotos.length > 0 ? (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs font-bold text-blue-800">
-              {taskPhotos.length} photo{taskPhotos.length > 1 ? 's' : ''} liée{taskPhotos.length > 1 ? 's' : ''} à une tâche de planning.
-            </div>
-          ) : null}
-          <div className="grid grid-cols-3 gap-2">
-            {data.photos.map((photo) => (
-              <PhotoCard
-                key={photo.id}
-                photo={photo}
-                isSelected={selectedPhotoIds.includes(photo.id)}
-                onToggleSelect={() => {
-                  setSelectedPhotoIds(prev => 
-                    prev.includes(photo.id)
-                      ? prev.filter(id => id !== photo.id)
-                      : [...prev, photo.id]
-                  );
-                }}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Boutons d'action */}
       <section className="space-y-3">
         <button
@@ -432,48 +384,6 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   );
 }
 
-// Composants
-function PhotoCard({
-  photo,
-  isSelected,
-  onToggleSelect,
-}: Readonly<{
-  photo: SessionPhoto;
-  isSelected: boolean;
-  onToggleSelect: () => void;
-}>) {
-  return (
-    <div
-      onClick={onToggleSelect}
-      className={`relative aspect-square overflow-hidden rounded-lg border-2 cursor-pointer transition active:scale-[0.95] ${
-        isSelected 
-          ? 'border-primary shadow-lg' 
-          : 'border-slate-200'
-      }`}
-    >
-      <SignedImage
-        photoId={photo.id}
-        alt={photo.filename}
-        className="w-full h-full object-cover"
-      />
-      {isSelected && (
-        <div className="absolute top-1 right-1 h-6 w-6 rounded-full bg-primary flex items-center justify-center">
-          <CheckIcon className="h-4 w-4 text-white" />
-        </div>
-      )}
-      {photo.planningAssignmentId ? (
-        <div className="absolute left-1 top-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-black text-white">
-          Tâche
-        </div>
-      ) : null}
-      <div className="absolute bottom-0 left-0 right-0 bg-slate-950/70 px-1 py-0.5">
-        <p className="text-[10px] text-white truncate">
-          {new Date(photo.takenAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 function ReportLoadingState() {
   return (
@@ -484,14 +394,5 @@ function ReportLoadingState() {
         <div className="h-32 animate-pulse rounded-lg bg-slate-100" />
       </div>
     </div>
-  );
-}
-
-// Icônes
-function CheckIcon({ className }: Readonly<{ className: string }>) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
   );
 }

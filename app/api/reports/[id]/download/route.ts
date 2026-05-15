@@ -43,8 +43,6 @@ Date : ${submittedAt.toLocaleDateString('fr-FR')}
 Session : ${report.session.date} ${report.session.time}
 ---
 ${report.content}
----
-Statut : ${getStatusLabel(report.validationStatus)}
 ===================================
   `.trim();
 
@@ -93,11 +91,6 @@ function generatePDFReport(report: ReportDetail) {
     y += 6;
   }
 
-  y += 10;
-  pdf.setFontSize(12);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(`Statut : ${getStatusLabel(report.validationStatus)}`, margin, y);
-
   const pdfBytes = pdf.output('arraybuffer');
   return new Response(pdfBytes, {
     headers: {
@@ -125,7 +118,7 @@ function slugify(value: string) {
     .slice(0, 80);
 }
 
-function getStatusLabel(status: ReportDetail['validationStatus']): string {
+function _getStatusLabel(status: ReportDetail['validationStatus']): string {
   switch (status) {
     case 'SUBMITTED':
       return 'Soumis';

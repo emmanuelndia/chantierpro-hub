@@ -49,7 +49,6 @@ export type OfflineSessionReportItem = {
   progressPercentage: number;
   blockageNote?: string;
   assignmentId?: string;
-  photoIds: string[];
   timestampLocal: string;
 };
 

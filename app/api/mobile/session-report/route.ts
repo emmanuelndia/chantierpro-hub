@@ -83,10 +83,12 @@ export const POST = withAuth(async ({ user, req }) => {
       }
     }
 
-    if (body.photoIds.length > 0) {
+    const photoIds = body.photoIds ?? [];
+
+    if (photoIds.length > 0) {
       const photosCount = await prisma.photo.count({
         where: {
-          id: { in: body.photoIds },
+          id: { in: photoIds },
           siteId: clockInRecord.siteId,
           uploadedById: user.id,
           isDeleted: false,
@@ -94,7 +96,7 @@ export const POST = withAuth(async ({ user, req }) => {
         },
       });
 
-      if (photosCount !== new Set(body.photoIds).size) {
+      if (photosCount !== new Set(photoIds).size) {
         return Response.json(
           { code: 'PHOTO_SCOPE_INVALID', message: 'Une ou plusieurs photos sont hors périmètre' },
           { status: 400 },

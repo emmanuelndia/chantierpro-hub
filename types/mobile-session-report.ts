@@ -39,7 +39,7 @@ export type SubmitReportRequest = {
   progressPercentage: number;
   blockageNote?: string | undefined;
   assignmentId?: string | undefined;
-  photoIds: string[];
+  photoIds?: string[] | undefined;
 };
 
 export type ReportSubmissionResponse = {

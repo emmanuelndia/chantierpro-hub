@@ -11,7 +11,6 @@ import {
   createOfflineClockInId,
   enqueueOfflineClockIn,
   enqueueOfflineComment,
-  enqueueOfflineReport,
   getMobileClockInPendingCount,
 } from '@/lib/mobile-clock-in-offline';
 import type {
@@ -27,7 +26,7 @@ import type { TodaySiteItem } from '@/types/projects';
 import type { NearbySiteItem } from '@/types/reports';
 
 type ClockInIntent = 'arrival' | 'departure' | 'pause-start' | 'pause-end';
-type Step = 'clock-in' | 'comment' | 'report' | 'confirmation';
+type Step = 'clock-in' | 'comment' | 'confirmation';
 
 type GeoState =
   | { status: 'loading' }
@@ -119,7 +118,6 @@ export function MobileClockInPage() {
   const [step, setStep] = useState<Step>('clock-in');
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [comment, setComment] = useState('');
-  const [reportContent, setReportContent] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [now, setNow] = useState(() => Date.now());
@@ -328,7 +326,6 @@ export function MobileClockInPage() {
       setSubmission(result);
       setErrorMessage(null);
       setComment('');
-      setReportContent('');
       setStep('comment');
       await refreshPendingCount();
       await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-today'] });
@@ -367,43 +364,6 @@ export function MobileClockInPage() {
     },
     onSuccess: () => moveAfterComment(),
     onError: (error) => setErrorMessage(error instanceof Error ? error.message : 'Commentaire impossible.'),
-  });
-
-  const reportMutation = useMutation({
-    mutationFn: async () => {
-      if (!submission || reportContent.trim() === '') {
-        return;
-      }
-
-      if (submission.offline) {
-        await enqueueOfflineReport({
-          clientId: submission.clientId,
-          siteId: submission.siteId,
-          content: reportContent.trim(),
-        });
-        await refreshPendingCount();
-        return;
-      }
-
-      if (!submission.record) {
-        return;
-      }
-
-      const response = await authFetch(`/api/sites/${submission.siteId}/reports`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: reportContent.trim(),
-          clockInRecordId: submission.record.id,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(await readApiMessage(response, 'Rapport impossible.'));
-      }
-    },
-    onSuccess: () => setStep('confirmation'),
-    onError: (error) => setErrorMessage(error instanceof Error ? error.message : 'Rapport impossible.'),
   });
 
   const canSubmit =
@@ -501,7 +461,12 @@ export function MobileClockInPage() {
   
   function moveAfterComment() {
     if (submission?.type === 'DEPARTURE') {
-      setStep('report');
+      if (submission.record) {
+        router.push(`/rapport-session?sessionId=${encodeURIComponent(submission.record.id)}`);
+        return;
+      }
+
+      setStep('confirmation');
       return;
     }
 
@@ -524,27 +489,6 @@ export function MobileClockInPage() {
         setValue={setComment}
         title="Commentaire"
         value={comment}
-      />
-    );
-  }
-
-  if (step === 'report' && submission) {
-    return (
-      <PostClockInPanel
-        busy={reportMutation.isPending}
-        errorMessage={errorMessage}
-        helperText="Vous pourrez encore soumettre ce rapport plus tard depuis l'historique."
-        label="Rapport de fin de session"
-        onPrimary={() => reportMutation.mutate()}
-        onSkip={() => {
-          if (window.confirm("Vous pourrez encore soumettre ce rapport plus tard depuis l'historique. Passer maintenant ?")) {
-            setStep('confirmation');
-          }
-        }}
-        primaryLabel="Soumettre"
-        setValue={setReportContent}
-        title="Rapport de fin de session"
-        value={reportContent}
       />
     );
   }
