@@ -1,11 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 import { ReportStatus, ReportValidationStatus, type Role } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, Download, FileText, FolderOpen } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
@@ -37,8 +38,6 @@ const validationOptions: { value: WebReportValidationFilter; label: string }[] =
 
 const filterInputClassName =
   'w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-500';
-const actionLinkClassName =
-  'rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50';
 
 export function ReportsWebPage({ viewer }: ReportsWebPageProps) {
   const queryClient = useQueryClient();
@@ -404,27 +403,37 @@ function ReportsTable({
                   </Badge>
                 </td>
                 <td className="px-4 py-4">
-                  <div className="flex min-w-52 flex-wrap gap-2">
-                    <Link className={actionLinkClassName} href={`/reports/${item.id}`}>
-                      Ouvrir
-                    </Link>
-                    <a className={actionLinkClassName} href={`/api/reports/${item.id}/download?format=pdf`}>
-                      PDF
-                    </a>
-                    <a className={actionLinkClassName} href={`/api/reports/${item.id}/download?format=txt`}>
-                      TXT
-                    </a>
-                    {canValidate && item.validationStatus !== 'VALIDATED_FOR_CLIENT' ? (
-                      <button
-                        className="rounded-2xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
-                        disabled={validating && validatingId === item.id}
-                        onClick={() => onValidate(item.id)}
-                        type="button"
-                      >
-                        {validating && validatingId === item.id ? 'Validation...' : 'Valider'}
-                      </button>
-                    ) : null}
-                  </div>
+                  <TableActionsMenu
+                    actions={[
+                      {
+                        label: 'Ouvrir',
+                        icon: <FolderOpen className="h-4 w-4" />,
+                        href: `/reports/${item.id}`,
+                        navigation: 'client',
+                      },
+                      {
+                        label: 'Telecharger PDF',
+                        icon: <Download className="h-4 w-4" />,
+                        href: `/api/reports/${item.id}/download?format=pdf`,
+                      },
+                      {
+                        label: 'Telecharger TXT',
+                        icon: <FileText className="h-4 w-4" />,
+                        href: `/api/reports/${item.id}/download?format=txt`,
+                      },
+                      ...(canValidate && item.validationStatus !== 'VALIDATED_FOR_CLIENT'
+                        ? [
+                            {
+                              label: validating && validatingId === item.id ? 'Validation...' : 'Valider',
+                              icon: <CheckCircle2 className="h-4 w-4" />,
+                              tone: 'success' as const,
+                              disabled: validating && validatingId === item.id,
+                              onClick: () => onValidate(item.id),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
                 </td>
               </tr>
             ))}

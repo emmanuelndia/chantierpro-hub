@@ -3,8 +3,10 @@
 import { GeneralSupervisorSiteScopeStatus, type Role } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
+import { Pencil, UserRoundX } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
@@ -366,21 +368,27 @@ function ScopesTable({
                 </td>
                 {canMutate ? (
                   <td className="px-4 py-4">
-                    <div className="flex min-w-48 flex-wrap gap-2">
-                      <button className={secondaryButtonClassName} disabled={isMutating} onClick={() => onEdit(scope)} type="button">
-                        Modifier
-                      </button>
-                      {scope.status === GeneralSupervisorSiteScopeStatus.ACTIVE ? (
-                        <button
-                          className="rounded-2xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
-                          disabled={isMutating}
-                          onClick={() => onDeactivate(scope)}
-                          type="button"
-                        >
-                          Desactiver
-                        </button>
-                      ) : null}
-                    </div>
+                    <TableActionsMenu
+                      actions={[
+                        {
+                          label: 'Modifier',
+                          icon: <Pencil className="h-4 w-4" />,
+                          disabled: isMutating,
+                          onClick: () => onEdit(scope),
+                        },
+                        ...(scope.status === GeneralSupervisorSiteScopeStatus.ACTIVE
+                          ? [
+                              {
+                                label: 'Desactiver',
+                                icon: <UserRoundX className="h-4 w-4" />,
+                                tone: 'danger' as const,
+                                disabled: isMutating,
+                                onClick: () => onDeactivate(scope),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
                   </td>
                 ) : null}
               </tr>

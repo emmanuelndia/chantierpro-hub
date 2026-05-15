@@ -1,12 +1,13 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ProjectStatus, Role } from '@prisma/client';
+import { Archive, FolderOpen, Pencil } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { ConfirmModal } from '@/components/confirm-modal';
 import { EmptyState } from '@/components/empty-state';
+import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type { PaginatedProjectsResponse, ProjectDetail, ProjectFormOptionsResponse } from '@/types/projects';
@@ -321,35 +322,35 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
                       <Badge tone={projectStatusTone(project.status)}>{humanizeProjectStatus(project.status)}</Badge>
                     </td>
                     <td className="px-6 py-5">
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                          href={`/web/projects/${project.id}`}
-                        >
-                          Ouvrir
-                        </Link>
-                        {canCreateProject ? (
-                          <button
-                            className="rounded-full border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100"
-                            onClick={() => {
-                              setEditingProject(project as ProjectDetail);
-                              setDrawerOpen(true);
-                            }}
-                            type="button"
-                          >
-                            Editer
-                          </button>
-                        ) : null}
-                        {canCreateProject ? (
-                          <button
-                            className="rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
-                            onClick={() => setProjectToArchive(project as ProjectDetail)}
-                            type="button"
-                          >
-                            Archiver
-                          </button>
-                        ) : null}
-                      </div>
+                      <TableActionsMenu
+                        actions={[
+                          {
+                            label: 'Ouvrir',
+                            icon: <FolderOpen className="h-4 w-4" />,
+                            href: `/web/projects/${project.id}`,
+                            navigation: 'client',
+                          },
+                          ...(canCreateProject
+                            ? [
+                                {
+                                  label: 'Editer',
+                                  icon: <Pencil className="h-4 w-4" />,
+                                  tone: 'warning' as const,
+                                  onClick: () => {
+                                    setEditingProject(project as ProjectDetail);
+                                    setDrawerOpen(true);
+                                  },
+                                },
+                                {
+                                  label: 'Archiver',
+                                  icon: <Archive className="h-4 w-4" />,
+                                  tone: 'danger' as const,
+                                  onClick: () => setProjectToArchive(project as ProjectDetail),
+                                },
+                              ]
+                            : []),
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))
