@@ -1,0 +1,71 @@
+CHANTIERPRO - PLAN DE DEPLOIEMENT 
+
+
+1. Preparer la version
+
+- Identifier le commit exact a deployer.
+- Verifier que les migrations attendues sont bien presentes.
+- Verifier les variables de production sur Vercel :
+  - base Neon ;
+  - authentification ;
+  - stockage R2.
+- Confirmer qu'une sauvegarde recente de la base existe.
+- Executer la recette finale avec le document `plan-recette-finale.txt`.
+- Utiliser `checklist-mise-en-production-finale.txt` pour valider le feu vert.
+
+
+2. Deployer
+
+- Appliquer les migrations de production :
+
+  npx prisma migrate deploy
+
+- Deployer la version validee sur Vercel.
+- Noter le dernier deploiement stable disponible en cas de retour arriere.
+
+
+3. Verifier juste apres
+
+Tester en priorite :
+
+
+- connexion web et mobile ;
+- roles et autorisations ;
+- planning ;
+- pointage ;
+- prise et affichage des photos R2 ;
+- rapports ;
+- synchronisation offline.
+
+Verifier aussi les logs Vercel pour detecter rapidement :
+
+- erreurs 500 ;
+- erreurs 401 anormales ;
+- erreurs R2 ;
+- erreurs de migration ou de base.
+
+
+4. Surveiller apres ouverture
+Pendant les premieres utilisations reelles, surveiller surtout :
+
+- connexion ;
+- photos ;
+- planning ;
+- pointage ;
+- rapports ;
+- synchronisation offline.
+
+Si un incident bloque l'usage, suivre `procedure-rollback-et-incident.txt`.
+
+
+5. Pour les versions suivantes
+
+Reprendre toujours le meme ordre :
+
+1. verifier la version ;
+2. verifier les migrations et les variables ;
+3. sauvegarder la base ;
+4. tester les parcours touches ;
+5. deployer ;
+6. verifier les fonctions critiques ;
+7. surveiller les logs.

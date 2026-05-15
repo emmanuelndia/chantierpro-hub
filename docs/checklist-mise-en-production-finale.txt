@@ -1,14 +1,13 @@
 CHANTIERPRO - CHECKLIST DE MISE EN PRODUCTION FINALE
-====================================================
 
 Objectif
---------
+
 Cette checklist sert de garde-fou avant l'ouverture de ChantierPro a de vrais utilisateurs.
 Une case non validee ne signifie pas toujours "interdiction de lancer", mais toute exception doit etre expliquee et acceptee.
 
 
 1. VERSION A METTRE EN PRODUCTION
----------------------------------
+
 [ ] La branche de production est identifiee.
 [ ] Le commit exact a deployer est identifie.
 [ ] Les fonctionnalites nouvelles sont gelees pendant la recette finale.
@@ -18,7 +17,7 @@ Une case non validee ne signifie pas toujours "interdiction de lancer", mais tou
 
 
 2. SECRETS ET VARIABLES D'ENVIRONNEMENT
----------------------------------------
+
 [ ] Les secrets deja exposes ou partages ont ete regeneres.
 [ ] DATABASE_URL de production validee.
 [ ] Secrets JWT / refresh valides.
