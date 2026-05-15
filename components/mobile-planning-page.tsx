@@ -2,7 +2,7 @@
 
 import { PlanningAssignmentStatus } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { authFetch } from '@/lib/auth/client-session';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import type { WebSessionUser } from '@/lib/auth/web-session';
@@ -144,6 +144,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
     getMutationError(updateAssignmentMutation.error) ??
     getMutationError(deleteAssignmentMutation.error) ??
     getMutationError(duplicateMutation.error);
+  const assignmentGroups = useMemo(() => groupPlanningAssignments(data?.assignments ?? []), [data?.assignments]);
 
   function navigateDate(direction: 'prev' | 'next') {
     const nextDate = addDays(selectedDateObject, direction === 'prev' ? -1 : 1);
@@ -259,18 +260,18 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
           {data.assignments.length > 0 ? (
             <section className="space-y-3">
               <SectionTitle label="Tâches assignées" count={data.assignments.length} />
-              {data.assignments.map((assignment) => (
-                <AssignmentCard
-                  key={assignment.id}
-                  assignment={assignment}
-                  isEditing={editingAssignmentId === assignment.id}
+              {assignmentGroups.map((group) => (
+                <AssignmentGroupCard
+                  key={group.key}
+                  assignments={group.assignments}
+                  editingAssignmentId={editingAssignmentId}
                   isMutating={updateAssignmentMutation.isPending || deleteAssignmentMutation.isPending}
-                  onEdit={() => setEditingAssignmentId(assignment.id)}
+                  onEdit={setEditingAssignmentId}
                   onCancelEdit={() => setEditingAssignmentId(null)}
-                  onUpdate={(updateData) => updateAssignmentMutation.mutate({ id: assignment.id, data: updateData })}
-                  onDelete={() => {
+                  onUpdate={(id, updateData) => updateAssignmentMutation.mutate({ id, data: updateData })}
+                  onDelete={(id) => {
                     if (window.confirm('Retirer cette tâche du planning ?')) {
-                      deleteAssignmentMutation.mutate(assignment.id);
+                      deleteAssignmentMutation.mutate(id);
                     }
                   }}
                 />
@@ -479,6 +480,123 @@ function AssignmentCard({
         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${planningStatus.className}`}>{planningStatus.label}</span>
       </div>
     </article>
+  );
+}
+
+type AssignmentGroup = {
+  key: string;
+  assignments: PlanningAssignment[];
+};
+
+function AssignmentGroupCard({
+  assignments,
+  editingAssignmentId,
+  isMutating,
+  onEdit,
+  onCancelEdit,
+  onUpdate,
+  onDelete,
+}: Readonly<{
+  assignments: PlanningAssignment[];
+  editingAssignmentId: string | null;
+  isMutating: boolean;
+  onEdit: (id: string) => void;
+  onCancelEdit: () => void;
+  onUpdate: (id: string, data: UpdateAssignmentRequest) => void;
+  onDelete: (id: string) => void;
+}>) {
+  const firstAssignment = assignments[0];
+
+  if (!firstAssignment) {
+    return null;
+  }
+
+  const initials = getInitials(firstAssignment.supervisorFirstName, firstAssignment.supervisorName);
+  const clockStatus = clockInStatusConfig[firstAssignment.clockInStatus];
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-black text-sky-800">
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-black text-slate-950">
+            {firstAssignment.supervisorFirstName} {firstAssignment.supervisorName}
+          </h3>
+          <p className="truncate text-sm font-semibold text-slate-600">{firstAssignment.siteName}</p>
+          <p className="mt-1 text-xs text-slate-500">{firstAssignment.siteAddress}</p>
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${clockStatus.className}`}>
+          {clockStatus.label}
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {assignments.map((assignment, index) =>
+          editingAssignmentId === assignment.id ? (
+            <AssignmentCard
+              key={assignment.id}
+              assignment={assignment}
+              isEditing
+              isMutating={isMutating}
+              onEdit={() => onEdit(assignment.id)}
+              onCancelEdit={onCancelEdit}
+              onUpdate={(updateData) => onUpdate(assignment.id, updateData)}
+              onDelete={() => onDelete(assignment.id)}
+            />
+          ) : (
+            <AssignmentTaskRow
+              key={assignment.id}
+              assignment={assignment}
+              index={index}
+              onEdit={() => onEdit(assignment.id)}
+            />
+          ),
+        )}
+      </div>
+    </article>
+  );
+}
+
+function AssignmentTaskRow({
+  assignment,
+  index,
+  onEdit,
+}: Readonly<{
+  assignment: PlanningAssignment;
+  index: number;
+  onEdit: () => void;
+}>) {
+  const planningStatus = planningStatusConfig[assignment.status];
+
+  return (
+    <section className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Tache {index + 1}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-800">{assignment.action}</p>
+        </div>
+        <IconButton label="Modifier" onClick={onEdit}>
+          <EditIcon className="h-4 w-4" />
+        </IconButton>
+      </div>
+
+      {assignment.targetProgress !== null ? (
+        <div className="mt-3 flex items-center gap-2">
+          <div className="h-2 flex-1 rounded-full bg-white">
+            <div className="h-2 rounded-full bg-sky-600" style={{ width: `${assignment.targetProgress}%` }} />
+          </div>
+          <span className="text-xs font-bold text-sky-700">{assignment.targetProgress}%</span>
+        </div>
+      ) : null}
+
+      <div className="mt-3">
+        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${planningStatus.className}`}>
+          {planningStatus.label}
+        </span>
+      </div>
+    </section>
   );
 }
 
@@ -819,6 +937,26 @@ async function getApiErrorMessage(response: Response, fallback: string) {
 
 function getMutationError(error: unknown) {
   return error instanceof Error ? error.message : null;
+}
+
+function groupPlanningAssignments(assignments: PlanningAssignment[]): AssignmentGroup[] {
+  const groups = new Map<string, PlanningAssignment[]>();
+
+  for (const assignment of assignments) {
+    const key = `${assignment.supervisorId}:${assignment.siteId}`;
+    const group = groups.get(key);
+
+    if (group) {
+      group.push(assignment);
+    } else {
+      groups.set(key, [assignment]);
+    }
+  }
+
+  return [...groups.entries()].map(([key, groupedAssignments]) => ({
+    key,
+    assignments: groupedAssignments,
+  }));
 }
 
 function getResourceEmptyDescription(siteCount: number) {
