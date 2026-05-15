@@ -215,6 +215,12 @@ export async function getMobileOfflineCache<T>(key: string): Promise<MobileOffli
   return item;
 }
 
+export async function removeMobileOfflineCache(key: string) {
+  const db = await openDb();
+  await storeRequest(db, 'cache', 'readwrite', (store) => store.delete(key));
+  db.close();
+}
+
 export async function syncMobileOfflineQueue({ mode }: { mode: 'auto' | 'manual' }) {
   if (syncInFlight) {
     return syncInFlight;

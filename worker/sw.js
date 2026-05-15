@@ -1,7 +1,8 @@
-const PRECACHE_NAME = 'chantierpro-precache-v5';
-const STATIC_CACHE_NAME = 'chantierpro-static-v5';
-const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v5';
+const PRECACHE_NAME = 'chantierpro-precache-v6';
+const STATIC_CACHE_NAME = 'chantierpro-static-v6';
+const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v6';
 const OFFLINE_FALLBACK_URL = '/mobile/offline';
+const OFFLINE_TERRAIN_SHELL_URL = '/mobile/offline-shell';
 const ESSENTIAL_MOBILE_ROUTES = [
   '/mobile/home',
   '/mobile/clock-in',
@@ -10,6 +11,7 @@ const ESSENTIAL_MOBILE_ROUTES = [
   '/mobile/sync',
   '/mobile/history',
   OFFLINE_FALLBACK_URL,
+  OFFLINE_TERRAIN_SHELL_URL,
   '/mobile/login',
   '/rapport-session',
 ];
@@ -114,6 +116,14 @@ async function networkFirstMobilePage(request) {
     }
     return response;
   } catch {
+    if (isOfflineTerrainRoute(new URL(request.url).pathname)) {
+      const terrainShellResponse =
+        (await cache.match(OFFLINE_TERRAIN_SHELL_URL)) ?? (await caches.match(OFFLINE_TERRAIN_SHELL_URL));
+      if (terrainShellResponse) {
+        return terrainShellResponse;
+      }
+    }
+
     const cachedResponse = await cache.match(request, { ignoreSearch: true });
     if (cachedResponse) {
       return cachedResponse;
@@ -134,4 +144,15 @@ async function networkFirstMobilePage(request) {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
   }
+}
+
+function isOfflineTerrainRoute(pathname) {
+  return (
+    pathname === '/mobile/home' ||
+    pathname === '/mobile/clock-in' ||
+    pathname === '/mobile/photo' ||
+    pathname === '/mobile/history' ||
+    pathname === '/mobile/sync' ||
+    pathname === '/rapport-session'
+  );
 }

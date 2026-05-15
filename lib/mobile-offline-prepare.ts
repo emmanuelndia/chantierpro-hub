@@ -5,6 +5,8 @@ import { setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import type { TodayClockInView } from '@/types/clock-in';
 import type { MobilePhotoSitesResponse } from '@/types/mobile-photo';
 import type { PlanningDayResponse, SupervisorMyAssignmentsResponse } from '@/types/mobile-planning';
+import type { MobileHistoryResponse } from '@/types/mobile-history';
+import type { MobileReportsHistoryResponse } from '@/types/mobile-history-reports';
 import type { TodaySiteItem } from '@/types/projects';  
 
 const OFFLINE_ROUTE_URLS = [
@@ -16,6 +18,7 @@ const OFFLINE_ROUTE_URLS = [
   '/mobile/history',
   '/mobile/offline',
   '/mobile/login',
+  '/mobile/offline-shell',
   '/rapport-session',
 ];
 const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v5';
@@ -33,6 +36,7 @@ export type MobileOfflinePreparationResult = {
   preparedAt: string;
   routesPrepared: number;
   missingRoutes: string[];
+  missingData: string[];
   dataPrepared: string[];
   errors: string[];
   status: 'ready' | 'incomplete';
@@ -65,20 +69,52 @@ export async function prepareMobileOfflineMode() {
   );
   await cacheJson<{ items: unknown[] }>('/api/users/me/clock-in/history', 'clock-in-history-7d', WEEK_CACHE_TTL_MS, dataPrepared, errors);
   await cacheJson<TodayClockInView>('/api/users/me/clock-in', 'clock-in-today', 30 * 60 * 1000, dataPrepared, errors);
+  await cacheJson<MobileHistoryResponse>(
+    '/api/mobile/history?period=week&limit=10',
+    'mobile-history-week',
+    WEEK_CACHE_TTL_MS,
+    dataPrepared,
+    errors,
+  );
+  await cacheJson<MobileReportsHistoryResponse>(
+    '/api/mobile/history/reports?period=week&limit=10',
+    'mobile-history-reports-week',
+    WEEK_CACHE_TTL_MS,
+    dataPrepared,
+    errors,
+    false,
+  );
+  const missingData = await getMissingPreparedData(todayKey);
 
   const result: MobileOfflinePreparationResult = {
     date: todayKey,
     preparedAt,
     routesPrepared: OFFLINE_ROUTE_URLS.length - missingRoutes.length,
     missingRoutes,
+    missingData,
     dataPrepared,
     errors,
-    status: errors.length === 0 && missingRoutes.length === 0 ? 'ready' : 'incomplete',
+    status: errors.length === 0 && missingRoutes.length === 0 && missingData.length === 0 ? 'ready' : 'incomplete',
   };
 
   await setMobileOfflineCache('offline-preparation-meta', result, null);
   window.dispatchEvent(new Event('mobile-offline-prepared'));
   return result;
+}
+
+async function getMissingPreparedData(todayKey: string) {
+  const { getMobileOfflineCache } = await import('@/lib/mobile-offline-db');
+  const requiredKeys = [
+    'offline-user',
+    'sites-today',
+    'mobile-photo-sites',
+    `mobile-planning-my-assignments-${todayKey}`,
+    'clock-in-history-7d',
+    'clock-in-today',
+    'mobile-history-week',
+  ];
+  const caches = await Promise.all(requiredKeys.map(async (key) => ({ key, item: await getMobileOfflineCache(key) })));
+  return caches.filter(({ item }) => !item).map(({ key }) => key);
 }
 
 export async function getMobileOfflinePreparationState() {

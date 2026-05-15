@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
 import { clearAccessToken, authFetch } from '@/lib/auth/client-session';
+import { removeMobileOfflineCache } from '@/lib/mobile-offline-db';
 import {
   MOBILE_PHOTO_QUALITY_OPTIONS,
   getStoredMobilePhotoQuality,
@@ -159,7 +160,9 @@ export function MobileProfilePage() {
     },
     onSettled: () => {
       clearAccessToken();
-      window.location.href = '/mobile/login';
+      void removeMobileOfflineCache('offline-user').finally(() => {
+        window.location.href = '/mobile/login';
+      });
     },
   });
 

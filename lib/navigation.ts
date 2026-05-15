@@ -170,13 +170,13 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/clock-in',
     label: 'Pointer',
     icon: 'clock-in',
-    roles: ['SUPERVISOR', 'COORDINATOR'],
+    roles: ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR'],
   },
   {
     href: '/mobile/photo',
     label: 'Photo',
     icon: 'photo',
-    roles: ['SUPERVISOR', 'COORDINATOR'],
+    roles: ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR'],
   },
   {
     href: '/mobile/projects',
@@ -206,7 +206,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/history',
     label: 'Historique',
     icon: 'history',
-    roles: ['SUPERVISOR', 'COORDINATOR'],
+    roles: ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR'],
   },
   {
     href: '/mobile/reports',

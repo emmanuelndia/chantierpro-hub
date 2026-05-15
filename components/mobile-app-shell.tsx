@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import type { Role } from '@prisma/client';
 import { BottomTabBar } from '@/components/bottom-tab-bar';
 import { MobileOfflineAutoSync } from '@/components/mobile-offline-auto-sync';
@@ -64,6 +64,10 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
 
   const hasOpenSession = Boolean(todayQuery.data?.activeSession);
   const incompleteSessionCount = historyQuery.data ?? 0;
+
+  useEffect(() => {
+    void setMobileOfflineCache('offline-user', user, null);
+  }, [user]);
 
   return (
     <div className="min-h-dvh bg-[#F6F9FC] text-ink">

@@ -151,6 +151,11 @@ export function MobileSyncPage() {
             {preparation.missingRoutes.length} page(s) encore absente(s) du cache de navigation.
           </p>
         ) : null}
+        {preparation?.missingData?.length ? (
+          <p className="mt-2 text-xs font-semibold text-orange-700">
+            {preparation.missingData.length} jeu(x) de donnees terrain encore manquant(s).
+          </p>
+        ) : null}
 
         <button
           className="mt-4 flex min-h-12 w-full items-center justify-center rounded-lg bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:opacity-45"

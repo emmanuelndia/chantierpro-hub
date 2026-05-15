@@ -5,6 +5,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { SignedImage } from '@/components/mobile/SignedImage';
 import { MobileOfflineLink } from '@/components/mobile-offline-link';
 import { authFetch } from '@/lib/auth/client-session';
+import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import type {
   MobileHistoryPeriod,
   MobileHistoryResponse,
@@ -44,13 +45,27 @@ export function MobileHistoryPage() {
         searchParams.set('cursor', pageParam);
       }
 
-      const response = await authFetch(`/api/mobile/history?${searchParams.toString()}`);
+      try {
+        const response = await authFetch(`/api/mobile/history?${searchParams.toString()}`);
 
-      if (!response.ok) {
-        throw new Error(`Mobile history failed with status ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Mobile history failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as MobileHistoryResponse;
+        if (period === 'week' && pageParam === null) {
+          await setMobileOfflineCache('mobile-history-week', payload, 7 * 24 * 60 * 60 * 1000);
+        }
+        return payload;
+      } catch {
+        if (period === 'week' && pageParam === null) {
+          const cached = await getMobileOfflineCache<MobileHistoryResponse>('mobile-history-week');
+          if (cached) {
+            return cached.payload;
+          }
+        }
+        throw new Error('Mobile history unavailable');
       }
-
-      return (await response.json()) as MobileHistoryResponse;
     },
     staleTime: 30_000,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -69,13 +84,27 @@ export function MobileHistoryPage() {
         searchParams.set('cursor', pageParam);
       }
 
-      const response = await authFetch(`/api/mobile/history/reports?${searchParams.toString()}`);
+      try {
+        const response = await authFetch(`/api/mobile/history/reports?${searchParams.toString()}`);
 
-      if (!response.ok) {
-        throw new Error(`Mobile reports history failed with status ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Mobile reports history failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as MobileReportsHistoryResponse;
+        if (period === 'week' && pageParam === null) {
+          await setMobileOfflineCache('mobile-history-reports-week', payload, 7 * 24 * 60 * 60 * 1000);
+        }
+        return payload;
+      } catch {
+        if (period === 'week' && pageParam === null) {
+          const cached = await getMobileOfflineCache<MobileReportsHistoryResponse>('mobile-history-reports-week');
+          if (cached) {
+            return cached.payload;
+          }
+        }
+        throw new Error('Mobile reports history unavailable');
       }
-
-      return (await response.json()) as MobileReportsHistoryResponse;
     },
     staleTime: 30_000,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
