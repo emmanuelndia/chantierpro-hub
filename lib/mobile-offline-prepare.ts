@@ -18,6 +18,7 @@ const OFFLINE_ROUTE_URLS = [
   '/mobile/login',
   '/rapport-session',
 ];
+const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v4';
 
 const DAY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const WEEK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -96,15 +97,21 @@ export async function getMobileOfflinePreparationState() {
 
 async function warmMobileRoutes(errors: string[]) {
   let prepared = 0;
+  const pageCache = await caches.open(MOBILE_PAGE_CACHE_NAME);
 
   await Promise.all(
     OFFLINE_ROUTE_URLS.map(async (url) => {
       try {
-        const response = await fetch(url, {
+        const request = new Request(url, {
           cache: 'reload',
           credentials: 'include',
+          headers: {
+            Accept: 'text/html',
+          },
         });
+        const response = await fetch(request);
         if (response.ok) {
+          await pageCache.put(url, response.clone());
           prepared += 1;
         } else {
           errors.push(`${url}: ${response.status}`);
