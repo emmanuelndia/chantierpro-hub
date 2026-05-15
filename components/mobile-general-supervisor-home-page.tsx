@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import { haversineDistanceKm } from '@/lib/haversine';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
+import { MobilePendingReportsAlert } from '@/components/mobile-pending-reports-alert';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { SessionStatus, TodayClockInView } from '@/types/clock-in';
 import type { TodaySiteItem } from '@/types/projects';
@@ -144,6 +145,8 @@ export function MobileGeneralSupervisorHomePage({ user }: MobileGeneralSuperviso
         pauseDurationSeconds={pauseDurationSeconds}
         sessionDurationSeconds={statusDurationSeconds}
       />
+
+      <MobilePendingReportsAlert />
 
       {/* Header avec informations utilisateur */}
       <section className="rounded-lg border border-purple-200 bg-purple-50 p-4">

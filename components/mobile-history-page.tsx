@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { SignedImage } from '@/components/mobile/SignedImage';
@@ -325,6 +326,11 @@ function SessionCard({
           <p className="mt-1 text-sm font-semibold text-slate-500">
             {statusLabels[session.status]} - {formatDuration(session.realDurationSeconds)}
           </p>
+          {session.reportMissing ? (
+            <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">
+              Rapport manquant
+            </span>
+          ) : null}
           {session.photos.length > 0 ? (
             <p className="mt-2 text-xs font-bold text-primary">{session.photos.length} photo(s)</p>
           ) : null}
@@ -380,6 +386,21 @@ function SessionDetail({
           <section className="rounded-lg border border-primary/20 bg-primary/10 p-4">
             <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-primary">Rapport soumis</h3>
             <p className="mt-3 text-sm leading-6 text-slate-700">{session.report.content}</p>
+          </section>
+        ) : session.reportMissing && session.departureRecordId ? (
+          <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-amber-700">
+              Rapport manquant
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-amber-900">
+              Cette session est terminee sans rapport. Vous pouvez encore le soumettre maintenant.
+            </p>
+            <Link
+              className="mt-4 inline-flex min-h-12 items-center justify-center rounded-lg bg-amber-600 px-4 text-sm font-black text-white"
+              href={`/mobile/rapport-session?sessionId=${encodeURIComponent(session.departureRecordId)}`}
+            >
+              Rediger le rapport
+            </Link>
           </section>
         ) : null}
 

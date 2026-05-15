@@ -516,9 +516,14 @@ export function MobileClockInPage() {
       <PostClockInPanel
         busy={reportMutation.isPending}
         errorMessage={errorMessage}
+        helperText="Vous pourrez encore soumettre ce rapport plus tard depuis l'historique."
         label="Rapport de fin de session"
         onPrimary={() => reportMutation.mutate()}
-        onSkip={() => setStep('confirmation')}
+        onSkip={() => {
+          if (window.confirm("Vous pourrez encore soumettre ce rapport plus tard depuis l'historique. Passer maintenant ?")) {
+            setStep('confirmation');
+          }
+        }}
         primaryLabel="Soumettre"
         setValue={setReportContent}
         title="Rapport de fin de session"
@@ -824,6 +829,7 @@ function ActionButton({
 function PostClockInPanel({
   busy,
   errorMessage,
+  helperText,
   label,
   onPrimary,
   onSkip,
@@ -834,6 +840,7 @@ function PostClockInPanel({
 }: Readonly<{
   busy: boolean;
   errorMessage: string | null;
+  helperText?: string;
   label: string;
   onPrimary: () => void;
   onSkip: () => void;
@@ -851,6 +858,7 @@ function PostClockInPanel({
       <label className="block text-sm font-bold text-slate-700" htmlFor="post-clock-in-text">
         {label}
       </label>
+      {helperText ? <p className="text-sm leading-6 text-slate-500">{helperText}</p> : null}
       <textarea
         className="min-h-36 w-full rounded-lg border border-slate-300 p-3 text-base outline-none focus:border-primary"
         id="post-clock-in-text"

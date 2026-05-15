@@ -106,6 +106,8 @@ export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) 
     },
     onSuccess: (response) => {
       void queryClient.invalidateQueries({ queryKey: ['mobile-session-report', sessionId] });
+      void queryClient.invalidateQueries({ queryKey: ['mobile-session-report-pending'] });
+      void queryClient.invalidateQueries({ queryKey: ['mobile-history'] });
       
       if (response.isOffline) {
         // Notification offline
@@ -147,7 +149,7 @@ export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) 
   };
 
   const handleSkip = () => {
-    if (confirm('Êtes-vous sûr de vouloir passer sans soumettre de rapport ?')) {
+    if (confirm("Vous pourrez encore soumettre ce rapport plus tard depuis l'historique. Passer maintenant ?")) {
       router.push('/mobile/home');
     }
   };
@@ -178,6 +180,32 @@ export function MobileSessionReportPage({ user }: MobileSessionReportPageProps) 
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
         Impossible de charger les données de la session. Veuillez réessayer.
+      </div>
+    );
+  }
+
+  if (data.hasExistingReport) {
+    return (
+      <div className="space-y-4">
+        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+            Rapport deja soumis
+          </p>
+          <h2 className="mt-2 text-xl font-black text-emerald-950">
+            Cette session a deja un rapport
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-emerald-900">
+            Le rapport n&apos;est plus modifiable depuis l&apos;application terrain.
+          </p>
+        </section>
+
+        <button
+          className="flex min-h-14 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-black text-white"
+          onClick={() => router.push('/mobile/history')}
+          type="button"
+        >
+          Voir dans l&apos;historique
+        </button>
       </div>
     );
   }

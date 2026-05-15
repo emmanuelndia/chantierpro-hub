@@ -56,3 +56,16 @@ export type SessionReportData = {
   hasExistingReport: boolean;
   existingReportId?: string | undefined;
 };
+
+export type PendingSessionReportItem = {
+  departureRecordId: string;
+  siteId: string;
+  siteName: string;
+  date: string;
+  endedAt: string;
+};
+
+export type PendingSessionReportsResponse = {
+  total: number;
+  items: PendingSessionReportItem[];
+};

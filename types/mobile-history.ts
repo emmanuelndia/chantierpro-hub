@@ -39,6 +39,7 @@ export type MobileHistoryReport = {
 
 export type MobileHistorySession = {
   id: string;
+  departureRecordId: string | null;
   siteId: string;
   siteName: string;
   startedAt: string;
@@ -48,6 +49,7 @@ export type MobileHistorySession = {
   pauseDurationSeconds: number;
   records: MobileHistoryRecord[];
   report: MobileHistoryReport | null;
+  reportMissing: boolean;
   photos: MobileHistoryPhoto[];
 };
 

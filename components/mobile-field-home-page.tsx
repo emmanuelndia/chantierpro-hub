@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import { haversineDistanceKm } from '@/lib/haversine';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
+import { MobilePendingReportsAlert } from '@/components/mobile-pending-reports-alert';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { SessionStatus, TodayClockInView } from '@/types/clock-in';
 import type { TodaySiteItem } from '@/types/projects';
@@ -119,6 +120,8 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
         pauseDurationSeconds={pauseDurationSeconds}
         sessionDurationSeconds={statusDurationSeconds}
       />
+
+      <MobilePendingReportsAlert />
 
       <section className="rounded-lg border border-sky-200 bg-sky-50 p-4">
         <div className="flex items-center gap-3">

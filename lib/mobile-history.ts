@@ -134,9 +134,11 @@ export async function getMobileHistory(
     prisma.report.findMany({
       where: {
         userId: user.id,
-        submittedAt: {
-          gte: from,
-          lte: now,
+        clockInRecord: {
+          timestampLocal: {
+            gte: from,
+            lte: now,
+          },
         },
       },
       orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
@@ -283,6 +285,7 @@ function finalizeSession(
 
   return {
     id: draft.id,
+    departureRecordId: departure?.id ?? null,
     siteId: draft.siteId,
     siteName: draft.siteName,
     startedAt: startedAt.toISOString(),
@@ -292,6 +295,7 @@ function finalizeSession(
     pauseDurationSeconds,
     records: draft.records.map(serializeRecord),
     report,
+    reportMissing: Boolean(departure && !report),
     photos: sessionPhotos,
   };
 }
