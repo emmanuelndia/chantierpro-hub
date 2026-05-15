@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ReportStatus, ReportValidationStatus, type Role } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Download, FileText, FolderOpen } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Download, FileText, FolderOpen } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableActionsMenu } from '@/components/table-actions-menu';
@@ -139,6 +139,10 @@ export function ReportsWebPage({ viewer }: ReportsWebPageProps) {
           </section>
 
           <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+            <div className="mb-5 flex flex-col gap-1">
+              <h2 className="text-lg font-semibold text-slate-950">Filtres rapports</h2>
+              <p className="text-sm text-slate-500">Affinez les rapports visibles avant consultation ou export.</p>
+            </div>
             <div className="grid gap-4 lg:grid-cols-4">
               <Field label="Du">
                 <input
@@ -239,16 +243,25 @@ export function ReportsWebPage({ viewer }: ReportsWebPageProps) {
                 />
               </Field>
             </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {(['csv', 'xlsx', 'pdf', 'txt'] as const).map((format) => (
-                <a
-                  className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold uppercase text-slate-700 transition hover:bg-slate-50"
-                  href={buildExportUrl(format)}
-                  key={format}
-                >
-                  Export {format}
-                </a>
-              ))}
+            <div className="mt-5 flex justify-end border-t border-slate-100 pt-4">
+              <details className="group relative">
+                <summary className="flex cursor-pointer list-none items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                  <Download className="h-4 w-4" />
+                  Exporter
+                  <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+                </summary>
+                <div className="absolute right-0 top-12 z-20 min-w-44 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                  {(['csv', 'xlsx', 'pdf', 'txt'] as const).map((format) => (
+                    <a
+                      className="block rounded-xl px-3 py-2.5 text-sm font-medium uppercase text-slate-700 transition hover:bg-slate-50"
+                      href={buildExportUrl(format)}
+                      key={format}
+                    >
+                      Export {format}
+                    </a>
+                  ))}
+                </div>
+              </details>
             </div>
           </section>
 

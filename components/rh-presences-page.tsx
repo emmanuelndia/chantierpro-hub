@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { FilterMultiSelect } from '@/components/filter-multi-select';
 import { StatsCard } from '@/components/stats-card';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
@@ -197,7 +198,11 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-        <div className="grid gap-4 xl:grid-cols-[0.9fr_0.9fr_1.2fr_1fr_1fr]">
+        <div className="mb-5 flex flex-col gap-1">
+          <h2 className="text-lg font-semibold text-slate-950">Filtres de présence</h2>
+          <p className="text-sm text-slate-500">Affinez la période, les ressources et les périmètres visibles.</p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[0.9fr_1fr_1.2fr_1.2fr]">
           <Field label="Mois / annee">
             <select
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
@@ -225,11 +230,8 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
             />
           </Field>
           <Field label="Projets">
-            <select
-              className="min-h-32 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-              multiple
-              onChange={(event) => {
-                const nextValues = [...event.target.selectedOptions].map((option) => option.value);
+            <FilterMultiSelect
+              onChange={(nextValues) => {
                 setProjectIds(nextValues);
                 setSiteIds((current) =>
                   current.filter((siteId) =>
@@ -240,37 +242,32 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
                 );
                 setExpandedUserId(null);
               }}
-              value={projectIds}
-            >
-              {(optionsQuery.data?.projects ?? []).map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.label}
-                </option>
-              ))}
-            </select>
+              options={(optionsQuery.data?.projects ?? []).map((project) => ({
+                value: project.id,
+                label: project.label,
+              }))}
+              placeholder="Tous les projets"
+              values={projectIds}
+            />
           </Field>
           <Field label="Sites">
-            <select
-              className="min-h-32 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-              multiple
-              onChange={(event) => {
-                setSiteIds([...event.target.selectedOptions].map((option) => option.value));
+            <FilterMultiSelect
+              onChange={(nextValues) => {
+                setSiteIds(nextValues);
                 setExpandedUserId(null);
               }}
-              value={siteIds}
-            >
-              {visibleSites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.label}
-                </option>
-              ))}
-            </select>
+              options={visibleSites.map((site) => ({
+                value: site.id,
+                label: site.label,
+              }))}
+              placeholder="Tous les sites"
+              values={siteIds}
+            />
           </Field>
-          <Field label="Acces">
-            <div className="flex h-full items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-              {viewer.role}
-            </div>
-          </Field>
+        </div>
+        <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Accès</span>
+          <Badge tone="neutral">{viewer.role}</Badge>
         </div>
       </section>
 

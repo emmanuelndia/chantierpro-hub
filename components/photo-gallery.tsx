@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PhotoCategory, type Role } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from '@/components/empty-state';
+import { FilterMultiSelect } from '@/components/filter-multi-select';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type { PaginatedPhotosResponse, PhotoDetail, PhotoItem, PhotoSiteOption } from '@/types/photos';
@@ -267,6 +268,9 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+        <div className="mb-5">
+          <h2 className="text-lg font-semibold text-slate-950">Filtres galerie</h2>
+        </div>
         <div className="grid gap-4 lg:grid-cols-[0.8fr_0.8fr_1.2fr_0.8fr]">
           <Field label="Periode du">
             <input
@@ -291,21 +295,18 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
             />
           </Field>
           <Field label="Auteurs">
-            <select
-              className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-              multiple
-              onChange={(event) => {
-                setAuthorIds([...event.target.selectedOptions].map((option) => option.value));
+            <FilterMultiSelect
+              onChange={(nextValues) => {
+                setAuthorIds(nextValues);
                 resetPage();
               }}
-              value={authorIds}
-            >
-              {(photosQuery.data?.authors ?? []).map((author) => (
-                <option key={author.id} value={author.id}>
-                  {author.firstName} {author.lastName}
-                </option>
-              ))}
-            </select>
+              options={(photosQuery.data?.authors ?? []).map((author) => ({
+                value: author.id,
+                label: `${author.firstName} ${author.lastName}`,
+              }))}
+              placeholder="Tous les auteurs"
+              values={authorIds}
+            />
           </Field>
           <Field label="Ordre">
             <select
