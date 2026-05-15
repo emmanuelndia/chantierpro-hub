@@ -91,7 +91,12 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
         const clientId = createOfflineId();
         await enqueueOfflineSessionReport({
           clientId,
-          ...data,
+          clockInRecordId: data.clockInRecordId,
+          content: data.content,
+          progressPercentage: data.progressPercentage,
+          photoIds: data.photoIds,
+          ...(data.blockageNote !== undefined ? { blockageNote: data.blockageNote } : {}),
+          ...(data.assignmentId !== undefined ? { assignmentId: data.assignmentId } : {}),
           timestampLocal: new Date().toISOString(),
         });
 
