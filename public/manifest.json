@@ -2,7 +2,7 @@
   "name": "ChantierPro Hub",
   "short_name": "ChantierPro",
   "description": "Application web et PWA de gestion de chantiers BTP.",
-  "start_url": "/mobile/login",
+  "start_url": "/mobile/home",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F6F9FC",

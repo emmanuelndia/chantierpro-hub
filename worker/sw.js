@@ -1,6 +1,7 @@
 const PRECACHE_NAME = 'chantierpro-precache-v6';
 const STATIC_CACHE_NAME = 'chantierpro-static-v6';
 const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v6';
+const OFFLINE_CACHE_VERSION = 'v6';
 const OFFLINE_FALLBACK_URL = '/mobile/offline';
 const OFFLINE_TERRAIN_SHELL_URL = '/mobile/offline-shell';
 const ESSENTIAL_MOBILE_ROUTES = [
@@ -81,6 +82,24 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'GET_OFFLINE_DIAGNOSTICS') {
+    return;
+  }
+
+  const replyPort = event.ports?.[0];
+
+  if (!replyPort) {
+    return;
+  }
+
+  event.waitUntil(
+    getOfflineDiagnostics().then((diagnostics) => {
+      replyPort.postMessage(diagnostics);
+    }),
+  );
+});
+
 function isStaticAsset(pathname) {
   return (
     pathname.startsWith('/_next/static/') ||
@@ -151,8 +170,27 @@ function isOfflineTerrainRoute(pathname) {
     pathname === '/mobile/home' ||
     pathname === '/mobile/clock-in' ||
     pathname === '/mobile/photo' ||
+    pathname === '/mobile/planning' ||
     pathname === '/mobile/history' ||
     pathname === '/mobile/sync' ||
     pathname === '/rapport-session'
   );
+}
+
+async function getOfflineDiagnostics() {
+  const pageCache = await caches.open(MOBILE_PAGE_CACHE_NAME);
+  const routes = await Promise.all(
+    ESSENTIAL_MOBILE_ROUTES.map(async (url) => ({
+      url,
+      cached: Boolean(await pageCache.match(url, { ignoreSearch: true })),
+    })),
+  );
+
+  return {
+    type: 'OFFLINE_DIAGNOSTICS',
+    cacheVersion: OFFLINE_CACHE_VERSION,
+    pageCacheName: MOBILE_PAGE_CACHE_NAME,
+    shellCached: Boolean(await pageCache.match(OFFLINE_TERRAIN_SHELL_URL, { ignoreSearch: true })),
+    routes,
+  };
 }

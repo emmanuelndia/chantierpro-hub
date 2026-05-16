@@ -8,6 +8,7 @@ import { MobileCoordinatorHomePage } from '@/components/mobile-coordinator-home-
 import { MobileGeneralSupervisorHomePage } from '@/components/mobile-general-supervisor-home-page';
 import { MobilePhotoCameraPage } from '@/components/mobile-photo-camera-page';
 import { MobileHistoryPage } from '@/components/mobile-history-page';
+import { MobilePlanningPage } from '@/components/mobile-planning-page';
 import { MobileSessionReportPage } from '@/components/mobile-session-report-page';
 import { MobileSyncPage } from '@/components/mobile-sync-page';
 import { getMobileOfflineCache } from '@/lib/mobile-offline-db';
@@ -62,6 +63,10 @@ function renderOfflineRoute(pathname: string, user: WebSessionUser) {
 
   if (pathname === '/mobile/history') {
     return <MobileHistoryPage />;
+  }
+
+  if (pathname === '/mobile/planning') {
+    return <MobilePlanningPage user={user} />;
   }
 
   if (pathname === '/mobile/sync') {

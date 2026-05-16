@@ -2,6 +2,10 @@
 
 import { authFetch } from '@/lib/auth/client-session';
 import { setMobileOfflineCache } from '@/lib/mobile-offline-db';
+import {
+  getMobileOfflineServiceWorkerDiagnostics,
+  type MobileOfflineServiceWorkerDiagnostics,
+} from '@/lib/mobile-offline-service-worker';
 import type { TodayClockInView } from '@/types/clock-in';
 import type { MobilePhotoSitesResponse } from '@/types/mobile-photo';
 import type { PlanningDayResponse, SupervisorMyAssignmentsResponse } from '@/types/mobile-planning';
@@ -21,7 +25,8 @@ const OFFLINE_ROUTE_URLS = [
   '/mobile/offline-shell',
   '/rapport-session',
 ];
-const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v5';
+const OFFLINE_CACHE_VERSION = 'v6';
+const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v6';
 
 const DAY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const WEEK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -34,6 +39,8 @@ type TodaySitesResponse = {
 export type MobileOfflinePreparationResult = {
   date: string;
   preparedAt: string;
+  cacheVersion: string;
+  serviceWorker: MobileOfflineServiceWorkerDiagnostics;
   routesPrepared: number;
   missingRoutes: string[];
   missingData: string[];
@@ -85,16 +92,26 @@ export async function prepareMobileOfflineMode() {
     false,
   );
   const missingData = await getMissingPreparedData(todayKey);
+  const serviceWorker = await getMobileOfflineServiceWorkerDiagnostics();
+  const serviceWorkerMissingRoutes = getMissingServiceWorkerRoutes(serviceWorker);
 
   const result: MobileOfflinePreparationResult = {
     date: todayKey,
     preparedAt,
-    routesPrepared: OFFLINE_ROUTE_URLS.length - missingRoutes.length,
-    missingRoutes,
+    cacheVersion: OFFLINE_CACHE_VERSION,
+    serviceWorker,
+    routesPrepared: OFFLINE_ROUTE_URLS.length - serviceWorkerMissingRoutes.length,
+    missingRoutes: serviceWorkerMissingRoutes,
     missingData,
     dataPrepared,
     errors,
-    status: errors.length === 0 && missingRoutes.length === 0 && missingData.length === 0 ? 'ready' : 'incomplete',
+    status:
+      errors.length === 0 &&
+      missingRoutes.length === 0 &&
+      missingData.length === 0 &&
+      isServiceWorkerReady(serviceWorker)
+        ? 'ready'
+        : 'incomplete',
   };
 
   await setMobileOfflineCache('offline-preparation-meta', result, null);
@@ -131,7 +148,22 @@ export async function getMobileOfflinePreparationState() {
     return { status: 'obsolete' as const, preparation: payload };
   }
 
-  return { status: payload.status ?? (payload.errors.length === 0 ? 'ready' : 'incomplete'), preparation: payload };
+  const serviceWorker = await getMobileOfflineServiceWorkerDiagnostics();
+  const serviceWorkerMissingRoutes = getMissingServiceWorkerRoutes(serviceWorker);
+  const preparation = {
+    ...payload,
+    serviceWorker,
+    missingRoutes: serviceWorkerMissingRoutes,
+  };
+
+  if (payload.cacheVersion !== OFFLINE_CACHE_VERSION || !isServiceWorkerReady(serviceWorker)) {
+    return { status: 'incomplete' as const, preparation };
+  }
+
+  return {
+    status: preparation.status ?? (preparation.errors.length === 0 ? 'ready' : 'incomplete'),
+    preparation,
+  };
 }
 
 async function warmMobileRoutes(errors: string[]) {
@@ -171,6 +203,26 @@ async function getMissingPreparedRoutes() {
   );
 
   return matches.filter((match) => !match.response).map((match) => match.url);
+}
+
+function getMissingServiceWorkerRoutes(diagnostics: MobileOfflineServiceWorkerDiagnostics) {
+  if (!diagnostics.active) {
+    return [...OFFLINE_ROUTE_URLS];
+  }
+
+  return OFFLINE_ROUTE_URLS.filter(
+    (url) => !diagnostics.routes.some((route) => route.url === url && route.cached),
+  );
+}
+
+function isServiceWorkerReady(diagnostics: MobileOfflineServiceWorkerDiagnostics) {
+  return (
+    diagnostics.active &&
+    diagnostics.cacheVersion === OFFLINE_CACHE_VERSION &&
+    diagnostics.pageCacheName === MOBILE_PAGE_CACHE_NAME &&
+    diagnostics.shellCached &&
+    getMissingServiceWorkerRoutes(diagnostics).length === 0
+  );
 }
 
 async function cacheJson<T>(

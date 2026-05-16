@@ -44,6 +44,9 @@ export function MobileOfflineStatus() {
     <div className={`border-b px-4 py-2 text-center text-xs font-bold ${config[1]}`}>
       {config[0]}
       {state.preparation ? ` - ${formatTime(state.preparation.preparedAt)}` : ''}
+      {state.status === 'incomplete' && state.preparation?.missingRoutes.length
+        ? ` - ${state.preparation.missingRoutes.length} page(s) manquante(s)`
+        : ''}
     </div>
   );
 }

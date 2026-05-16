@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import {
-  getMobileOfflineCache,
   getMobileOfflinePendingCounts,
   getMobileOfflineSyncLogs,
   syncMobileOfflineQueue,
   type MobileOfflinePendingCounts,
   type MobileOfflineSyncLog,
 } from '@/lib/mobile-offline-db';
-import { prepareMobileOfflineMode, type MobileOfflinePreparationResult } from '@/lib/mobile-offline-prepare';
+import {
+  getMobileOfflinePreparationState,
+  prepareMobileOfflineMode,
+  type MobileOfflinePreparationResult,
+} from '@/lib/mobile-offline-prepare';
 import { useMobileNetworkState } from '@/hooks/use-mobile-network-state';
 
 const emptyCounts: MobileOfflinePendingCounts = {
@@ -34,14 +37,14 @@ export function MobileSyncPage() {
   }, []);
 
   async function refresh() {
-    const [nextCounts, nextLogs, preparationMeta] = await Promise.all([
+    const [nextCounts, nextLogs, preparationState] = await Promise.all([
       getMobileOfflinePendingCounts(),
       getMobileOfflineSyncLogs(),
-      getMobileOfflineCache<MobileOfflinePreparationResult>('offline-preparation-meta'),
+      getMobileOfflinePreparationState(),
     ]);
     setCounts(nextCounts);
     setLogs(nextLogs);
-    setPreparation(preparationMeta?.payload ?? null);
+    setPreparation(preparationState.preparation);
   }
 
   async function syncNow() {
@@ -136,6 +139,18 @@ export function MobileSyncPage() {
           </p>
         ) : null}
 
+        {preparation ? (
+          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">Diagnostic offline</p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+              <DiagnosticRow label="Service worker" value={preparation.serviceWorker.active ? 'Actif' : 'Absent'} />
+              <DiagnosticRow label="Version" value={preparation.serviceWorker.cacheVersion ?? 'Inconnue'} />
+              <DiagnosticRow label="Cache pages" value={preparation.serviceWorker.pageCacheName ?? 'Indisponible'} />
+              <DiagnosticRow label="Shell terrain" value={preparation.serviceWorker.shellCached ? 'Present' : 'Absent'} />
+            </dl>
+          </div>
+        ) : null}
+
         {preparation?.errors.length ? (
           <div className="mt-3 space-y-1">
             {preparation.errors.slice(0, 3).map((error) => (
@@ -148,7 +163,8 @@ export function MobileSyncPage() {
 
         {preparation?.missingRoutes?.length ? (
           <p className="mt-3 text-xs font-semibold text-orange-700">
-            {preparation.missingRoutes.length} page(s) encore absente(s) du cache de navigation.
+            {preparation.missingRoutes.length} page(s) encore absente(s) du cache actif :{' '}
+            {preparation.missingRoutes.join(', ')}.
           </p>
         ) : null}
         {preparation?.missingData?.length ? (
@@ -219,6 +235,15 @@ function CountCard({ label, value }: Readonly<{ label: string; value: number }>)
       <div className="text-3xl font-black text-slate-950">{value}</div>
       <div className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">{label}</div>
     </div>
+  );
+}
+
+function DiagnosticRow({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <>
+      <dt className="font-bold text-slate-500">{label}</dt>
+      <dd className="truncate font-black text-slate-900">{value}</dd>
+    </>
   );
 }
 
