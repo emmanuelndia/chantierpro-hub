@@ -224,7 +224,6 @@ export function MobileClockInPage() {
       await setMobileOfflineCache('sites-today', payload, 24 * 60 * 60 * 1000);
       return payload;
     },
-    enabled: manualMode || networkState === 'offline' || Boolean(requestedSiteId) || Boolean(todayQuery.data?.activeSession),
     staleTime: 300_000,
   });
 
@@ -251,13 +250,15 @@ export function MobileClockInPage() {
 
       return (await response.json()) as NearbySitesResponse;
     },
-    enabled: geoState.status === 'ready' && !manualMode && !requestedSiteId,
+    enabled: geoState.status === 'ready' && !requestedSiteId,
     staleTime: 30_000,
   });
 
   const todaySites = useMemo(() => todaySitesQuery.data?.items ?? [], [todaySitesQuery.data?.items]);
   const activeSession = todayQuery.data?.activeSession ?? null;
   const quickSite = nearbyQuery.data?.sites[0] ?? null;
+  const nearbySuggestion =
+    quickSite && !todaySites.some((site) => site.id === quickSite.id) ? quickSite : null;
 
   useEffect(() => {
     if (requestedIntent) {
@@ -277,6 +278,24 @@ export function MobileClockInPage() {
     }
   }, [activeSession?.siteId, selectedSiteId]);
 
+  useEffect(() => {
+    if (selectedSiteId || todaySites.length === 0) {
+      return;
+    }
+
+    const openSessionSite = todaySites.find((site) => site.hasOpenSession);
+
+    if (openSessionSite) {
+      setSelectedSiteId(openSessionSite.id);
+      setManualMode(true);
+      return;
+    }
+
+    const closestAssignedSite = findClosestTodaySite(todaySites, geoState);
+    setSelectedSiteId((closestAssignedSite ?? todaySites[0])?.id ?? null);
+    setManualMode(true);
+  }, [geoState, selectedSiteId, todaySites]);
+
   const selectedSite = useMemo(() => {
     const siteFromToday = todaySites.find((site) => site.id === selectedSiteId);
 
@@ -284,7 +303,7 @@ export function MobileClockInPage() {
       return fromTodaySite(siteFromToday, geoState);
     }
 
-    if (!manualMode && quickSite) {
+    if (todaySites.length === 0 && !manualMode && quickSite) {
       return fromNearbySite(quickSite);
     }
 
@@ -569,7 +588,18 @@ export function MobileClockInPage() {
         </div>
       ) : null}
 
-      {!manualMode && geoState.status === 'ready' ? (
+      <ManualSiteList
+        geoState={geoState}
+        loading={todaySitesQuery.isLoading}
+        onSelect={(siteId) => {
+          setSelectedSiteId(siteId);
+          setManualMode(true);
+        }}
+        selectedSiteId={selectedSite?.id ?? null}
+        sites={todaySites}
+      />
+
+      {geoState.status === 'ready' && todaySites.length === 0 ? (
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
           {nearbyQuery.isLoading ? (
             <p className="text-sm font-semibold text-slate-500">Recherche du chantier le plus proche...</p>
@@ -599,13 +629,13 @@ export function MobileClockInPage() {
         </section>
       ) : null}
 
-      {manualMode ? (
-        <ManualSiteList
-          geoState={geoState}
-          loading={todaySitesQuery.isLoading}
-          onSelect={setSelectedSiteId}
-          selectedSiteId={selectedSite?.id ?? null}
-          sites={todaySites}
+      {nearbySuggestion ? (
+        <NearbySuggestionCard
+          onSelect={() => {
+            setSelectedSiteId(nearbySuggestion.id);
+            setManualMode(false);
+          }}
+          site={nearbySuggestion}
         />
       ) : null}
 
@@ -653,7 +683,7 @@ export function MobileClockInPage() {
             <ActionButton
               busy={clockInMutation.isPending}
               disabled={!canSubmit}
-              label={quickSite && !manualMode ? 'POINTER ICI' : 'POINTER ENTREE'}
+              label={todaySites.length === 0 && quickSite && !manualMode ? 'POINTER ICI' : 'POINTER ENTREE'}
               onClick={() => {
                 setSelectedIntent('arrival');
                 clockInMutation.mutate('arrival');
@@ -787,6 +817,7 @@ function ManualSiteList({
                   <div className="min-w-0">
                     <p className="truncate text-base font-black text-slate-950">{site.name}</p>
                     <p className="mt-1 truncate text-sm text-slate-500">{site.address}</p>
+                    <p className="mt-2 text-xs font-bold text-emerald-700">Assigne aujourd&apos;hui</p>
                   </div>
                   <span className="shrink-0 text-sm font-bold text-primary">
                     {selectableSite.distanceKm === null ? 'N/A' : `${selectableSite.distanceKm.toFixed(2)} km`}
@@ -797,6 +828,35 @@ function ManualSiteList({
           })}
         </div>
       )}
+    </section>
+  );
+}
+
+function NearbySuggestionCard({
+  onSelect,
+  site,
+}: Readonly<{
+  onSelect: () => void;
+  site: NearbySiteItem;
+}>) {
+  return (
+    <section className="rounded-lg border border-sky-200 bg-sky-50 p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">Site proche detecte</p>
+      <div className="mt-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-black text-slate-950">{site.name}</h3>
+          <p className="mt-1 truncate text-sm text-slate-600">{site.address}</p>
+          <p className="mt-2 text-xs font-bold text-sky-700">Non assigne aujourd&apos;hui</p>
+        </div>
+        <span className="shrink-0 text-sm font-bold text-sky-700">{site.distance.toFixed(2)} km</span>
+      </div>
+      <button
+        className="mt-4 min-h-12 w-full rounded-lg border border-sky-300 bg-white px-4 text-sm font-bold text-sky-800"
+        onClick={onSelect}
+        type="button"
+      >
+        Choisir ce site
+      </button>
     </section>
   );
 }
@@ -965,6 +1025,22 @@ function fromNearbySite(site: NearbySiteItem): SelectableSite {
     radiusKm: site.radiusKm,
     distanceKm: site.distance,
   };
+}
+
+function findClosestTodaySite(sites: TodaySiteItem[], geoState: GeoState) {
+  if (geoState.status !== 'ready') {
+    return null;
+  }
+
+  return sites
+    .map((site) => ({
+      site,
+      distanceKm: haversineDistanceKm(
+        { latitude: geoState.latitude, longitude: geoState.longitude },
+        { latitude: site.latitude, longitude: site.longitude },
+      ),
+    }))
+    .sort((left, right) => left.distanceKm - right.distanceKm)[0]?.site ?? null;
 }
 
 function buildOfflineSessionStatus(
