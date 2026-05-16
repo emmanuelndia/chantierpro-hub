@@ -7,6 +7,7 @@ export type MobileOfflineServiceWorkerRoute = {
 
 export type MobileOfflineServiceWorkerDiagnostics = {
   active: boolean;
+  registrationError: string | null;
   cacheVersion: string | null;
   pageCacheName: string | null;
   shellCached: boolean;
@@ -37,6 +38,7 @@ export async function getMobileOfflineServiceWorkerDiagnostics(): Promise<Mobile
     const diagnostics = await sendDiagnosticsRequest(worker);
     return {
       active: true,
+      registrationError: null,
       cacheVersion: diagnostics.cacheVersion,
       pageCacheName: diagnostics.pageCacheName,
       shellCached: diagnostics.shellCached,
@@ -47,6 +49,23 @@ export async function getMobileOfflineServiceWorkerDiagnostics(): Promise<Mobile
       ...inactiveDiagnostics(),
       active: true,
     };
+  }
+}
+
+export async function ensureMobileServiceWorkerRegistration() {
+  if (typeof window === 'undefined' || process.env.NODE_ENV === 'development' || !('serviceWorker' in navigator)) {
+    return null;
+  }
+
+  try {
+    const existing = await navigator.serviceWorker.getRegistration('/');
+    const registration = existing ?? (await navigator.serviceWorker.register('/sw.js', { scope: '/' }));
+    await navigator.serviceWorker.ready;
+    window.dispatchEvent(new Event('mobile-service-worker-ready'));
+    return registration;
+  } catch (error) {
+    window.dispatchEvent(new Event('mobile-service-worker-error'));
+    return error instanceof Error ? error : new Error('Service worker registration failed.');
   }
 }
 
@@ -75,6 +94,7 @@ function sendDiagnosticsRequest(worker: ServiceWorker) {
 function inactiveDiagnostics(): MobileOfflineServiceWorkerDiagnostics {
   return {
     active: false,
+    registrationError: null,
     cacheVersion: null,
     pageCacheName: null,
     shellCached: false,

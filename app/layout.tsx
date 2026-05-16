@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { ServiceWorkerDevReset } from '@/components/service-worker-dev-reset';
+import { MobileServiceWorkerRegister } from '@/components/mobile-service-worker-register';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html lang="fr">
       <body>
         <ServiceWorkerDevReset />
+        <MobileServiceWorkerRegister />
         {children}
       </body>
     </html>

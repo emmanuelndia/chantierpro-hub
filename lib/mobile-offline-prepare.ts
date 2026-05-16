@@ -3,6 +3,7 @@
 import { authFetch } from '@/lib/auth/client-session';
 import { setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import {
+  ensureMobileServiceWorkerRegistration,
   getMobileOfflineServiceWorkerDiagnostics,
   type MobileOfflineServiceWorkerDiagnostics,
 } from '@/lib/mobile-offline-service-worker';
@@ -54,6 +55,12 @@ export async function prepareMobileOfflineMode() {
   const preparedAt = new Date().toISOString();
   const errors: string[] = [];
   const dataPrepared: string[] = [];
+  const registrationResult = await ensureMobileServiceWorkerRegistration();
+
+  if (registrationResult instanceof Error) {
+    errors.push(`service-worker: ${registrationResult.message}`);
+  }
+
   await warmMobileRoutes(errors);
   const missingRoutes = await getMissingPreparedRoutes();
 

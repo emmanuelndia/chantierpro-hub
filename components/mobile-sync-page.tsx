@@ -148,6 +148,9 @@ export function MobileSyncPage() {
               <DiagnosticRow label="Cache pages" value={preparation.serviceWorker.pageCacheName ?? 'Indisponible'} />
               <DiagnosticRow label="Shell terrain" value={preparation.serviceWorker.shellCached ? 'Present' : 'Absent'} />
             </dl>
+            {preparation.serviceWorker.registrationError ? (
+              <p className="mt-2 text-xs font-semibold text-red-600">{preparation.serviceWorker.registrationError}</p>
+            ) : null}
           </div>
         ) : null}
 

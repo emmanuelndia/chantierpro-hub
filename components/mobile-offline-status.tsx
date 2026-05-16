@@ -25,9 +25,11 @@ export function MobileOfflineStatus() {
     };
     window.addEventListener('online', handleOnline);
     window.addEventListener('mobile-offline-prepared', handleOnline);
+    window.addEventListener('mobile-service-worker-ready', handleOnline);
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('mobile-offline-prepared', handleOnline);
+      window.removeEventListener('mobile-service-worker-ready', handleOnline);
     };
   }, []);
 
