@@ -172,6 +172,14 @@ export async function getMobileOfflinePendingCounts(): Promise<MobileOfflinePend
   return { clockIns, comments, photos, reports, sessionReports, taskUpdates };
 }
 
+export async function getPendingOfflineClockIns() {
+  await migrateLegacyClockInQueue();
+  const db = await openDb();
+  const items = await getAll<OfflineClockInItem>(db, 'clockIns');
+  db.close();
+  return items.sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal));
+}
+
 export async function countPendingMobilePhotos() {
   return (await getMobileOfflinePendingCounts()).photos;
 }

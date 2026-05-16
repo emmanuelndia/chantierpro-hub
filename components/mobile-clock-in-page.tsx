@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,12 +17,19 @@ import type {
   SessionStatus,
   TodayClockInView,
 } from '@/types/clock-in';
-import { getMobileOfflineCache, setMobileOfflineCache, syncMobileOfflineQueue } from '@/lib/mobile-offline-db';
+import {
+  getMobileOfflineCache,
+  getPendingOfflineClockIns,
+  setMobileOfflineCache,
+  syncMobileOfflineQueue,
+} from '@/lib/mobile-offline-db';
+import { buildLocalSessionStatus } from '@/lib/mobile-clock-in-session';
 import { useGeolocation } from '@/lib/hooks/useGeolocation';
 import { useMobileNetworkState } from '@/hooks/use-mobile-network-state';
 import { getMobileOfflinePreparationState } from '@/lib/mobile-offline-prepare';
 import type { TodaySiteItem } from '@/types/projects';
 import type { NearbySiteItem } from '@/types/reports';
+import { MobileOfflineLink } from '@/components/mobile-offline-link';
 
 type ClockInIntent = 'arrival' | 'departure' | 'pause-start' | 'pause-end';
 type Step = 'clock-in' | 'comment' | 'confirmation';
@@ -222,6 +228,12 @@ export function MobileClockInPage() {
     staleTime: 300_000,
   });
 
+  const pendingClockInsQuery = useQuery({
+    queryKey: ['mobile-clock-in-pending-items'],
+    queryFn: getPendingOfflineClockIns,
+    staleTime: 0,
+  });
+
   const nearbyQuery = useQuery({
     queryKey: ['mobile-sites-nearby', geoState.status === 'ready' ? geoState.latitude : null, geoState.status === 'ready' ? geoState.longitude : null],
     queryFn: async () => {
@@ -290,12 +302,12 @@ export function MobileClockInPage() {
         const response = await authFetch(`/api/sites/${selectedSite.id}/clock-in/session-status`);
 
         if (!response.ok) {
-          return buildOfflineSessionStatus(selectedSite.id, activeSession);
+          return buildOfflineSessionStatus(selectedSite.id, todayQuery.data?.items ?? [], pendingClockInsQuery.data ?? []);
         }
 
         return (await response.json()) as SessionStatus;
       } catch {
-        return buildOfflineSessionStatus(selectedSite.id, activeSession);
+        return buildOfflineSessionStatus(selectedSite.id, todayQuery.data?.items ?? [], pendingClockInsQuery.data ?? []);
       }
     },
     enabled: Boolean(selectedSite),
@@ -303,7 +315,13 @@ export function MobileClockInPage() {
     staleTime: 30_000,
   });
 
-  const sessionStatus = sessionStatusQuery.data;
+  const localSessionStatus = selectedSite
+    ? buildOfflineSessionStatus(selectedSite.id, todayQuery.data?.items ?? [], pendingClockInsQuery.data ?? [])
+    : null;
+  const sessionStatus =
+    networkState === 'offline' || (pendingClockInsQuery.data?.length ?? 0) > 0
+      ? localSessionStatus
+      : sessionStatusQuery.data;
   const selectedSiteSessionLoaded = sessionStatus !== undefined || sessionStatusQuery.isError;
   const hasOpenSession = selectedSite ? Boolean(sessionStatus?.sessionOpen) : Boolean(activeSession);
   const pauseActive = Boolean(sessionStatus?.pauseActive);
@@ -320,6 +338,12 @@ export function MobileClockInPage() {
     selectedSite !== null &&
     selectedDistance > selectedSite.radiusKm;
 
+  useEffect(() => {
+    if (!requestedIntent && sessionStatus?.sessionOpen) {
+      setSelectedIntent('departure');
+    }
+  }, [requestedIntent, sessionStatus?.sessionOpen]);
+
   const clockInMutation = useMutation({
     mutationFn: submitClockIn,
     onSuccess: async (result) => {
@@ -328,6 +352,7 @@ export function MobileClockInPage() {
       setComment('');
       setStep('comment');
       await refreshPendingCount();
+      await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-pending-items'] });
       await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-today'] });
       await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-history'] });
     },
@@ -532,6 +557,17 @@ export function MobileClockInPage() {
           Derniere position recente utilisee ({formatTime(geoState.capturedAt)}).
         </div>
       ) : null}
+      {geoState.status === 'ready' ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700">
+          <p>
+            {geoState.source === 'LIVE' ? 'Position live' : 'Position cachee'} a {formatTime(geoState.capturedAt)}
+            {geoState.accuracy !== null ? ` - precision ${Math.round(geoState.accuracy)} m` : ''}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Le chantier est choisi manuellement, mais la distance est calculee avec votre position GPS.
+          </p>
+        </div>
+      ) : null}
 
       {!manualMode && geoState.status === 'ready' ? (
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
@@ -634,9 +670,9 @@ export function MobileClockInPage() {
         </div>
       ) : null}
 
-      <Link className="block text-center text-sm font-bold text-slate-500" href="/mobile/home">
+      <MobileOfflineLink className="block text-center text-sm font-bold text-slate-500" href="/mobile/home">
         Retour accueil
-      </Link>
+      </MobileOfflineLink>
     </div>
   );
 }
@@ -931,24 +967,12 @@ function fromNearbySite(site: NearbySiteItem): SelectableSite {
   };
 }
 
-function buildOfflineSessionStatus(siteId: string, activeSession: TodayClockInView['activeSession']) {
-  if (activeSession?.siteId !== siteId) {
-    return {
-      sessionOpen: false,
-      arrivalTime: null,
-      duration: null,
-      pauseActive: false,
-      pauseDuration: 0,
-    } satisfies SessionStatus;
-  }
-
-  return {
-    sessionOpen: true,
-    arrivalTime: activeSession.arrivalAt,
-    duration: activeSession.durationSeconds,
-    pauseActive: false,
-    pauseDuration: 0,
-  } satisfies SessionStatus;
+function buildOfflineSessionStatus(
+  siteId: string,
+  serverItems: ClockInRecordItem[],
+  pendingItems: Awaited<ReturnType<typeof getPendingOfflineClockIns>>,
+) {
+  return buildLocalSessionStatus(siteId, serverItems, pendingItems);
 }
 
 async function readApiMessage(response: Response, fallback: string) {

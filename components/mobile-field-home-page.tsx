@@ -29,6 +29,8 @@ type MobileFieldHomePageProps = Readonly<{
 
 export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
   const [now, setNow] = useState(() => Date.now());
+  const [usingOfflineSites, setUsingOfflineSites] = useState(false);
+  const [usingOfflineClockIn, setUsingOfflineClockIn] = useState(false);
   const geoState = useCurrentPosition();
 
   useEffect(() => {
@@ -39,21 +41,27 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
   const sitesQuery = useQuery({
     queryKey: ['mobile-sites-today'],
     queryFn: async () => {
-      const response = await authFetch('/api/users/me/sites/today');
+      try {
+        const response = await authFetch('/api/users/me/sites/today');
 
-      if (!response.ok) {
+        if (!response.ok) {
+          throw new Error(`Today sites request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as TodaySitesResponse;
+        setUsingOfflineSites(false);
+        await setMobileOfflineCache('sites-today', payload, 24 * 60 * 60 * 1000);
+        return payload;
+      } catch {
         const cached = await getMobileOfflineCache<TodaySitesResponse>('sites-today');
 
         if (cached) {
+          setUsingOfflineSites(true);
           return cached.payload;
         }
 
-        throw new Error(`Today sites request failed with status ${response.status}`);
+        throw new Error('Today sites request failed');
       }
-
-      const payload = (await response.json()) as TodaySitesResponse;
-      await setMobileOfflineCache('sites-today', payload, 24 * 60 * 60 * 1000);
-      return payload;
     },
     refetchInterval: 60_000,
     staleTime: 300_000,
@@ -62,13 +70,27 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
   const clockInQuery = useQuery({
     queryKey: ['mobile-clock-in-today'],
     queryFn: async () => {
-      const response = await authFetch('/api/users/me/clock-in');
+      try {
+        const response = await authFetch('/api/users/me/clock-in');
 
-      if (!response.ok) {
-        throw new Error(`Clock-in request failed with status ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Clock-in request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as TodayClockInView;
+        setUsingOfflineClockIn(false);
+        await setMobileOfflineCache('clock-in-today', payload, 30 * 60 * 1000);
+        return payload;
+      } catch {
+        const cached = await getMobileOfflineCache<TodayClockInView>('clock-in-today');
+
+        if (cached) {
+          setUsingOfflineClockIn(true);
+          return cached.payload;
+        }
+
+        throw new Error('Clock-in request failed');
       }
-
-      return (await response.json()) as TodayClockInView;
     },
     refetchInterval: 30_000,
     staleTime: 30_000,
@@ -88,13 +110,17 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
         return null;
       }
 
-      const response = await authFetch(`/api/sites/${primarySite.id}/clock-in/session-status`);
+      try {
+        const response = await authFetch(`/api/sites/${primarySite.id}/clock-in/session-status`);
 
-      if (!response.ok) {
+        if (!response.ok) {
+          return null;
+        }
+
+        return (await response.json()) as SessionStatus;
+      } catch {
         return null;
       }
-
-      return (await response.json()) as SessionStatus;
     },
     enabled: Boolean(primarySite),
     refetchInterval: 30_000,
@@ -147,6 +173,12 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
             <span className="text-xs font-semibold text-slate-400">{sites.length} sites</span>
           ) : null}
         </div>
+
+        {usingOfflineSites || usingOfflineClockIn ? (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+            Donnees hors ligne. Les chantiers prepares du jour sont affiches.
+          </p>
+        ) : null}
 
         {loading ? <SitesLoadingState /> : null}
 
