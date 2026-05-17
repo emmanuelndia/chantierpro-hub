@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/auth-provider';
+import { MobileLaunchScreen } from '@/components/mobile-launch-screen';
 import type { AuthErrorCode, LoginResponse } from '@/types/auth';
 
 type LoginErrorPayload = {
@@ -463,14 +464,7 @@ function InlineError({ message }: Readonly<{ message: string }>) {
 }
 
 function MobileAuthLoadingState() {
-  return (
-    <main className="flex min-h-dvh items-center justify-center bg-slate-950 px-6">
-      <div className="flex w-full max-w-sm items-center justify-center gap-3 rounded-3xl bg-white p-7 text-slate-700 shadow-panel">
-        <SpinnerIcon className="h-5 w-5 animate-spin" />
-        <span className="text-sm font-semibold">Verification de session...</span>
-      </div>
-    </main>
-  );
+  return <MobileLaunchScreen />;
 }
 
 function baseIcon(className: string, children: React.ReactNode) {
