@@ -33,6 +33,9 @@ type SiteRow = {
       userId: string;
     }[];
   }[];
+  planningAssignments: {
+    supervisorId: string;
+  }[];
   clockInRecords: {
     userId: string;
     type: ClockInType;
@@ -94,6 +97,15 @@ export async function getMobileManagementDashboard(
           },
         },
       },
+      planningAssignments: {
+        where: {
+          date: today,
+          deletedAt: null,
+        },
+        select: {
+          supervisorId: true,
+        },
+      },
       clockInRecords: {
         where: {
           status: ClockInStatus.VALID,
@@ -140,7 +152,7 @@ export async function getMobileManagementDashboard(
   const noPresenceAlerts = buildNoPresenceAlerts(sites, now);
   const alerts = [...noPresenceAlerts, ...incompleteAlerts].sort(compareAlerts);
   const presentResources = countScopedPresentUsers(sites, today);
-  const totalResources = countScopedResourceUsers(sites);
+  const totalResources = countScopedResourceUsers(sites, today);
 
   return {
     generatedAt: now.toISOString(),
@@ -183,6 +195,12 @@ function serializeSiteItem(site: SiteRow, today: Date): MobileManagementSiteItem
     for (const member of team.members) {
       activeResourceIds.add(member.userId);
     }
+  }
+  for (const assignment of site.planningAssignments) {
+    activeResourceIds.add(assignment.supervisorId);
+  }
+  for (const record of site.clockInRecords.filter((item) => sameDateOnly(item.timestampLocal, today))) {
+    activeResourceIds.add(record.userId);
   }
 
   return {
@@ -299,7 +317,7 @@ async function findIncompleteSessionAlerts(
     }));
 }
 
-function countScopedResourceUsers(sites: SiteRow[]) {
+function countScopedResourceUsers(sites: SiteRow[], today: Date) {
   const userIds = new Set<string>();
 
   for (const site of sites) {
@@ -307,6 +325,12 @@ function countScopedResourceUsers(sites: SiteRow[]) {
       for (const member of team.members) {
         userIds.add(member.userId);
       }
+    }
+    for (const assignment of site.planningAssignments) {
+      userIds.add(assignment.supervisorId);
+    }
+    for (const record of site.clockInRecords.filter((item) => sameDateOnly(item.timestampLocal, today))) {
+      userIds.add(record.userId);
     }
   }
 

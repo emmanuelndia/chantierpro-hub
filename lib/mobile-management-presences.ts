@@ -33,6 +33,11 @@ type PresenceRecord = {
   type: ClockInType;
   status: ClockInStatus;
   timestampLocal: Date;
+  user: {
+    firstName: string;
+    lastName: string;
+    role: Role;
+  };
 };
 
 type SiteRow = {
@@ -53,6 +58,14 @@ type SiteRow = {
         role: Role;
       };
     }[];
+  }[];
+  planningAssignments: {
+    supervisorId: string;
+    supervisor: {
+      firstName: string;
+      lastName: string;
+      role: Role;
+    };
   }[];
   clockInRecords: PresenceRecord[];
 };
@@ -134,6 +147,22 @@ export async function getMobileManagementPresences(
             },
           },
         },
+        planningAssignments: {
+          where: {
+            date: today,
+            deletedAt: null,
+          },
+          select: {
+            supervisorId: true,
+            supervisor: {
+              select: {
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        },
         clockInRecords: {
           where: {
             clockInDate: today,
@@ -145,6 +174,13 @@ export async function getMobileManagementPresences(
             type: true,
             status: true,
             timestampLocal: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
           },
         },
       },
@@ -208,15 +244,39 @@ function serializeSite(site: SiteRow): MobileManagementPresenceSite {
 }
 
 function serializeResources(site: SiteRow): MobileManagementPresenceResource[] {
-  const uniqueMembers = new Map<string, SiteRow['teams'][number]['members'][number]>();
+  const uniqueResources = new Map<
+    string,
+    {
+      userId: string;
+      user: {
+        firstName: string;
+        lastName: string;
+        role: Role;
+      };
+    }
+  >();
 
   for (const team of site.teams) {
     for (const member of team.members) {
-      uniqueMembers.set(member.userId, member);
+      uniqueResources.set(member.userId, member);
     }
   }
 
-  return [...uniqueMembers.values()]
+  for (const assignment of site.planningAssignments) {
+    uniqueResources.set(assignment.supervisorId, {
+      userId: assignment.supervisorId,
+      user: assignment.supervisor,
+    });
+  }
+
+  for (const record of site.clockInRecords) {
+    uniqueResources.set(record.userId, {
+      userId: record.userId,
+      user: record.user,
+    });
+  }
+
+  return [...uniqueResources.values()]
     .map((member) => {
       const records = site.clockInRecords.filter((record) => record.userId === member.userId);
       const state = getPresenceState(records);
