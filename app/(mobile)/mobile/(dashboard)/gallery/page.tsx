@@ -20,7 +20,6 @@ const mobileCameraRoles: readonly Role[] = [
 const mobileCameraFabRoles: readonly Role[] = [
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
-  Role.ADMIN,
   Role.GENERAL_SUPERVISOR,
   Role.COORDINATOR,
 ];
