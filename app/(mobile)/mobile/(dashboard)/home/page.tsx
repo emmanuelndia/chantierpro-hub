@@ -3,12 +3,14 @@ import { MobileFieldHomePage } from '@/components/mobile-field-home-page';
 import { MobileCoordinatorHomePage } from '@/components/mobile-coordinator-home-page';
 import { MobileGeneralSupervisorHomePage } from '@/components/mobile-general-supervisor-home-page';
 import { MobileManagementDashboardPage } from '@/components/mobile-management-dashboard-page';
+import { MobileAdminDashboardPage } from '@/components/mobile-admin-dashboard-page';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
 
 const fieldRoles = ['SUPERVISOR'] as const;
 const generalSupervisorRoles = ['GENERAL_SUPERVISOR'] as const;
 const coordinatorRoles = ['COORDINATOR'] as const;
 const managementRoles = ['PROJECT_MANAGER', 'DIRECTION'] as const;
+const adminRoles = ['ADMIN'] as const;
 
 export default async function MobileHomePage() {
   const session = await getCurrentWebSession();
@@ -31,6 +33,10 @@ export default async function MobileHomePage() {
 
   if (managementRoles.includes(session.role as (typeof managementRoles)[number])) {
     return <MobileManagementDashboardPage user={session} />;
+  }
+
+  if (adminRoles.includes(session.role as (typeof adminRoles)[number])) {
+    return <MobileAdminDashboardPage user={session} />;
   }
 
   redirect('/mobile/profile');

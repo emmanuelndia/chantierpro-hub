@@ -188,7 +188,19 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/gallery',
     label: 'Galerie',
     icon: 'photo',
-    roles: ['PROJECT_MANAGER', 'DIRECTION'],
+    roles: ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+  },
+  {
+    href: '/mobile/users',
+    label: 'Utilisateurs',
+    icon: 'teams',
+    roles: ['ADMIN'],
+  },
+  {
+    href: '/mobile/logs',
+    label: 'Logs',
+    icon: 'history',
+    roles: ['ADMIN'],
   },
   {
     href: '/mobile/planning',
@@ -200,7 +212,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/supervisor-scopes',
     label: 'Périmètres',
     icon: 'teams',
-    roles: ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    roles: ['PROJECT_MANAGER', 'DIRECTION'],
   },
   {
     href: '/mobile/history',
