@@ -5,6 +5,7 @@ import { ProjectStatus } from '@prisma/client';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
+import { MobileFloatingCreateLink } from '@/components/mobile-floating-create-link';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type {
   MobileProjectListItem,
@@ -73,12 +74,6 @@ export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
               {user.role === 'DIRECTION' ? 'Vue globale active' : 'Vos projets et chantiers'}
             </p>
           </div>
-          <Link
-            className="flex min-h-12 shrink-0 items-center justify-center rounded-lg bg-primary px-3 text-sm font-black text-white shadow-panel transition active:scale-[0.98]"
-            href="/mobile/projects/new"
-          >
-            Nouveau
-          </Link>
         </div>
       </section>
 
@@ -149,14 +144,7 @@ export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
             )}
           </section>
 
-          <Link
-            className="fixed right-4 z-40 flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition active:scale-[0.98]"
-            href="/mobile/projects/new"
-            style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.5rem)' }}
-          >
-            <PlusIcon className="h-5 w-5" />
-            Nouveau projet
-          </Link>
+          <MobileFloatingCreateLink href="/mobile/projects/new" label="Nouveau projet" />
         </>
       ) : null}
     </div>
@@ -336,13 +324,6 @@ function ProjectsIcon({ className }: Readonly<{ className: string }>) {
       <path d="M4 6.5h16M4 12h16M4 17.5h10" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
       <path d="M5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4Z" stroke="currentColor" strokeWidth="1.8" />
     </>,
-  );
-}
-
-function PlusIcon({ className }: Readonly<{ className: string }>) {
-  return baseIcon(
-    className,
-    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />,
   );
 }
 

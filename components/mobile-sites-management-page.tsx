@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
+import { MobileFloatingCreateLink } from '@/components/mobile-floating-create-link';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { MobileSitesManagementResponse, MobileSiteStatusFilter } from '@/types/mobile-sites';
 
@@ -74,12 +75,6 @@ export function MobileSitesManagementPage({ user }: MobileSitesManagementPagePro
               {selectedProjectName ?? 'Suivi des sites, équipes et pointages'}
             </p>
           </div>
-          <Link
-            className="flex min-h-12 shrink-0 items-center justify-center rounded-lg bg-primary px-3 text-sm font-black text-white shadow-panel"
-            href={projectId === 'ALL' ? '/mobile/sites/new' : `/mobile/sites/new?projectId=${encodeURIComponent(projectId)}`}
-          >
-            Nouveau
-          </Link>
         </div>
       </section>
 
@@ -195,6 +190,11 @@ export function MobileSitesManagementPage({ user }: MobileSitesManagementPagePro
           </article>
         ))}
       </section>
+
+      <MobileFloatingCreateLink
+        href={projectId === 'ALL' ? '/mobile/sites/new' : `/mobile/sites/new?projectId=${encodeURIComponent(projectId)}`}
+        label="Nouveau chantier"
+      />
     </div>
   );
 }

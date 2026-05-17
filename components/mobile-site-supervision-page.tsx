@@ -114,7 +114,7 @@ export function MobileSiteSupervisionPage({ siteId }: MobileSiteSupervisionPageP
 
 function PresenceTab({ items }: Readonly<{ items: MobileSitePresenceItem[] }>) {
   if (items.length === 0) {
-    return <EmptyPanel text="Aucune ressource active sur ce chantier." />;
+    return <EmptyPanel text="Aucune presence aujourd'hui." />;
   }
 
   return (

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ClockInType, type Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { FilterMultiSelect } from '@/components/filter-multi-select';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type { SiteDetail, PaginatedSitePresencesResponse } from '@/types/projects';
@@ -183,7 +184,11 @@ export function SitePresencesPage({ siteId, viewer }: SitePresencesPageProps) {
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-        <div className="grid gap-4 xl:grid-cols-[0.9fr_0.9fr_1.2fr_1fr]">
+        <div className="mb-5 flex flex-col gap-1">
+          <h2 className="text-lg font-semibold text-slate-950">Filtres de presence</h2>
+          <p className="text-sm text-slate-500">Affinez la periode, les ressources et le type de pointage.</p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[0.9fr_0.9fr_1.2fr_1fr]">
           <Field label="Periode du">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
@@ -207,22 +212,15 @@ export function SitePresencesPage({ siteId, viewer }: SitePresencesPageProps) {
             />
           </Field>
           <Field label="Ressources">
-            <select
-              className="min-h-32 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-              multiple
-              onChange={(event) => {
-                const nextValues = [...event.target.selectedOptions].map((option) => option.value);
+            <FilterMultiSelect
+              onChange={(nextValues) => {
                 setResourceIds(nextValues);
                 setPage(1);
               }}
-              value={resourceIds}
-            >
-              {resourceOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              options={resourceOptions}
+              placeholder="Toutes les ressources"
+              values={resourceIds}
+            />
           </Field>
           <Field label="Type de pointage">
             <select
@@ -241,6 +239,26 @@ export function SitePresencesPage({ siteId, viewer }: SitePresencesPageProps) {
               <option value="PAUSE_END">Fin pause</option>
             </select>
           </Field>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm">
+          <p className="text-slate-500">
+            {resourceIds.length > 0 ? `${resourceIds.length} ressource${resourceIds.length > 1 ? 's' : ''} selectionnee${resourceIds.length > 1 ? 's' : ''}` : 'Toutes les ressources'}
+          </p>
+          {(from || to || type !== 'ALL' || resourceIds.length > 0) ? (
+            <button
+              className="rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              onClick={() => {
+                setFrom('');
+                setTo('');
+                setType('ALL');
+                setResourceIds([]);
+                setPage(1);
+              }}
+              type="button"
+            >
+              Reinitialiser
+            </button>
+          ) : null}
         </div>
       </section>
 

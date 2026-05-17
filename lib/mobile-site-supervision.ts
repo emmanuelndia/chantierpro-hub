@@ -1,12 +1,4 @@
-import {
-  ClockInStatus,
-  ClockInType,
-  Role,
-  SiteStatus,
-  TeamMemberStatus,
-  TeamStatus,
-  type PrismaClient,
-} from '@prisma/client';
+import { ClockInStatus, ClockInType, Role, SiteStatus, type PrismaClient } from '@prisma/client';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import { getOperationalSiteIds } from '@/lib/dashboard';
 import type {
@@ -56,30 +48,7 @@ export async function getMobileSiteSupervision(
   }
 
   const today = toDateOnlyDate(new Date());
-  const [members, records, photos, reports] = await Promise.all([
-    prisma.teamMember.findMany({
-      where: {
-        status: TeamMemberStatus.ACTIVE,
-        user: {
-          isActive: true,
-        },
-        team: {
-          siteId,
-          status: TeamStatus.ACTIVE,
-        },
-      },
-      select: {
-        userId: true,
-        user: {
-          select: {
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
-      },
-      orderBy: [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }, { userId: 'asc' }],
-    }),
+  const [records, photos, reports] = await Promise.all([
     prisma.clockInRecord.findMany({
       where: {
         siteId,
@@ -92,6 +61,13 @@ export async function getMobileSiteSupervision(
         type: true,
         status: true,
         timestampLocal: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
       },
     }),
     prisma.photo.findMany({
@@ -147,7 +123,7 @@ export async function getMobileSiteSupervision(
     },
     presence: {
       date: today.toISOString().slice(0, 10),
-      items: serializePresenceItems(members, records),
+      items: serializePresenceItems(records),
     },
     photos: photos.map(serializePhoto),
     reports: reports.map(serializeReport),
@@ -193,30 +169,34 @@ async function getScopedSupervisionSite(prisma: PrismaClient, user: AuthLikeUser
 }
 
 function serializePresenceItems(
-  members: {
-    userId: string;
+  records: (PresenceRecord & {
     user: {
       firstName: string;
       lastName: string;
       role: Role;
     };
-  }[],
-  records: PresenceRecord[],
+  })[],
 ): MobileSitePresenceItem[] {
-  const uniqueMembers = new Map<string, (typeof members)[number]>();
+  const users = new Map<string, (typeof records)[number]['user']>();
 
-  for (const member of members) {
-    uniqueMembers.set(member.userId, member);
+  for (const record of records) {
+    users.set(record.userId, record.user);
   }
 
-  return [...uniqueMembers.values()].map((member) => {
-    const userRecords = records.filter((record) => record.userId === member.userId);
+  return [...users.entries()]
+    .sort((left, right) => {
+      const leftName = `${left[1].firstName} ${left[1].lastName}`;
+      const rightName = `${right[1].firstName} ${right[1].lastName}`;
+      return leftName.localeCompare(rightName);
+    })
+    .map(([userId, user]) => {
+    const userRecords = records.filter((record) => record.userId === userId);
     const state = getPresenceState(userRecords);
 
     return {
-      userId: member.userId,
-      name: `${member.user.firstName} ${member.user.lastName}`,
-      role: member.user.role,
+      userId,
+      name: `${user.firstName} ${user.lastName}`,
+      role: user.role,
       status: state.status,
       presentSince: state.presentSince?.toISOString() ?? null,
       pauseSince: state.pauseSince?.toISOString() ?? null,

@@ -118,16 +118,6 @@ export function MobileAdminUsersPage() {
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Administration</p>
             <h1 className="mt-2 text-xl font-black text-slate-950">Utilisateurs</h1>
           </div>
-          <button
-            className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-bold text-white"
-            onClick={() => {
-              setEditingUser(null);
-              setFormMode('create');
-            }}
-            type="button"
-          >
-            Creer
-          </button>
         </div>
       </section>
 
@@ -186,6 +176,18 @@ export function MobileAdminUsersPage() {
       </section>
 
       <Pagination page={usersQuery.data?.page ?? page} totalPages={usersQuery.data?.totalPages ?? 1} onPageChange={setPage} />
+      <button
+        className="fixed right-4 z-40 flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition active:scale-[0.98]"
+        onClick={() => {
+          setEditingUser(null);
+          setFormMode('create');
+        }}
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.5rem)' }}
+        type="button"
+      >
+        <span aria-hidden="true" className="text-lg leading-none">+</span>
+        Nouvel utilisateur
+      </button>
       <UserFormSheet mode={formMode} user={editingUser} pending={saveMutation.isPending} onClose={() => setFormMode(null)} onSubmit={(values) => saveMutation.mutate(values)} />
       <ConfirmModal
         open={Boolean(statusTarget)}

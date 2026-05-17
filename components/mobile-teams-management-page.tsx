@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
+import { MobileFloatingCreateLink } from '@/components/mobile-floating-create-link';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { MobileTeamsManagementResponse, MobileTeamStatusFilter } from '@/types/mobile-teams';
 
@@ -62,14 +63,6 @@ export function MobileTeamsManagementPage({ user }: MobileTeamsManagementPagePro
             <h1 className="text-2xl font-black leading-7 text-slate-950">{getTitleForRole(user.role)}</h1>
             <p className="mt-1 text-sm font-semibold text-slate-600">Chantiers, responsables et membres actifs</p>
           </div>
-          {data?.canMutate ? (
-            <Link
-              className="flex min-h-12 shrink-0 items-center justify-center rounded-lg bg-primary px-3 text-sm font-black text-white shadow-panel"
-              href={siteId === 'ALL' ? '/mobile/teams/new' : `/mobile/teams/new?siteId=${encodeURIComponent(siteId)}`}
-            >
-              Nouvelle
-            </Link>
-          ) : null}
         </div>
       </section>
 
@@ -208,6 +201,13 @@ export function MobileTeamsManagementPage({ user }: MobileTeamsManagementPagePro
           </article>
         ))}
       </section>
+
+      {data?.canMutate ? (
+        <MobileFloatingCreateLink
+          href={siteId === 'ALL' ? '/mobile/teams/new' : `/mobile/teams/new?siteId=${encodeURIComponent(siteId)}`}
+          label="Nouvelle equipe"
+        />
+      ) : null}
     </div>
   );
 }
