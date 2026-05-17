@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { PlanningAssignmentStatus, type Role } from '@prisma/client';
 import { useMutation, useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
@@ -27,6 +29,12 @@ type PlanningWebPageProps = Readonly<{
 
 type ViewMode = 'day' | 'week';
 type DrawerMode = 'create' | 'edit';
+type PlanningAssignmentGroup = {
+  supervisorId: string;
+  supervisorFirstName: string;
+  supervisorName: string;
+  assignments: PlanningWebAssignment[];
+};
 
 type AssignmentFormState = {
   id?: string;
@@ -335,7 +343,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       {dayQuery.isLoading ? <LoadingState /> : null}
 
       {data && viewMode === 'day' ? (
-        <DayPlanningTable
+        <DayPlanningCards
           assignments={filteredAssignments}
           canMutate={canMutate}
           sites={sites}
@@ -381,7 +389,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   );
 }
 
-function DayPlanningTable({
+function DayPlanningCards({
   assignments,
   sites,
   canMutate,
@@ -398,68 +406,84 @@ function DayPlanningTable({
     return <EmptyState title="Aucune tâche" description="Aucune ligne ne correspond aux filtres sélectionnés." />;
   }
 
+  const groups = groupAssignmentsByResource(assignments);
+
   return (
-    <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-panel">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            <tr>
-              <th className="px-4 py-4">Ressource</th>
-              <th className="px-4 py-4">Poste</th>
-              <th className="px-4 py-4">Projet</th>
-              <th className="px-4 py-4">Chantier</th>
-              <th className="px-4 py-4">Tâche</th>
-              <th className="px-4 py-4">Progression</th>
-              <th className="px-4 py-4">Statut</th>
-              {canMutate ? <th className="px-4 py-4">Actions</th> : null}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {assignments.map((assignment) => {
+    <section className="space-y-4">
+      {groups.map((group) => (
+        <article className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-panel" key={group.supervisorId}>
+          <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <Link
+                className="text-lg font-semibold text-slate-950 underline-offset-4 hover:text-orange-700 hover:underline"
+                href={`/web/users/${encodeURIComponent(group.supervisorId)}/assignments-history`}
+              >
+                {group.supervisorFirstName} {group.supervisorName}
+              </Link>
+              <p className="mt-1 text-sm text-slate-500">Ressource terrain</p>
+            </div>
+            <Badge tone="info">{group.assignments.length} tâche(s)</Badge>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {group.assignments.map((assignment) => {
               const site = sites.find((item) => item.id === assignment.siteId);
               return (
-                <tr className="align-top" key={assignment.id}>
-                  <td className="px-4 py-4">
-                    <Link
-                      className="font-semibold text-slate-950 underline-offset-4 hover:text-orange-700 hover:underline"
-                      href={`/web/users/${encodeURIComponent(assignment.supervisorId)}/assignments-history`}
-                    >
-                      {assignment.supervisorFirstName} {assignment.supervisorName}
-                    </Link>
-                    <p className="text-xs text-slate-500">Ressource terrain</p>
-                  </td>
-                  <td className="px-4 py-4 text-slate-700">Ressource terrain</td>
-                  <td className="px-4 py-4 text-slate-700">{site?.project.name ?? '-'}</td>
-                  <td className="px-4 py-4">
+                <div
+                  className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(8rem,0.8fr)_minmax(12rem,1.1fr)_minmax(12rem,1.2fr)_10rem_9rem_auto] md:items-center"
+                  key={assignment.id}
+                >
+                  <PlanningTaskField label="Projet">
+                    <p className="font-medium text-slate-800">{site?.project.name ?? '-'}</p>
+                  </PlanningTaskField>
+                  <PlanningTaskField label="Chantier">
                     <p className="font-semibold text-slate-800">{assignment.siteName}</p>
                     <p className="text-xs text-slate-500">{assignment.siteAddress}</p>
-                  </td>
-                  <td className="max-w-xs px-4 py-4 text-slate-700">{assignment.action}</td>
-                  <td className="px-4 py-4">
+                  </PlanningTaskField>
+                  <PlanningTaskField label="Tâche">
+                    <p className="text-slate-700">{assignment.action}</p>
+                  </PlanningTaskField>
+                  <PlanningTaskField label="Progression">
                     <ProgressValue value={assignment.targetProgress} />
-                  </td>
-                  <td className="px-4 py-4">
+                  </PlanningTaskField>
+                  <PlanningTaskField label="Statut">
                     <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
-                  </td>
+                  </PlanningTaskField>
                   {canMutate ? (
-                    <td className="px-4 py-4">
-                      <div className="flex min-w-40 flex-wrap gap-2">
-                        <button className={buttonClassName} onClick={() => onEdit(assignment)} type="button">
-                          Modifier
-                        </button>
-                        <button className="rounded-2xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50" onClick={() => onDelete(assignment)} type="button">
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
+                    <div className="flex justify-start md:justify-end">
+                      <TableActionsMenu
+                        actions={[
+                          {
+                            label: 'Modifier',
+                            icon: <Pencil className="h-4 w-4" />,
+                            onClick: () => onEdit(assignment),
+                          },
+                          {
+                            label: 'Supprimer',
+                            icon: <Trash2 className="h-4 w-4" />,
+                            tone: 'danger',
+                            onClick: () => onDelete(assignment),
+                          },
+                        ]}
+                      />
+                    </div>
                   ) : null}
-                </tr>
+                </div>
               );
             })}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </article>
+      ))}
     </section>
+  );
+}
+
+function PlanningTaskField({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
+  return (
+    <div>
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:hidden">{label}</p>
+      {children}
+    </div>
   );
 }
 
@@ -856,6 +880,28 @@ function filterAssignments(assignments: PlanningWebAssignment[], sites: Availabl
       (!filters.resourceId || assignment.supervisorId === filters.resourceId)
     );
   });
+}
+
+function groupAssignmentsByResource(assignments: PlanningWebAssignment[]): PlanningAssignmentGroup[] {
+  const groups = new Map<string, PlanningAssignmentGroup>();
+
+  for (const assignment of assignments) {
+    const existing = groups.get(assignment.supervisorId);
+
+    if (existing) {
+      existing.assignments.push(assignment);
+      continue;
+    }
+
+    groups.set(assignment.supervisorId, {
+      supervisorId: assignment.supervisorId,
+      supervisorFirstName: assignment.supervisorFirstName,
+      supervisorName: assignment.supervisorName,
+      assignments: [assignment],
+    });
+  }
+
+  return [...groups.values()];
 }
 
 function getProjectOptions(sites: AvailableSite[]) {
