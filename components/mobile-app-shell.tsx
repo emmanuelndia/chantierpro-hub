@@ -24,6 +24,7 @@ const fieldRoles: readonly Role[] = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPER
 export function MobileAppShell({ user, children }: MobileAppShellProps) {
   const tabs = getMobileNavigationForRole(user.role);
   const shouldLoadClockInBadges = fieldRoles.includes(user.role);
+  const shouldEnableTerrainOffline = fieldRoles.includes(user.role);
 
   const todayQuery = useQuery({
     queryKey: ['mobile-clock-in-today'],
@@ -72,8 +73,8 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
   return (
     <div className="min-h-dvh bg-[#F6F9FC] text-ink">
       <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-white shadow-[0_0_36px_rgba(20,34,54,0.08)]">
-        <MobileOfflineAutoSync />
-        <MobileOfflinePreparer />
+        {shouldEnableTerrainOffline ? <MobileOfflineAutoSync /> : null}
+        {shouldEnableTerrainOffline ? <MobileOfflinePreparer /> : null}
         <header className="border-b border-slate-200 bg-white px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
             ChantierPro
@@ -91,8 +92,8 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
           </div>
         </header>
 
-        <OfflineBanner />
-        <MobileOfflineStatus />
+        {shouldEnableTerrainOffline ? <OfflineBanner /> : null}
+        {shouldEnableTerrainOffline ? <MobileOfflineStatus /> : null}
 
         <main className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-4">
           {children}

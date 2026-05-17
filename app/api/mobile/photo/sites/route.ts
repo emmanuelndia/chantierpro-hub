@@ -11,6 +11,7 @@ const mobilePhotoSiteRoles: readonly Role[] = [
   Role.GENERAL_SUPERVISOR,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
+  Role.ADMIN,
 ];
 
 export const GET = withAuth(async ({ user }) => {
