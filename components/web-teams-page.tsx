@@ -2,18 +2,18 @@
 
 import Link from 'next/link';
 import { TeamStatus } from '@prisma/client';
+import { ExternalLink, Pencil } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { TableActionsMenu } from '@/components/table-actions-menu';
 import { authFetch } from '@/lib/auth/client-session';
 import type { WebTeamsResponse, WebTeamStatusFilter } from '@/types/web-teams';
 
 const inputClassName =
   'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-500';
-const actionLinkClassName =
-  'rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50';
 
 export function WebTeamsPage() {
   const searchParams = useSearchParams();
@@ -147,14 +147,22 @@ function TeamsTable({ teams }: Readonly<{ teams: WebTeamsResponse['teams'] }>) {
                   {team.activeMembersCount} actif(s), {team.inactiveMembersCount} historique
                 </td>
                 <td className="px-4 py-4">
-                  <div className="flex flex-wrap gap-2">
-                    <Link className={actionLinkClassName} href={`/web/teams/${team.id}`}>
-                      Ouvrir
-                    </Link>
-                    <Link className={actionLinkClassName} href={`/web/teams/${team.id}/edit`}>
-                      Modifier
-                    </Link>
-                  </div>
+                  <TableActionsMenu
+                    actions={[
+                      {
+                        label: 'Ouvrir',
+                        icon: <ExternalLink className="h-4 w-4" />,
+                        href: `/web/teams/${team.id}`,
+                        navigation: 'client',
+                      },
+                      {
+                        label: 'Modifier',
+                        icon: <Pencil className="h-4 w-4" />,
+                        href: `/web/teams/${team.id}/edit`,
+                        navigation: 'client',
+                      },
+                    ]}
+                  />
                 </td>
               </tr>
             ))}

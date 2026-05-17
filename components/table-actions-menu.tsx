@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { Ellipsis } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 export type TableActionItem = {
   label: string;
@@ -16,7 +17,39 @@ export type TableActionItem = {
 
 export function TableActionsMenu({ actions }: Readonly<{ actions: TableActionItem[] }>) {
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null);
+      return;
+    }
+
+    function updatePosition() {
+      const trigger = triggerRef.current;
+      const menu = menuRef.current;
+      if (!trigger) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const menuWidth = menu?.offsetWidth ?? 192;
+      const menuHeight = menu?.offsetHeight ?? Math.max(actions.length * 44 + 12, 56);
+      const gap = 8;
+      const left = Math.min(Math.max(12, rect.right - menuWidth), window.innerWidth - menuWidth - 12);
+      const belowTop = rect.bottom + gap;
+      const top = belowTop + menuHeight <= window.innerHeight - 12 ? belowTop : Math.max(12, rect.top - menuHeight - gap);
+      setPosition({ left, top });
+    }
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [actions.length, open]);
 
   useEffect(() => {
     if (!open) {
@@ -24,7 +57,7 @@ export function TableActionsMenu({ actions }: Readonly<{ actions: TableActionIte
     }
 
     function handlePointerDown(event: MouseEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) {
+      if (!menuRef.current?.contains(event.target as Node) && !triggerRef.current?.contains(event.target as Node)) {
         setOpen(false);
       }
     }
@@ -45,8 +78,9 @@ export function TableActionsMenu({ actions }: Readonly<{ actions: TableActionIte
   }, [open]);
 
   return (
-    <div ref={menuRef} className="relative inline-flex">
+    <div className="inline-flex">
       <button
+        ref={triggerRef}
         aria-expanded={open}
         aria-haspopup="menu"
         className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
@@ -57,8 +91,14 @@ export function TableActionsMenu({ actions }: Readonly<{ actions: TableActionIte
         <Ellipsis className="h-4 w-4" />
       </button>
 
-      {open ? (
-        <div className="absolute right-0 top-12 z-20 min-w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl" role="menu">
+      {open
+        ? createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[70] min-w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl"
+          role="menu"
+          style={position ?? { left: -9999, top: -9999 }}
+        >
           {actions.map((action) => {
             const className = `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${getToneClassName(action.tone)}`;
             const content = (
@@ -106,8 +146,10 @@ export function TableActionsMenu({ actions }: Readonly<{ actions: TableActionIte
               </button>
             );
           })}
-        </div>
-      ) : null}
+        </div>,
+        document.body,
+          )
+        : null}
     </div>
   );
 }

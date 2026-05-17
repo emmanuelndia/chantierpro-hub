@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { TeamMemberStatus, TeamRole, TeamStatus } from '@prisma/client';
+import { History, UserRoundX } from 'lucide-react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type { WebTeamDetailResponse, WebTeamMember } from '@/types/web-teams';
@@ -182,29 +184,38 @@ function MembersSection({
                 </Badge>
               </div>
               {onRemove && member.status === TeamMemberStatus.ACTIVE ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link
-                    className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
-                    href={`/web/users/${encodeURIComponent(member.userId)}/assignments-history`}
-                  >
-                    Historique
-                  </Link>
-                  <button
-                    className="rounded-2xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                    disabled={member.userId === teamLeadId}
-                    onClick={() => onRemove(member)}
-                    type="button"
-                  >
-                    Retirer
-                  </button>
+                <div className="mt-4">
+                  <TableActionsMenu
+                    actions={[
+                      {
+                        label: 'Historique',
+                        icon: <History className="h-4 w-4" />,
+                        href: `/web/users/${encodeURIComponent(member.userId)}/assignments-history`,
+                        navigation: 'client',
+                      },
+                      {
+                        label: 'Retirer',
+                        icon: <UserRoundX className="h-4 w-4" />,
+                        tone: 'danger',
+                        disabled: member.userId === teamLeadId,
+                        onClick: () => onRemove(member),
+                      },
+                    ]}
+                  />
                 </div>
               ) : (
-                <Link
-                  className="mt-4 inline-flex rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
-                  href={`/web/users/${encodeURIComponent(member.userId)}/assignments-history`}
-                >
-                  Historique
-                </Link>
+                <div className="mt-4">
+                  <TableActionsMenu
+                    actions={[
+                      {
+                        label: 'Historique',
+                        icon: <History className="h-4 w-4" />,
+                        href: `/web/users/${encodeURIComponent(member.userId)}/assignments-history`,
+                        navigation: 'client',
+                      },
+                    ]}
+                  />
+                </div>
               )}
             </article>
           ))}

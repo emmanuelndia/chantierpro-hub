@@ -14,7 +14,6 @@ import type {
   PlanningWebAssignment,
   PlanningWebCreateRequest,
   PlanningWebDayResponse,
-  PlanningWebDuplicateResponse,
   PlanningWebFilters,
   PlanningWebMutationResponse,
   PlanningWebUpdateRequest,
@@ -118,20 +117,6 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     onError: (error) => pushMutationError(error, 'Suppression impossible'),
   });
 
-  const duplicateMutation = useMutation({
-    mutationFn: duplicatePlanning,
-    onSuccess: async (payload, variables) => {
-      pushToast({
-        type: 'success',
-        title: 'Planning duplique',
-        message: `${payload.createdCount} tâche(s) créée(s), ${payload.skippedCount} ignorée(s).`,
-      });
-      setSelectedDate(variables.targetDate);
-      await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
-    },
-    onError: (error) => pushMutationError(error, 'Duplication impossible'),
-  });
-
   const data = dayQuery.data;
   const filteredAssignments = useMemo(
     () => filterAssignments(data?.assignments ?? [], data?.availableSites ?? [], filters),
@@ -141,7 +126,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const sites = data?.availableSites ?? [];
   const resources = data?.unassignedSupervisors ?? [];
   const selectedDateObject = parseDateKey(selectedDate);
-  const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || duplicateMutation.isPending;
+  const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   function setFilter(key: keyof PlanningWebFilters, value: string) {
     setFilters((current) => ({
@@ -209,11 +194,6 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         },
       });
     }
-  }
-
-  function duplicateToTomorrow() {
-    const targetDate = formatDateKey(addDays(selectedDateObject, 1));
-    duplicateMutation.mutate({ sourceDate: selectedDate, targetDate });
   }
 
   function pushMutationError(error: unknown, title: string) {
@@ -323,14 +303,11 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Actions planning</h2>
-            <p className="mt-1 text-sm text-slate-600">Crée une tâche ou copie le planning vers demain.</p>
+            <p className="mt-1 text-sm text-slate-600">Crée une tâche pour une ressource terrain.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" disabled={isMutating} onClick={() => openCreate()} type="button">
               Ajouter une tâche
-            </button>
-            <button className={buttonClassName} disabled={isMutating || data.assignments.length === 0} onClick={duplicateToTomorrow} type="button">
-              {duplicateMutation.isPending ? 'Duplication...' : 'Dupliquer vers demain'}
             </button>
           </div>
         </section>
@@ -352,7 +329,18 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         />
       ) : null}
 
-      {data && viewMode === 'week' ? <WeekPlanningGrid dates={weekDates} filters={filters} queries={weekQueries} /> : null}
+      {data && viewMode === 'week' ? (
+        <WeekPlanningGrid
+          dates={weekDates}
+          filters={filters}
+          queries={weekQueries}
+          onSelectDate={(date) => {
+            setSelectedDate(date);
+            setForm((current) => ({ ...current, date }));
+            setViewMode('day');
+          }}
+        />
+      ) : null}
 
       {data ? (
         <ResourcesPanel
@@ -491,10 +479,12 @@ function WeekPlanningGrid({
   dates,
   filters,
   queries,
+  onSelectDate,
 }: Readonly<{
   dates: string[];
   filters: PlanningWebFilters;
   queries: UseQueryResult<PlanningWebDayResponse>[];
+  onSelectDate: (date: string) => void;
 }>) {
   return (
     <section className="grid gap-4 xl:grid-cols-7">
@@ -503,7 +493,12 @@ function WeekPlanningGrid({
         if (!query) return null;
         const assignments = filterAssignments(query.data?.assignments ?? [], query.data?.availableSites ?? [], filters);
         return (
-          <article className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-panel" key={date}>
+          <button
+            className="rounded-[2rem] border border-slate-200 bg-white p-4 text-left shadow-panel transition hover:border-slate-300 hover:shadow-lg"
+            key={date}
+            onClick={() => onSelectDate(date)}
+            type="button"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{formatWeekday(parseDateKey(date))}</p>
@@ -524,7 +519,7 @@ function WeekPlanningGrid({
               {!query.isLoading && assignments.length === 0 ? <p className="text-sm text-slate-500">Aucune tâche</p> : null}
               {assignments.length > 4 ? <p className="text-xs font-semibold text-slate-500">+{assignments.length - 4} autre(s)</p> : null}
             </div>
-          </article>
+          </button>
         );
       })}
     </section>
@@ -848,18 +843,6 @@ async function deleteAssignment(id: string) {
   if (!response.ok) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de supprimer la tâche.'));
   }
-}
-
-async function duplicatePlanning(data: { sourceDate: string; targetDate: string }) {
-  const response = await authFetch('/api/planning/duplicate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    throw new Error(await getApiErrorMessage(response, 'Impossible de dupliquer le planning.'));
-  }
-  return (await response.json()) as PlanningWebDuplicateResponse;
 }
 
 async function getApiErrorMessage(response: Response, fallback: string) {
