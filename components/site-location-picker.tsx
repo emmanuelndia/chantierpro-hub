@@ -22,6 +22,7 @@ const DEFAULT_CENTER = {
 const DEFAULT_ZOOM = 6;
 const ACTIVE_LOCATION_ZOOM = 14;
 const ZERO_POINT_THRESHOLD = 0.01;
+const MANUAL_GPS_ADDRESS = 'Point GPS selectionne';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '';
 const GEOFENCE_SOURCE_ID = 'site-location-picker-geofence';
@@ -71,11 +72,12 @@ export function SiteLocationPicker({
   const updateCoordinates = useCallback(
     (nextLatitude: number, nextLongitude: number) => {
       onChange({
+        ...(address.trim() ? {} : { address: MANUAL_GPS_ADDRESS }),
         latitude: formatCoordinate(nextLatitude),
         longitude: formatCoordinate(nextLongitude),
       });
     },
-    [onChange],
+    [address, onChange],
   );
 
   const suggestionsQuery = useQuery({
@@ -284,7 +286,16 @@ export function SiteLocationPicker({
             Recherche adresse indisponible. Verifiez MAPBOX_ACCESS_TOKEN cote serveur.
           </p>
         ) : null}
-        {addressQuery.trim().length >= 3 && suggestionsQuery.isSuccess && suggestionsQuery.data.items.length === 0 ? (
+        {addressQuery.trim().length >= 3 && suggestionsQuery.isSuccess && suggestionsQuery.data.error ? (
+          <p className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
+            Recherche indisponible : verifiez MAPBOX_ACCESS_TOKEN dans Vercel. Vous pouvez quand meme placer le
+            point sur la carte.
+          </p>
+        ) : null}
+        {addressQuery.trim().length >= 3 &&
+        suggestionsQuery.isSuccess &&
+        !suggestionsQuery.data.error &&
+        suggestionsQuery.data.items.length === 0 ? (
           <p className="text-xs font-semibold text-slate-500">
             Aucune suggestion trouvee. Essayez un nom de ville, quartier ou chantier plus precis.
           </p>

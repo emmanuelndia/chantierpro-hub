@@ -174,6 +174,7 @@ export type GeocodingSuggestion = {
 
 export type GeocodingSearchResponse = {
   items: GeocodingSuggestion[];
+  error?: 'MAPBOX_UNAVAILABLE' | 'MAPBOX_TOKEN_MISSING';
 };
 
 export type CreateProjectInput = {

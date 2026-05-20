@@ -539,19 +539,27 @@ export async function buildSitePresencesCsv(
 export async function searchMapboxAddress(query: string): Promise<GeocodingSearchResponse> {
   const token = process.env.MAPBOX_ACCESS_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   if (!token) {
-    return { items: [] };
+    return { items: [], error: 'MAPBOX_TOKEN_MISSING' };
   }
 
-  const primaryItems = await fetchMapboxAddressSuggestions(query, token);
-  const fallbackQuery = `${query}, Cote d'Ivoire`;
-  const fallbackItems =
-    primaryItems.length > 0 || query.toLowerCase().includes("cote d'ivoire") || query.toLowerCase().includes('ivoire')
-      ? []
-      : await fetchMapboxAddressSuggestions(fallbackQuery, token);
+  try {
+    const primaryItems = await fetchMapboxAddressSuggestions(query, token);
+    const fallbackQuery = `${query}, Cote d'Ivoire`;
+    const fallbackItems =
+      primaryItems.length > 0 || query.toLowerCase().includes("cote d'ivoire") || query.toLowerCase().includes('ivoire')
+        ? []
+        : await fetchMapboxAddressSuggestions(fallbackQuery, token);
 
-  return {
-    items: dedupeGeocodingSuggestions([...primaryItems, ...fallbackItems]).slice(0, 6),
-  };
+    return {
+      items: dedupeGeocodingSuggestions([...primaryItems, ...fallbackItems]).slice(0, 6),
+    };
+  } catch (error) {
+    console.warn('Mapbox geocoding search unavailable', {
+      message: error instanceof Error ? error.message : 'Unknown Mapbox error',
+    });
+
+    return { items: [], error: 'MAPBOX_UNAVAILABLE' };
+  }
 }
 
 async function fetchMapboxAddressSuggestions(query: string, token: string) {
