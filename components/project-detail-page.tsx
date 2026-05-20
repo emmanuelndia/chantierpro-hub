@@ -777,13 +777,18 @@ function setNumberChange<T extends keyof SiteMutationBody>(
 }
 
 function canSubmitSiteForm(values: SiteFormValues) {
+  const latitude = Number(values.latitude);
+  const longitude = Number(values.longitude);
+
   return Boolean(
     values.name.trim() &&
-      values.latitude.trim() &&
-      values.longitude.trim() &&
-      values.area.trim() &&
-      values.startDate &&
-      values.siteManagerId,
+      Number.isFinite(latitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      Number.isFinite(longitude) &&
+      longitude >= -180 &&
+      longitude <= 180 &&
+      (Math.abs(latitude) > 0.01 || Math.abs(longitude) > 0.01),
   );
 }
 
