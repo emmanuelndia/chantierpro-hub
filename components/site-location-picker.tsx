@@ -2,7 +2,7 @@
 
 import mapboxgl from 'mapbox-gl';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authFetch } from '@/lib/auth/client-session';
 import type { GeocodingSearchResponse, GeocodingSuggestion } from '@/types/projects';
 
@@ -16,9 +16,12 @@ type SiteLocationPickerProps = Readonly<{
 }>;
 
 const DEFAULT_CENTER = {
-  latitude: 5.3600,
-  longitude: -4.0083,
+  latitude: 7.539989,
+  longitude: -5.54708,
 };
+const DEFAULT_ZOOM = 6;
+const ACTIVE_LOCATION_ZOOM = 14;
+const ZERO_POINT_THRESHOLD = 0.01;
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '';
 const GEOFENCE_SOURCE_ID = 'site-location-picker-geofence';
@@ -50,7 +53,7 @@ export function SiteLocationPicker({
       return null;
     }
 
-    if (!isValidLatitude(parsedLatitude) || !isValidLongitude(parsedLongitude)) {
+    if (!isUsableSiteCoordinate(parsedLatitude, parsedLongitude)) {
       return null;
     }
 
@@ -64,6 +67,16 @@ export function SiteLocationPicker({
     const parsed = Number(radiusKm);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 2;
   }, [radiusKm]);
+
+  const updateCoordinates = useCallback(
+    (nextLatitude: number, nextLongitude: number) => {
+      onChange({
+        latitude: formatCoordinate(nextLatitude),
+        longitude: formatCoordinate(nextLongitude),
+      });
+    },
+    [onChange],
+  );
 
   const suggestionsQuery = useQuery({
     queryKey: ['site-location-picker-geocoding', addressQuery],
@@ -95,16 +108,21 @@ export function SiteLocationPicker({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [center.longitude, center.latitude],
-      zoom: location ? 14 : 11,
+      zoom: location ? ACTIVE_LOCATION_ZOOM : DEFAULT_ZOOM,
       attributionControl: false,
     });
 
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
     map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
 
-    const marker = new mapboxgl.Marker({ color: '#ea580c', draggable: true })
-      .setLngLat([center.longitude, center.latitude])
-      .addTo(map);
+    const marker = new mapboxgl.Marker({ color: '#ea580c', draggable: true }).setLngLat([
+      center.longitude,
+      center.latitude,
+    ]);
+
+    if (location) {
+      marker.addTo(map);
+    }
 
     marker.on('dragend', () => {
       const nextLocation = marker.getLngLat();
@@ -112,6 +130,7 @@ export function SiteLocationPicker({
     });
 
     map.on('click', (event) => {
+      markerRef.current ??= marker.addTo(map);
       marker.setLngLat(event.lngLat);
       updateCoordinates(event.lngLat.lat, event.lngLat.lng);
     });
@@ -125,15 +144,21 @@ export function SiteLocationPicker({
 
     map.on('load', () => {
       mapRef.current = map;
-      markerRef.current = marker;
+      markerRef.current = location ? marker : null;
       setMapLoaded(true);
-      syncGeofence(map, center.latitude, center.longitude, geofenceRadius);
+      if (location) {
+        syncGeofence(map, center.latitude, center.longitude, geofenceRadius);
+      }
     });
 
     return () => {
-      marker.remove();
-      map.remove();
+      if (!markerRef.current) {
+        marker.remove();
+      } else {
+        markerRef.current.remove();
+      }
       markerRef.current = null;
+      map.remove();
       mapRef.current = null;
       setMapLoaded(false);
       setMapError(null);
@@ -143,14 +168,27 @@ export function SiteLocationPicker({
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current || !markerRef.current || !location) {
+    if (!mapRef.current || !location) {
       return;
     }
 
     const lngLat: [number, number] = [location.longitude, location.latitude];
+    if (!markerRef.current) {
+      markerRef.current = new mapboxgl.Marker({ color: '#ea580c', draggable: true })
+        .setLngLat(lngLat)
+        .addTo(mapRef.current);
+
+      markerRef.current.on('dragend', () => {
+        const nextLocation = markerRef.current?.getLngLat();
+        if (nextLocation) {
+          updateCoordinates(nextLocation.lat, nextLocation.lng);
+        }
+      });
+    }
+
     markerRef.current.setLngLat(lngLat);
-    mapRef.current.easeTo({ center: lngLat, zoom: Math.max(mapRef.current.getZoom(), 14), duration: 500 });
-  }, [location]);
+    mapRef.current.easeTo({ center: lngLat, zoom: Math.max(mapRef.current.getZoom(), ACTIVE_LOCATION_ZOOM), duration: 500 });
+  }, [location, updateCoordinates]);
 
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !location) {
@@ -160,12 +198,15 @@ export function SiteLocationPicker({
     syncGeofence(mapRef.current, location.latitude, location.longitude, geofenceRadius);
   }, [geofenceRadius, location, mapLoaded]);
 
-  function updateCoordinates(nextLatitude: number, nextLongitude: number) {
-    onChange({
-      latitude: formatCoordinate(nextLatitude),
-      longitude: formatCoordinate(nextLongitude),
-    });
-  }
+  useEffect(() => {
+    if (!mapRef.current || location) {
+      return;
+    }
+
+    markerRef.current?.remove();
+    markerRef.current = null;
+    removeGeofence(mapRef.current);
+  }, [location]);
 
   function selectSuggestion(suggestion: GeocodingSuggestion) {
     setAddressQuery(suggestion.label);
@@ -245,7 +286,7 @@ export function SiteLocationPicker({
         ) : null}
         {addressQuery.trim().length >= 3 && suggestionsQuery.isSuccess && suggestionsQuery.data.items.length === 0 ? (
           <p className="text-xs font-semibold text-slate-500">
-            Aucune suggestion trouvee. Essayez un nom plus precis ou utilisez la carte.
+            Aucune suggestion trouvee. Essayez un nom de ville, quartier ou chantier plus precis.
           </p>
         ) : null}
 
@@ -333,6 +374,14 @@ function isValidLongitude(value: number) {
   return value >= -180 && value <= 180;
 }
 
+function isUsableSiteCoordinate(latitude: number, longitude: number) {
+  if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+    return false;
+  }
+
+  return Math.abs(latitude) > ZERO_POINT_THRESHOLD || Math.abs(longitude) > ZERO_POINT_THRESHOLD;
+}
+
 function formatCoordinate(value: number) {
   return value.toFixed(6);
 }
@@ -368,6 +417,20 @@ function syncGeofence(map: mapboxgl.Map, latitude: number, longitude: number, ra
       'line-width': 2,
     },
   });
+}
+
+function removeGeofence(map: mapboxgl.Map) {
+  if (map.getLayer(GEOFENCE_FILL_ID)) {
+    map.removeLayer(GEOFENCE_FILL_ID);
+  }
+
+  if (map.getLayer(GEOFENCE_LINE_ID)) {
+    map.removeLayer(GEOFENCE_LINE_ID);
+  }
+
+  if (map.getSource(GEOFENCE_SOURCE_ID)) {
+    map.removeSource(GEOFENCE_SOURCE_ID);
+  }
 }
 
 function buildCircleFeature(latitude: number, longitude: number, radiusKm: number): GeoJSON.Feature<GeoJSON.Polygon> {

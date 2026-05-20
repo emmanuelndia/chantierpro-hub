@@ -542,6 +542,19 @@ export async function searchMapboxAddress(query: string): Promise<GeocodingSearc
     return { items: [] };
   }
 
+  const primaryItems = await fetchMapboxAddressSuggestions(query, token);
+  const fallbackQuery = `${query}, Cote d'Ivoire`;
+  const fallbackItems =
+    primaryItems.length > 0 || query.toLowerCase().includes("cote d'ivoire") || query.toLowerCase().includes('ivoire')
+      ? []
+      : await fetchMapboxAddressSuggestions(fallbackQuery, token);
+
+  return {
+    items: dedupeGeocodingSuggestions([...primaryItems, ...fallbackItems]).slice(0, 6),
+  };
+}
+
+async function fetchMapboxAddressSuggestions(query: string, token: string) {
   const url = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`);
   url.searchParams.set('access_token', token);
   url.searchParams.set('autocomplete', 'true');
@@ -549,6 +562,7 @@ export async function searchMapboxAddress(query: string): Promise<GeocodingSearc
   url.searchParams.set('language', 'fr');
   url.searchParams.set('country', 'ci');
   url.searchParams.set('proximity', '-4.0083,5.3600');
+  url.searchParams.set('types', 'address,poi,place,locality,neighborhood');
 
   const response = await fetch(url, {
     headers: {
@@ -559,7 +573,7 @@ export async function searchMapboxAddress(query: string): Promise<GeocodingSearc
 
   if (!response.ok) {
     console.warn('Mapbox geocoding search failed', { status: response.status });
-    return { items: [] };
+    throw new Error(`Mapbox geocoding search failed with status ${response.status}`);
   }
 
   const payload = (await response.json()) as {
@@ -569,16 +583,29 @@ export async function searchMapboxAddress(query: string): Promise<GeocodingSearc
     }[];
   };
 
-  return {
-    items:
-      payload.features
-        ?.filter((feature) => feature.place_name && Array.isArray(feature.center) && feature.center.length === 2)
-        .map((feature) => ({
-          label: feature.place_name ?? '',
-          latitude: feature.center?.[1] ?? 0,
-          longitude: feature.center?.[0] ?? 0,
-        })) ?? [],
-  };
+  return (
+    payload.features
+      ?.filter((feature) => feature.place_name && Array.isArray(feature.center) && feature.center.length === 2)
+      .map((feature) => ({
+        label: feature.place_name ?? '',
+        latitude: feature.center?.[1] ?? 0,
+        longitude: feature.center?.[0] ?? 0,
+      })) ?? []
+  );
+}
+
+function dedupeGeocodingSuggestions(items: GeocodingSearchResponse['items']) {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const key = `${item.label.toLowerCase()}:${item.latitude.toFixed(5)}:${item.longitude.toFixed(5)}`;
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
 }
 
 const userOptionSelect = {
