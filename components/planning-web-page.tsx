@@ -709,7 +709,7 @@ function AssignmentDrawer({
               value={form.action}
             />
           </Field>
-          <Field label="Progression cible %">
+          <Field label="Progression cible % (facultatif)">
             <input
               className={filterClassName}
               max={100}
@@ -718,6 +718,9 @@ function AssignmentDrawer({
               type="number"
               value={form.targetProgress}
             />
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Laissez vide si aucune progression cible n&apos;est définie.
+            </p>
             {!progressValid ? <p className="mt-2 text-xs font-semibold text-red-600">La progression doit etre entre 0 et 100.</p> : null}
           </Field>
           <Field label="Type de tâche">

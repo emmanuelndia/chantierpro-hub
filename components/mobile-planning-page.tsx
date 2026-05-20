@@ -381,7 +381,7 @@ function AssignmentCard({
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
-            Progression cible
+            Progression cible (facultatif)
             <input
               type="number"
               min="0"
@@ -397,6 +397,9 @@ function AssignmentCard({
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
               placeholder="0-100"
             />
+            <span className="mt-2 block text-xs font-semibold text-slate-500">
+              Laissez vide si aucune progression cible n&apos;est définie.
+            </span>
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
@@ -790,7 +793,7 @@ function AssignmentBottomSheet({
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
-            Progression cible
+            Progression cible (facultatif)
             <input
               type="number"
               min="0"
@@ -806,6 +809,9 @@ function AssignmentBottomSheet({
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
               placeholder="0-100"
             />
+            <span className="mt-2 block text-xs font-semibold text-slate-500">
+              Laissez vide si aucune progression cible n&apos;est définie.
+            </span>
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">

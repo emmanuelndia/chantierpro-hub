@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
-import type { PlanningAssignmentStatus, PlanningWorkLocationType, Prisma, PrismaClient, Role } from '@prisma/client';
+import type { PlanningWorkLocationType, Prisma, PrismaClient, Role } from '@prisma/client';
 import { operationalPlanningSiteWhere } from '@/lib/mobile-planning';
 
 type AuthLikeUser = {
@@ -28,15 +28,6 @@ type PlanningExportRow = {
   type: string;
   action: string;
   progress: string;
-  status: string;
-  createdBy: string;
-};
-
-const statusLabels: Record<PlanningAssignmentStatus, string> = {
-  ASSIGNED: 'Non démarré',
-  IN_PROGRESS: 'En cours',
-  COMPLETED: 'Terminé',
-  CANCELLED: 'Annulé',
 };
 
 const workLocationLabels: Record<PlanningWorkLocationType, string> = {
@@ -75,12 +66,13 @@ export function parsePlanningExportQuery(searchParams: URLSearchParams): Plannin
 
 export async function buildPlanningExport(prisma: PrismaClient, user: AuthLikeUser, query: PlanningExportQuery) {
   const rows = await getPlanningExportRows(prisma, user, query);
+  const projectTitle = getProjectTitle(rows);
 
   if (query.format === 'pdf') {
-    return buildPlanningExportPdf(rows, query.date);
+    return buildPlanningExportPdf(rows, query.date, projectTitle);
   }
 
-  return buildPlanningExportXlsx(rows, query.date);
+  return buildPlanningExportXlsx(rows, query.date, projectTitle);
 }
 
 async function getPlanningExportRows(
@@ -119,7 +111,6 @@ async function getPlanningExportRows(
       date: true,
       action: true,
       targetProgress: true,
-      status: true,
       workLocationType: true,
       supervisor: {
         select: {
@@ -139,12 +130,6 @@ async function getPlanningExportRows(
           },
         },
       },
-      createdBy: {
-        select: {
-          firstName: true,
-          lastName: true,
-        },
-      },
     },
   });
 
@@ -158,12 +143,10 @@ async function getPlanningExportRows(
     type: workLocationLabels[assignment.workLocationType],
     action: assignment.action,
     progress: assignment.targetProgress === null ? '' : String(assignment.targetProgress),
-    status: statusLabels[assignment.status],
-    createdBy: `${assignment.createdBy.firstName} ${assignment.createdBy.lastName}`,
   }));
 }
 
-function buildPlanningExportXlsx(rows: PlanningExportRow[], date: string) {
+async function buildPlanningExportXlsx(rows: PlanningExportRow[], date: string, projectTitle: string) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'ChantierPro';
   workbook.created = new Date();
@@ -171,19 +154,15 @@ function buildPlanningExportXlsx(rows: PlanningExportRow[], date: string) {
   const worksheet = workbook.addWorksheet('Récap planning');
   worksheet.columns = [
     { header: 'Date', key: 'date', width: 14 },
-    { header: 'Nom de la ressource', key: 'resource', width: 28 },
-    { header: 'Poste', key: 'role', width: 24 },
-    { header: 'Nom du projet', key: 'project', width: 28 },
-    { header: 'Nom du site / adresse géographique', key: 'siteAddress', width: 36 },
-    { header: 'Type', key: 'type', width: 14 },
-    { header: 'Action du jour', key: 'action', width: 50 },
-    { header: 'Progression en %', key: 'progress', width: 16 },
-    { header: 'Statut', key: 'status', width: 18 },
-    { header: 'Créé par', key: 'createdBy', width: 26 },
+    { header: 'Nom de la ressource', key: 'resource', width: 30 },
+    { header: 'Poste', key: 'role', width: 26 },
+    { header: 'Nom du site / adresse géographique', key: 'siteAddress', width: 44 },
+    { header: 'Action du jour', key: 'action', width: 58 },
+    { header: 'Progression en %', key: 'progress', width: 18 },
   ];
 
-  worksheet.mergeCells('A1:J1');
-  worksheet.getCell('A1').value = 'PLANNING ACTIVITÉS JOURNALIÈRES';
+  worksheet.mergeCells('A1:F1');
+  worksheet.getCell('A1').value = `PLANNING ACTIVITÉS JOURNALIÈRES : ${projectTitle}`;
   worksheet.getCell('A1').font = { bold: true, size: 14 };
   worksheet.getCell('A1').alignment = { horizontal: 'center' };
   worksheet.getCell('A1').fill = {
@@ -198,8 +177,12 @@ function buildPlanningExportXlsx(rows: PlanningExportRow[], date: string) {
 
   for (const row of rows) {
     worksheet.addRow({
-      ...row,
-      siteAddress: row.address ? `${row.site} - ${row.address}` : row.site,
+      date: row.date,
+      resource: row.resource,
+      role: row.role,
+      siteAddress: formatSiteAddress(row),
+      action: row.action,
+      progress: row.progress,
     });
   }
 
@@ -221,29 +204,27 @@ function buildPlanningExportXlsx(rows: PlanningExportRow[], date: string) {
     to: { row: 2, column: worksheet.columns.length },
   };
 
-  return workbook.xlsx.writeBuffer().then((buffer) => ({
+  const buffer = await workbook.xlsx.writeBuffer();
+  return {
     buffer: Buffer.from(buffer),
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     fileName: `recap-planning-${date}.xlsx`,
-  }));
+  };
 }
 
-function buildPlanningExportPdf(rows: PlanningExportRow[], date: string) {
+function buildPlanningExportPdf(rows: PlanningExportRow[], date: string, projectTitle: string) {
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 8;
   const tableWidth = pageWidth - margin * 2;
   const columns = [
-    { label: 'DATE', key: 'date', width: 19 },
-    { label: 'NOM DE LA RESSOURCE', key: 'resource', width: 46 },
-    { label: 'POSTE', key: 'role', width: 36 },
-    { label: 'NOM DU PROJET', key: 'project', width: 34 },
-    { label: 'SITE / ADRESSE', key: 'siteAddress', width: 42 },
-    { label: 'TYPE', key: 'type', width: 20 },
-    { label: 'ACTION DU JOUR', key: 'action', width: 58 },
-    { label: 'PROGRESSION', key: 'progress', width: 22 },
-    { label: 'STATUT', key: 'status', width: 22 },
+    { label: 'DATE', key: 'date', width: 22 },
+    { label: 'NOM DE LA RESSOURCE', key: 'resource', width: 50 },
+    { label: 'POSTE', key: 'role', width: 38 },
+    { label: 'NOM DU SITE / ADRESSE GÉOGRAPHIQUE', key: 'siteAddress', width: 55 },
+    { label: 'ACTION DU JOUR', key: 'action', width: 76 },
+    { label: 'PROGRESSION EN %', key: 'progress', width: 28 },
   ];
   const scale = tableWidth / columns.reduce((sum, column) => sum + column.width, 0);
   const scaledColumns = columns.map((column) => ({ ...column, width: column.width * scale }));
@@ -254,7 +235,7 @@ function buildPlanningExportPdf(rows: PlanningExportRow[], date: string) {
     pdf.rect(margin, y, tableWidth, 8, 'F');
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(12);
-    pdf.text('PLANNING ACTIVITÉS JOURNALIÈRES', pageWidth / 2, y + 5.5, { align: 'center' });
+    pdf.text(`PLANNING ACTIVITÉS JOURNALIÈRES : ${projectTitle}`, pageWidth / 2, y + 5.5, { align: 'center' });
     y += 12;
   };
 
@@ -279,9 +260,12 @@ function buildPlanningExportPdf(rows: PlanningExportRow[], date: string) {
 
   for (const row of rows) {
     const cells = {
-      ...row,
-      siteAddress: row.address ? `${row.site} - ${row.address}` : row.site,
-      progress: row.progress ? `${row.progress}%` : '',
+      date: row.date,
+      resource: row.resource,
+      role: row.role,
+      siteAddress: formatSiteAddress(row),
+      action: row.action,
+      progress: row.progress,
     };
     const lineGroups = scaledColumns.map((column) =>
       pdf.splitTextToSize(String(cells[column.key as keyof typeof cells] ?? ''), column.width - 2) as string[],
@@ -317,6 +301,15 @@ function buildPlanningExportPdf(rows: PlanningExportRow[], date: string) {
     contentType: 'application/pdf',
     fileName: `recap-planning-${date}.pdf`,
   };
+}
+
+function getProjectTitle(rows: PlanningExportRow[]) {
+  const projects = [...new Set(rows.map((row) => row.project).filter(Boolean))];
+  return projects.length === 1 ? projects[0] ?? 'TOUS PROJETS' : 'TOUS PROJETS';
+}
+
+function formatSiteAddress(row: PlanningExportRow) {
+  return row.address ? `${row.site} - ${row.address}` : row.site;
 }
 
 function parsePlanningExportFormat(value: string | null): PlanningExportFormat | null {

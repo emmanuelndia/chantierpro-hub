@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import type { Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
+import { MustChangePasswordBanner } from '@/components/must-change-password-banner';
 import { useToast } from '@/components/toast-provider';
 import { getWebBreadcrumbs, getWebNavigationForRole } from '@/lib/navigation';
 import type { WebSessionUser } from '@/lib/auth/web-session';
@@ -198,6 +199,7 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
         </header>
 
         <main className="custom-scrollbar h-[calc(100vh-4rem)] overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+          {user.mustChangePassword ? <MustChangePasswordBanner href="/settings/profil" variant="web" /> : null}
           {children}
         </main>
       </div>
