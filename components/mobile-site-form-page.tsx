@@ -4,6 +4,7 @@ import { SiteStatus } from '@prisma/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { SiteLocationPicker } from '@/components/site-location-picker';
 import { authFetch } from '@/lib/auth/client-session';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { MobileSiteFormOptionsResponse, MobileSiteFormResponse } from '@/types/mobile-sites';
@@ -232,14 +233,19 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
           />
         </Field>
 
-        <Field label="Adresse" error={errors.address}>
-          <input
-            className={inputClass}
-            onChange={(event) => setValues((current) => ({ ...current, address: event.target.value }))}
-            placeholder="Adresse du chantier"
-            value={values.address}
+        <div className="space-y-2">
+          <SiteLocationPicker
+            address={values.address}
+            compact
+            latitude={values.latitude}
+            longitude={values.longitude}
+            onChange={(nextValues) => setValues((current) => ({ ...current, ...nextValues }))}
+            radiusKm={values.radiusKm}
           />
-        </Field>
+          {errors.address ? <span className="block text-xs font-bold text-red-600">{errors.address}</span> : null}
+          {errors.latitude ? <span className="block text-xs font-bold text-red-600">{errors.latitude}</span> : null}
+          {errors.longitude ? <span className="block text-xs font-bold text-red-600">{errors.longitude}</span> : null}
+        </div>
 
         <Field label="Description" error={errors.description}>
           <textarea
@@ -252,27 +258,6 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
       </section>
 
       <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Latitude" error={errors.latitude}>
-            <input
-              className={inputClass}
-              inputMode="decimal"
-              onChange={(event) => setValues((current) => ({ ...current, latitude: event.target.value }))}
-              placeholder="5.3480"
-              value={values.latitude}
-            />
-          </Field>
-          <Field label="Longitude" error={errors.longitude}>
-            <input
-              className={inputClass}
-              inputMode="decimal"
-              onChange={(event) => setValues((current) => ({ ...current, longitude: event.target.value }))}
-              placeholder="-4.0083"
-              value={values.longitude}
-            />
-          </Field>
-        </div>
-
         <div className="grid grid-cols-2 gap-3">
           <Field label="Rayon GPS (km)" error={errors.radiusKm}>
             <input

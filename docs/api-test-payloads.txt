@@ -23,6 +23,7 @@ SUPABASE_STORAGE_BUCKET=chantierpro-photos
 
 Variable geocoding recommandee
 MAPBOX_ACCESS_TOKEN=ton-token-mapbox-serveur
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=ton-token-mapbox-public
 
 Variable utile pour les tests smoke
 AUTH_SMOKE_PORT=3105
@@ -36,6 +37,8 @@ Ou chercher chaque valeur
 - SUPABASE_SERVICE_ROLE_KEY : dashboard Supabase > Settings > API > service_role key
 - SUPABASE_STORAGE_BUCKET : nom exact du bucket prive Supabase Storage
 - MAPBOX_ACCESS_TOKEN : dashboard Mapbox > Access tokens > token secret utilise par le proxy backend
+- NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN : token public Mapbox utilise par la carte chantier cote navigateur.
+  En production, restreindre ce token aux domaines autorises de l'application.
 - AUTH_SMOKE_PORT : libre, optionnel, seulement pour scripts/auth-smoke.ts
 
 Ou le code utilise ces variables
@@ -43,6 +46,7 @@ Ou le code utilise ces variables
 - lib/auth/tokens.ts -> JWT_SECRET, JWT_REFRESH_SECRET
 - lib/storage.ts et lib/photo-storage.ts -> STORAGE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_STORAGE_BUCKET
 - lib/project-web.ts -> MAPBOX_ACCESS_TOKEN pour l'autocompletion adresse chantier
+- components/site-location-picker.tsx -> NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN pour afficher la carte Mapbox
 - scripts/auth-smoke.ts -> AUTH_SMOKE_PORT
 
 Important

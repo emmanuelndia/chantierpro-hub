@@ -9,10 +9,10 @@ import { Badge } from '@/components/badge';
 import { ConfirmModal } from '@/components/confirm-modal';
 import { EmptyState } from '@/components/empty-state';
 import { PhotoGallery } from '@/components/photo-gallery';
+import { SiteLocationPicker } from '@/components/site-location-picker';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
-  GeocodingSearchResponse,
   ProjectDetail,
   ProjectFormOptionsResponse,
   ProjectPresenceSummary,
@@ -478,24 +478,10 @@ function SiteFormDrawer({
   onClose: () => void;
 }>) {
   const [values, setValues] = useState<SiteFormValues>(() => buildInitialSiteFormValues(initialSite));
-  const [addressQuery, setAddressQuery] = useState(initialSite?.address ?? '');
 
   useEffect(() => {
     setValues(buildInitialSiteFormValues(initialSite));
-    setAddressQuery(initialSite?.address ?? '');
   }, [initialSite]);
-
-  const addressSuggestionsQuery = useQuery({
-    queryKey: ['mapbox-addresses', addressQuery],
-    queryFn: async () => {
-      const response = await authFetch(`/api/geocoding/search?q=${encodeURIComponent(addressQuery)}`);
-      if (!response.ok) {
-        throw new Error(`Geocoding request failed with status ${response.status}`);
-      }
-      return (await response.json()) as GeocodingSearchResponse;
-    },
-    enabled: open && addressQuery.trim().length >= 3,
-  });
 
   if (!open) {
     return null;
@@ -531,57 +517,13 @@ function SiteFormDrawer({
             />
           </Field>
 
-          <Field label="Adresse">
-            <div className="space-y-3">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-                onChange={(event) => {
-                  setAddressQuery(event.target.value);
-                  setValues((current) => ({ ...current, address: event.target.value }));
-                }}
-                value={addressQuery}
-              />
-              {addressSuggestionsQuery.data?.items.length ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-                  {addressSuggestionsQuery.data.items.map((item) => (
-                    <button
-                      key={`${item.label}:${item.latitude}:${item.longitude}`}
-                      className="flex w-full items-start rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
-                      onClick={() => {
-                        setAddressQuery(item.label);
-                        setValues((current) => ({
-                          ...current,
-                          address: item.label,
-                          latitude: String(item.latitude),
-                          longitude: String(item.longitude),
-                        }));
-                      }}
-                      type="button"
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </Field>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Latitude">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-                onChange={(event) => setValues((current) => ({ ...current, latitude: event.target.value }))}
-                value={values.latitude}
-              />
-            </Field>
-            <Field label="Longitude">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-                onChange={(event) => setValues((current) => ({ ...current, longitude: event.target.value }))}
-                value={values.longitude}
-              />
-            </Field>
-          </div>
+          <SiteLocationPicker
+            address={values.address}
+            latitude={values.latitude}
+            longitude={values.longitude}
+            onChange={(nextValues) => setValues((current) => ({ ...current, ...nextValues }))}
+            radiusKm={values.radiusKm}
+          />
 
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Surface">

@@ -546,6 +546,8 @@ export async function searchMapboxAddress(query: string): Promise<GeocodingSearc
   url.searchParams.set('autocomplete', 'true');
   url.searchParams.set('limit', '6');
   url.searchParams.set('language', 'fr');
+  url.searchParams.set('country', 'ci');
+  url.searchParams.set('proximity', '-4.0083,5.3600');
 
   const response = await fetch(url, {
     headers: {
