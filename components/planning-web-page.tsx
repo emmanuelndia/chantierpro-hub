@@ -318,11 +318,20 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
             <button
               className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
               disabled={isMutating}
-              onClick={() => void downloadPlanningExport(selectedDate, filters, pushMutationError)}
+              onClick={() => void downloadPlanningExport(selectedDate, filters, 'xlsx', pushMutationError)}
               type="button"
             >
               <Download className="h-4 w-4" />
-              Télécharger le récap
+              Récap Excel
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              disabled={isMutating}
+              onClick={() => void downloadPlanningExport(selectedDate, filters, 'pdf', pushMutationError)}
+              type="button"
+            >
+              <Download className="h-4 w-4" />
+              Récap PDF
             </button>
             <button className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" disabled={isMutating} onClick={() => openCreate()} type="button">
               Ajouter une tâche
@@ -893,10 +902,11 @@ async function deleteAssignment(id: string) {
 async function downloadPlanningExport(
   date: string,
   filters: PlanningWebFilters,
+  format: 'xlsx' | 'pdf',
   onError: (error: unknown, title: string) => void,
 ) {
   try {
-    const searchParams = new URLSearchParams({ date });
+    const searchParams = new URLSearchParams({ date, format });
     if (filters.projectId) searchParams.set('projectId', filters.projectId);
     if (filters.siteId) searchParams.set('siteId', filters.siteId);
     if (filters.resourceId) searchParams.set('resourceId', filters.resourceId);
@@ -910,7 +920,7 @@ async function downloadPlanningExport(
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = extractFileName(response.headers.get('content-disposition')) ?? `recap-planning-${date}.xlsx`;
+    anchor.download = extractFileName(response.headers.get('content-disposition')) ?? `recap-planning-${date}.${format}`;
     document.body.append(anchor);
     anchor.click();
     anchor.remove();

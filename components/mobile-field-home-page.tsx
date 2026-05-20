@@ -175,6 +175,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
   const pauseDurationSeconds = calculateElapsedSeconds(null, now, sessionStatus?.pauseDuration);
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
   const loading = sitesQuery.isLoading || clockInQuery.isLoading;
+  const showSitesSection = loading || sites.length > 0 || officeAssignments.length === 0;
 
   return (
     <div className="space-y-5">
@@ -202,6 +203,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
         </div>
       </section>
 
+      {showSitesSection ? (
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
@@ -220,7 +222,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
 
         {loading ? <SitesLoadingState /> : null}
 
-        {!loading && sites.length === 0 ? <EmptySitesState /> : null}
+        {!loading && sites.length === 0 && officeAssignments.length === 0 ? <EmptySitesState /> : null}
 
         {!loading && sites.length > 0 ? (
           <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2">
@@ -235,6 +237,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
           </div>
         ) : null}
       </section>
+      ) : null}
 
       <OfficeAssignmentsSection assignments={officeAssignments} usingOfflineData={usingOfflineAssignments} />
 

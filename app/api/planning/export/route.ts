@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { canAccessWebPlanning } from '@/lib/mobile-planning';
-import { buildPlanningExportXlsx, parsePlanningExportQuery } from '@/lib/planning-export';
+import { buildPlanningExport, parsePlanningExportQuery } from '@/lib/planning-export';
 
 export const GET = withAuth(async ({ req, user }) => {
   if (!canAccessWebPlanning(user.role)) {
@@ -14,17 +14,17 @@ export const GET = withAuth(async ({ req, user }) => {
   }
 
   try {
-    const artifact = await buildPlanningExportXlsx(prisma, user, query);
+    const artifact = await buildPlanningExport(prisma, user, query);
     return new Response(artifact.buffer, {
       headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Type': artifact.contentType,
         'Content-Disposition': `attachment; filename="${artifact.fileName}"`,
       },
     });
   } catch (error) {
     console.error('Planning export error:', error);
     return Response.json(
-      { code: 'EXPORT_FAILED', message: "La génération du récap planning a échoué." },
+      { code: 'EXPORT_FAILED', message: 'La génération du récap planning a échoué.' },
       { status: 500 },
     );
   }
