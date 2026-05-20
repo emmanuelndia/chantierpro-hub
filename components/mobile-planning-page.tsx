@@ -418,7 +418,7 @@ function AssignmentCard({
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
-            Type de tÃ¢che
+            Type de tâche
             <select
               value={editData.workLocationType ?? PlanningWorkLocationType.ON_SITE}
               onChange={(event) => {
@@ -809,7 +809,7 @@ function AssignmentBottomSheet({
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
-            Type de tÃ¢che
+            Type de tâche
             <select
               value={formData.workLocationType ?? PlanningWorkLocationType.ON_SITE}
               onChange={(event) => {
@@ -825,7 +825,7 @@ function AssignmentBottomSheet({
               ))}
             </select>
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              Bureau signifie que la tÃ¢che n&apos;exige pas de pointage chantier.
+              Bureau signifie que la tâche n&apos;exige pas de pointage chantier.
             </p>
           </label>
         </div>

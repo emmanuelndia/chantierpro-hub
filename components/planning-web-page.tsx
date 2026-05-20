@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { PlanningAssignmentStatus, PlanningWorkLocationType, type Role } from '@prisma/client';
 import { useMutation, useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Download, Pencil, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
@@ -54,15 +54,15 @@ const buttonClassName =
   'rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 
 const planningStatusLabel: Record<PlanningAssignmentStatus, string> = {
-  ASSIGNED: 'Non demarre',
+  ASSIGNED: 'Non démarré',
   IN_PROGRESS: 'En cours',
-  COMPLETED: 'Termine',
-  CANCELLED: 'Annule',
+  COMPLETED: 'Terminé',
+  CANCELLED: 'Annulé',
 };
 
 const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
-  ON_SITE: 'Presence chantier requise',
-  OFFICE: 'Tache bureau / coordination',
+  ON_SITE: 'Présence chantier requise',
+  OFFICE: 'Tâche bureau / coordination',
 };
 
 export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
@@ -209,7 +209,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     pushToast({
       type: 'error',
       title,
-      message: error instanceof Error ? error.message : 'Operation refusee.',
+      message: error instanceof Error ? error.message : 'Opération refusée.',
     });
   }
 
@@ -304,7 +304,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           <MetricCard label="Tâches" value={data.assignments.length} />
           <MetricCard label="Ressources actives" value={data.unassignedSupervisors.length} />
           <MetricCard label="Chantiers accessibles" value={data.availableSites.length} />
-          <MetricCard label="Affichees" value={filteredAssignments.length} />
+          <MetricCard label="Affichées" value={filteredAssignments.length} />
         </section>
       ) : null}
 
@@ -315,6 +315,15 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
             <p className="mt-1 text-sm text-slate-600">Crée une tâche pour une ressource terrain.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              disabled={isMutating}
+              onClick={() => void downloadPlanningExport(selectedDate, filters, pushMutationError)}
+              type="button"
+            >
+              <Download className="h-4 w-4" />
+              Télécharger le récap
+            </button>
             <button className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" disabled={isMutating} onClick={() => openCreate()} type="button">
               Ajouter une tâche
             </button>
@@ -440,7 +449,7 @@ function DayPlanningCards({
                   <PlanningTaskField label="Tâche">
                     <p className="text-slate-700">{assignment.action}</p>
                     <p className="mt-1 text-xs text-slate-500">
-                      Cree par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
+                      Créé par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
                     </p>
                   </PlanningTaskField>
                   <PlanningTaskField label="Progression">
@@ -702,7 +711,7 @@ function AssignmentDrawer({
             />
             {!progressValid ? <p className="mt-2 text-xs font-semibold text-red-600">La progression doit etre entre 0 et 100.</p> : null}
           </Field>
-          <Field label="Type de tÃ¢che">
+          <Field label="Type de tâche">
             <select
               className={filterClassName}
               onChange={(event) => onChange({ ...form, workLocationType: event.target.value as PlanningWorkLocationType })}
@@ -715,7 +724,7 @@ function AssignmentDrawer({
               ))}
             </select>
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              Une tÃ¢che bureau reste dans le planning, mais ne demande pas de pointage chantier.
+              Une tâche bureau reste dans le planning, mais ne demande pas de pointage chantier.
             </p>
           </Field>
           {mode === 'edit' ? (
@@ -881,6 +890,36 @@ async function deleteAssignment(id: string) {
   }
 }
 
+async function downloadPlanningExport(
+  date: string,
+  filters: PlanningWebFilters,
+  onError: (error: unknown, title: string) => void,
+) {
+  try {
+    const searchParams = new URLSearchParams({ date });
+    if (filters.projectId) searchParams.set('projectId', filters.projectId);
+    if (filters.siteId) searchParams.set('siteId', filters.siteId);
+    if (filters.resourceId) searchParams.set('resourceId', filters.resourceId);
+
+    const response = await authFetch(`/api/planning/export?${searchParams.toString()}`, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(await getApiErrorMessage(response, 'Export planning impossible.'));
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = extractFileName(response.headers.get('content-disposition')) ?? `recap-planning-${date}.xlsx`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    onError(error, 'Export impossible');
+  }
+}
+
 async function getApiErrorMessage(response: Response, fallback: string) {
   try {
     const payload = (await response.json()) as { message?: string };
@@ -888,6 +927,11 @@ async function getApiErrorMessage(response: Response, fallback: string) {
   } catch {
     return fallback;
   }
+}
+
+function extractFileName(contentDisposition: string | null) {
+  const match = contentDisposition?.match(/filename="([^"]+)"/);
+  return match?.[1] ?? null;
 }
 
 function filterAssignments(assignments: PlanningWebAssignment[], sites: AvailableSite[], filters: PlanningWebFilters) {
