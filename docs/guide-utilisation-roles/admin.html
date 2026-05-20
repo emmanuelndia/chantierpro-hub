@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChantierPro - Guide d'utilisation Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div><a class="pill" href="index.html">Retour accueil</a><h1>Guide Admin</h1></div>
+      <div class="meta"><p><strong>Role :</strong> ADMIN</p><p>Version web + version mobile</p></div>
+    </header>
+
+    <section class="hero">
+      <article class="card">
+        <h2>Objectif du role</h2>
+        <p class="muted">L'administrateur gere les comptes, verifie les acces, consulte la galerie, suit les logs de suppression et intervient rapidement quand un utilisateur est bloque.</p>
+      </article>
+      <article class="card light">
+        <h3>Ecrans accessibles</h3>
+        <p><strong>Web :</strong> Tableau de bord, Utilisateurs, Galerie photos, Logs de suppression, projets en consultation, rapports selon droits et profil.</p>
+        <p><strong>Mobile :</strong> Accueil admin, Utilisateurs, Galerie, Logs et Profil. L'admin mobile est volontairement online-only.</p>
+      </article>
+    </section>
+
+    <nav class="role-nav">
+      <a href="#web">Version web</a>
+      <a href="#mobile">Version mobile</a>
+      <a href="#regles">Regles importantes</a>
+      <a href="#problemes">Problemes frequents</a>
+    </nav>
+
+    <section class="platform-section" id="web">
+      <div class="platform-heading"><h2>Version web</h2><span class="platform-tag">Bureau</span></div>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Ouvrir le tableau de bord admin</h3><div class="action-meta"><p><strong>Chemin :</strong> Menu lateral &gt; Tableau de bord.</p><p><strong>Ou appuyer :</strong> entree Tableau de bord.</p><p><strong>Resultat attendu :</strong> les compteurs et indicateurs principaux de l'application s'affichent.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-web-dashboard.png" alt="Tableau de bord admin web" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Tableau de bord web</span><code>assets/admin-web-dashboard.png</code></div></div></div><figcaption><strong>Tableau de bord</strong><span>Point de depart de l'administration web.</span></figcaption></figure></div>
+      </article>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Creer un utilisateur</h3><div class="action-meta"><p><strong>Chemin :</strong> Menu lateral &gt; Utilisateurs.</p><p><strong>Ou appuyer :</strong> Nouveau utilisateur, remplir les informations et enregistrer.</p><p><strong>Resultat attendu :</strong> le compte est cree avec le bon role et le bon statut.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-web-utilisateurs.png" alt="Utilisateurs admin web" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Utilisateurs web</span><code>assets/admin-web-utilisateurs.png</code></div></div></div><figcaption><strong>Utilisateurs</strong><span>Recherche, filtres, creation et consultation.</span></figcaption></figure></div>
+      </article>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Modifier, desactiver ou reactiver un compte</h3><div class="action-meta"><p><strong>Chemin :</strong> Utilisateurs &gt; ligne ou carte utilisateur.</p><p><strong>Ou appuyer :</strong> menu a trois points puis Modifier, Desactiver ou Reactiver.</p><p><strong>Resultat attendu :</strong> l'action cible le bon utilisateur et la liste se met a jour.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-web-utilisateur-actions.png" alt="Actions utilisateur admin web" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Actions utilisateur web</span><code>assets/admin-web-utilisateur-actions.png</code></div></div></div><figcaption><strong>Actions utilisateur</strong><span>Modifier, reset mot de passe, activer ou desactiver.</span></figcaption></figure></div>
+      </article>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Reinitialiser un mot de passe</h3><div class="action-meta"><p><strong>Chemin :</strong> Utilisateurs &gt; menu a trois points.</p><p><strong>Ou appuyer :</strong> Reset MDP, puis confirmer.</p><p><strong>Resultat attendu :</strong> un nouveau mot de passe est genere ou applique selon le parcours de l'application.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-web-reset-password.png" alt="Reset mot de passe admin web" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Reset MDP web</span><code>assets/admin-web-reset-password.png</code></div></div></div><figcaption><strong>Reset MDP</strong><span>Action d'assistance utilisateur.</span></figcaption></figure></div>
+      </article>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Consulter la galerie photos</h3><div class="action-meta"><p><strong>Chemin :</strong> Menu lateral &gt; Galerie photos.</p><p><strong>Ou appuyer :</strong> choisir un chantier, ouvrir une photo.</p><p><strong>Resultat attendu :</strong> les photos stockees sur R2 s'affichent correctement.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-web-galerie.png" alt="Galerie admin web" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Galerie web</span><code>assets/admin-web-galerie.png</code></div></div></div><figcaption><strong>Galerie</strong><span>Consultation des photos par chantier.</span></figcaption></figure></div>
+      </article>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Auditer les logs de suppression</h3><div class="action-meta"><p><strong>Chemin :</strong> Menu lateral &gt; Logs de suppression.</p><p><strong>Ou appuyer :</strong> utiliser les filtres date, auteur ou export.</p><p><strong>Resultat attendu :</strong> les suppressions restent tracables avec auteur, date, chantier et motif.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-web-logs.png" alt="Logs admin web" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Logs web</span><code>assets/admin-web-logs.png</code></div></div></div><figcaption><strong>Logs</strong><span>Audit des suppressions.</span></figcaption></figure></div>
+      </article>
+    </section>
+
+    <section class="platform-section" id="mobile">
+      <div class="platform-heading"><h2>Version mobile</h2><span class="platform-tag">Telephone</span></div>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Ouvrir l'accueil admin mobile</h3><div class="action-meta"><p><strong>Chemin :</strong> Onglet Accueil.</p><p><strong>Ou appuyer :</strong> raccourcis Utilisateurs, Galerie ou Logs.</p><p><strong>Resultat attendu :</strong> l'admin accede vite aux interventions utiles sur telephone.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-mobile-dashboard.jpeg" alt="Accueil admin mobile" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Accueil mobile</span><code>assets/admin-mobile-dashboard.jpeg</code></div></div></div><figcaption><strong>Accueil admin</strong><span>Dashboard admin simplifie sur telephone.</span></figcaption></figure></div>
+      </article>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Gerer les utilisateurs sur mobile</h3><div class="action-meta"><p><strong>Chemin :</strong> Onglet Utilisateurs.</p><p><strong>Ou appuyer :</strong> recherche, filtres, Nouveau utilisateur ou menu a trois points.</p><p><strong>Resultat attendu :</strong> creation, modification, activation et reset MDP restent possibles sur telephone.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-mobile-utilisateurs.jpeg" alt="Utilisateurs admin mobile" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Utilisateurs mobile</span><code>assets/admin-mobile-utilisateurs.jpeg</code></div></div></div><figcaption><strong>Utilisateurs mobile</strong><span>Cartes lisibles au lieu d'un grand tableau.</span></figcaption></figure></div>
+      </article>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Consulter la galerie mobile</h3><div class="action-meta"><p><strong>Chemin :</strong> Onglet Galerie.</p><p><strong>Ou appuyer :</strong> choisir un chantier puis ouvrir une photo.</p><p><strong>Resultat attendu :</strong> la galerie s'ouvre en ligne pour l'admin.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-mobile-galerie.jpeg" alt="Galerie admin mobile" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Galerie mobile</span><code>assets/admin-mobile-galerie.jpeg</code></div></div></div><figcaption><strong>Galerie mobile</strong><span>Photos par chantier.</span></figcaption></figure></div>
+      </article>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Consulter les logs sur mobile</h3><div class="action-meta"><p><strong>Chemin :</strong> Onglet Logs.</p><p><strong>Ou appuyer :</strong> filtres date ou auteur, puis ouvrir une carte log.</p><p><strong>Resultat attendu :</strong> les suppressions sont lisibles sur telephone.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-mobile-logs.jpeg" alt="Logs admin mobile" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Logs mobile</span><code>assets/admin-mobile-logs.jpeg</code></div></div></div><figcaption><strong>Logs mobile</strong><span>Audit rapide depuis telephone.</span></figcaption></figure></div>
+      </article>
+
+      <article class="action-card">
+        <div class="action-copy"><h3>Ouvrir le profil</h3><div class="action-meta"><p><strong>Chemin :</strong> Onglet Profil.</p><p><strong>Ou appuyer :</strong> Profil, changer mot de passe si besoin, Deconnexion.</p><p><strong>Resultat attendu :</strong> la session admin est fermee proprement si l'utilisateur se deconnecte.</p></div></div>
+        <div class="action-shot"><figure class="screenshot-slot"><div class="shot-frame"><img src="assets/admin-mobile-profil.jpeg" alt="Profil admin mobile" loading="lazy"><div class="shot-placeholder"><div><strong>Capture a inserer</strong><span>Profil mobile</span><code>assets/admin-mobile-profil.jpeg</code></div></div></div><figcaption><strong>Profil</strong><span>Compte et deconnexion.</span></figcaption></figure></div>
+      </article>
+    </section>
+
+    <section class="section grid two" id="regles">
+      <article class="card"><h2>Regles importantes</h2><ul class="checklist muted"><li>L'admin peut gerer les utilisateurs, mais il doit toujours verifier le role avant d'attribuer un acces.</li><li>Un utilisateur inactif ne doit plus apparaitre dans les selecteurs operationnels.</li><li>L'admin mobile est online-only : il n'a pas besoin du mode offline terrain.</li></ul></article>
+      <article class="card" id="problemes"><h2>Si une action manque</h2><ul class="checklist muted"><li>Verifier que le compte connecte est bien ADMIN.</li><li>Retirer les filtres role ou statut dans la liste utilisateurs.</li><li>Rafraichir apres une creation ou une modification.</li><li>Si la galerie ne charge pas, verifier les variables R2 et les filtres chantier.</li></ul></article>
+    </section>
+  </main>
+  <script src="screenshots.js"></script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+CHANTIERPRO - GUIDE POUR TESTER L'APPLICATION
+=============================================
+
+Merci de participer aux tests de ChantierPro.
+
+Le but n'est pas seulement de verifier que l'application fonctionne, mais aussi
+de voir si elle est claire, rapide et pratique a utiliser dans des situations reelles.
+Si quelque chose vous semble incomprehensible, trop long ou peu logique, notez-le.
+
+
+AVANT DE COMMENCER
+------------------
+- Utilisez le compte qui vous a ete attribue.
+- Testez sur le support prevu : web, mobile, ou les deux.
+- Allez jusqu'au bout des actions, ne vous contentez pas d'ouvrir les ecrans.
+- Quand un probleme apparait, faites si possible une capture ou une courte video.
+
+
+CE QU'IL FAUT NOTER
+-------------------
+Pour chaque probleme, indiquez :
+- votre role ;
+- l'ecran utilise ;
+- l'action effectuee ;
+- ce que vous attendiez ;
+- ce qui s'est produit ;
+- si le probleme est bloquant, majeur ou mineur ;
+- une capture ou video si possible.
+
+Notez aussi :
+- ce qui n'est pas clair ;
+- les ecrans trop lents ;
+- les actions qui demandent trop de clics ;
+- les messages difficiles a comprendre.
+
+
+ORDRE CONSEILLE DES TESTS
+-------------------------
+1. ADMIN
+2. PROJECT_MANAGER
+3. GENERAL_SUPERVISOR
+4. SUPERVISOR
+5. COORDINATOR
+6. DIRECTION
+
+Cet ordre permet de creer d'abord les utilisateurs, projets, chantiers et plannings,
+puis de tester les usages terrain et enfin les vues de suivi.
+
+
+ADMIN
+-----
+Vous devez surtout verifier :
+- la connexion ;
+- la creation, modification, activation et desactivation des utilisateurs ;
+- la recherche et les filtres utilisateurs ;
+- la presence des nouveaux utilisateurs dans les selecteurs utiles ;
+- la galerie ;
+- les logs de suppression.
+
+Points importants :
+- un utilisateur terrain actif doit apparaitre dans les selecteurs planning/equipe ;
+- un utilisateur inactif ne doit plus etre propose ;
+- un utilisateur HR ne doit pas apparaitre comme ressource terrain.
+
+
+PROJECT_MANAGER
+---------------
+Vous devez surtout verifier :
+- vos projets et uniquement vos projets ;
+- la creation et modification des projets ;
+- la creation et modification partielle des chantiers ;
+- l'attribution de sites aux superviseurs generaux ;
+- le planning de vos chantiers ;
+- les rapports de vos projets.
+
+Points importants :
+- vous devez pouvoir affecter une ressource venant d'un autre projet ;
+- une meme ressource peut avoir plusieurs taches ;
+- en vue semaine, cliquer sur un jour doit ouvrir le detail de cette journee.
+
+
+GENERAL_SUPERVISOR
+------------------
+Vous devez surtout verifier :
+- les sites qui vous ont ete confies ;
+- le planning sur ces sites ;
+- l'affectation de plusieurs taches a une meme ressource ;
+- les ressources deja assignees ailleurs mais encore disponibles ;
+- la creation et la gestion d'equipes ;
+- les rapports de votre perimetre.
+
+Points importants :
+- un site non confie ne doit pas apparaitre dans votre planning ;
+- une meme ressource peut travailler sur plusieurs chantiers le meme jour ;
+- plusieurs taches d'une ressource doivent etre regroupees proprement.
+
+
+SUPERVISOR
+----------
+Vous devez surtout verifier :
+- les chantiers du jour ;
+- les taches affectees ;
+- le pointage ;
+- les photos ;
+- les rapports ;
+- l'historique.
+
+Parcours a jouer :
+1. Ouvrir l'accueil et verifier les chantiers du jour.
+2. Pointer l'entree sur un chantier.
+3. Si vous etes affecte sur un second chantier, pointer aussi dessus.
+4. Fermer a distance une ancienne session si vous avez ete deplace.
+5. Prendre une photo chantier.
+6. Prendre une photo liee a une tache.
+7. Soumettre un rapport juste apres la sortie.
+8. Sur une autre session, passer le rapport puis le rediger plus tard depuis l'historique.
+
+Points importants :
+- les chantiers affiches doivent venir du planning du jour ;
+- un chantier proche non assigne ne doit pas masquer un chantier prevu ;
+- une photo envoyee doit ensuite etre visible ;
+- un rapport manque doit pouvoir etre rattrape plus tard.
+
+
+COORDINATOR
+-----------
+Vous devez surtout verifier :
+- l'acces aux rapports autorises ;
+- les filtres ;
+- l'ouverture des details ;
+- les telechargements ;
+- la lisibilite des informations.
+
+
+DIRECTION
+---------
+Vous devez surtout verifier :
+- la vue globale ;
+- les projets et chantiers ;
+- les rapports ;
+- les presences ;
+- la galerie ;
+- les filtres et telechargements.
+
+
+MODE HORS LIGNE TERRAIN
+-----------------------
+A tester principalement avec un compte SUPERVISOR.
+
+Parcours :
+1. Se connecter avec internet.
+2. Verifier que le mode hors ligne est pret.
+3. Couper internet.
+4. Fermer puis rouvrir l'application.
+5. Naviguer entre accueil, pointage, photo, historique et sync.
+6. Pointer hors ligne.
+7. Prendre une photo hors ligne.
+8. Verifier les elements en attente.
+9. Remettre internet.
+10. Verifier la synchronisation.
+
+Ce qu'il faut verifier :
+- les chantiers du jour restent visibles ;
+- les actions hors ligne passent bien en attente ;
+- les photos ne sont pas perdues ;
+- la synchronisation repart au retour du reseau ;
+- les messages affiches restent compréhensibles.
+
+
+VERIFICATIONS COMMUNES
+----------------------
+Quel que soit votre role, verifiez aussi :
+- la connexion et la deconnexion ;
+- les menus visibles ;
+- les recherches et filtres ;
+- les photos ;
+- les telechargements autorises ;
+- les boutons d'action a trois points sur le web ;
+- la lisibilite des ecrans sur votre appareil.
+
+
+EXEMPLE DE RETOUR
+-----------------
+- Role : SUPERVISOR
+- Support : mobile
+- Ecran : Pointage
+- Action : entree sur chantier B apres affectation
+- Resultat attendu : le chantier B est visible et le bouton d'entree est disponible
+- Resultat obtenu : seul un autre chantier proche apparait
+- Gravite : majeure
+- Capture/video : oui
+- Commentaire : le chantier B etait bien prevu dans le planning du jour
+
+
+MERCI
+-----
+Merci de tester l'application comme si vous deviez l'utiliser reellement.
+Les remarques sur l'ergonomie et la comprehension sont aussi importantes que les bugs.

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChantierPro - Guides de test par role</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#E8500A;--orange2:#FF6B2B;--dark:#1A1614;--dark2:#2A2220;--sand:#C8B8A8;--cream:#F5EFE8;--white:#FDFAF7;--line:rgba(200,184,168,.14)}
+*{box-sizing:border-box}body{margin:0;background:var(--dark);color:var(--cream);font:15px/1.6 "DM Sans",Arial,sans-serif;padding:38px 28px 56px}a{color:inherit;text-decoration:none}
+header{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:30px;padding-bottom:24px;border-bottom:2px solid var(--orange)}
+.badge{display:inline-block;background:var(--orange);color:#fff;font:700 10px "Syne";letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:3px;margin-bottom:12px}
+h1{font:800 clamp(28px,5vw,48px)/1.05 "Syne";margin:0;color:var(--white)}h1 span{color:var(--orange2)}.meta{text-align:right;color:var(--sand);font-size:12px}.meta strong{color:var(--white)}
+.intro{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;margin-bottom:24px}.card{background:var(--dark2);border:1px solid var(--line);border-left:3px solid var(--orange);border-radius:8px;padding:20px}.card h2,.card h3{font-family:"Syne";margin:0 0 12px;color:var(--white)}.card p{margin:0;color:var(--sand)}
+.roles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:26px 0}.role{background:var(--cream);color:#1A1614;border-radius:8px;padding:18px;min-height:190px;display:flex;flex-direction:column}.role small{font:700 10px "Syne";letter-spacing:.12em;color:var(--orange);text-transform:uppercase}.role h2{font:800 20px "Syne";margin:8px 0 10px}.role p{color:#4A3F3A;margin:0 0 14px}.role a{margin-top:auto;background:var(--dark);color:var(--white);display:inline-flex;justify-content:center;padding:10px 12px;border-radius:5px;font-weight:700}
+.steps{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}.step{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:6px;padding:12px;text-align:center}.step b{color:var(--orange2);display:block;font-family:"Syne";font-size:18px}.step span{font-size:11px;color:var(--sand)}
+ul{margin:0;padding-left:18px;color:var(--sand)}li+li{margin-top:6px}footer{margin-top:30px;padding-top:16px;border-top:1px solid var(--line);text-align:center;color:rgba(200,184,168,.55);font-size:12px}
+@media(max-width:900px){.intro,.roles{grid-template-columns:1fr}.steps{grid-template-columns:repeat(2,1fr)}.meta{text-align:left}}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="badge">Kit de recette</div><h1>Guides de test<br><span>par role</span></h1></div>
+  <div class="meta"><p><strong>ChantierPro</strong></p><p>Application web + mobile</p><p>Semaine de recette</p></div>
+</header>
+
+<section class="intro">
+  <article class="card">
+    <h2>Objectif</h2>
+    <p>Chaque testeur suit le guide de son role pour verifier les actions qu'il peut reellement faire dans ChantierPro. Le but est de trouver les bugs, les blocages, les lenteurs et les ecrans difficiles a comprendre.</p>
+  </article>
+  <article class="card">
+    <h3>Regles communes</h3>
+    <ul>
+      <li>Utiliser le compte attribue.</li>
+      <li>Aller jusqu'au bout des actions.</li>
+      <li>Noter role, ecran, action, attendu, obtenu et gravite.</li>
+      <li>Ajouter une capture ou video si possible.</li>
+    </ul>
+  </article>
+</section>
+
+<section class="card">
+  <h2>Ordre conseille</h2>
+  <div class="steps">
+    <div class="step"><b>1</b><span>ADMIN</span></div>
+    <div class="step"><b>2</b><span>PROJECT MANAGER</span></div>
+    <div class="step"><b>3</b><span>GENERAL SUPERVISOR</span></div>
+    <div class="step"><b>4</b><span>SUPERVISOR</span></div>
+    <div class="step"><b>5</b><span>COORDINATOR</span></div>
+    <div class="step"><b>6</b><span>DIRECTION</span></div>
+  </div>
+</section>
+
+<main class="roles">
+  <article class="role"><small>Administration</small><h2>ADMIN</h2><p>Utilisateurs, galerie, logs, droits et verification des selecteurs.</p><a href="admin.html">Ouvrir le guide</a></article>
+  <article class="role"><small>Pilotage projet</small><h2>PROJECT_MANAGER</h2><p>Projets, chantiers, perimetres GS, planning et rapports de ses projets.</p><a href="project-manager.html">Ouvrir le guide</a></article>
+  <article class="role"><small>Organisation terrain</small><h2>GENERAL_SUPERVISOR</h2><p>Sites confies, ressources tournantes, equipes, planning et rapports du perimetre.</p><a href="general-supervisor.html">Ouvrir le guide</a></article>
+  <article class="role"><small>Execution terrain</small><h2>SUPERVISOR</h2><p>Chantiers du jour, pointage, photos, rapports, historique et mode hors ligne.</p><a href="supervisor.html">Ouvrir le guide</a></article>
+  <article class="role"><small>Suivi</small><h2>COORDINATOR</h2><p>Rapports autorises, filtres, details et telechargements.</p><a href="coordinator.html">Ouvrir le guide</a></article>
+  <article class="role"><small>Direction</small><h2>DIRECTION</h2><p>Vue globale, projets, rapports, presences, galerie et syntheses.</p><a href="direction.html">Ouvrir le guide</a></article>
+</main>
+
+<footer>ChantierPro - Kit de guides de test par role</footer>
+</body>
+</html>

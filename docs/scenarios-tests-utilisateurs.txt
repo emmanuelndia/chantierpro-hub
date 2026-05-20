@@ -1,7 +1,16 @@
-PLAN DE TEST UTILISATEURS PAR ROLE
-==================================
+CHANTIERPRO - SCENARIOS DE TEST UTILISATEURS
+============================================
 
-ORDRE DES TESTS
+But du test
+-----------
+Ces tests servent a verifier que l'application fonctionne dans les vrais usages,
+avec les bons droits selon les roles, et que les ecrans sont faciles a comprendre.
+
+Chaque testeur doit utiliser le role qui lui est donne, suivre les scenarios de son
+role, et noter tout ce qui lui parait anormal, bloquant, lent ou peu clair.
+
+
+ORDRE CONSEILLE DES TESTS
 -------------------------
 1. ADMIN
 2. PROJECT_MANAGER
@@ -10,364 +19,406 @@ ORDRE DES TESTS
 5. COORDINATOR
 6. DIRECTION
 
+Cet ordre est utile parce que les premiers roles creent les donnees dont les suivants
+ont besoin : utilisateurs, projets, chantiers, perimetres, planning, puis execution terrain.
+
+
+REGLES POUR TOUS LES TESTEURS
+-----------------------------
+- Tester sur les ecrans web et mobile si le role dispose des deux versions.
+- Ne pas seulement verifier qu'un bouton existe : aller jusqu'au resultat attendu.
+- Noter aussi les problemes de comprehension, pas seulement les bugs techniques.
+- Faire une capture ou une video quand le probleme peut etre vu a l'ecran.
+- Tester le mode hors ligne uniquement avec les profils terrain concernes, apres avoir
+  d'abord valide le parcours normal avec reseau.
+
 
 1. ADMIN
 --------
 
-Objectif du role
-
-L'administrateur doit pouvoir gerer les utilisateurs et verifier que les acces
-generaux de l'application fonctionnent correctement.
+Objectif
+L'administrateur doit pouvoir gerer les utilisateurs et controler rapidement
+les fonctions d'administration.
 
 Tests a effectuer
 
-1. Connexion
+1. Connexion et navigation
 - Se connecter avec un compte ADMIN.
-- Verifier l'arrivee sur le bon espace.
-- Verifier que les menus autorises sont visibles.
-- Verifier qu'aucun menu reserve a un autre role n'apparait par erreur.
+- Verifier l'arrivee sur le bon tableau de bord.
+- Verifier les menus web et mobile visibles.
+- Verifier qu'aucun ecran metier inutile n'apparait dans l'administration mobile.
 
 2. Gestion des utilisateurs
-- Creer un nouvel utilisateur SUPERVISOR.
-- Creer un nouvel utilisateur GENERAL_SUPERVISOR.
-- Creer un nouvel utilisateur PROJECT_MANAGER.
-- Modifier le nom ou prenom d'un utilisateur existant.
-- Desactiver un utilisateur.
-- Reactiver un utilisateur.
-- Rechercher un utilisateur dans la liste.
-- Verifier que la pagination reste correcte.
+- Creer un utilisateur SUPERVISOR.
+- Creer un utilisateur GENERAL_SUPERVISOR.
+- Creer un utilisateur PROJECT_MANAGER.
+- Modifier un utilisateur existant.
+- Desactiver puis reactiver un utilisateur.
+- Reinitialiser un mot de passe.
+- Rechercher un utilisateur par nom.
+- Filtrer les utilisateurs par role et statut.
 
-3. Visibilite dans les selecteurs
-- Apres creation d'un utilisateur terrain, verifier qu'il apparait :
-  - dans les formulaires d'equipe ;
-  - dans les selecteurs de planning ;
-  - dans les ecrans ou son role est attendu.
+3. Controle des selecteurs
+- Verifier qu'un nouvel utilisateur terrain apparait dans :
+  - les formulaires d'equipe ;
+  - les selecteurs de planning ;
+  - les ecrans ou son role est attendu.
 - Verifier qu'un utilisateur inactif n'apparait plus dans les selecteurs operationnels.
 - Verifier qu'un utilisateur HR n'apparait pas comme ressource terrain.
 
-4. Logs et suivi
-- Consulter les logs de suppression.
-- Verifier que les actions importantes sont retrouvees.
+4. Galerie et logs
+- Ouvrir la galerie admin mobile et web.
+- Changer de chantier et verifier que les photos se chargent.
+- Ouvrir les logs de suppression.
+- Verifier que les informations importantes sont lisibles.
+
+Resultats attendus
+- Les utilisateurs sont crees, modifies et reactives sans erreur.
+- Les nouveaux profils sont visibles la ou ils doivent l'etre.
+- Les profils inactifs et HR ne polluent pas les selecteurs terrain.
+- Les logs et la galerie sont consultables.
 
 Erreurs a noter
-- Creation utilisateur impossible.
+- Creation ou modification impossible.
 - Utilisateur cree mais absent des listes.
 - Utilisateur inactif encore visible dans les selecteurs.
-- Mauvais roles affiches.
-- Pagination cassee.
+- Mauvais role propose.
+- Galerie vide ou photos non chargees.
 - Menus interdits visibles.
 - Messages d'erreur peu clairs.
 
 
-2. DIRECTION
-------------
-
-Objectif du role
-La direction doit avoir une vision globale fiable sur l'activite, les projets,
-les rapports et les donnees de presence.
-
-Tests a effectuer
-
-1. Connexion et navigation
-- Se connecter en DIRECTION.
-- Verifier les menus visibles.
-- Verifier que les ecrans d'administration pure ne sont pas accessibles.
-
-2. Vue globale
-- Ouvrir le tableau de bord.
-- Verifier que les chiffres affiches semblent coherents avec les donnees de test.
-- Verifier les alertes, les compteurs et les syntheses.
-
-3. Projets et chantiers
-- Consulter la liste de tous les projets.
-- Ouvrir plusieurs projets.
-- Verifier que les sites rattaches sont visibles.
-- Verifier que les informations principales sont lisibles.
-
-4. Rapports terrain
-- Ouvrir l'ecran des rapports terrain.
-- Filtrer par date, projet, chantier, ressource et statut.
-- Ouvrir le detail d'un rapport.
-- Telecharger un rapport dans les formats autorises.
-- Verifier que les rapports des differents projets sont visibles.
-
-5. Presences / RH
-- Ouvrir l'ecran de presence.
-- Filtrer par mois, projet, site et ressource.
-- Verifier la lisibilite des tableaux et des donnees affichees.
-
-6. Galerie photo
-- Ouvrir la galerie.
-- Filtrer les photos.
-- Ouvrir plusieurs photos.
-- Verifier que les images s'affichent correctement.
-
-Erreurs a noter
-- Donnees globales incompletes.
-- Rapports manquants alors qu'ils existent.
-- Telechargements impossibles.
-- Filtres qui ne fonctionnent pas.
-- Photos absentes ou lentes.
-- Tableaux difficiles a lire.
-- Acces refuse alors que le role devrait etre autorise.
-
-
-3. PROJECT_MANAGER
+2. PROJECT_MANAGER
 ------------------
 
-Objectif du role
-Le chef de projet doit pouvoir piloter ses projets, ses chantiers, confier des
-sites a des superviseurs generaux et planifier les ressources sur ses propres sites.
+Objectif
+Le chef de projet doit pouvoir gerer ses projets, ses chantiers, confier des sites
+aux superviseurs generaux et planifier les ressources sur ses propres sites.
 
 Tests a effectuer
 
-1. Connexion et perimetre
+1. Perimetre
 - Se connecter en PROJECT_MANAGER.
 - Verifier qu'il voit uniquement ses projets.
-- Verifier qu'il ne peut pas modifier les projets d'un autre chef de projet.
+- Essayer d'ouvrir ou modifier un projet qui appartient a un autre chef de projet.
 
-2. Gestion des projets
+2. Projets et chantiers
 - Creer un projet.
-- Modifier un projet existant.
-- Modifier seulement un champ du projet pour verifier la modification partielle.
-- Ouvrir le detail du projet.
-
-3. Gestion des chantiers
-- Creer plusieurs chantiers dans un projet.
-- Modifier uniquement les coordonnees GPS d'un chantier.
-- Modifier uniquement le nom ou l'adresse d'un chantier.
-- Verifier que les autres champs restent inchanges.
+- Modifier seulement un champ du projet.
+- Creer plusieurs chantiers dans ce projet.
+- Modifier seulement les coordonnees GPS d'un chantier.
+- Modifier seulement le nom ou l'adresse d'un chantier.
+- Verifier que les autres champs ne sont pas perdus.
 - Ouvrir le detail d'un chantier.
 
-4. Perimetres des superviseurs generaux
+3. Perimetres GS
 - Confier un site A a un superviseur general.
 - Confier un site B au meme superviseur general.
-- Confier le meme site A a un autre superviseur general.
-- Verifier que les affectations apparaissent correctement.
-- Verifier qu'il ne peut pas confier un site qui ne lui appartient pas.
+- Confier le site A a un deuxieme superviseur general.
+- Essayer de confier un site qui n'appartient pas a ses projets.
 
-5. Planning
+4. Planning
 - Ouvrir le planning.
-- Verifier que seuls ses propres chantiers apparaissent.
-- Affecter une ressource terrain active a un de ses chantiers.
-- Affecter une meme ressource a deux chantiers differents.
-- Affecter plusieurs taches differentes a la meme ressource sur le meme chantier.
-- Modifier une tache.
-- Supprimer une tache.
-- Tenter de creer deux fois exactement la meme tache.
+- Verifier que seuls ses chantiers apparaissent.
+- Affecter une ressource active a un chantier.
+- Affecter la meme ressource a deux chantiers differents le meme jour.
+- Ajouter plusieurs taches a la meme ressource.
+- Modifier puis supprimer une tache.
+- Tenter d'ajouter deux fois exactement la meme tache.
 - Verifier que les ressources venant d'un autre projet restent assignables.
-
-6. Rapports et suivi
-- Consulter les rapports de ses projets.
-- Filtrer par chantier ou ressource.
-- Ouvrir et telecharger un rapport autorise.
-
-Erreurs a noter
-- Projet ou chantier absent alors qu'il appartient au chef de projet.
-- Chantiers d'un autre chef de projet visibles.
-- Modification partielle refusee.
-- Superviseur general impossible a affecter.
-- Ressource terrain absente alors qu'elle est active.
-- Planning qui bloque une ressource deja assignee ailleurs.
-- Doublons ou cartes incoherentes dans le planning.
-- Rapports de ses projets invisibles.
-
-
-4. GENERAL_SUPERVISOR
----------------------
-
-Objectif du role
-Le superviseur general doit organiser le travail sur les sites qui lui ont ete
-confies, affecter des ressources et suivre les rapports de son perimetre.
-
-Tests a effectuer
-
-1. Connexion et perimetre
-- Se connecter en GENERAL_SUPERVISOR.
-- Verifier qu'il voit uniquement les sites qui lui sont confies pour le planning.
-- Verifier qu'un site non confie n'apparait pas dans son planning.
-- Verifier qu'il peut etre lui-meme affecte comme ressource terrain sur un autre site sans obtenir automatiquement le droit de le planifier.
-
-2. Planning
-- Creer une affectation pour une ressource sur un site confie.
-- Affecter une meme ressource sur plusieurs chantiers le meme jour.
-- Ajouter plusieurs taches pour la meme ressource sur le meme chantier.
-- Modifier une tache.
-- Supprimer une tache.
-- Dupliquer un planning depuis la veille.
-- Verifier que les cartes regroupent bien plusieurs taches sous la meme ressource quand c'est le meme chantier.
-- Verifier que le doublon exact de tache est refuse proprement.
-
-3. Ressources
-- Verifier que tous les profils terrain actifs assignables apparaissent.
-- Verifier qu'une ressource deja affectee ailleurs reste visible.
-- Verifier que les informations de disponibilite sont compréhensibles.
-
-4. Equipes
-- Creer une equipe.
-- Ajouter des membres.
-- Retirer un membre.
-- Reajouter le meme membre.
-- Verifier qu'il n'apparait qu'une seule fois comme membre actif.
-- Verifier qu'un GENERAL_SUPERVISOR peut aussi etre chef ou membre d'equipe si prevu.
+- En vue semaine, cliquer sur un jour et verifier que le detail du jour s'ouvre.
 
 5. Rapports
-- Consulter les rapports relevant de son perimetre.
-- Ouvrir le detail d'un rapport.
-- Verifier les photos liees aux taches si elles existent.
+- Consulter les rapports de ses projets.
+- Filtrer par chantier, ressource et date.
+- Ouvrir puis telecharger un rapport autorise.
+
+Resultats attendus
+- Le chef de projet reste limite a ses projets.
+- Les modifications partielles fonctionnent.
+- Les superviseurs generaux peuvent recevoir plusieurs sites.
+- Les ressources restent tournantes entre projets et chantiers.
+- Le planning regroupe correctement les taches par ressource.
 
 Erreurs a noter
-- Site confie absent du planning.
-- Site non confie visible par erreur.
-- Ressource terrain manquante.
-- Blocage injustifie lors d'une affectation multi-chantier.
-- Plusieurs cartes inutiles pour la meme ressource sur le meme chantier.
-- Doublon membre actif / inactif visible.
-- Rapports absents ou non autorises a tort.
+- Projet ou chantier absent alors qu'il appartient au testeur.
+- Donnees d'un autre chef de projet visibles.
+- Modification partielle refusee.
+- Ressource active absente du planning.
+- Affectation refusee alors qu'elle devrait etre autorisee.
+- Doublons ou cartes de planning incoherentes.
+- Rapports attendus mais invisibles.
 
 
-5. COORDINATOR
---------------
+3. GENERAL_SUPERVISOR
+---------------------
 
-Objectif du role
-Le coordinateur doit pouvoir suivre les rapports terrain et verifier les travaux
-remontes par les equipes.
+Objectif
+Le superviseur general doit organiser le travail sur les sites qui lui ont ete
+confies et suivre les ressources de son perimetre.
 
 Tests a effectuer
 
-1. Connexion et navigation
-- Se connecter en COORDINATOR.
-- Verifier les menus visibles.
-- Verifier qu'il accede aux rapports autorises.
+1. Perimetre
+- Se connecter en GENERAL_SUPERVISOR.
+- Verifier que seuls les sites confies apparaissent dans son planning.
+- Verifier qu'un site non confie n'apparait pas.
+- Verifier qu'etre affecte comme simple ressource sur un site ne donne pas automatiquement
+  le droit de planifier ce site.
 
-2. Tableau de bord mobile
-- Verifier les indicateurs affiches.
-- Verifier les rapports en attente.
-- Verifier les rapports recents.
+2. Planning
+- Creer une tache pour une ressource sur un site confie.
+- Affecter la meme ressource a plusieurs chantiers le meme jour.
+- Ajouter plusieurs taches a la meme ressource.
+- Modifier puis supprimer une tache.
+- Tenter un doublon exact.
+- Verifier que la vue jour regroupe bien les taches d'une meme ressource.
+- Verifier que la vue semaine permet d'ouvrir une journee.
 
-3. Rapports
-- Consulter la liste des rapports.
-- Filtrer les rapports.
+3. Ressources et equipes
+- Verifier que les ressources terrain actives sont disponibles dans les selecteurs.
+- Verifier qu'une ressource deja affectee ailleurs reste visible.
+- Creer une equipe.
+- Ajouter plusieurs membres.
+- Retirer puis reajouter le meme membre.
+- Verifier qu'il n'apparait qu'une seule fois comme membre actif.
+
+4. Rapports
+- Consulter les rapports de son perimetre.
 - Ouvrir plusieurs rapports.
-- Verifier le statut et le contenu.
-- Telecharger les rapports autorises.
+- Verifier la lisibilite des informations de chantier, ressource et progression.
 
-4. Fonctions terrain si le coordinateur est utilise comme ressource
-- Voir ses chantiers du jour.
-- Pointer.
-- Prendre une photo.
-- Soumettre un rapport si le flux le permet.
+Resultats attendus
+- Le perimetre planning est respecte.
+- Les ressources restent assignables meme si elles tournent deja ailleurs.
+- Les taches d'une ressource sont regroupees proprement.
+- Les equipes ne creent pas de doublons actifs.
 
 Erreurs a noter
-- Erreur 401 ou 403 injustifiee.
-- Rapports absents.
-- Donnees non mises a jour.
-- Filtres inefficaces.
-- Rapport telechargeable par d'autres roles mais pas par le coordinateur.
-- Informations trop difficiles a lire.
+- Site confie absent ou site non confie visible.
+- Ressource active absente des selecteurs.
+- Blocage injustifie en multi-chantier.
+- Plusieurs cartes inutiles pour la meme ressource.
+- Doublon actif/inactif visible apres reactivation membre.
+- Rapport autorise introuvable.
 
 
-6. SUPERVISOR
+4. SUPERVISOR
 -------------
 
-Objectif du role
+Objectif
 Le superviseur terrain doit pouvoir executer sa journee : voir ses chantiers,
-pointer, realiser ses taches, prendre des photos et envoyer ses rapports.
+pointer, suivre ses taches, prendre des photos et envoyer ses rapports.
 
 Tests a effectuer
 
-1. Chantiers du jour
+1. Accueil et chantiers du jour
 - Se connecter en SUPERVISOR.
 - Verifier les chantiers affiches sur l'accueil.
 - Verifier que les chantiers affiches viennent du planning du jour.
-- Verifier qu'un chantier seulement rattache par equipe mais non planifie aujourd'hui n'apparait pas.
-- Verifier que plusieurs chantiers apparaissent si plusieurs affectations existent.
+- Verifier qu'un chantier seulement lie a une equipe mais non planifie aujourd'hui n'apparait pas.
+- Verifier que plusieurs chantiers apparaissent s'il est affecte sur plusieurs sites.
 
 2. Taches du jour
-- Verifier les taches assignees sur chaque chantier.
-- Verifier que plusieurs taches peuvent exister sur le meme chantier.
-- Verifier que les taches sont bien liees au bon chantier.
+- Ouvrir les taches affectees.
+- Verifier que plusieurs taches peuvent exister sur un meme chantier.
+- Verifier que chaque tache reste liee au bon chantier.
 
 3. Pointage
 - Pointer l'entree sur un chantier A.
-- Pointer sur un chantier B si une affectation existe aussi sur B.
-- Fermer ensuite la session A a distance si la ressource a ete deplacee.
+- Si le testeur est aussi affecte a B, pointer ensuite sur B.
+- Fermer la session A a distance apres deplacement.
 - Faire pause puis reprise.
 - Tester un pointage hors rayon pour verifier le refus.
+- Verifier que le chantier planifie reste visible meme si un autre site proche est detecte.
 
 4. Photos
 - Prendre une photo chantier simple.
 - Prendre une photo liee a une tache.
-- Verifier que la photo apparait ensuite dans la galerie ou l'historique attendu.
-- Verifier que la photo liee a une tache reste rattachee a la bonne tache.
+- Verifier l'affichage de la photo apres envoi.
+- Verifier que la photo de tache reste rattachee a la bonne tache.
 
 5. Rapports
 - Apres une sortie, rediger et envoyer un rapport immediatement.
-- Sur une autre session, cliquer sur passer.
+- Sur une autre session, choisir de passer le rapport.
 - Revenir plus tard depuis l'historique et soumettre le rapport manquant.
-- Verifier qu'un rapport deja soumis ne peut plus etre renvoye en double.
+- Verifier qu'un rapport deja envoye ne peut pas etre renvoye une deuxieme fois.
 
 6. Historique
 - Ouvrir l'historique.
 - Verifier les sessions terminees.
 - Verifier les badges de rapport manquant.
-- Verifier les photos et les informations de session.
+- Verifier les photos et les donnees de session.
+
+Resultats attendus
+- Les chantiers du jour correspondent aux affectations reelles.
+- Le pointage respecte les regles terrain et les deplacements.
+- Les photos sont visibles apres envoi.
+- Les rapports immediats et tardifs fonctionnent.
 
 Erreurs a noter
 - Mauvais chantier affiche sur l'accueil.
 - Tache absente ou rattachee au mauvais site.
-- Pointage impossible alors que la ressource est autorisee.
-- Fermeture distante impossible alors qu'elle devrait etre autorisee.
-- Photo enregistree mais non visible.
-- Rapport impossible a soumettre.
-- Rapport manquant sans possibilite de rattrapage.
-- Historique incomplet.
+- Chantier assigne masque par un chantier proche non assigne.
+- Pointage impossible alors qu'il devrait etre autorise.
+- Fermeture distante impossible alors qu'elle devrait l'etre.
+- Photo enregistree mais invisible.
+- Rapport impossible a envoyer ou a rattraper.
 - Message trop technique ou incomprehensible.
 
 
-7. VERIFICATIONS TRANSVERSES
+5. COORDINATOR
+--------------
+
+Objectif
+Le coordinateur doit pouvoir suivre les rapports terrain de son perimetre et
+retrouver facilement l'information utile.
+
+Tests a effectuer
+- Se connecter en COORDINATOR.
+- Verifier les menus visibles.
+- Ouvrir la liste des rapports.
+- Filtrer les rapports par date, chantier, ressource et statut.
+- Ouvrir plusieurs rapports.
+- Telecharger les rapports autorises.
+- Verifier le tableau de bord mobile si disponible.
+
+Resultats attendus
+- Les rapports attendus sont visibles.
+- Les filtres reduisent correctement la liste.
+- Les telechargements autorises fonctionnent.
+
+Erreurs a noter
+- Erreur 401 ou 403 injustifiee.
+- Rapport attendu absent.
+- Filtres sans effet.
+- Telechargement refuse alors qu'il devrait etre autorise.
+- Informations difficiles a lire.
+
+
+6. DIRECTION
+------------
+
+Objectif
+La direction doit disposer d'une vue globale fiable sur les projets, les rapports,
+les presences et les photos.
+
+Tests a effectuer
+- Se connecter en DIRECTION.
+- Ouvrir le tableau de bord global.
+- Consulter plusieurs projets et chantiers.
+- Ouvrir les rapports terrain.
+- Filtrer par date, projet, chantier, ressource et statut.
+- Telecharger plusieurs rapports.
+- Ouvrir les ecrans de presence.
+- Utiliser les filtres de presence.
+- Ouvrir la galerie photo et plusieurs images.
+
+Resultats attendus
+- La direction voit l'ensemble des donnees attendues.
+- Les filtres et telechargements fonctionnent.
+- Les photos s'affichent correctement.
+
+Erreurs a noter
+- Donnees globales incompletes.
+- Rapports manquants.
+- Photos non chargees.
+- Filtres inefficaces.
+- Tableaux ou blocs difficiles a lire.
+
+
+7. MODE HORS LIGNE TERRAIN
+---------------------------
+
+A tester surtout par SUPERVISOR, et si besoin par un autre role terrain.
+
+Tests a effectuer
+- Se connecter avec internet.
+- Verifier que le mode offline devient pret.
+- Couper internet.
+- Fermer puis rouvrir l'application mobile.
+- Naviguer entre accueil, pointage, photo, historique et sync.
+- Verifier que les chantiers du jour restent visibles.
+- Pointer une entree hors ligne.
+- Verifier que la sortie ou les actions suivantes deviennent possibles localement.
+- Prendre une photo chantier hors ligne.
+- Prendre une photo liee a une tache si disponible.
+- Verifier les files d'attente.
+- Remettre internet et verifier la synchronisation.
+
+Resultats attendus
+- La navigation terrain reste possible sans reseau.
+- Les donnees du jour preparees restent visibles.
+- Les actions hors ligne passent en attente sans etre perdues.
+- Les photos et pointages se synchronisent au retour reseau.
+- Les messages affiches expliquent clairement l'etat offline.
+
+Erreurs a noter
+- Ecran "hors connexion" bloquant apres preparation.
+- Chantiers du jour absents hors ligne.
+- Pointage impossible hors ligne alors que le cache est pret.
+- Photo offline impossible ou perdue.
+- Synchronisation qui ne repart pas au retour reseau.
+- Donnees obsoletes ou message incomprehensible.
+
+
+8. VERIFICATIONS TRANSVERSES
 -----------------------------
 
-A tester avec plusieurs roles
+A faire par plusieurs testeurs
 - Connexion.
 - Deconnexion.
 - Acces direct a une URL protegee.
-- Visibilite des menus selon les droits.
-- Cohérence des noms, statuts et libelles.
-- Telechargement des rapports.
-- Affichage des photos.
+- Visibilite correcte des menus selon le role.
 - Recherche et filtres.
+- Affichage des photos.
+- Telechargement des rapports.
+- Menus d'actions a trois points sur les ecrans web.
+- Lisibilite mobile et web.
 
 Erreurs generales a noter
-- Erreurs 401 alors que l'utilisateur est connecte.
-- Erreurs 403 alors que le role est autorise.
+- Erreur 401 alors que l'utilisateur est connecte.
+- Erreur 403 alors que le role est autorise.
 - Donnees d'un autre perimetre visibles.
-- Pages vides sans explication.
-- Boutons non fonctionnels.
-- Debordements visuels.
-- Temps de chargement trop longs.
-- Messages peu clairs.
+- Page vide sans explication.
+- Bouton non fonctionnel.
+- Menu d'actions coupe ou cache.
+- Debordement visuel.
+- Temps de chargement trop long.
+- Message peu clair.
 
 
-8. FORMAT CONSEILLE POUR LE COMPTE RENDU
-----------------------------------------
+9. FICHE DE RETOUR A REMPLIR
+----------------------------
 
 Pour chaque anomalie, noter :
-- Role :
+- Nom du testeur :
+- Role utilise :
+- Support : web / mobile
 - Ecran :
 - Action realisee :
 - Resultat attendu :
 - Resultat obtenu :
-- Gravite :
-- Capture / video :
-- Commentaire :
+- Gravite : bloquante / majeure / mineure
+- Capture ou video :
+- Commentaire libre :
 
-Exemple :
-- Role : SUPERVISOR
+Noter aussi meme sans bug :
+- Ce qui n'etait pas clair.
+- Les ecrans trop lents.
+- Les actions qui demandent trop de clics.
+- Les libelles ou messages difficiles a comprendre.
+
+
+EXEMPLE DE RETOUR
+-----------------
+- Nom du testeur : ...
+- Role utilise : SUPERVISOR
+- Support : mobile
 - Ecran : Pointage
 - Action realisee : entree sur chantier B apres affectation
-- Resultat attendu : bouton pointer entree disponible
-- Resultat obtenu : seulement sortie et pause proposes
+- Resultat attendu : le chantier B est visible et le bouton d'entree est disponible
+- Resultat obtenu : seul un autre chantier proche apparait
 - Gravite : majeure
-- Capture / video : oui
-- Commentaire : la session A etait encore ouverte
+- Capture ou video : oui
+- Commentaire libre : le chantier B etait bien prevu dans le planning du jour

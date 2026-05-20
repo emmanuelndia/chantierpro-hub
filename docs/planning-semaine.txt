@@ -1,0 +1,9 @@
+faire un chat bot pour permettre aux users de pouvoir poser des questions sur comment utiliser l'application 
+faire une documentation détaillée de comment utiliser l'application
+
+Faire un planning de la semaine pour le déploiement et les tests sur l'application 
+
+Toujours envoyer les fichiers sur here.now en arrangeant pour que ce soit facile à lire 
+
+Regarder des tutos sur comment utiliser Codex
+
