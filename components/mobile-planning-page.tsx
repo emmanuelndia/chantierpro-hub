@@ -1,6 +1,6 @@
 'use client';
 
-import { PlanningAssignmentStatus } from '@prisma/client';
+import { PlanningAssignmentStatus, PlanningWorkLocationType } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { authFetch } from '@/lib/auth/client-session';
@@ -356,6 +356,7 @@ function AssignmentCard({
     action: assignment.action,
     targetProgress: assignment.targetProgress,
     status: assignment.status,
+    workLocationType: assignment.workLocationType,
   });
   const initials = getInitials(assignment.supervisorFirstName, assignment.supervisorName);
   const clockStatus = clockInStatusConfig[assignment.clockInStatus];
@@ -411,6 +412,24 @@ function AssignmentCard({
               {Object.values(PlanningAssignmentStatus).map((status) => (
                 <option key={status} value={status}>
                   {planningStatusConfig[status].label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block text-sm font-semibold text-slate-700">
+            Type de tÃ¢che
+            <select
+              value={editData.workLocationType ?? PlanningWorkLocationType.ON_SITE}
+              onChange={(event) => {
+                const workLocationType = event.currentTarget.value as PlanningWorkLocationType;
+                setEditData((prev) => ({ ...prev, workLocationType }));
+              }}
+              className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+            >
+              {Object.values(PlanningWorkLocationType).map((type) => (
+                <option key={type} value={type}>
+                  {workLocationTypeLabel[type]}
                 </option>
               ))}
             </select>
@@ -478,6 +497,9 @@ function AssignmentCard({
       <div className="mt-3 flex flex-wrap gap-2">
         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${clockStatus.className}`}>{clockStatus.label}</span>
         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${planningStatus.className}`}>{planningStatus.label}</span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+          {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+        </span>
       </div>
     </article>
   );
@@ -594,6 +616,9 @@ function AssignmentTaskRow({
       <div className="mt-3">
         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${planningStatus.className}`}>
           {planningStatus.label}
+        </span>
+        <span className="ml-2 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700">
+          {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
         </span>
       </div>
     </section>
@@ -782,6 +807,27 @@ function AssignmentBottomSheet({
               placeholder="0-100"
             />
           </label>
+
+          <label className="block text-sm font-semibold text-slate-700">
+            Type de tÃ¢che
+            <select
+              value={formData.workLocationType ?? PlanningWorkLocationType.ON_SITE}
+              onChange={(event) => {
+                const workLocationType = event.currentTarget.value as PlanningWorkLocationType;
+                setFormData((prev) => ({ ...prev, workLocationType }));
+              }}
+              className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+            >
+              {Object.values(PlanningWorkLocationType).map((type) => (
+                <option key={type} value={type}>
+                  {workLocationTypeLabel[type]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Bureau signifie que la tÃ¢che n&apos;exige pas de pointage chantier.
+            </p>
+          </label>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
@@ -873,6 +919,11 @@ const planningStatusConfig: Record<PlanningAssignmentStatus, { label: string; cl
   CANCELLED: { label: 'Annulé', className: 'bg-red-100 text-red-700' },
 };
 
+const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
+  ON_SITE: 'Presence chantier requise',
+  OFFICE: 'Tache bureau / coordination',
+};
+
 function createEmptyForm(date: string): CreateAssignmentRequest {
   return {
     supervisorId: '',
@@ -880,6 +931,7 @@ function createEmptyForm(date: string): CreateAssignmentRequest {
     action: '',
     targetProgress: null,
     date,
+    workLocationType: PlanningWorkLocationType.ON_SITE,
   };
 }
 

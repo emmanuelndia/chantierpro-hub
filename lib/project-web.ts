@@ -226,6 +226,7 @@ export async function listProjectFormOptions(
     }),
     prisma.user.findMany({
       where: {
+        role: Role.GENERAL_SUPERVISOR,
         isActive: true,
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
@@ -536,7 +537,7 @@ export async function buildSitePresencesCsv(
 }
 
 export async function searchMapboxAddress(query: string): Promise<GeocodingSearchResponse> {
-  const token = process.env.MAPBOX_ACCESS_TOKEN;
+  const token = process.env.MAPBOX_ACCESS_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   if (!token) {
     return { items: [] };
   }
@@ -557,6 +558,7 @@ export async function searchMapboxAddress(query: string): Promise<GeocodingSearc
   });
 
   if (!response.ok) {
+    console.warn('Mapbox geocoding search failed', { status: response.status });
     return { items: [] };
   }
 

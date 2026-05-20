@@ -248,10 +248,9 @@ export function MobileProjectFormPage({ mode, user, projectId }: MobileProjectFo
             />
             <TextAreaField
               error={errors.description}
-              label="Description"
+              label="Description (facultatif)"
               onChange={(value) => updateValue('description', value)}
               placeholder="Objectif, contraintes et périmètre du projet"
-              required
               value={values.description}
             />
             <TextField
@@ -489,10 +488,6 @@ function validateProjectForm(values: ProjectFormValues): ProjectFormErrors {
 
   if (!values.name.trim()) {
     errors.name = 'Le nom du projet est requis.';
-  }
-
-  if (!values.description.trim()) {
-    errors.description = 'La description est requise.';
   }
 
   if (!values.address.trim()) {

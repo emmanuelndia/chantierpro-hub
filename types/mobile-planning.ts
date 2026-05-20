@@ -1,4 +1,4 @@
-import type { PlanningAssignmentStatus, SiteStatus } from '@prisma/client';
+import type { PlanningAssignmentStatus, PlanningWorkLocationType, SiteStatus } from '@prisma/client';
 
 export type PlanningClockInStatus = 'CLOCKED_IN' | 'CLOCKED_OUT' | 'ON_PAUSE';
 
@@ -14,7 +14,14 @@ export type PlanningAssignment = {
   targetProgress: number | null;
   assignedAt: string;
   status: PlanningAssignmentStatus;
+  workLocationType: PlanningWorkLocationType;
   clockInStatus: PlanningClockInStatus;
+  createdBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
 };
 
 export type PlanningClockInStatusItem = {
@@ -62,12 +69,14 @@ export type CreateAssignmentRequest = {
   action: string;
   targetProgress: number | null;
   date: string;
+  workLocationType?: PlanningWorkLocationType;
 };
 
 export type UpdateAssignmentRequest = {
   action?: string;
   targetProgress?: number | null;
   status?: PlanningAssignmentStatus;
+  workLocationType?: PlanningWorkLocationType;
 };
 
 export type DuplicateAssignmentsRequest = {
@@ -101,6 +110,7 @@ export type SupervisorMyAssignment = {
   action: string;
   targetProgress: number | null;
   status: PlanningAssignmentStatus;
+  workLocationType: PlanningWorkLocationType;
   photos: SupervisorTaskPhoto[];
 };
 

@@ -454,7 +454,7 @@ function ProjectDrawer({
         <div className="mt-6 grid gap-4">
           <InputField label="Nom du projet" value={values.name} onChange={(value) => setValues((current) => ({ ...current, name: value }))} />
           <TextAreaField
-            label="Description"
+            label="Description (facultatif)"
             value={values.description}
             onChange={(value) => setValues((current) => ({ ...current, description: value }))}
           />
@@ -669,7 +669,6 @@ function buildInitialProjectFormValues(
 function canSubmitProjectForm(values: ProjectFormValues) {
   return Boolean(
     values.name.trim() &&
-      values.description.trim() &&
       values.address.trim() &&
       values.city.trim() &&
       values.startDate &&

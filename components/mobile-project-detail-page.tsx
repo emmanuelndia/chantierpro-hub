@@ -180,7 +180,9 @@ function SummaryTab({ detail }: Readonly<{ detail: MobileProjectDetailResponse }
     <section className="space-y-3">
       <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
         <h2 className="text-base font-black text-slate-950">Résumé</h2>
-        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{detail.project.description}</p>
+        {detail.project.description ? (
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{detail.project.description}</p>
+        ) : null}
         <div className="mt-4">
           <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span>Progression</span>

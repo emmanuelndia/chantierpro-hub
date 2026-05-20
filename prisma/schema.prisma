@@ -89,6 +89,11 @@ enum PlanningAssignmentStatus {
   CANCELLED
 }
 
+enum PlanningWorkLocationType {
+  ON_SITE
+  OFFICE
+}
+
 enum GeneralSupervisorSiteScopeStatus {
   ACTIVE
   INACTIVE
@@ -276,6 +281,7 @@ model PlanningAssignment {
   action         String
   targetProgress Int?
   status         PlanningAssignmentStatus @default(ASSIGNED)
+  workLocationType PlanningWorkLocationType @default(ON_SITE)
   createdById    String
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt

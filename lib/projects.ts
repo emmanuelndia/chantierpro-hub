@@ -263,13 +263,13 @@ export function parseCreateProjectInput(body: unknown): CreateProjectInput | nul
   const startDate = sanitizeDateString(body.startDate);
   const endDate = body.endDate === null || body.endDate === undefined ? null : sanitizeDateString(body.endDate);
 
-  if (!name || !description || !address || !city || !projectManagerId || !status || !startDate) {
+  if (!name || !address || !city || !projectManagerId || !status || !startDate) {
     return null;
   }
 
   return {
     name,
-    description,
+    description: description ?? '',
     address,
     city,
     projectManagerId,
@@ -293,9 +293,7 @@ export function parseUpdateProjectInput(body: unknown): UpdateProjectInput | nul
   }
 
   if ('description' in body) {
-    const description = sanitizeString(body.description);
-    if (!description) return null;
-    input.description = description;
+    input.description = sanitizeString(body.description) ?? '';
   }
 
   if ('address' in body) {
@@ -359,7 +357,6 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
   if (
     !name ||
     !address ||
-    !description ||
     !siteManagerId ||
     !startDate ||
     !status ||
@@ -378,7 +375,7 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
     longitude,
     radiusKm,
     radiusKmProvided,
-    description,
+    description: description ?? '',
     status,
     area,
     startDate,
@@ -413,9 +410,7 @@ export function parseUpdateSiteInput(body: unknown): UpdateSiteInput | null {
   }
 
   if ('description' in body) {
-    const description = sanitizeString(body.description);
-    if (!description) return null;
-    input.description = description;
+    input.description = sanitizeString(body.description) ?? '';
   }
 
   if ('siteManagerId' in body) {
@@ -542,11 +537,12 @@ export async function validateSiteManager(prisma: PrismaClient, siteManagerId: s
     where: { id: siteManagerId },
     select: {
       id: true,
+      role: true,
       isActive: true,
     },
   });
 
-  return Boolean(manager?.isActive);
+  return Boolean(manager?.isActive && manager.role === Role.GENERAL_SUPERVISOR);
 }
 
 export async function archiveProject(prisma: PrismaClient, projectId: string) {

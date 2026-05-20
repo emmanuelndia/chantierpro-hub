@@ -1,4 +1,4 @@
-import { ClockInStatus, ClockInType, PlanningAssignmentStatus, ReportStatus, Role } from '@prisma/client';
+import { ClockInStatus, ClockInType, PlanningAssignmentStatus, PlanningWorkLocationType, ReportStatus, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import type { ReportSubmissionResponse, SubmitReportRequest } from '@/types/mobile-session-report';
@@ -69,6 +69,7 @@ export const POST = withAuth(async ({ user, req }) => {
           supervisorId: user.id,
           siteId: clockInRecord.siteId,
           deletedAt: null,
+          workLocationType: PlanningWorkLocationType.ON_SITE,
         },
         select: {
           id: true,

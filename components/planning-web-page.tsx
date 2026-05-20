@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { PlanningAssignmentStatus, type Role } from '@prisma/client';
+import { PlanningAssignmentStatus, PlanningWorkLocationType, type Role } from '@prisma/client';
 import { useMutation, useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { Pencil, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -44,6 +44,7 @@ type AssignmentFormState = {
   action: string;
   targetProgress: string;
   status: PlanningAssignmentStatus;
+  workLocationType: PlanningWorkLocationType;
 };
 
 const todayKey = formatDateKey(new Date());
@@ -57,6 +58,11 @@ const planningStatusLabel: Record<PlanningAssignmentStatus, string> = {
   IN_PROGRESS: 'En cours',
   COMPLETED: 'Termine',
   CANCELLED: 'Annule',
+};
+
+const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
+  ON_SITE: 'Presence chantier requise',
+  OFFICE: 'Tache bureau / coordination',
 };
 
 export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
@@ -160,6 +166,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       action: assignment.action,
       targetProgress: assignment.targetProgress === null ? '' : String(assignment.targetProgress),
       status: assignment.status,
+      workLocationType: assignment.workLocationType,
     });
     setDrawerMode('edit');
   }
@@ -179,6 +186,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         action: form.action,
         targetProgress,
         date: form.date,
+        workLocationType: form.workLocationType,
       };
       createMutation.mutate(payload);
       return;
@@ -191,6 +199,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           action: form.action,
           targetProgress,
           status: form.status,
+          workLocationType: form.workLocationType,
         },
       });
     }
@@ -430,12 +439,20 @@ function DayPlanningCards({
                   </PlanningTaskField>
                   <PlanningTaskField label="Tâche">
                     <p className="text-slate-700">{assignment.action}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Cree par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
+                    </p>
                   </PlanningTaskField>
                   <PlanningTaskField label="Progression">
                     <ProgressValue value={assignment.targetProgress} />
                   </PlanningTaskField>
                   <PlanningTaskField label="Statut">
-                    <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
+                    <div className="space-y-2">
+                      <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
+                      <Badge tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : 'info'}>
+                        {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                      </Badge>
+                    </div>
                   </PlanningTaskField>
                   {canMutate ? (
                     <div className="flex justify-start md:justify-end">
@@ -514,6 +531,9 @@ function WeekPlanningGrid({
                     {assignment.supervisorFirstName} {assignment.supervisorName}
                   </p>
                   <p className="truncate text-xs text-slate-600">{assignment.siteName}</p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                  </p>
                 </div>
               ))}
               {!query.isLoading && assignments.length === 0 ? <p className="text-sm text-slate-500">Aucune tâche</p> : null}
@@ -681,6 +701,22 @@ function AssignmentDrawer({
               value={form.targetProgress}
             />
             {!progressValid ? <p className="mt-2 text-xs font-semibold text-red-600">La progression doit etre entre 0 et 100.</p> : null}
+          </Field>
+          <Field label="Type de tÃ¢che">
+            <select
+              className={filterClassName}
+              onChange={(event) => onChange({ ...form, workLocationType: event.target.value as PlanningWorkLocationType })}
+              value={form.workLocationType}
+            >
+              {Object.values(PlanningWorkLocationType).map((type) => (
+                <option key={type} value={type}>
+                  {workLocationTypeLabel[type]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Une tÃ¢che bureau reste dans le planning, mais ne demande pas de pointage chantier.
+            </p>
           </Field>
           {mode === 'edit' ? (
             <Field label="Statut">
@@ -904,6 +940,7 @@ function createEmptyForm(date: string): AssignmentFormState {
     action: '',
     targetProgress: '',
     status: PlanningAssignmentStatus.ASSIGNED,
+    workLocationType: PlanningWorkLocationType.ON_SITE,
   };
 }
 

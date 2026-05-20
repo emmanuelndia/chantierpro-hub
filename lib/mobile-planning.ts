@@ -3,6 +3,7 @@ import {
   ClockInType,
   GeneralSupervisorSiteScopeStatus,
   PlanningAssignmentStatus,
+  PlanningWorkLocationType,
   Prisma,
   Role,
   SiteStatus,
@@ -231,7 +232,7 @@ export async function createPlanningAssignment(
       siteId: normalized.siteId,
       deletedAt: null,
     },
-    select: { id: true, action: true, targetProgress: true },
+    select: { id: true, action: true, targetProgress: true, workLocationType: true },
   });
 
   if (existingTasks.some((task) => isSameTask(task, normalized))) {
@@ -247,6 +248,7 @@ export async function createPlanningAssignment(
         siteId: normalized.siteId,
         action: normalized.action,
         targetProgress: normalized.targetProgress,
+        workLocationType: normalized.workLocationType,
         status: PlanningAssignmentStatus.ASSIGNED,
         createdById: user.id,
       },
@@ -294,6 +296,7 @@ export async function updatePlanningAssignment(
   const action = normalizeOptionalAction(input.action);
   const targetProgress = normalizeTargetProgress(input.targetProgress);
   const status = normalizePlanningStatus(input.status);
+  const workLocationType = normalizeWorkLocationType(input.workLocationType);
 
   if (input.action !== undefined && !action) {
     return planningError('INVALID_ACTION', "L'action est requise.", 400);
@@ -307,12 +310,17 @@ export async function updatePlanningAssignment(
     return planningError('INVALID_STATUS', 'Statut de planning invalide.', 400);
   }
 
+  if (input.workLocationType !== undefined && !workLocationType) {
+    return planningError('INVALID_WORK_LOCATION', 'Type de travail invalide.', 400);
+  }
+
   const assignment = await prisma.planningAssignment.update({
     where: { id: existing.id },
     data: {
       ...(action ? { action } : {}),
       ...(input.targetProgress !== undefined ? { targetProgress } : {}),
       ...(status ? { status } : {}),
+      ...(workLocationType ? { workLocationType } : {}),
     },
     select: planningAssignmentSelect,
   });
@@ -345,6 +353,7 @@ export async function getSupervisorMyAssignments(
       action: true,
       targetProgress: true,
       status: true,
+      workLocationType: true,
       site: {
         select: {
           name: true,
@@ -377,6 +386,7 @@ export async function getSupervisorMyAssignments(
       action: assignment.action,
       targetProgress: assignment.targetProgress,
       status: assignment.status,
+      workLocationType: assignment.workLocationType,
       photos: assignment.photos.map((photo) => ({
         id: photo.id,
         filename: photo.filename,
@@ -485,6 +495,7 @@ export async function duplicatePlanningAssignments(
         siteId: true,
         action: true,
         targetProgress: true,
+        workLocationType: true,
       },
     }),
     prisma.site.findMany({ where: targetSiteWhere, select: { id: true } }),
@@ -499,13 +510,25 @@ export async function duplicatePlanningAssignments(
   const targetSupervisorIds = new Set(validSupervisorIds);
   const existingTargetKeys = new Set(
     existingTargetAssignments.map((assignment) =>
-      buildTaskKey(assignment.supervisorId, assignment.siteId, assignment.action, assignment.targetProgress),
+      buildTaskKey(
+        assignment.supervisorId,
+        assignment.siteId,
+        assignment.action,
+        assignment.targetProgress,
+        assignment.workLocationType,
+      ),
     ),
   );
   const validAssignments: PlanningAssignmentRow[] = [];
 
   for (const assignment of sourceAssignments) {
-    const key = buildTaskKey(assignment.supervisorId, assignment.siteId, assignment.action, assignment.targetProgress);
+    const key = buildTaskKey(
+      assignment.supervisorId,
+      assignment.siteId,
+      assignment.action,
+      assignment.targetProgress,
+      assignment.workLocationType,
+    );
 
     if (!targetSiteIds.has(assignment.siteId) || !targetSupervisorIds.has(assignment.supervisorId) || existingTargetKeys.has(key)) {
       continue;
@@ -528,6 +551,7 @@ export async function duplicatePlanningAssignments(
           siteId: assignment.siteId,
           action: assignment.action,
           targetProgress: assignment.targetProgress,
+          workLocationType: assignment.workLocationType,
           status: PlanningAssignmentStatus.ASSIGNED,
           createdById: user.id,
         },
@@ -567,6 +591,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   const siteId = normalizeId(input.siteId);
   const action = normalizeOptionalAction(input.action);
   const targetProgress = normalizeTargetProgress(input.targetProgress);
+  const workLocationType = normalizeWorkLocationType(input.workLocationType) ?? PlanningWorkLocationType.ON_SITE;
 
   if (!supervisorId || !siteId || !action) {
     return planningError('INVALID_REQUEST', 'Ressource terrain, chantier et action sont requis.', 400);
@@ -599,6 +624,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
     siteId,
     action,
     targetProgress,
+    workLocationType,
   };
 }
 
@@ -664,8 +690,14 @@ function getSupervisorAvailabilityLabel(supervisorId: string, assignedSupervisor
   return siteName ? `Assigne sur ${siteName}` : 'Disponible';
 }
 
-function buildTaskKey(supervisorId: string, siteId: string, action: string, targetProgress: number | null) {
-  return `${supervisorId}:${siteId}:${normalizeTaskActionKey(action)}:${targetProgress ?? 'null'}`;
+function buildTaskKey(
+  supervisorId: string,
+  siteId: string,
+  action: string,
+  targetProgress: number | null,
+  workLocationType: PlanningWorkLocationType,
+) {
+  return `${supervisorId}:${siteId}:${normalizeTaskActionKey(action)}:${targetProgress ?? 'null'}:${workLocationType}`;
 }
 
 function normalizeTaskActionKey(action: string) {
@@ -673,12 +705,13 @@ function normalizeTaskActionKey(action: string) {
 }
 
 function isSameTask(
-  existing: { action: string; targetProgress: number | null },
-  normalized: { action: string; targetProgress: number | null },
+  existing: { action: string; targetProgress: number | null; workLocationType: PlanningWorkLocationType },
+  normalized: { action: string; targetProgress: number | null; workLocationType: PlanningWorkLocationType },
 ) {
   return (
     normalizeTaskActionKey(existing.action) === normalizeTaskActionKey(normalized.action) &&
-    existing.targetProgress === normalized.targetProgress
+    existing.targetProgress === normalized.targetProgress &&
+    existing.workLocationType === normalized.workLocationType
   );
 }
 
@@ -753,6 +786,7 @@ const planningAssignmentSelect = {
   action: true,
   targetProgress: true,
   status: true,
+  workLocationType: true,
   createdAt: true,
   supervisor: {
     select: {
@@ -766,6 +800,14 @@ const planningAssignmentSelect = {
       id: true,
       name: true,
       address: true,
+    },
+  },
+  createdBy: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      role: true,
     },
   },
 } satisfies Prisma.PlanningAssignmentSelect;
@@ -796,7 +838,14 @@ function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns
     targetProgress: assignment.targetProgress,
     assignedAt: assignment.date.toISOString(),
     status: assignment.status,
+    workLocationType: assignment.workLocationType,
     clockInStatus: getClockInStatus(assignment, clockIns),
+    createdBy: {
+      id: assignment.createdBy.id,
+      firstName: assignment.createdBy.firstName,
+      lastName: assignment.createdBy.lastName,
+      role: assignment.createdBy.role,
+    },
   };
 }
 
@@ -882,6 +931,12 @@ function normalizePlanningStatus(status: PlanningAssignmentStatus | undefined) {
   if (!status) return null;
 
   return Object.values(PlanningAssignmentStatus).includes(status) ? status : null;
+}
+
+function normalizeWorkLocationType(value: PlanningWorkLocationType | undefined) {
+  if (!value) return null;
+
+  return Object.values(PlanningWorkLocationType).includes(value) ? value : null;
 }
 
 function formatPlanningDate(date: Date) {

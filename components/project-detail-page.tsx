@@ -222,7 +222,9 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
               </p>
             </div>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{project.name}</h1>
-            <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600">{project.description}</p>
+            {project.description ? (
+              <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600">{project.description}</p>
+            ) : null}
             <p className="mt-4 text-sm text-slate-500">
               {project.city} • {project.address} • {formatDate(project.startDate)} → {project.endDate ? formatDate(project.endDate) : 'Ouvert'}
             </p>
@@ -478,6 +480,10 @@ function SiteFormDrawer({
   onClose: () => void;
 }>) {
   const [values, setValues] = useState<SiteFormValues>(() => buildInitialSiteFormValues(initialSite));
+  const currentManagerIsOutsideGsOptions = Boolean(
+    initialSite?.siteManagerId &&
+      !(options?.siteManagers ?? []).some((manager) => manager.id === initialSite.siteManagerId),
+  );
 
   useEffect(() => {
     setValues(buildInitialSiteFormValues(initialSite));
@@ -533,18 +539,28 @@ function SiteFormDrawer({
                 value={values.area}
               />
             </Field>
-            <Field label="Responsable chantier">
+            <Field label="Responsable chantier (GS)">
               <select
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
                 onChange={(event) => setValues((current) => ({ ...current, siteManagerId: event.target.value }))}
                 value={values.siteManagerId}
               >
+                {currentManagerIsOutsideGsOptions ? (
+                  <option value={initialSite?.siteManagerId}>
+                    Responsable actuel non-GS - selectionner un superviseur general
+                  </option>
+                ) : null}
                 {(options?.siteManagers ?? []).map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.firstName} {item.lastName}
                   </option>
                 ))}
               </select>
+              {currentManagerIsOutsideGsOptions ? (
+                <p className="mt-2 text-xs font-semibold text-orange-600">
+                  La nouvelle regle limite le responsable chantier aux superviseurs generaux actifs.
+                </p>
+              ) : null}
             </Field>
           </div>
 
@@ -567,7 +583,7 @@ function SiteFormDrawer({
             </Field>
           </div>
 
-          <Field label="Description">
+          <Field label="Description (facultatif)">
             <textarea
               className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
               onChange={(event) => setValues((current) => ({ ...current, description: event.target.value }))}
@@ -766,7 +782,6 @@ function canSubmitSiteForm(values: SiteFormValues) {
       values.address.trim() &&
       values.latitude.trim() &&
       values.longitude.trim() &&
-      values.description.trim() &&
       values.area.trim() &&
       values.startDate &&
       values.siteManagerId,

@@ -1,4 +1,4 @@
-import { ClockInStatus, ClockInType, Role, SiteStatus } from '@prisma/client';
+import { ClockInStatus, ClockInType, PlanningWorkLocationType, Role, SiteStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { canUploadPhotos, jsonPhotoError } from '@/lib/photos';
@@ -36,6 +36,7 @@ export const GET = withAuth(async ({ user }) => {
           supervisorId: user.id,
           date: today,
           deletedAt: null,
+          workLocationType: PlanningWorkLocationType.ON_SITE,
         },
         select: {
           id: true,
@@ -86,6 +87,7 @@ function getSiteWhere(user: { id: string; role: Role }, today: Date) {
               supervisorId: user.id,
               date: today,
               deletedAt: null,
+              workLocationType: PlanningWorkLocationType.ON_SITE,
             },
           },
         },

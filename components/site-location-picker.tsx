@@ -40,6 +40,7 @@ export function SiteLocationPicker({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [geoMessage, setGeoMessage] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   const location = useMemo(() => {
     const parsedLatitude = parseCoordinate(latitude);
@@ -86,6 +87,7 @@ export function SiteLocationPicker({
       return;
     }
 
+    setMapError(null);
     mapboxgl.accessToken = MAPBOX_TOKEN;
 
     const center = location ?? DEFAULT_CENTER;
@@ -114,6 +116,13 @@ export function SiteLocationPicker({
       updateCoordinates(event.lngLat.lat, event.lngLat.lng);
     });
 
+    map.on('error', (event) => {
+      console.error('Mapbox map error', event.error);
+      setMapError(
+        "La carte Mapbox n'a pas pu charger les tuiles. Verifiez NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN et les restrictions de domaine.",
+      );
+    });
+
     map.on('load', () => {
       mapRef.current = map;
       markerRef.current = marker;
@@ -127,6 +136,7 @@ export function SiteLocationPicker({
       markerRef.current = null;
       mapRef.current = null;
       setMapLoaded(false);
+      setMapError(null);
     };
     // The map must be created once. Later coordinate/radius changes are handled below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,6 +235,19 @@ export function SiteLocationPicker({
             </div>
           ) : null}
         </div>
+        {addressQuery.trim().length >= 3 && suggestionsQuery.isFetching ? (
+          <p className="text-xs font-semibold text-slate-500">Recherche adresse en cours...</p>
+        ) : null}
+        {addressQuery.trim().length >= 3 && suggestionsQuery.isError ? (
+          <p className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
+            Recherche adresse indisponible. Verifiez MAPBOX_ACCESS_TOKEN cote serveur.
+          </p>
+        ) : null}
+        {addressQuery.trim().length >= 3 && suggestionsQuery.isSuccess && suggestionsQuery.data.items.length === 0 ? (
+          <p className="text-xs font-semibold text-slate-500">
+            Aucune suggestion trouvee. Essayez un nom plus precis ou utilisez la carte.
+          </p>
+        ) : null}
 
         <button
           className="inline-flex min-h-10 items-center justify-center rounded-full border border-orange-200 bg-white px-4 text-sm font-semibold text-orange-700 transition hover:border-orange-300 hover:bg-orange-50"
@@ -239,11 +262,16 @@ export function SiteLocationPicker({
       {MAPBOX_TOKEN ? (
         <div
           className={[
-            'overflow-hidden rounded-2xl border border-slate-200 bg-slate-100',
+            'relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100',
             compact ? 'h-64' : 'h-80',
           ].join(' ')}
         >
           <div ref={mapContainerRef} className="h-full w-full" />
+          {mapError ? (
+            <div className="absolute inset-x-3 bottom-3 rounded-xl border border-orange-200 bg-white/95 px-3 py-2 text-xs font-semibold text-orange-700 shadow-lg">
+              {mapError}
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-orange-300 bg-orange-50 p-4 text-sm font-semibold text-orange-700">

@@ -1,4 +1,4 @@
-import { ClockInStatus, ClockInType, Role } from '@prisma/client';
+import { ClockInStatus, ClockInType, PlanningWorkLocationType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { createInternalPhotoUrl } from '@/lib/photos';
@@ -104,6 +104,7 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
           siteId: departureRecord.siteId,
           supervisorId: user.id,
           deletedAt: null,
+          workLocationType: PlanningWorkLocationType.ON_SITE,
         },
         select: {
           id: true,

@@ -1,4 +1,4 @@
-import { ClockInStatus, ClockInType, SiteStatus } from '@prisma/client';
+import { ClockInStatus, ClockInType, PlanningWorkLocationType, SiteStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { isTechnician } from '@/lib/clock-in';
@@ -29,6 +29,7 @@ export const GET = withAuth(async ({ user }) => {
               supervisorId: user.id,
               date: todayDate,
               deletedAt: null,
+              workLocationType: PlanningWorkLocationType.ON_SITE,
             },
           },
         },
@@ -57,6 +58,7 @@ export const GET = withAuth(async ({ user }) => {
           supervisorId: user.id,
           date: todayDate,
           deletedAt: null,
+          workLocationType: PlanningWorkLocationType.ON_SITE,
         },
         select: {
           id: true,

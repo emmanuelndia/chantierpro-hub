@@ -15,10 +15,15 @@ Retour chef projet:
 
 - Le chef projet peut voir le planning que le GS a fait et peut le gérer
 
-- La coordinatrice peut être assigné à un chantier mais n'est pas forcément sur le chantier c'est à dire au bureau
+- La coordinatrice peut être assigné à un chantier mais n'est pas forcément sur le chantier c'est à dire au bureau ça modifie un peu la perception du planning
 
-- Créer un role bureau d'étude qui fait le programme des ses ressources sur un même projet ou site qu'un GS, peut intervenir sur tous les projets
 
 - Rendre les champs descriptions projets et sites non obligatoires
 
 - Responsable de chantier doit être limité au role GS
+
+- Créer un role bureau d'étude qui fait le programme des ses ressources sur un même projet ou site qu'un GS, peut intervenir sur tous les projets
+
+Quand on finit d'assigner les ressources aux chantiers on doit pouvoir télécharger le recap du planning 
+
+Possibilité de suivre l'évolution des projets

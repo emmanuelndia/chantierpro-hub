@@ -97,6 +97,9 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
   const options = mode === 'edit' ? editQuery.data?.options : optionsQuery.data;
   const site = editQuery.data?.site ?? null;
   const canEditRadius = user.role === 'DIRECTION';
+  const currentManagerIsOutsideGsOptions = Boolean(
+    site?.siteManagerId && !(options?.siteManagers ?? []).some((manager) => manager.id === site.siteManagerId),
+  );
   const isLoading = mode === 'edit' ? editQuery.isLoading : optionsQuery.isLoading;
   const isError = mode === 'edit' ? editQuery.isError : optionsQuery.isError;
 
@@ -247,7 +250,7 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
           {errors.longitude ? <span className="block text-xs font-bold text-red-600">{errors.longitude}</span> : null}
         </div>
 
-        <Field label="Description" error={errors.description}>
+        <Field label="Description (facultatif)" error={errors.description}>
           <textarea
             className={`${inputClass} min-h-24 resize-none py-3`}
             onChange={(event) => setValues((current) => ({ ...current, description: event.target.value }))}
@@ -318,12 +321,17 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
           </Field>
         </div>
 
-        <Field label="Responsable chantier" error={errors.siteManagerId}>
+        <Field label="Responsable chantier (GS)" error={errors.siteManagerId}>
           <select
             className={inputClass}
             onChange={(event) => setValues((current) => ({ ...current, siteManagerId: event.target.value }))}
             value={values.siteManagerId}
           >
+            {currentManagerIsOutsideGsOptions ? (
+              <option value={site?.siteManagerId}>
+                Responsable actuel non-GS - choisir un superviseur general
+              </option>
+            ) : null}
             <option value="">Choisir un responsable</option>
             {options.siteManagers.map((manager) => (
               <option key={manager.id} value={manager.id}>
@@ -331,6 +339,11 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
               </option>
             ))}
           </select>
+          {currentManagerIsOutsideGsOptions ? (
+            <p className="mt-2 text-xs font-bold text-primary">
+              Le responsable chantier doit maintenant etre un superviseur general actif.
+            </p>
+          ) : null}
         </Field>
       </section>
 
@@ -384,7 +397,6 @@ function validateValues(values: SiteFormValues, radiusRequired: boolean): SiteFo
   if (!values.projectId) nextErrors.projectId = 'Projet requis.';
   if (values.name.trim().length < 3) nextErrors.name = 'Nom requis, 3 caractères minimum.';
   if (!values.address.trim()) nextErrors.address = 'Adresse requise.';
-  if (!values.description.trim()) nextErrors.description = 'Description requise.';
   if (!values.siteManagerId) nextErrors.siteManagerId = 'Responsable requis.';
   if (!values.startDate) nextErrors.startDate = 'Date de début requise.';
 

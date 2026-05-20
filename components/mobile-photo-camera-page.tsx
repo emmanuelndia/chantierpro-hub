@@ -152,7 +152,7 @@ export function MobilePhotoCameraPage() {
     [selectedSiteId, sites],
   );
   const siteAssignments = useMemo(
-    () => assignments.filter((assignment) => assignment.siteId === selectedSite?.id),
+    () => assignments.filter((assignment) => assignment.siteId === selectedSite?.id && assignment.workLocationType !== 'OFFICE'),
     [assignments, selectedSite?.id],
   );
   const selectedAssignment = useMemo(
