@@ -3,14 +3,13 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SignedImage } from '@/components/mobile/SignedImage';
+import { MobileNotificationBell } from '@/components/mobile-notification-bell';
 import { authFetch } from '@/lib/auth/client-session';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type {
   MobileManagementAlertItem,
   MobileManagementDashboardResponse,
   MobileManagementDashboardWidget,
-  MobileManagementPhotoItem,
   MobileManagementSiteItem,
 } from '@/types/mobile-management';
 
@@ -49,14 +48,23 @@ export function MobileManagementDashboardPage({ user }: MobileManagementDashboar
               Bonjour {user.firstName}, suivi des chantiers actifs
             </p>
           </div>
+          <MobileNotificationBell
+            count={dashboard?.alerts.length ?? 0}
+            emptyText="Aucune alerte active."
+            title="Alertes"
+          >
+            {dashboard?.alerts.map((alert) => (
+              <AlertRow alert={alert} key={alert.id} />
+            ))}
+          </MobileNotificationBell>
         </div>
       </section>
 
       {dashboardQuery.isLoading ? <DashboardLoadingState /> : null}
 
       {dashboardQuery.isError ? (
-        <section className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-          Impossible de charger le dashboard supervision. Verifiez la connexion puis reessayez.
+        <section className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm font-semibold text-orange-700">
+          Connectez-vous pour charger le dashboard supervision.
         </section>
       ) : null}
 
@@ -103,47 +111,6 @@ export function MobileManagementDashboardPage({ user }: MobileManagementDashboar
             )}
           </section>
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-                Alertes
-              </h2>
-              <span className="text-xs font-semibold text-slate-400">
-                {dashboard.alerts.length}
-              </span>
-            </div>
-
-            {dashboard.alerts.length > 0 ? (
-              <div className="space-y-2">
-                {dashboard.alerts.map((alert) => (
-                  <AlertRow alert={alert} key={alert.id} />
-                ))}
-              </div>
-            ) : (
-              <EmptyPanel text="Aucune alerte active." />
-            )}
-          </section>
-
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-                Dernieres photos
-              </h2>
-              <span className="text-xs font-semibold text-slate-400">
-                {dashboard.latestPhotos.length}/4
-              </span>
-            </div>
-
-            {dashboard.latestPhotos.length > 0 ? (
-              <div className="grid grid-cols-4 gap-2">
-                {dashboard.latestPhotos.map((photo) => (
-                  <PhotoThumb key={photo.id} photo={photo} />
-                ))}
-              </div>
-            ) : (
-              <EmptyPanel text="Aucune photo recente." />
-            )}
-          </section>
         </>
       ) : null}
     </div>
@@ -258,21 +225,6 @@ function AlertRow({ alert }: Readonly<{ alert: MobileManagementAlertItem }>) {
           </p>
           <p className="mt-1 text-sm leading-5 text-slate-600">{alert.description}</p>
         </div>
-      </div>
-    </Link>
-  );
-}
-
-function PhotoThumb({ photo }: Readonly<{ photo: MobileManagementPhotoItem }>) {
-  return (
-    <Link
-      className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
-      href={`/mobile/photo?siteId=${encodeURIComponent(photo.siteId)}`}
-      title={photo.siteName}
-    >
-      <SignedImage photoId={photo.id} alt={photo.filename} className="object-cover" fill sizes="96px" />
-      <div className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-1.5 py-1 text-[10px] font-semibold text-white">
-        <span className="block truncate">{photo.siteName}</span>
       </div>
     </Link>
   );

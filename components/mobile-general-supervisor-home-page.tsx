@@ -7,6 +7,7 @@ import { authFetch } from '@/lib/auth/client-session';
 import { haversineDistanceKm } from '@/lib/haversine';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import { MobilePendingReportsAlert } from '@/components/mobile-pending-reports-alert';
+import { MobileNotificationBell } from '@/components/mobile-notification-bell';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { SessionStatus, TodayClockInView } from '@/types/clock-in';
 import type { TodaySiteItem } from '@/types/projects';
@@ -158,6 +159,15 @@ export function MobileGeneralSupervisorHomePage({ user }: MobileGeneralSuperviso
             <p className="text-base font-bold text-purple-950">Bonjour {user.firstName}</p>
             <p className="mt-1 text-sm text-purple-800">{formatLongDate(new Date())}</p>
           </div>
+          <MobileNotificationBell
+            count={dashboard?.priorityAlerts.length ?? 0}
+            emptyText="Aucune alerte prioritaire."
+            title="Alertes prioritaires"
+          >
+            {dashboard?.priorityAlerts.map((alert) => (
+              <AlertCard key={alert.id} alert={alert} />
+            ))}
+          </MobileNotificationBell>
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
             {initials}
           </div>
@@ -289,7 +299,7 @@ export function MobileGeneralSupervisorHomePage({ user }: MobileGeneralSuperviso
             </h3>
           </div>
           <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-center text-sm text-orange-700">
-            Impossible de charger le planning du jour
+            Connectez-vous pour charger le planning du jour.
           </div>
         </section>
       ) : dashboard?.todayAssignments && dashboard.todayAssignments.length > 0 ? (
@@ -308,45 +318,6 @@ export function MobileGeneralSupervisorHomePage({ user }: MobileGeneralSuperviso
           <div className="space-y-2">
             {dashboard.todayAssignments.map((assignment) => (
               <AssignmentCard key={assignment.id} assignment={assignment} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* Alertes prioritaires */}
-      {dashboardQuery.isLoading ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-              Alertes prioritaires
-            </h3>
-          </div>
-          <div className="h-20 animate-pulse rounded-lg bg-slate-100" />
-        </section>
-      ) : dashboardQuery.isError ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-              Alertes prioritaires
-            </h3>
-          </div>
-          <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-center text-sm text-orange-700">
-            Impossible de charger les alertes
-          </div>
-        </section>
-      ) : dashboard?.priorityAlerts && dashboard.priorityAlerts.length > 0 ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-              Alertes prioritaires
-            </h3>
-            <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">
-              {dashboard.priorityAlerts.length}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {dashboard.priorityAlerts.map((alert) => (
-              <AlertCard key={alert.id} alert={alert} />
             ))}
           </div>
         </section>

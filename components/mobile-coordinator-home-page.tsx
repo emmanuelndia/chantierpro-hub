@@ -7,6 +7,7 @@ import { authFetch } from '@/lib/auth/client-session';
 import { haversineDistanceKm } from '@/lib/haversine';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import { MobilePendingReportsAlert } from '@/components/mobile-pending-reports-alert';
+import { MobileNotificationBell } from '@/components/mobile-notification-bell';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { SessionStatus, TodayClockInView } from '@/types/clock-in';
 import type { TodaySiteItem } from '@/types/projects';
@@ -175,6 +176,21 @@ export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePagePro
             <p className="text-base font-bold text-sky-950">Bonjour {user.firstName}</p>
             <p className="mt-1 text-sm text-sky-800">{formatLongDate(new Date())}</p>
           </div>
+          <MobileNotificationBell
+            count={dashboard?.pendingReports.length ?? 0}
+            emptyText="Aucun rapport en attente."
+            title="Rapports en attente"
+          >
+            {dashboard?.pendingReports.map((report) => (
+              <PendingReportCard
+                key={report.id}
+                report={report}
+                onRemind={() => {
+                  void handleRemindSupervisor(report.supervisorId, report.id);
+                }}
+              />
+            ))}
+          </MobileNotificationBell>
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
             {initials}
           </div>
@@ -235,51 +251,6 @@ export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePagePro
         )}
       </section>
 
-      {/* Rapports en attente */}
-      {coordinatorDashboardQuery.isLoading ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-              Rapports en attente
-            </h2>
-          </div>
-          <div className="h-20 animate-pulse rounded-lg bg-slate-100" />
-        </section>
-      ) : coordinatorDashboardQuery.isError ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-              Rapports en attente
-            </h2>
-          </div>
-          <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-center text-sm text-orange-700">
-            Impossible de charger les rapports en attente
-          </div>
-        </section>
-      ) : dashboard?.pendingReports && dashboard.pendingReports.length > 0 ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-              Rapports en attente
-            </h2>
-            <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">
-              {dashboard.pendingReports.length}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {dashboard.pendingReports.map((report) => (
-              <PendingReportCard
-                key={report.id}
-                report={report}
-                onRemind={() => {
-                  void handleRemindSupervisor(report.supervisorId, report.id);
-                }}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       {/* Rapports récents */}
       {coordinatorDashboardQuery.isLoading ? (
         <section className="space-y-3">
@@ -302,7 +273,7 @@ export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePagePro
             </h2>
           </div>
           <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-center text-sm text-orange-700">
-            Impossible de charger les rapports récents
+            Connectez-vous pour charger les rapports.
           </div>
         </section>
       ) : dashboard?.recentReports && dashboard.recentReports.length > 0 ? (

@@ -224,13 +224,13 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/reports',
     label: 'Rapports',
     icon: 'reports',
-    roles: ['COORDINATOR', 'GENERAL_SUPERVISOR'],
+    roles: ['COORDINATOR'],
   },
   {
     href: '/mobile/teams',
     label: 'Équipes',
     icon: 'teams',
-    roles: ['GENERAL_SUPERVISOR'],
+    roles: [],
   },
   {
     href: '/mobile/profile',

@@ -47,7 +47,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
         }
         
         // Lancer une erreur avec le statut pour une gestion spécifique
-        const error: HttpStatusError = new Error(await getApiErrorMessage(response, 'Impossible de charger le planning.'));
+        const error: HttpStatusError = new Error(await getApiErrorMessage(response, 'Connectez-vous pour charger le planning.'));
         error.status = response.status;
         throw error;
       }

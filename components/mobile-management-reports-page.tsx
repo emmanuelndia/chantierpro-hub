@@ -31,8 +31,8 @@ export function MobileManagementReportsPage() {
         const data = (await response.json()) as ReportsListResponse | MobileReportsListItem[];
         setReports(Array.isArray(data) ? data : data.data ?? []);
         setError(null);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Impossible de charger les rapports.');
+      } catch {
+        setError('Connectez-vous pour charger les rapports.');
       } finally {
         setLoading(false);
       }
@@ -54,7 +54,7 @@ export function MobileManagementReportsPage() {
       <div className="p-4">
         <MobileReportsErrorState
           detail={error}
-          message="Erreur de chargement"
+          message="Connectez-vous pour charger les rapports"
           onRetry={() => window.location.reload()}
         />
       </div>
