@@ -294,11 +294,11 @@ export function SiteLocationPicker({
           ) : null}
         </div>
         {showSearchFeedback && searchQuery.trim().length >= 3 && suggestionsQuery.isFetching ? (
-          <p className="text-xs font-semibold text-slate-500">Recherche adresse en cours...</p>
+          <p className="text-xs font-semibold text-slate-500">Recherche de lieu en cours...</p>
         ) : null}
         {showSearchFeedback && searchQuery.trim().length >= 3 && suggestionsQuery.isError ? (
           <p className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
-            Recherche adresse indisponible. Verifiez MAPBOX_ACCESS_TOKEN cote serveur.
+            Recherche de lieu indisponible. Verifiez MAPBOX_ACCESS_TOKEN cote serveur.
           </p>
         ) : null}
         {showSearchFeedback &&
@@ -306,8 +306,8 @@ export function SiteLocationPicker({
         suggestionsQuery.isSuccess &&
         suggestionsQuery.data.error ? (
           <p className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
-            Recherche indisponible : verifiez MAPBOX_ACCESS_TOKEN dans Vercel. Vous pouvez quand meme placer le
-            point sur la carte.
+            Recherche de lieu indisponible : verifiez MAPBOX_ACCESS_TOKEN dans Vercel. Vous pouvez quand meme
+            placer le point sur la carte.
           </p>
         ) : null}
         {showSearchFeedback &&
@@ -316,7 +316,7 @@ export function SiteLocationPicker({
         !suggestionsQuery.data.error &&
         suggestionsQuery.data.items.length === 0 ? (
           <p className="text-xs font-semibold text-slate-500">
-            Aucune suggestion trouvee. Essayez un nom de ville, quartier ou chantier plus precis.
+            Aucun lieu trouve. Essayez une ville, un quartier, une ecole, une station ou un repere plus precis.
           </p>
         ) : null}
 

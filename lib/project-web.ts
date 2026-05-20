@@ -57,6 +57,7 @@ type PresenceRecord = {
 type MapboxV6FeatureProperties = {
   name_preferred?: string;
   name?: string;
+  feature_type?: string;
   full_address?: string;
   place_formatted?: string;
   coordinates?: {
@@ -64,6 +65,16 @@ type MapboxV6FeatureProperties = {
     longitude?: number;
   };
 };
+
+class MapboxProviderError extends Error {
+  constructor(
+    message: string,
+    readonly provider: 'geocoding' | 'searchbox',
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 type SessionState = {
   arrival: PresenceRecord | null;
@@ -555,24 +566,55 @@ export async function searchMapboxAddress(query: string): Promise<GeocodingSearc
     return { items: [], error: 'MAPBOX_TOKEN_MISSING' };
   }
 
-  try {
-    const primaryItems = await fetchMapboxAddressSuggestions(query, token);
-    const fallbackQuery = `${query}, Cote d'Ivoire`;
-    const fallbackItems =
-      primaryItems.length > 0 || query.toLowerCase().includes("cote d'ivoire") || query.toLowerCase().includes('ivoire')
-        ? []
-        : await fetchMapboxAddressSuggestions(fallbackQuery, token);
+  const failures: MapboxProviderError[] = [];
+  const primaryItems = await collectMapboxSuggestions(query, token, failures);
+  const fallbackQuery = `${query}, Cote d'Ivoire`;
+  const shouldTryFallback =
+    primaryItems.length === 0 && !query.toLowerCase().includes("cote d'ivoire") && !query.toLowerCase().includes('ivoire');
+  const fallbackItems = shouldTryFallback ? await collectMapboxSuggestions(fallbackQuery, token, failures) : [];
+  const items = dedupeGeocodingSuggestions([...primaryItems, ...fallbackItems]).slice(0, 6);
 
-    return {
-      items: dedupeGeocodingSuggestions([...primaryItems, ...fallbackItems]).slice(0, 6),
-    };
-  } catch (error) {
+  if (items.length > 0) {
+    return { items };
+  }
+
+  const onlyProviderFailures = failures.length >= (shouldTryFallback ? 4 : 2);
+  const hasAuthFailure = failures.some((failure) => failure.status === 401 || failure.status === 403);
+  if (onlyProviderFailures || hasAuthFailure) {
     console.warn('Mapbox geocoding search unavailable', {
-      message: error instanceof Error ? error.message : 'Unknown Mapbox error',
+      failures: failures.map((failure) => ({
+        provider: failure.provider,
+        status: failure.status,
+      })),
     });
-
     return { items: [], error: 'MAPBOX_UNAVAILABLE' };
   }
+
+  return { items: [] };
+}
+
+async function collectMapboxSuggestions(query: string, token: string, failures: MapboxProviderError[]) {
+  const results = await Promise.allSettled([
+    fetchMapboxAddressSuggestions(query, token),
+    fetchMapboxPlaceSuggestions(query, token),
+  ]);
+
+  const items: GeocodingSearchResponse['items'] = [];
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      items.push(...result.value);
+      continue;
+    }
+
+    if (result.reason instanceof MapboxProviderError) {
+      failures.push(result.reason);
+      continue;
+    }
+
+    failures.push(new MapboxProviderError('Unknown Mapbox search failure', 'geocoding', 500));
+  }
+
+  return items;
 }
 
 async function fetchMapboxAddressSuggestions(query: string, token: string) {
@@ -582,10 +624,10 @@ async function fetchMapboxAddressSuggestions(query: string, token: string) {
   url.searchParams.set('autocomplete', 'true');
   url.searchParams.set('limit', '6');
   url.searchParams.set('language', 'fr');
-  url.searchParams.set('country', 'ci');
+  url.searchParams.set('country', 'CI');
   url.searchParams.set('proximity', COTE_D_IVOIRE_CENTER);
   url.searchParams.set('bbox', COTE_D_IVOIRE_BBOX);
-  url.searchParams.set('types', 'address,street,place,locality,neighborhood,poi');
+  url.searchParams.set('types', 'address,street,place,locality,neighborhood');
 
   const response = await fetch(url, {
     headers: {
@@ -596,7 +638,67 @@ async function fetchMapboxAddressSuggestions(query: string, token: string) {
 
   if (!response.ok) {
     console.warn('Mapbox geocoding search failed', { status: response.status });
-    throw new Error(`Mapbox geocoding search failed with status ${response.status}`);
+    throw new MapboxProviderError(
+      `Mapbox geocoding search failed with status ${response.status}`,
+      'geocoding',
+      response.status,
+    );
+  }
+
+  const payload = (await response.json()) as {
+    features?: {
+      properties?: MapboxV6FeatureProperties;
+      geometry?: {
+        coordinates?: [number, number];
+      };
+    }[];
+  };
+
+  return (
+    payload.features
+      ?.map((feature) => {
+        const longitude = feature.properties?.coordinates?.longitude ?? feature.geometry?.coordinates?.[0];
+        const latitude = feature.properties?.coordinates?.latitude ?? feature.geometry?.coordinates?.[1];
+        const label = formatMapboxV6Label(feature.properties);
+
+        return label && typeof latitude === 'number' && typeof longitude === 'number'
+          ? {
+              label,
+              latitude,
+              longitude,
+            }
+          : null;
+      })
+      .filter((item): item is GeocodingSearchResponse['items'][number] => item !== null) ?? []
+  );
+}
+
+async function fetchMapboxPlaceSuggestions(query: string, token: string) {
+  const url = new URL('https://api.mapbox.com/search/searchbox/v1/forward');
+  url.searchParams.set('access_token', token);
+  url.searchParams.set('q', query);
+  url.searchParams.set('auto_complete', 'true');
+  url.searchParams.set('limit', '6');
+  url.searchParams.set('language', 'fr');
+  url.searchParams.set('country', 'CI');
+  url.searchParams.set('proximity', COTE_D_IVOIRE_CENTER);
+  url.searchParams.set('bbox', COTE_D_IVOIRE_BBOX);
+  url.searchParams.set('types', 'address,street,place,locality,neighborhood,poi,category');
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    console.warn('Mapbox Search Box search failed', { status: response.status });
+    throw new MapboxProviderError(
+      `Mapbox Search Box search failed with status ${response.status}`,
+      'searchbox',
+      response.status,
+    );
   }
 
   const payload = (await response.json()) as {
