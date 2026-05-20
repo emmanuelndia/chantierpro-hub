@@ -8,6 +8,7 @@ import { haversineDistanceKm } from '@/lib/haversine';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import { MobilePendingReportsAlert } from '@/components/mobile-pending-reports-alert';
 import { MobileNotificationBell } from '@/components/mobile-notification-bell';
+import { MobileOfficeAssignmentsSection, useTodayOfficeAssignments } from '@/components/mobile-office-assignments-section';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { SessionStatus, TodayClockInView } from '@/types/clock-in';
 import type { TodaySiteItem } from '@/types/projects';
@@ -36,6 +37,7 @@ type MobileCoordinatorHomePageProps = Readonly<{
 export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePageProps) {
   const [now, setNow] = useState(() => Date.now());
   const geoState = useCurrentPosition();
+  const { officeAssignments, usingOfflineAssignments } = useTodayOfficeAssignments();
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -133,6 +135,7 @@ export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePagePro
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
   const loading = sitesQuery.isLoading || clockInQuery.isLoading || coordinatorDashboardQuery.isLoading;
   const dashboard = coordinatorDashboardQuery.data;
+  const showSitesSection = loading || sites.length > 0 || officeAssignments.length === 0;
 
   const handleRemindSupervisor = async (supervisorId: string, reportId: string) => {
     try {
@@ -298,6 +301,7 @@ export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePagePro
       ) : null}
 
       {/* Site du jour et actions */}
+      {showSitesSection ? (
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
@@ -310,7 +314,7 @@ export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePagePro
 
         {loading ? <SitesLoadingState /> : null}
 
-        {!loading && sites.length === 0 ? <EmptySitesState /> : null}
+        {!loading && sites.length === 0 && officeAssignments.length === 0 ? <EmptySitesState /> : null}
 
         {!loading && sites.length > 0 ? (
           <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2">
@@ -325,6 +329,9 @@ export function MobileCoordinatorHomePage({ user }: MobileCoordinatorHomePagePro
           </div>
         ) : null}
       </section>
+      ) : null}
+
+      <MobileOfficeAssignmentsSection assignments={officeAssignments} usingOfflineData={usingOfflineAssignments} />
 
       {primarySite ? (
         <section className="space-y-3">
