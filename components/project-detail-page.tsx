@@ -489,6 +489,22 @@ function SiteFormDrawer({
     setValues(buildInitialSiteFormValues(initialSite));
   }, [initialSite]);
 
+  useEffect(() => {
+    const defaultSiteManagerId = options?.siteManagers.at(0)?.id;
+    if (initialSite || !defaultSiteManagerId) {
+      return;
+    }
+
+    setValues((current) =>
+      current.siteManagerId
+        ? current
+        : {
+            ...current,
+            siteManagerId: defaultSiteManagerId,
+          },
+    );
+  }, [initialSite, options]);
+
   if (!open) {
     return null;
   }
