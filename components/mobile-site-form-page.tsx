@@ -245,7 +245,6 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
             onChange={(nextValues) => setValues((current) => ({ ...current, ...nextValues }))}
             radiusKm={values.radiusKm}
           />
-          {errors.address ? <span className="block text-xs font-bold text-red-600">{errors.address}</span> : null}
           {errors.latitude ? <span className="block text-xs font-bold text-red-600">{errors.latitude}</span> : null}
           {errors.longitude ? <span className="block text-xs font-bold text-red-600">{errors.longitude}</span> : null}
         </div>
@@ -396,7 +395,6 @@ function validateValues(values: SiteFormValues, radiusRequired: boolean): SiteFo
 
   if (!values.projectId) nextErrors.projectId = 'Projet requis.';
   if (values.name.trim().length < 3) nextErrors.name = 'Nom requis, 3 caractères minimum.';
-  if (!values.address.trim()) nextErrors.address = 'Adresse requise.';
   if (!values.siteManagerId) nextErrors.siteManagerId = 'Responsable requis.';
   if (!values.startDate) nextErrors.startDate = 'Date de début requise.';
 

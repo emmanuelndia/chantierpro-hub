@@ -66,6 +66,8 @@ export const projectPublicSelect = {
   },
 } satisfies Prisma.ProjectSelect;
 
+export const SITE_ADDRESS_NOT_PROVIDED = 'Adresse non renseignée';
+
 export const projectDetailSelect = {
   id: true,
   name: true,
@@ -341,7 +343,7 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
   }
 
   const name = sanitizeProjectName(body.name);
-  const address = sanitizeString(body.address);
+  const address = sanitizeString(body.address) ?? SITE_ADDRESS_NOT_PROVIDED;
   const description = sanitizeString(body.description);
   const siteManagerId = sanitizeString(body.siteManagerId);
   const startDate = sanitizeDateString(body.startDate);
@@ -356,7 +358,6 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
 
   if (
     !name ||
-    !address ||
     !siteManagerId ||
     !startDate ||
     !status ||
@@ -404,9 +405,7 @@ export function parseUpdateSiteInput(body: unknown): UpdateSiteInput | null {
   }
 
   if ('address' in body) {
-    const address = sanitizeString(body.address);
-    if (!address) return null;
-    input.address = address;
+    input.address = sanitizeString(body.address) ?? SITE_ADDRESS_NOT_PROVIDED;
   }
 
   if ('description' in body) {

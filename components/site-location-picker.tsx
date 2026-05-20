@@ -22,7 +22,6 @@ const DEFAULT_CENTER = {
 const DEFAULT_ZOOM = 6;
 const ACTIVE_LOCATION_ZOOM = 14;
 const ZERO_POINT_THRESHOLD = 0.01;
-const MANUAL_GPS_ADDRESS = 'Point GPS selectionne';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '';
 const GEOFENCE_SOURCE_ID = 'site-location-picker-geofence';
@@ -40,11 +39,12 @@ export function SiteLocationPicker({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
-  const [addressQuery, setAddressQuery] = useState(address);
+  const [searchQuery, setSearchQuery] = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [geoMessage, setGeoMessage] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [showSearchFeedback, setShowSearchFeedback] = useState(false);
 
   const location = useMemo(() => {
     const parsedLatitude = parseCoordinate(latitude);
@@ -71,31 +71,27 @@ export function SiteLocationPicker({
 
   const updateCoordinates = useCallback(
     (nextLatitude: number, nextLongitude: number) => {
+      setShowSearchFeedback(false);
       onChange({
-        ...(address.trim() ? {} : { address: MANUAL_GPS_ADDRESS }),
         latitude: formatCoordinate(nextLatitude),
         longitude: formatCoordinate(nextLongitude),
       });
     },
-    [address, onChange],
+    [onChange],
   );
 
   const suggestionsQuery = useQuery({
-    queryKey: ['site-location-picker-geocoding', addressQuery],
+    queryKey: ['site-location-picker-geocoding', searchQuery],
     queryFn: async () => {
-      const response = await authFetch(`/api/geocoding/search?q=${encodeURIComponent(addressQuery.trim())}`);
+      const response = await authFetch(`/api/geocoding/search?q=${encodeURIComponent(searchQuery.trim())}`);
       if (!response.ok) {
         throw new Error(`Geocoding request failed with status ${response.status}`);
       }
       return (await response.json()) as GeocodingSearchResponse;
     },
-    enabled: addressQuery.trim().length >= 3,
+    enabled: searchQuery.trim().length >= 3,
     staleTime: 60_000,
   });
-
-  useEffect(() => {
-    setAddressQuery(address);
-  }, [address]);
 
   useEffect(() => {
     if (!MAPBOX_TOKEN || !mapContainerRef.current || mapRef.current) {
@@ -211,7 +207,8 @@ export function SiteLocationPicker({
   }, [location]);
 
   function selectSuggestion(suggestion: GeocodingSuggestion) {
-    setAddressQuery(suggestion.label);
+    setShowSearchFeedback(false);
+    setSearchQuery(suggestion.label);
     onChange({
       address: suggestion.label,
       latitude: formatCoordinate(suggestion.latitude),
@@ -246,24 +243,42 @@ export function SiteLocationPicker({
   return (
     <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
       <div className="space-y-2">
-        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Localisation du chantier</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Coordonnees GPS du chantier</span>
         <p className="text-sm text-slate-600">
-          Recherchez un lieu, ajustez le marqueur sur la carte, ou renseignez les coordonnees manuellement.
+          Recherchez un lieu proche pour placer le marqueur, puis ajustez le point exact du chantier sur la carte.
         </p>
       </div>
 
       <div className="space-y-3">
+        <label className="block space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Adresse ou repere du chantier
+          </span>
+          <input
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-orange-500"
+            onChange={(event) => onChange({ address: event.target.value })}
+            placeholder="Ex. pres de l'ecole primaire, quartier Commerce..."
+            value={address}
+          />
+          <span className="block text-xs font-semibold text-slate-500">
+            Le repere aide les equipes a identifier le site. Les coordonnees servent au pointage GPS.
+          </span>
+        </label>
+
         <div className="relative">
+          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Rechercher un lieu proche
+          </span>
           <input
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-orange-500"
             onChange={(event) => {
-              setAddressQuery(event.target.value);
-              onChange({ address: event.target.value });
+              setShowSearchFeedback(true);
+              setSearchQuery(event.target.value);
             }}
-            placeholder="Rechercher une adresse, un quartier, un lieu..."
-            value={addressQuery}
+            placeholder="Ecole, restaurant, station, marche, quartier..."
+            value={searchQuery}
           />
-          {suggestionsQuery.data?.items.length ? (
+          {showSearchFeedback && suggestionsQuery.data?.items.length ? (
             <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
               {suggestionsQuery.data.items.map((item) => (
                 <button
@@ -278,21 +293,25 @@ export function SiteLocationPicker({
             </div>
           ) : null}
         </div>
-        {addressQuery.trim().length >= 3 && suggestionsQuery.isFetching ? (
+        {showSearchFeedback && searchQuery.trim().length >= 3 && suggestionsQuery.isFetching ? (
           <p className="text-xs font-semibold text-slate-500">Recherche adresse en cours...</p>
         ) : null}
-        {addressQuery.trim().length >= 3 && suggestionsQuery.isError ? (
+        {showSearchFeedback && searchQuery.trim().length >= 3 && suggestionsQuery.isError ? (
           <p className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
             Recherche adresse indisponible. Verifiez MAPBOX_ACCESS_TOKEN cote serveur.
           </p>
         ) : null}
-        {addressQuery.trim().length >= 3 && suggestionsQuery.isSuccess && suggestionsQuery.data.error ? (
+        {showSearchFeedback &&
+        searchQuery.trim().length >= 3 &&
+        suggestionsQuery.isSuccess &&
+        suggestionsQuery.data.error ? (
           <p className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
             Recherche indisponible : verifiez MAPBOX_ACCESS_TOKEN dans Vercel. Vous pouvez quand meme placer le
             point sur la carte.
           </p>
         ) : null}
-        {addressQuery.trim().length >= 3 &&
+        {showSearchFeedback &&
+        searchQuery.trim().length >= 3 &&
         suggestionsQuery.isSuccess &&
         !suggestionsQuery.data.error &&
         suggestionsQuery.data.items.length === 0 ? (

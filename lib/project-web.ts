@@ -16,6 +16,8 @@ import type {
 
 export const PROJECTS_PAGE_SIZE = 25;
 export const SITE_PRESENCES_PAGE_SIZE = 25;
+const COTE_D_IVOIRE_BBOX = '-8.7,4.0,-2.45,10.75';
+const COTE_D_IVOIRE_CENTER = '-5.54708,7.539989';
 
 type AuthLikeUser = {
   id: string;
@@ -49,6 +51,17 @@ type PresenceRecord = {
   user: {
     firstName: string;
     lastName: string;
+  };
+};
+
+type MapboxV6FeatureProperties = {
+  name_preferred?: string;
+  name?: string;
+  full_address?: string;
+  place_formatted?: string;
+  coordinates?: {
+    latitude?: number;
+    longitude?: number;
   };
 };
 
@@ -563,14 +576,16 @@ export async function searchMapboxAddress(query: string): Promise<GeocodingSearc
 }
 
 async function fetchMapboxAddressSuggestions(query: string, token: string) {
-  const url = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`);
+  const url = new URL('https://api.mapbox.com/search/geocode/v6/forward');
   url.searchParams.set('access_token', token);
+  url.searchParams.set('q', query);
   url.searchParams.set('autocomplete', 'true');
   url.searchParams.set('limit', '6');
   url.searchParams.set('language', 'fr');
   url.searchParams.set('country', 'ci');
-  url.searchParams.set('proximity', '-4.0083,5.3600');
-  url.searchParams.set('types', 'address,poi,place,locality,neighborhood');
+  url.searchParams.set('proximity', COTE_D_IVOIRE_CENTER);
+  url.searchParams.set('bbox', COTE_D_IVOIRE_BBOX);
+  url.searchParams.set('types', 'address,street,place,locality,neighborhood,poi');
 
   const response = await fetch(url, {
     headers: {
@@ -586,20 +601,47 @@ async function fetchMapboxAddressSuggestions(query: string, token: string) {
 
   const payload = (await response.json()) as {
     features?: {
-      place_name?: string;
-      center?: [number, number];
+      properties?: MapboxV6FeatureProperties;
+      geometry?: {
+        coordinates?: [number, number];
+      };
     }[];
   };
 
   return (
     payload.features
-      ?.filter((feature) => feature.place_name && Array.isArray(feature.center) && feature.center.length === 2)
-      .map((feature) => ({
-        label: feature.place_name ?? '',
-        latitude: feature.center?.[1] ?? 0,
-        longitude: feature.center?.[0] ?? 0,
-      })) ?? []
+      ?.map((feature) => {
+        const longitude = feature.properties?.coordinates?.longitude ?? feature.geometry?.coordinates?.[0];
+        const latitude = feature.properties?.coordinates?.latitude ?? feature.geometry?.coordinates?.[1];
+        const label = formatMapboxV6Label(feature.properties);
+
+        return label && typeof latitude === 'number' && typeof longitude === 'number'
+          ? {
+              label,
+              latitude,
+              longitude,
+            }
+          : null;
+      })
+      .filter((item): item is GeocodingSearchResponse['items'][number] => item !== null) ?? []
   );
+}
+
+function formatMapboxV6Label(feature: MapboxV6FeatureProperties | undefined) {
+  if (!feature) {
+    return '';
+  }
+
+  if (feature.full_address) {
+    return feature.full_address;
+  }
+
+  const name = feature.name_preferred ?? feature.name;
+  if (!name) {
+    return '';
+  }
+
+  return feature.place_formatted ? `${name}, ${feature.place_formatted}` : name;
 }
 
 function dedupeGeocodingSuggestions(items: GeocodingSearchResponse['items']) {

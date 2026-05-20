@@ -779,7 +779,6 @@ function setNumberChange<T extends keyof SiteMutationBody>(
 function canSubmitSiteForm(values: SiteFormValues) {
   return Boolean(
     values.name.trim() &&
-      values.address.trim() &&
       values.latitude.trim() &&
       values.longitude.trim() &&
       values.area.trim() &&
