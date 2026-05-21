@@ -16,7 +16,7 @@ export default async function MobileReportsPage() {
     return <MobileCoordinatorReportsPage user={session} />;
   }
 
-  if (session.role === 'GENERAL_SUPERVISOR') {
+  if (session.role === 'GENERAL_SUPERVISOR' || session.role === 'BE_MANAGER') {
     return <MobileGeneralSupervisorReportsPage user={session} />;
   }
 

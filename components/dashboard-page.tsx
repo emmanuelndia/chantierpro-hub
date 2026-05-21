@@ -130,10 +130,15 @@ function DashboardContent({ data }: Readonly<{ data: DashboardResponse }>) {
         </DashboardFrame>
       );
     case 'GENERAL_SUPERVISOR':
+    case 'BE_MANAGER':
       return (
         <DashboardFrame
-          title="Coordination sites confies"
-          description="Pilotage des chantiers confies, des assignations du jour et des remontees attendues."
+          title={data.role === 'BE_MANAGER' ? "Bureau d'etude" : 'Coordination sites confies'}
+          description={
+            data.role === 'BE_MANAGER'
+              ? "Planning des ressources BE, suivi des sites concernes et remontees attendues."
+              : 'Pilotage des chantiers confies, des assignations du jour et des remontees attendues.'
+          }
         >
           <StatsGrid stats={data.stats} />
           <GeneralSupervisorSitesPanel items={data.entrustedSites} />

@@ -28,11 +28,13 @@ export const REPORT_CREATE_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_RESOURCE,
 ];
 
 export const REPORT_READ_ALL_ROLES: readonly Role[] = [
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_MANAGER,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,
@@ -721,6 +723,20 @@ async function getWebReportSiteWhere(prisma: PrismaClient, user: AuthLikeUser): 
         some: {
           generalSupervisorId: user.id,
           status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+        },
+      },
+    };
+  }
+
+  if (user.role === Role.BE_MANAGER) {
+    return {
+      planningAssignments: {
+        some: {
+          deletedAt: null,
+          supervisor: {
+            role: Role.BE_RESOURCE,
+            isActive: true,
+          },
         },
       },
     };

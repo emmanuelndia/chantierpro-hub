@@ -2,16 +2,34 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { Prisma, Role } from '@prisma/client';
+import { getOperationalSiteIds } from '@/lib/dashboard';
 
 export const GET = withAuth(async ({ user }) => {
   try {
     const where: Prisma.ReportWhereInput = {};
     
-    if (user.role === Role.SUPERVISOR) {
+    if (user.role === Role.SUPERVISOR || user.role === Role.BE_RESOURCE) {
       where.userId = user.id;
     }
-    // For other roles, they might see all reports or filter by their managed sites
-    // For now, let's keep it simple as requested
+
+    if (user.role === Role.COORDINATOR) {
+      const siteIds = await getOperationalSiteIds(prisma, user.id);
+      where.siteId = { in: siteIds };
+    }
+
+    if (user.role === Role.BE_MANAGER) {
+      where.site = {
+        planningAssignments: {
+          some: {
+            deletedAt: null,
+            supervisor: {
+              role: Role.BE_RESOURCE,
+              isActive: true,
+            },
+          },
+        },
+      };
+    }
 
     const reports = await prisma.report.findMany({
       where,

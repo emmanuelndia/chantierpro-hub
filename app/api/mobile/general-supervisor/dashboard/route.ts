@@ -8,7 +8,7 @@ import type {
 } from '@/types/mobile-general-supervisor';
 
 export const GET = withAuth(async ({ user }) => {
-  if (user.role !== Role.GENERAL_SUPERVISOR) {
+  if (user.role !== Role.GENERAL_SUPERVISOR && user.role !== Role.BE_MANAGER) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
@@ -21,8 +21,17 @@ export const GET = withAuth(async ({ user }) => {
     const assignments = await prisma.planningAssignment.findMany({
       where: {
         date: today,
-        createdById: user.id,
         deletedAt: null,
+        ...(user.role === Role.BE_MANAGER
+          ? {
+              supervisor: {
+                role: Role.BE_RESOURCE,
+                isActive: true,
+              },
+            }
+          : {
+              createdById: user.id,
+            }),
       },
       orderBy: [{ site: { name: 'asc' } }, { supervisor: { lastName: 'asc' } }],
       select: {

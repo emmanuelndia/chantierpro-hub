@@ -37,6 +37,8 @@ const roleLabels: Record<Role, string> = {
   SUPERVISOR: 'Chef de chantier',
   COORDINATOR: 'Coordinateur',
   GENERAL_SUPERVISOR: 'Superviseur général',
+  BE_MANAGER: "Responsable Bureau d'étude",
+  BE_RESOURCE: "Ressource Bureau d'étude",
   PROJECT_MANAGER: 'Chef de projet',
   DIRECTION: 'Direction',
 };

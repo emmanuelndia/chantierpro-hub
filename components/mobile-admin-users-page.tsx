@@ -8,6 +8,7 @@ import { ConfirmModal } from '@/components/confirm-modal';
 import { EmptyState } from '@/components/empty-state';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
+import { formatRoleLabel } from '@/lib/role-labels';
 import type { PaginatedUsersResponse, UserDetail, UserListItem } from '@/types/users';
 
 const ROLE_OPTIONS = Object.values(Role);
@@ -284,7 +285,7 @@ function buildValues(user: UserListItem | null): UserFormValues {
   return { email: user?.email ?? '', firstName: user?.firstName ?? '', lastName: user?.lastName ?? '', role: user?.role ?? Role.SUPERVISOR };
 }
 
-function formatRole(role: Role) { return role.replaceAll('_', ' '); }
+function formatRole(role: Role) { return formatRoleLabel(role); }
 function formatDate(value: string) { return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(value)); }
 function getErrorMessage(error: unknown) { return error instanceof Error ? error.message : 'Une erreur est survenue.'; }
 async function readMessage(response: Response) {

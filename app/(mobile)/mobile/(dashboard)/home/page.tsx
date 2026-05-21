@@ -6,8 +6,8 @@ import { MobileManagementDashboardPage } from '@/components/mobile-management-da
 import { MobileAdminDashboardPage } from '@/components/mobile-admin-dashboard-page';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
 
-const fieldRoles = ['SUPERVISOR'] as const;
-const generalSupervisorRoles = ['GENERAL_SUPERVISOR'] as const;
+const fieldRoles = ['SUPERVISOR', 'BE_RESOURCE'] as const;
+const generalSupervisorRoles = ['GENERAL_SUPERVISOR', 'BE_MANAGER'] as const;
 const coordinatorRoles = ['COORDINATOR'] as const;
 const managementRoles = ['PROJECT_MANAGER', 'DIRECTION'] as const;
 const adminRoles = ['ADMIN'] as const;

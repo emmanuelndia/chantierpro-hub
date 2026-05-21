@@ -81,7 +81,7 @@ function renderOfflineRoute(pathname: string, user: WebSessionUser) {
     return <MobileCoordinatorHomePage user={user} />;
   }
 
-  if (user.role === 'GENERAL_SUPERVISOR') {
+  if (user.role === 'GENERAL_SUPERVISOR' || user.role === 'BE_MANAGER') {
     return <MobileGeneralSupervisorHomePage user={user} />;
   }
 

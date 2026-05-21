@@ -7,6 +7,7 @@ import type { Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
 import { useToast } from '@/components/toast-provider';
 import { getWebBreadcrumbs, getWebNavigationForRole } from '@/lib/navigation';
+import { formatRoleLabel } from '@/lib/role-labels';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { WebNavIcon } from '@/types/navigation';
 
@@ -19,6 +20,8 @@ const roleTone: Record<Role, 'success' | 'warning' | 'error' | 'neutral' | 'info
   SUPERVISOR: 'success',
   COORDINATOR: 'info',
   GENERAL_SUPERVISOR: 'warning',
+  BE_MANAGER: 'warning',
+  BE_RESOURCE: 'success',
   PROJECT_MANAGER: 'neutral',
   DIRECTION: 'error',
   HR: 'info',
@@ -143,7 +146,7 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <Badge tone={roleTone[user.role]}>{user.role.replaceAll('_', ' ')}</Badge>
+            <Badge tone={roleTone[user.role]}>{formatRoleLabel(user.role)}</Badge>
             <button
               aria-label="Notifications"
               className="relative rounded-full border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 hover:text-primary"

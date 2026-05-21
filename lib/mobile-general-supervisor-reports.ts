@@ -38,7 +38,7 @@ type DepartureRow = Prisma.ClockInRecordGetPayload<{
 }>;
 
 export function canAccessGeneralSupervisorReports(role: Role) {
-  return role === Role.GENERAL_SUPERVISOR;
+  return role === Role.GENERAL_SUPERVISOR || role === Role.BE_MANAGER;
 }
 
 export async function getGeneralSupervisorReports(
@@ -57,6 +57,10 @@ export async function getGeneralSupervisorReports(
   const supervisorId = cleanString(filters.supervisorId);
   const status = normalizeStatus(filters.status ?? null);
   const query = cleanString(filters.q);
+  const resourceRoles =
+    user.role === Role.BE_MANAGER
+      ? [Role.BE_RESOURCE]
+      : [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
 
   const scopedSiteWhere: Prisma.SiteWhereInput = {
     ...siteWhere,
@@ -95,7 +99,7 @@ export async function getGeneralSupervisorReports(
     user: {
       isActive: true,
       role: {
-        in: [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR],
+        in: resourceRoles,
       },
     },
   };
@@ -113,17 +117,29 @@ export async function getGeneralSupervisorReports(
       where: {
         isActive: true,
         role: {
-          in: [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR],
+          in: resourceRoles,
         },
-        teamMemberships: {
-          some: {
-            status: TeamMemberStatus.ACTIVE,
-            team: {
-              status: TeamStatus.ACTIVE,
-              site: siteWhere,
+        OR: [
+          {
+            teamMemberships: {
+              some: {
+                status: TeamMemberStatus.ACTIVE,
+                team: {
+                  status: TeamStatus.ACTIVE,
+                  site: siteWhere,
+                },
+              },
             },
           },
-        },
+          {
+            planningAssignments: {
+              some: {
+                deletedAt: null,
+                site: siteWhere,
+              },
+            },
+          },
+        ],
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
       select: {
@@ -239,6 +255,20 @@ export async function getGeneralSupervisorReportDetail(
 }
 
 function operationalSiteWhere(user: AuthLikeUser): Prisma.SiteWhereInput {
+  if (user.role === Role.BE_MANAGER) {
+    return {
+      planningAssignments: {
+        some: {
+          deletedAt: null,
+          supervisor: {
+            role: Role.BE_RESOURCE,
+            isActive: true,
+          },
+        },
+      },
+    };
+  }
+
   return {
     teams: {
       some: {

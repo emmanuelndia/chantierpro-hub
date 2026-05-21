@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { EmptyState } from '@/components/empty-state';
 import { authFetch } from '@/lib/auth/client-session';
 import type { PaginatedProjectsResponse, TodaySiteItem } from '@/types/projects';
+import type { PaginatedPhotosResponse } from '@/types/photos';
 
 const PhotoGallery = dynamic(
   () => import('@/components/photo-gallery').then((module) => module.PhotoGallery),
@@ -23,7 +24,7 @@ type PhotosHubPageProps = Readonly<{
 }>;
 
 const PROJECT_SCOPE_ROLES: readonly Role[] = ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'];
-const SITE_SCOPE_ROLES: readonly Role[] = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR'];
+const SITE_SCOPE_ROLES: readonly Role[] = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'BE_MANAGER'];
 
 export function PhotosHubPage({ viewer }: PhotosHubPageProps) {
   if (PROJECT_SCOPE_ROLES.includes(viewer.role)) {
@@ -126,6 +127,18 @@ function SitePhotosHub({ viewer }: PhotosHubPageProps) {
   const sitesQuery = useQuery({
     queryKey: ['photos-hub-today-sites'],
     queryFn: async () => {
+      if (viewer.role === 'BE_MANAGER') {
+        const response = await authFetch('/api/mobile/photos/gallery?page=1', { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`BE gallery sites request failed with status ${response.status}`);
+        }
+
+        return ((await response.json()) as PaginatedPhotosResponse).sites.map((site) => ({
+          id: site.id,
+          name: site.name,
+        })) as TodaySiteItem[];
+      }
+
       const response = await authFetch('/api/users/me/sites/today', { cache: 'no-store' });
       if (!response.ok) {
         throw new Error(`Today sites request failed with status ${response.status}`);

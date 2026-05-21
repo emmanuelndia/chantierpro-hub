@@ -11,7 +11,7 @@ export default async function MobileSessionReportPageWrapper() {
   }
 
   // Rôles autorisés à soumettre des rapports
-  const allowedRoles = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR'];
+  const allowedRoles = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE'];
   
   if (allowedRoles.includes(session.role)) {
     return <MobileSessionReportPage user={session} />;

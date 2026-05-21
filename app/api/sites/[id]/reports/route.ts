@@ -78,7 +78,7 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
   try {
     // Filtre selon le rôle
     const where: Prisma.ReportWhereInput = { siteId: params.id };
-    if (user.role === Role.SUPERVISOR) {
+    if (user.role === Role.SUPERVISOR || user.role === Role.BE_RESOURCE) {
       where.userId = user.id; // ne voit que ses propres rapports
     }
 

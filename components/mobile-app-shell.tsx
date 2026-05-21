@@ -19,7 +19,7 @@ type MobileAppShellProps = Readonly<{
   children: ReactNode;
 }>;
 
-const fieldRoles: readonly Role[] = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR'];
+const fieldRoles: readonly Role[] = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE'];
 
 export function MobileAppShell({ user, children }: MobileAppShellProps) {
   const tabs = getMobileNavigationForRole(user.role);

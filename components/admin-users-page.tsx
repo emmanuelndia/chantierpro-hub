@@ -10,10 +10,11 @@ import { ConfirmModal } from '@/components/confirm-modal';
 import { EmptyState } from '@/components/empty-state';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
+import { formatRoleLabel } from '@/lib/role-labels';
 import type { PaginatedUsersResponse, UserDetail, UserListItem } from '@/types/users';
 
 const ROLE_OPTIONS = Object.values(Role);
-const HISTORY_RESOURCE_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
+const HISTORY_RESOURCE_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
 
 type UserFormValues = {
   email: string;
@@ -613,7 +614,7 @@ function buildInitialValues(user: UserListItem | null): UserFormValues {
 }
 
 function formatRole(role: Role) {
-  return role.replaceAll('_', ' ');
+  return formatRoleLabel(role);
 }
 
 function formatDate(value: string) {

@@ -38,6 +38,8 @@ const PHOTO_UPLOAD_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_MANAGER,
+  Role.BE_RESOURCE,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,
@@ -48,11 +50,12 @@ const ADMIN_LOG_ROLES: readonly Role[] = [Role.DIRECTION, Role.ADMIN];
 const PHOTO_SITE_FULL_VIEW_ROLES: readonly Role[] = [
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_MANAGER,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,
 ];
-const PHOTO_OWN_ONLY_ROLES: readonly Role[] = [Role.SUPERVISOR];
+const PHOTO_OWN_ONLY_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.BE_RESOURCE];
 const MAX_PHOTO_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const COMPRESS_PHOTO_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const PHOTO_PAGE_SIZE = 20;
@@ -402,6 +405,33 @@ export async function getAccessibleSiteForPhoto(
     });
   }
 
+  if (user.role === Role.BE_MANAGER) {
+    return prisma.site.findFirst({
+      where: {
+        id: siteId,
+        planningAssignments: {
+          some: {
+            deletedAt: null,
+            supervisor: {
+              role: Role.BE_RESOURCE,
+              isActive: true,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        project: {
+          select: {
+            projectManagerId: true,
+          },
+        },
+      },
+    });
+  }
+
   const assignmentDate = options.date ? formatDateKey(options.date) : null;
 
   return prisma.site.findFirst({
@@ -615,7 +645,11 @@ export async function getAccessiblePhotoById(
   }
 
   if (canReadAllSitePhotos(payload.user.role)) {
-    if (payload.user.role === Role.COORDINATOR || payload.user.role === Role.GENERAL_SUPERVISOR) {
+    if (
+      payload.user.role === Role.COORDINATOR ||
+      payload.user.role === Role.GENERAL_SUPERVISOR ||
+      payload.user.role === Role.BE_MANAGER
+    ) {
       const site = await getAccessibleSiteForPhoto(prisma, photo.siteId, payload.user);
       return site ? serializePhoto(photo) : null;
     }
@@ -1207,7 +1241,11 @@ export async function getAccessiblePhotoStorageById(
   }
 
   if (canReadAllSitePhotos(payload.user.role)) {
-    if (payload.user.role === Role.COORDINATOR || payload.user.role === Role.GENERAL_SUPERVISOR) {
+    if (
+      payload.user.role === Role.COORDINATOR ||
+      payload.user.role === Role.GENERAL_SUPERVISOR ||
+      payload.user.role === Role.BE_MANAGER
+    ) {
       const site = await getAccessibleSiteForPhoto(prisma, photo.siteId, payload.user);
       return site ? photo : null;
     }
