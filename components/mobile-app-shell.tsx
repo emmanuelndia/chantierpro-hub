@@ -20,7 +20,7 @@ type MobileAppShellProps = Readonly<{
   children: ReactNode;
 }>;
 
-const fieldRoles: readonly Role[] = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR'];
+const fieldRoles: readonly Role[] = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE'];
 
 export function MobileAppShell({ user, children }: MobileAppShellProps) {
   const tabs = getMobileNavigationForRole(user.role);
@@ -95,7 +95,11 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
 
         {shouldEnableTerrainOffline ? <OfflineBanner /> : null}
         {shouldEnableTerrainOffline ? <MobileOfflineStatus /> : null}
+<<<<<<< HEAD
         {user.mustChangePassword ? <MustChangePasswordBanner href="/mobile/profile" variant="mobile" /> : null}
+=======
+        <MustChangePasswordBanner href="/mobile/profile" show={user.mustChangePassword} />
+>>>>>>> develop
 
         <main className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-4">
           {children}

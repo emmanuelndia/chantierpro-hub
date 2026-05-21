@@ -20,7 +20,7 @@ import type {
   SupervisorMyAssignmentsResponse,
 } from '@/types/mobile-planning';
 import { createInternalPhotoUrl } from '@/lib/photos';
-import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import { BE_FIELD_USER_ROLES, CLASSIC_FIELD_USER_ROLES, FIELD_USER_ROLES } from '@/lib/field-roles';
 import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 
 type AuthLikeUser = {
@@ -41,7 +41,7 @@ type ClockInRow = {
 };
 
 export function canAccessMobilePlanning(role: Role) {
-  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, Role.PROJECT_MANAGER];
+  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, Role.BE_MANAGER, Role.PROJECT_MANAGER];
 
   return allowedRoles.includes(role);
 }
@@ -49,6 +49,7 @@ export function canAccessMobilePlanning(role: Role) {
 export function canAccessWebPlanning(role: Role) {
   const allowedRoles: readonly Role[] = [
     Role.GENERAL_SUPERVISOR,
+    Role.BE_MANAGER,
     Role.PROJECT_MANAGER,
     Role.DIRECTION,
     Role.ADMIN,
@@ -58,7 +59,7 @@ export function canAccessWebPlanning(role: Role) {
 }
 
 export function canMutateWebPlanning(role: Role) {
-  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, Role.PROJECT_MANAGER];
+  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, Role.BE_MANAGER, Role.PROJECT_MANAGER];
 
   return allowedRoles.includes(role);
 }
@@ -573,6 +574,13 @@ function getScopedPlanningAssignment(prisma: PrismaClient, user: AuthLikeUser, a
       id: assignmentId,
       deletedAt: null,
       site: operationalPlanningSiteWhere(user),
+      ...(user.role === Role.BE_MANAGER
+        ? {
+            supervisor: {
+              role: Role.BE_RESOURCE,
+            },
+          }
+        : {}),
     },
     select: planningAssignmentSelect,
   });
@@ -628,11 +636,12 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   };
 }
 
-async function getScopedSupervisorIds(prisma: PrismaClient, _user: AuthLikeUser, _date: Date) {
+async function getScopedSupervisorIds(prisma: PrismaClient, user: AuthLikeUser, _date: Date) {
+  const roles = user.role === Role.BE_MANAGER ? BE_FIELD_USER_ROLES : CLASSIC_FIELD_USER_ROLES;
   const supervisors = await prisma.user.findMany({
     where: {
       role: {
-        in: [...FIELD_USER_ROLES],
+        in: [...roles],
       },
       isActive: true,
     },

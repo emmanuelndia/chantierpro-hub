@@ -24,7 +24,7 @@ export default async function MobileReportDetailRoute({
     return <MobileManagementReportDetailPage reportId={id} />;
   }
 
-  if (session.role === 'GENERAL_SUPERVISOR') {
+  if (session.role === 'GENERAL_SUPERVISOR' || session.role === 'BE_MANAGER') {
     return <MobileGeneralSupervisorReportDetailPage reportId={id} />;
   }
 

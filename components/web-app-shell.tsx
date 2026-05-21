@@ -8,6 +8,7 @@ import { Badge } from '@/components/badge';
 import { MustChangePasswordBanner } from '@/components/must-change-password-banner';
 import { useToast } from '@/components/toast-provider';
 import { getWebBreadcrumbs, getWebNavigationForRole } from '@/lib/navigation';
+import { formatRoleLabel } from '@/lib/role-labels';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { WebNavIcon } from '@/types/navigation';
 
@@ -20,6 +21,8 @@ const roleTone: Record<Role, 'success' | 'warning' | 'error' | 'neutral' | 'info
   SUPERVISOR: 'success',
   COORDINATOR: 'info',
   GENERAL_SUPERVISOR: 'warning',
+  BE_MANAGER: 'warning',
+  BE_RESOURCE: 'success',
   PROJECT_MANAGER: 'neutral',
   DIRECTION: 'error',
   HR: 'info',
@@ -144,7 +147,7 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <Badge tone={roleTone[user.role]}>{user.role.replaceAll('_', ' ')}</Badge>
+            <Badge tone={roleTone[user.role]}>{formatRoleLabel(user.role)}</Badge>
             <button
               aria-label="Notifications"
               className="relative rounded-full border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 hover:text-primary"
@@ -199,7 +202,11 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
         </header>
 
         <main className="custom-scrollbar h-[calc(100vh-4rem)] overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+<<<<<<< HEAD
           {user.mustChangePassword ? <MustChangePasswordBanner href="/settings/profil" variant="web" /> : null}
+=======
+          <MustChangePasswordBanner href="/settings/profil" show={user.mustChangePassword} />
+>>>>>>> develop
           {children}
         </main>
       </div>

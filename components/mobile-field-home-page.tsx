@@ -10,6 +10,7 @@ import { MobileOfflineLink } from '@/components/mobile-offline-link';
 import { MobileOfficeAssignmentsSection, useTodayOfficeAssignments } from '@/components/mobile-office-assignments-section';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { SessionStatus, TodayClockInView } from '@/types/clock-in';
+import type { SupervisorMyAssignment, SupervisorMyAssignmentsResponse } from '@/types/mobile-planning';
 import type { TodaySiteItem } from '@/types/projects';
 
 type TodaySitesResponse = {
@@ -32,8 +33,13 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
   const [now, setNow] = useState(() => Date.now());
   const [usingOfflineSites, setUsingOfflineSites] = useState(false);
   const [usingOfflineClockIn, setUsingOfflineClockIn] = useState(false);
+  const [usingOfflineAssignments, setUsingOfflineAssignments] = useState(false);
   const geoState = useCurrentPosition();
+<<<<<<< HEAD
   const { officeAssignments, usingOfflineAssignments } = useTodayOfficeAssignments();
+=======
+  const todayKey = useMemo(() => formatDateKey(new Date()), []);
+>>>>>>> develop
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -98,7 +104,40 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
     staleTime: 30_000,
   });
 
+  const assignmentsQuery = useQuery({
+    queryKey: ['mobile-my-assignments', todayKey],
+    queryFn: async () => {
+      try {
+        const response = await authFetch(`/api/mobile/planning/my-assignments?date=${encodeURIComponent(todayKey)}`);
+
+        if (!response.ok) {
+          throw new Error(`My assignments request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as SupervisorMyAssignmentsResponse;
+        setUsingOfflineAssignments(false);
+        await setMobileOfflineCache(`mobile-planning-my-assignments-${todayKey}`, payload, 24 * 60 * 60 * 1000);
+        return payload;
+      } catch {
+        const cached = await getMobileOfflineCache<SupervisorMyAssignmentsResponse>(`mobile-planning-my-assignments-${todayKey}`);
+
+        if (cached) {
+          setUsingOfflineAssignments(true);
+          return cached.payload;
+        }
+
+        throw new Error('My assignments request failed');
+      }
+    },
+    refetchInterval: 60_000,
+    staleTime: 300_000,
+  });
+
   const sites = useMemo(() => sitesQuery.data?.items ?? [], [sitesQuery.data?.items]);
+  const officeAssignments = useMemo(
+    () => (assignmentsQuery.data?.assignments ?? []).filter((assignment) => assignment.workLocationType === 'OFFICE'),
+    [assignmentsQuery.data?.assignments],
+  );
   const activeSession = clockInQuery.data?.activeSession ?? null;
   const primarySite = useMemo(
     () => sites.find((site) => site.id === activeSession?.siteId) ?? sites[0] ?? null,
@@ -180,7 +219,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
 
         {usingOfflineSites || usingOfflineClockIn ? (
           <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-            Donnees hors ligne. Les chantiers prepares du jour sont affiches.
+            Données hors ligne. Les chantiers préparés du jour sont affichés.
           </p>
         ) : null}
 
@@ -205,6 +244,12 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
 
       <MobileOfficeAssignmentsSection assignments={officeAssignments} usingOfflineData={usingOfflineAssignments} />
 
+      <OfficeAssignmentsSection
+        assignments={officeAssignments}
+        isLoading={assignmentsQuery.isLoading}
+        usingOfflineData={usingOfflineAssignments}
+      />
+
       {primarySite ? (
         <section className="space-y-3">
           <PrimaryActionButton
@@ -227,7 +272,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
 
       {sitesQuery.isError || clockInQuery.isError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-          Impossible de charger les donnees terrain. Verifiez la connexion puis reessayez.
+          Impossible de charger les données terrain. Vérifiez la connexion puis réessayez.
         </div>
       ) : null}
     </div>
@@ -248,7 +293,7 @@ function StatusBanner({
   if (pauseActive) {
     return (
       <div className="sticky top-0 z-20 rounded-lg border border-orange-200 bg-orange-100 px-4 py-3 text-sm font-bold text-orange-900 shadow-sm">
-        ⏸ Pause depuis {formatShortDuration(pauseDurationSeconds)}
+        Pause depuis {formatShortDuration(pauseDurationSeconds)}
       </div>
     );
   }
@@ -256,7 +301,7 @@ function StatusBanner({
   if (hasOpenSession) {
     return (
       <div className="sticky top-0 z-20 rounded-lg border border-emerald-200 bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-900 shadow-sm">
-        ✅ Pointé depuis {formatShortDuration(sessionDurationSeconds)}
+        Pointé depuis {formatShortDuration(sessionDurationSeconds)}
       </div>
     );
   }
@@ -265,6 +310,75 @@ function StatusBanner({
     <div className="sticky top-0 z-20 rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600 shadow-sm">
       Non pointé
     </div>
+  );
+}
+
+function OfficeAssignmentsSection({
+  assignments,
+  isLoading,
+  usingOfflineData,
+}: Readonly<{
+  assignments: SupervisorMyAssignment[];
+  isLoading: boolean;
+  usingOfflineData: boolean;
+}>) {
+  if (isLoading) {
+    return (
+      <section>
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
+          Tâches bureau du jour
+        </h2>
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="h-5 w-2/3 animate-pulse rounded bg-slate-200" />
+          <div className="mt-3 h-4 w-full animate-pulse rounded bg-slate-100" />
+        </div>
+      </section>
+    );
+  }
+
+  if (assignments.length === 0) {
+    return null;
+  }
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
+          Tâches bureau du jour
+        </h2>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+          {assignments.length}
+        </span>
+      </div>
+
+      {usingOfflineData ? (
+        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+          Données hors ligne. Les tâches bureau préparées du jour sont affichées.
+        </p>
+      ) : null}
+
+      <div className="space-y-3">
+        {assignments.map((assignment) => (
+          <article key={assignment.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-bold text-slate-950">{assignment.siteName}</h3>
+                <p className="mt-1 text-sm text-slate-500">{assignment.siteAddress}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                Bureau
+              </span>
+            </div>
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-800">{assignment.action}</p>
+            {assignment.targetProgress !== null ? (
+              <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
+                Progression cible : {assignment.targetProgress}%
+              </p>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -404,7 +518,7 @@ function EmptySitesState() {
         Aucun chantier assigné aujourd&apos;hui
       </h3>
       <p className="mt-2 text-sm leading-6 text-slate-500">
-        Les chantiers assignes apparaitront ici des qu&apos;ils seront disponibles.
+        Les chantiers assignés apparaîtront ici dès qu&apos;ils seront disponibles.
       </p>
     </section>
   );
@@ -473,6 +587,10 @@ function formatLongDate(value: Date) {
     month: 'long',
     year: 'numeric',
   }).format(value);
+}
+
+function formatDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
 }
 
 function baseIcon(className: string, children: ReactNode) {

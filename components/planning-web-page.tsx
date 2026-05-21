@@ -74,7 +74,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [form, setForm] = useState<AssignmentFormState>(() => createEmptyForm(selectedDate));
   const [deleteTarget, setDeleteTarget] = useState<PlanningWebAssignment | null>(null);
-  const canMutate = viewer.role === 'GENERAL_SUPERVISOR' || viewer.role === 'PROJECT_MANAGER';
+  const canMutate = viewer.role === 'GENERAL_SUPERVISOR' || viewer.role === 'BE_MANAGER' || viewer.role === 'PROJECT_MANAGER';
 
   const dayQuery = useQuery({
     queryKey: ['web-planning', selectedDate],

@@ -26,6 +26,7 @@ export const FIELD_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_RESOURCE,
 ];
 
 export const clockInRecordSelect = {

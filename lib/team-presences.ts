@@ -18,6 +18,7 @@ import type {
 const TEAM_PRESENCE_ROLES: readonly Role[] = [
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_MANAGER,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,
@@ -112,6 +113,7 @@ export async function getTeamPresences(
   const allSiteIds = await getScopedTeamPresenceSiteIds(prisma, user);
   const scopedSiteIds = query.siteId ? allSiteIds.filter((siteId) => siteId === query.siteId) : allSiteIds;
   const day = dayRange(query.date);
+  const resourceRole = user.role === Role.BE_MANAGER ? Role.BE_RESOURCE : Role.SUPERVISOR;
 
   const [sites, supervisors, records, fallbackReports] = await Promise.all([
     prisma.site.findMany({
@@ -126,7 +128,7 @@ export async function getTeamPresences(
         name: true,
       },
     }),
-    findScopedSupervisors(prisma, scopedSiteIds),
+    findScopedSupervisors(prisma, scopedSiteIds, resourceRole),
     prisma.clockInRecord.findMany({
       where: {
         status: ClockInStatus.VALID,
@@ -135,7 +137,7 @@ export async function getTeamPresences(
           in: scopedSiteIds,
         },
         user: {
-          role: Role.SUPERVISOR,
+          role: resourceRole,
           isActive: true,
         },
       },
@@ -170,7 +172,7 @@ export async function getTeamPresences(
           in: scopedSiteIds,
         },
         user: {
-          role: Role.SUPERVISOR,
+          role: resourceRole,
           isActive: true,
         },
       },
@@ -232,6 +234,27 @@ async function getScopedTeamPresenceSiteIds(prisma: PrismaClient, user: AuthLike
     return getOperationalSiteIds(prisma, user.id);
   }
 
+  if (user.role === Role.BE_MANAGER) {
+    const sites = await prisma.site.findMany({
+      where: {
+        planningAssignments: {
+          some: {
+            deletedAt: null,
+            supervisor: {
+              role: Role.BE_RESOURCE,
+              isActive: true,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return sites.map((site) => site.id);
+  }
+
   const sites = await prisma.site.findMany({
     where:
       user.role === Role.PROJECT_MANAGER
@@ -249,16 +272,26 @@ async function getScopedTeamPresenceSiteIds(prisma: PrismaClient, user: AuthLike
   return sites.map((site) => site.id);
 }
 
-async function findScopedSupervisors(prisma: PrismaClient, siteIds: string[]) {
+async function findScopedSupervisors(prisma: PrismaClient, siteIds: string[], resourceRole: Role) {
   if (siteIds.length === 0) {
     return [];
   }
 
   return prisma.user.findMany({
     where: {
-      role: Role.SUPERVISOR,
+      role: resourceRole,
       isActive: true,
       OR: [
+        {
+          planningAssignments: {
+            some: {
+              deletedAt: null,
+              siteId: {
+                in: siteIds,
+              },
+            },
+          },
+        },
         {
           teamMemberships: {
             some: {

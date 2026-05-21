@@ -599,7 +599,7 @@ function AssignmentTaskRow({
     <section className="rounded-lg border border-slate-100 bg-slate-50 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Tache {index + 1}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Tâche {index + 1}</p>
           <p className="mt-1 text-sm leading-6 text-slate-800">{assignment.action}</p>
         </div>
         <IconButton label="Modifier" onClick={onEdit}>
@@ -772,7 +772,7 @@ function AssignmentBottomSheet({
               ) : null}
               {displayedSites.map((site) => (
                 <option key={site.id} value={site.id}>
-                  {site.project.name} — {site.name}
+                  {site.project.name} â€” {site.name}
                 </option>
               ))}
             </select>
@@ -926,8 +926,8 @@ const planningStatusConfig: Record<PlanningAssignmentStatus, { label: string; cl
 };
 
 const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
-  ON_SITE: 'Presence chantier requise',
-  OFFICE: 'Tache bureau / coordination',
+  ON_SITE: 'Présence chantier requise',
+  OFFICE: 'Tâche bureau / coordination',
 };
 
 function createEmptyForm(date: string): CreateAssignmentRequest {

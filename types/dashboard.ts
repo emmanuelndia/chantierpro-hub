@@ -13,7 +13,8 @@ export type DashboardSupportedRole =
   | 'DIRECTION'
   | 'ADMIN'
   | 'COORDINATOR'
-  | 'GENERAL_SUPERVISOR';
+  | 'GENERAL_SUPERVISOR'
+  | 'BE_MANAGER';
 
 export type DashboardStat = {
   label: string;
@@ -189,7 +190,7 @@ export type CoordinatorDashboardData = {
 };
 
 export type GeneralSupervisorDashboardData = {
-  role: 'GENERAL_SUPERVISOR';
+  role: 'GENERAL_SUPERVISOR' | 'BE_MANAGER';
   generatedAt: string;
   stats: DashboardStat[];
   entrustedSites: GeneralSupervisorSiteDashboardItem[];

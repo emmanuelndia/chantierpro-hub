@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { canUploadPhotos, createInternalPhotoUrl, jsonPhotoError, parsePhotoListQuery } from '@/lib/photos';
 import type { PaginatedPhotosResponse } from '@/types/photos';
-import { Prisma, ProjectStatus, SiteStatus } from '@prisma/client';
+import { Prisma, ProjectStatus, Role, SiteStatus } from '@prisma/client';
 
 const mobileGalleryPhotoSelect = {
   id: true,
@@ -262,6 +262,71 @@ export const GET = withAuth(async ({ user, req }) => {
           sites: siteRows,
         };
       }
+    }
+    else if (user.role === 'BE_MANAGER') {
+      const where: Prisma.PhotoWhereInput = {
+        isDeleted: false,
+        site: {
+          status: SiteStatus.ACTIVE,
+          planningAssignments: {
+            some: {
+              deletedAt: null,
+              supervisor: {
+                role: Role.BE_RESOURCE,
+                isActive: true,
+              },
+            },
+          },
+        },
+      };
+
+      addPhotoFilters(where, query);
+
+      const [photos, totalItems, authorRows, siteRows] = await Promise.all([
+        prisma.photo.findMany({
+          where,
+          orderBy: [{ timestampLocal: query.sort }, { id: query.sort }],
+          skip: (query.page - 1) * 20,
+          take: 20,
+          select: mobileGalleryPhotoSelect,
+        }),
+        prisma.photo.count({ where }),
+        prisma.photo.findMany({
+          where,
+          distinct: ['uploadedById'],
+          orderBy: [{ uploadedBy: { firstName: 'asc' } }, { uploadedBy: { lastName: 'asc' } }],
+          select: {
+            uploadedBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        }),
+        prisma.site.findMany({
+          where: where.site as Prisma.SiteWhereInput,
+          select: {
+            id: true,
+            name: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        }),
+      ]);
+
+      photosResponse = {
+        items: photos.map(serializeMobileGalleryPhoto),
+        page: query.page,
+        pageSize: 20,
+        totalItems,
+        totalPages: Math.max(1, Math.ceil(totalItems / 20)),
+        authors: authorRows.map((row) => row.uploadedBy),
+        sites: siteRows,
+      };
     }
 
     if (!photosResponse) {

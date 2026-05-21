@@ -9,7 +9,7 @@ export default async function MobilePlanningRoute() {
     redirect('/mobile/login?next=/mobile/planning');
   }
 
-  if (session.role !== 'GENERAL_SUPERVISOR' && session.role !== 'PROJECT_MANAGER') {
+  if (session.role !== 'GENERAL_SUPERVISOR' && session.role !== 'BE_MANAGER' && session.role !== 'PROJECT_MANAGER') {
     redirect('/mobile/profile');
   }
 

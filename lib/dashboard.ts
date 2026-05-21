@@ -30,9 +30,10 @@ const DASHBOARD_ROLES: readonly DashboardSupportedRole[] = [
   Role.ADMIN,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_MANAGER,
 ] as const;
 
-const FIELD_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
+const FIELD_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
 
 type AuthLikeUser = {
   id: string;
@@ -88,7 +89,9 @@ export async function getDashboardData(prisma: PrismaClient, user: AuthLikeUser)
     case Role.COORDINATOR:
       return getCoordinatorDashboard(prisma, user.id);
     case Role.GENERAL_SUPERVISOR:
-      return getGeneralSupervisorDashboard(prisma, user.id);
+      return getGeneralSupervisorDashboard(prisma, user.id, user.role);
+    case Role.BE_MANAGER:
+      return getGeneralSupervisorDashboard(prisma, user.id, user.role);
     default:
       throw new Error(`Unsupported dashboard role: ${user.role}`);
   }
@@ -672,11 +675,28 @@ async function getCoordinatorDashboard(prisma: PrismaClient, userId: string): Pr
   };
 }
 
-async function getGeneralSupervisorDashboard(prisma: PrismaClient, userId: string): Promise<DashboardResponse> {
+async function getGeneralSupervisorDashboard(
+  prisma: PrismaClient,
+  userId: string,
+  role: 'GENERAL_SUPERVISOR' | 'BE_MANAGER',
+): Promise<DashboardResponse> {
   const now = new Date();
   const today = dayRange(now);
   const todayDate = today.from;
-  const siteWhere = generalSupervisorPlanningSiteWhere({ id: userId, role: Role.GENERAL_SUPERVISOR }, todayDate);
+  const siteWhere =
+    role === Role.BE_MANAGER
+      ? {
+          planningAssignments: {
+            some: {
+              deletedAt: null,
+              supervisor: {
+                role: Role.BE_RESOURCE,
+                isActive: true,
+              },
+            },
+          },
+        }
+      : generalSupervisorPlanningSiteWhere({ id: userId, role: Role.GENERAL_SUPERVISOR }, todayDate);
   const entrustedSites = await prisma.site.findMany({
     where: siteWhere,
     orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
@@ -910,14 +930,17 @@ async function getGeneralSupervisorDashboard(prisma: PrismaClient, userId: strin
     alerts.push({
       id: 'no-entrusted-sites',
       level: 'info',
-      title: 'Aucun chantier confie',
-      description: "Aucun perimetre actif aujourd'hui. Les widgets planning et rapports restent donc vides.",
+      title: role === Role.BE_MANAGER ? 'Aucun chantier BE planifie' : 'Aucun chantier confie',
+      description:
+        role === Role.BE_MANAGER
+          ? "Aucune ressource BE n'est encore assignee sur un chantier."
+          : "Aucun perimetre actif aujourd'hui. Les widgets planning et rapports restent donc vides.",
       badge: 'Scope',
     });
   }
 
   return {
-    role: Role.GENERAL_SUPERVISOR,
+    role,
     generatedAt: now.toISOString(),
     stats: [
       createStat('sites', 'Sites confies', entrustedSites.length, 'primary'),

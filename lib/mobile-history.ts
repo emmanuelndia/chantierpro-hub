@@ -57,7 +57,7 @@ type DraftSession = {
   records: ClockInRow[];
 };
 
-const FIELD_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
+const FIELD_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 30;
 

@@ -69,7 +69,7 @@ export const GET = withAuth(
       }),
     );
   },
-  [Role.ADMIN, Role.DIRECTION, Role.GENERAL_SUPERVISOR, Role.PROJECT_MANAGER, Role.COORDINATOR],
+  [Role.ADMIN, Role.DIRECTION, Role.GENERAL_SUPERVISOR, Role.BE_MANAGER, Role.PROJECT_MANAGER, Role.COORDINATOR],
 );
 
 export const POST = withAuth(

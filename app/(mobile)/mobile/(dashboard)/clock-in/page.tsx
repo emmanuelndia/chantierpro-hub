@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { MobileClockInPage } from '@/components/mobile-clock-in-page';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
 
-const fieldRoles = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR'] as const;
+const fieldRoles = ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE'] as const;
 
 export default async function MobileClockInRoutePage() {
   const session = await getCurrentWebSession();

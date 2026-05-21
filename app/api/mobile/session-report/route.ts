@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import type { ReportSubmissionResponse, SubmitReportRequest } from '@/types/mobile-session-report';
 
-const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
+const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
 
 export const POST = withAuth(async ({ user, req }) => {
   if (!allowedRoles.includes(user.role)) {

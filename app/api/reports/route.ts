@@ -8,7 +8,7 @@ export const GET = withAuth(async ({ user }) => {
   try {
     const where: Prisma.ReportWhereInput = {};
     
-    if (user.role === Role.SUPERVISOR) {
+    if (user.role === Role.SUPERVISOR || user.role === Role.BE_RESOURCE) {
       where.userId = user.id;
     }
 
@@ -16,6 +16,23 @@ export const GET = withAuth(async ({ user }) => {
       const siteIds = await getOperationalSiteIds(prisma, user.id);
       where.siteId = { in: siteIds };
     }
+<<<<<<< HEAD
+=======
+
+    if (user.role === Role.BE_MANAGER) {
+      where.site = {
+        planningAssignments: {
+          some: {
+            deletedAt: null,
+            supervisor: {
+              role: Role.BE_RESOURCE,
+              isActive: true,
+            },
+          },
+        },
+      };
+    }
+>>>>>>> develop
 
     const reports = await prisma.report.findMany({
       where,

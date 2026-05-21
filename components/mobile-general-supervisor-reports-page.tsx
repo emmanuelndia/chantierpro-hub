@@ -65,7 +65,9 @@ export function MobileGeneralSupervisorReportsPage({ user }: MobileGeneralSuperv
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Général superviseur</p>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+          {user.role === 'BE_MANAGER' ? "Bureau d'etude" : 'Général superviseur'}
+        </p>
         <h1 className="mt-1 text-2xl font-black text-slate-950">Rapports terrain</h1>
       </div>
       <MobileReportsList reports={reports} />

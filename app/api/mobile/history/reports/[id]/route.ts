@@ -4,7 +4,7 @@ import { withAuth } from '@/lib/auth/with-auth';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import type { ReportDetail } from '@/types/mobile-history-reports';
 
-const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
+const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
 
 export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
   if (!allowedRoles.includes(user.role)) {

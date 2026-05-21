@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { getOperationalSiteIds } from '@/lib/dashboard';
 import { canCreateReports, canReadAllReports, jsonReportError } from '@/lib/reports';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { jsPDF } from 'jspdf';
 
 const exportReportInclude = {
@@ -61,6 +61,21 @@ export const GET = withAuth(async ({ user, req }) => {
         lt: new Date(targetDate.setHours(23, 59, 59, 999)),
       },
       ...(siteIds ? { siteId: { in: siteIds } } : {}),
+      ...(user.role === Role.BE_MANAGER
+        ? {
+            site: {
+              planningAssignments: {
+                some: {
+                  deletedAt: null,
+                  supervisor: {
+                    role: Role.BE_RESOURCE,
+                    isActive: true,
+                  },
+                },
+              },
+            },
+          }
+        : {}),
     },
     include: exportReportInclude,
     orderBy: [

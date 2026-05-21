@@ -8,6 +8,7 @@ const mobileGalleryRoles: readonly Role[] = [
   Role.DIRECTION,
   Role.ADMIN,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_MANAGER,
   Role.COORDINATOR,
 ];
 
@@ -15,12 +16,14 @@ const mobileCameraRoles: readonly Role[] = [
   Role.SUPERVISOR,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_RESOURCE,
 ];
 
 const mobileCameraFabRoles: readonly Role[] = [
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_MANAGER,
   Role.COORDINATOR,
 ];
 

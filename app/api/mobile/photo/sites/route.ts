@@ -9,6 +9,7 @@ const mobilePhotoSiteRoles: readonly Role[] = [
   Role.SUPERVISOR,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_RESOURCE,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,

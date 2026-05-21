@@ -34,9 +34,11 @@ const initialPasswordValues: PasswordValues = {
 const roleLabels: Record<Role, string> = {
   ADMIN: 'Administrateur',
   HR: 'Ressources humaines',
-  SUPERVISOR: 'Chef de chantier',
+  SUPERVISOR: 'Superviseur',
   COORDINATOR: 'Coordinateur',
   GENERAL_SUPERVISOR: 'Superviseur général',
+  BE_MANAGER: "Responsable Bureau d'étude",
+  BE_RESOURCE: "Ressource Bureau d'étude",
   PROJECT_MANAGER: 'Chef de projet',
   DIRECTION: 'Direction',
 };

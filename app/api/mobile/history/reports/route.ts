@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import type { MobileReportsHistoryResponse, ReportSummary } from '@/types/mobile-history-reports';
 
-const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
+const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
 
 export const GET = withAuth(async ({ user, req }) => {
   if (!allowedRoles.includes(user.role)) {

@@ -24,6 +24,7 @@ type PresenceRecord = {
 const MOBILE_SITE_SUPERVISION_ROLES: readonly Role[] = [
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_MANAGER,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
 ];
@@ -135,6 +136,29 @@ async function getScopedSupervisionSite(prisma: PrismaClient, user: AuthLikeUser
     const siteIds = await getOperationalSiteIds(prisma, user.id);
 
     if (!siteIds.includes(siteId)) {
+      return null;
+    }
+  }
+
+  if (user.role === Role.BE_MANAGER) {
+    const site = await prisma.site.findFirst({
+      where: {
+        id: siteId,
+        status: SiteStatus.ACTIVE,
+        planningAssignments: {
+          some: {
+            deletedAt: null,
+            supervisor: {
+              role: Role.BE_RESOURCE,
+              isActive: true,
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!site) {
       return null;
     }
   }
