@@ -66,10 +66,10 @@ export function MobileOfficeAssignmentsSection({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-indigo-700">
-            Tâches bureau du jour
+            Taches bureau du jour
           </h2>
           <p className="mt-1 text-sm font-semibold text-indigo-900">
-            Ces tâches ne demandent pas de pointage chantier.
+            Ces taches ne demandent pas de pointage chantier.
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-bold text-indigo-700">
@@ -79,7 +79,7 @@ export function MobileOfficeAssignmentsSection({
 
       {usingOfflineData ? (
         <p className="mt-3 rounded-lg bg-white/80 p-3 text-xs font-semibold text-indigo-900">
-          Données hors ligne. Les tâches préparées du jour sont affichées.
+          Donnees hors ligne. Les taches preparees du jour sont affichees.
         </p>
       ) : null}
 

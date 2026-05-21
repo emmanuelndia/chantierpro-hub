@@ -60,7 +60,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
   },
   {
     href: '/web/supervisor-scopes',
-    label: 'Perimetres GS',
+    label: 'Perimetres',
     icon: 'users',
     roles: ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
     breadcrumb: ['Perimetres GS'],
@@ -210,7 +210,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
   },
   {
     href: '/mobile/supervisor-scopes',
-    label: 'Périmètres',
+    label: 'Perimetres',
     icon: 'teams',
     roles: ['PROJECT_MANAGER', 'DIRECTION'],
   },
@@ -224,15 +224,11 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/reports',
     label: 'Rapports',
     icon: 'reports',
-<<<<<<< HEAD
     roles: ['COORDINATOR'],
-=======
-    roles: ['COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_MANAGER'],
->>>>>>> develop
   },
   {
     href: '/mobile/teams',
-    label: 'Équipes',
+    label: 'Equipes',
     icon: 'teams',
     roles: [],
   },
@@ -312,7 +308,7 @@ export function getWebBreadcrumbs(pathname: string) {
   }
 
   if (/^\/web\/teams\/[^/]+\/edit$/.test(pathname)) {
-    return ['Equipes', 'Modifier'];
+    return ['Equipes', 'Modifier equipe'];
   }
 
   if (/^\/web\/teams\/[^/]+$/.test(pathname)) {

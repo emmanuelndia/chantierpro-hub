@@ -16,8 +16,6 @@ export const GET = withAuth(async ({ user }) => {
       const siteIds = await getOperationalSiteIds(prisma, user.id);
       where.siteId = { in: siteIds };
     }
-<<<<<<< HEAD
-=======
 
     if (user.role === Role.BE_MANAGER) {
       where.site = {
@@ -32,7 +30,6 @@ export const GET = withAuth(async ({ user }) => {
         },
       };
     }
->>>>>>> develop
 
     const reports = await prisma.report.findMany({
       where,
@@ -47,6 +44,6 @@ export const GET = withAuth(async ({ user }) => {
     return NextResponse.json({ data: reports, total: reports.length });
   } catch (error) {
     console.error('Error fetching all reports:', error);
-    return NextResponse.json({ error: 'Erreur lors de la récupération des rapports' }, { status: 500 });
+    return NextResponse.json({ error: 'Erreur lors de la recuperation des rapports' }, { status: 500 });
   }
 });

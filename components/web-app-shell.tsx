@@ -202,11 +202,7 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
         </header>
 
         <main className="custom-scrollbar h-[calc(100vh-4rem)] overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
-<<<<<<< HEAD
-          {user.mustChangePassword ? <MustChangePasswordBanner href="/settings/profil" variant="web" /> : null}
-=======
-          <MustChangePasswordBanner href="/settings/profil" show={user.mustChangePassword} />
->>>>>>> develop
+<MustChangePasswordBanner href="/settings/profil" show={user.mustChangePassword} />
           {children}
         </main>
       </div>

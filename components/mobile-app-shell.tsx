@@ -95,11 +95,7 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
 
         {shouldEnableTerrainOffline ? <OfflineBanner /> : null}
         {shouldEnableTerrainOffline ? <MobileOfflineStatus /> : null}
-<<<<<<< HEAD
-        {user.mustChangePassword ? <MustChangePasswordBanner href="/mobile/profile" variant="mobile" /> : null}
-=======
-        <MustChangePasswordBanner href="/mobile/profile" show={user.mustChangePassword} />
->>>>>>> develop
+<MustChangePasswordBanner href="/mobile/profile" show={user.mustChangePassword} />
 
         <main className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-4">
           {children}
