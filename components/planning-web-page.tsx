@@ -54,15 +54,15 @@ const buttonClassName =
   'rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 
 const planningStatusLabel: Record<PlanningAssignmentStatus, string> = {
-  ASSIGNED: 'Non demarre',
+  ASSIGNED: 'Non démarré',
   IN_PROGRESS: 'En cours',
-  COMPLETED: 'Termine',
-  CANCELLED: 'Annule',
+  COMPLETED: 'Terminé',
+  CANCELLED: 'Annulé',
 };
 
 const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
-  ON_SITE: 'Presence chantier requise',
-  OFFICE: 'Tache bureau / coordination',
+  ON_SITE: 'Présence chantier requise',
+  OFFICE: 'Tâche bureau / coordination',
 };
 
 export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
@@ -702,7 +702,7 @@ function AssignmentDrawer({
             />
             {!progressValid ? <p className="mt-2 text-xs font-semibold text-red-600">La progression doit etre entre 0 et 100.</p> : null}
           </Field>
-          <Field label="Type de tÃ¢che">
+          <Field label="Type de tâche">
             <select
               className={filterClassName}
               onChange={(event) => onChange({ ...form, workLocationType: event.target.value as PlanningWorkLocationType })}
@@ -715,7 +715,7 @@ function AssignmentDrawer({
               ))}
             </select>
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              Une tÃ¢che bureau reste dans le planning, mais ne demande pas de pointage chantier.
+              Une tâche bureau reste dans le planning, mais ne demande pas de pointage chantier.
             </p>
           </Field>
           {mode === 'edit' ? (

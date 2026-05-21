@@ -1,7 +1,7 @@
 import type { Role } from '@prisma/client';
 
 const ROLE_LABELS: Record<Role, string> = {
-  SUPERVISOR: 'Chef de chantier',
+  SUPERVISOR: 'Superviseur',
   COORDINATOR: 'Coordinateur',
   GENERAL_SUPERVISOR: 'Superviseur general',
   BE_MANAGER: "Responsable Bureau d'etude",

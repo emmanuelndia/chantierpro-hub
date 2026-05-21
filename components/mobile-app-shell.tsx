@@ -7,6 +7,7 @@ import { BottomTabBar } from '@/components/bottom-tab-bar';
 import { MobileOfflineAutoSync } from '@/components/mobile-offline-auto-sync';
 import { MobileOfflinePreparer } from '@/components/mobile-offline-preparer';
 import { MobileOfflineStatus } from '@/components/mobile-offline-status';
+import { MustChangePasswordBanner } from '@/components/must-change-password-banner';
 import { OfflineBanner } from '@/components/offline-banner';
 import { authFetch } from '@/lib/auth/client-session';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
@@ -94,6 +95,7 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
 
         {shouldEnableTerrainOffline ? <OfflineBanner /> : null}
         {shouldEnableTerrainOffline ? <MobileOfflineStatus /> : null}
+        <MustChangePasswordBanner href="/mobile/profile" show={user.mustChangePassword} />
 
         <main className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-4">
           {children}
