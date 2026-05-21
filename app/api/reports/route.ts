@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { Prisma, Role } from '@prisma/client';
+import { getOperationalSiteIds } from '@/lib/dashboard';
 
 export const GET = withAuth(async ({ user }) => {
   try {
@@ -10,8 +11,11 @@ export const GET = withAuth(async ({ user }) => {
     if (user.role === Role.SUPERVISOR) {
       where.userId = user.id;
     }
-    // For other roles, they might see all reports or filter by their managed sites
-    // For now, let's keep it simple as requested
+
+    if (user.role === Role.COORDINATOR) {
+      const siteIds = await getOperationalSiteIds(prisma, user.id);
+      where.siteId = { in: siteIds };
+    }
 
     const reports = await prisma.report.findMany({
       where,

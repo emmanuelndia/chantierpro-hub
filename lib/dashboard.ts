@@ -1,6 +1,7 @@
 import {
   ClockInStatus,
   ClockInType,
+  PlanningAssignmentStatus,
   ProjectStatus,
   ReportValidationStatus,
   Role,
@@ -1071,6 +1072,17 @@ export async function getOperationalSiteIds(prisma: PrismaClient, userId: string
           photos: {
             some: {
               uploadedById: userId,
+            },
+          },
+        },
+        {
+          planningAssignments: {
+            some: {
+              supervisorId: userId,
+              deletedAt: null,
+              status: {
+                not: PlanningAssignmentStatus.CANCELLED,
+              },
             },
           },
         },
