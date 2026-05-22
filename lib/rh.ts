@@ -26,6 +26,9 @@ const rhClockInRecordSelect = {
   timestampLocal: true,
   distanceToSite: true,
   comment: true,
+  isRemoteCheckout: true,
+  isAutoClosed: true,
+  isRegularized: true,
   user: {
     select: {
       id: true,
@@ -88,6 +91,8 @@ type SessionBuildState = {
 };
 
 type BuiltSession = {
+  arrivalRecordId: string;
+  departureRecordId: string | null;
   userId: string;
   firstName: string;
   lastName: string;
@@ -103,8 +108,11 @@ type BuiltSession = {
   pauseDurationHours: number;
   distanceMeters: number;
   comment: string | null;
-  status: 'VALID' | 'INCOMPLETE_SESSION';
+  status: 'COMPLETE' | 'INCOMPLETE_SESSION' | 'TO_REGULARIZE' | 'TO_REVIEW_RH';
   incomplete: boolean;
+  isRemoteCheckout: boolean;
+  isAutoClosed: boolean;
+  isRegularized: boolean;
   startedAt: string;
 };
 
@@ -320,6 +328,111 @@ export async function getRhPresenceDetailForUser(
     sessions: sortedSessions,
   };
 }
+
+export async function regularizeRhSession(
+  prisma: PrismaClient,
+  payload: {
+    arrivalRecordId: string;
+    correctedDepartureTime: string;
+    comment: string;
+    author: AuthLikeUser;
+  },
+) {
+  if (!canAccessRh(payload.author.role)) {
+    return { code: 'FORBIDDEN' as const, recordId: null };
+  }
+
+  const comment = payload.comment.trim();
+  const correctedDepartureTime = new Date(payload.correctedDepartureTime);
+
+  if (!comment || Number.isNaN(correctedDepartureTime.getTime())) {
+    return { code: 'BAD_REQUEST' as const, recordId: null };
+  }
+
+  const arrival = await prisma.clockInRecord.findUnique({
+    where: { id: payload.arrivalRecordId },
+    select: {
+      id: true,
+      siteId: true,
+      userId: true,
+      type: true,
+      status: true,
+      clockInDate: true,
+      latitude: true,
+      longitude: true,
+      accuracy: true,
+      distanceToSite: true,
+      timestampLocal: true,
+    },
+  });
+
+  if (arrival?.type !== ClockInType.ARRIVAL || arrival.status !== ClockInStatus.VALID) {
+    return { code: 'NOT_FOUND' as const, recordId: null };
+  }
+
+  if (correctedDepartureTime.getTime() <= arrival.timestampLocal.getTime()) {
+    return { code: 'BAD_REQUEST' as const, recordId: null };
+  }
+
+  const existingDeparture = await prisma.clockInRecord.findFirst({
+    where: {
+      userId: arrival.userId,
+      siteId: arrival.siteId,
+      status: ClockInStatus.VALID,
+      type: ClockInType.DEPARTURE,
+      timestampLocal: {
+        gt: arrival.timestampLocal,
+      },
+    },
+    orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    select: { id: true },
+  });
+
+  if (existingDeparture) {
+    return { code: 'BAD_REQUEST' as const, recordId: null };
+  }
+
+  const departure = await prisma.$transaction(async (tx) => {
+    const created = await tx.clockInRecord.create({
+      data: {
+        siteId: arrival.siteId,
+        userId: arrival.userId,
+        type: ClockInType.DEPARTURE,
+        clockInDate: new Date(`${correctedDepartureTime.toISOString().slice(0, 10)}T00:00:00.000Z`),
+        clockInTime: correctedDepartureTime,
+        latitude: arrival.latitude,
+        longitude: arrival.longitude,
+        accuracy: arrival.accuracy,
+        distanceToSite: arrival.distanceToSite,
+        status: ClockInStatus.VALID,
+        comment,
+        timestampLocal: correctedDepartureTime,
+        isRegularized: true,
+      },
+      select: { id: true },
+    });
+
+    await tx.clockInRegularization.create({
+      data: {
+        clockInRecordId: created.id,
+        correctedDepartureTime,
+        authorId: payload.author.id,
+        comment,
+      },
+    });
+
+    await tx.clockInRecord.update({
+      where: { id: arrival.id },
+      data: { isRegularized: true },
+      select: { id: true },
+    });
+
+    return created;
+  });
+
+  return { code: null, recordId: departure.id };
+}
+
 
 export async function buildRhExportArtifact(
   prisma: PrismaClient,
@@ -726,8 +839,11 @@ function buildCompleteSession(
   const durationMs = Math.max(0, departure.timestampLocal.getTime() - arrival.timestampLocal.getTime());
   const realDurationHours = roundHours((durationMs - accumulatedPauseMs) / 3_600_000);
   const pauseDurationHours = roundHours(accumulatedPauseMs / 3_600_000);
+  const needsReview = departure.isRemoteCheckout && realDurationHours > 6;
 
   return {
+    arrivalRecordId: arrival.id,
+    departureRecordId: departure.id,
     userId: arrival.userId,
     firstName: arrival.user.firstName,
     lastName: arrival.user.lastName,
@@ -743,8 +859,11 @@ function buildCompleteSession(
     pauseDurationHours,
     distanceMeters: Math.round(arrival.distanceToSite.toNumber() * 1000),
     comment: departure?.comment ?? arrival.comment,
-    status: 'VALID',
+    status: needsReview ? 'TO_REVIEW_RH' : 'COMPLETE',
     incomplete: false,
+    isRemoteCheckout: departure.isRemoteCheckout,
+    isAutoClosed: departure.isAutoClosed,
+    isRegularized: departure.isRegularized,
     startedAt: arrival.timestampLocal.toISOString(),
   };
 }
@@ -753,7 +872,11 @@ function buildIncompleteSession(
   arrival: SerializableRhClockInRecord,
   accumulatedPauseMs: number,
 ): BuiltSession {
+  const isPreviousDay = arrival.timestampLocal.toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10);
+
   return {
+    arrivalRecordId: arrival.id,
+    departureRecordId: null,
     userId: arrival.userId,
     firstName: arrival.user.firstName,
     lastName: arrival.user.lastName,
@@ -769,8 +892,11 @@ function buildIncompleteSession(
     pauseDurationHours: roundHours(accumulatedPauseMs / 3_600_000),
     distanceMeters: Math.round(arrival.distanceToSite.toNumber() * 1000),
     comment: arrival.comment,
-    status: 'INCOMPLETE_SESSION',
+    status: isPreviousDay || arrival.isAutoClosed ? 'TO_REGULARIZE' : 'INCOMPLETE_SESSION',
     incomplete: true,
+    isRemoteCheckout: false,
+    isAutoClosed: isPreviousDay || arrival.isAutoClosed,
+    isRegularized: arrival.isRegularized,
     startedAt: arrival.timestampLocal.toISOString(),
   };
 }
@@ -822,6 +948,8 @@ function buildPresenceSummary(sessions: BuiltSession[]): RhPresenceSummaryItem {
 
 function serializeRhPresenceSession(session: BuiltSession): RhPresenceSessionItem {
   return {
+    arrivalRecordId: session.arrivalRecordId,
+    departureRecordId: session.departureRecordId,
     date: session.date,
     siteId: session.siteId,
     siteName: session.siteName,
@@ -833,6 +961,9 @@ function serializeRhPresenceSession(session: BuiltSession): RhPresenceSessionIte
     comment: session.comment,
     status: session.status,
     incomplete: session.incomplete,
+    isRemoteCheckout: session.isRemoteCheckout,
+    isAutoClosed: session.isAutoClosed,
+    isRegularized: session.isRegularized,
   };
 }
 

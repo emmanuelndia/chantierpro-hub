@@ -129,6 +129,7 @@ model User {
   reports            Report[]
   reportsValidated   Report[]            @relation("ReportValidator")
   rhExportsCreated   RhExportHistory[]    @relation("RhExportCreator")
+  clockInRegularizations ClockInRegularization[] @relation("ClockInRegularizationAuthor")
   refreshTokens      RefreshToken[]
   pushTokens         PushToken[]
   loginAttempts      LoginAttempt[]
@@ -239,14 +240,33 @@ model ClockInRecord {
   status         ClockInStatus
   comment        String?
   timestampLocal DateTime
+  isRemoteCheckout Boolean      @default(false)
+  isAutoClosed     Boolean      @default(false)
+  isRegularized    Boolean      @default(false)
   createdAt      DateTime       @default(now())
   site           Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
   user           User           @relation(fields: [userId], references: [id])
   report         Report?
+  regularizations ClockInRegularization[]
 
   @@index([siteId])
   @@index([userId])
   @@index([userId, siteId, clockInDate])
+}
+
+model ClockInRegularization {
+  id                     String        @id @default(cuid())
+  clockInRecordId        String
+  correctedDepartureTime DateTime
+  authorId               String
+  comment                String
+  createdAt              DateTime      @default(now())
+  clockInRecord          ClockInRecord @relation(fields: [clockInRecordId], references: [id], onDelete: Cascade)
+  author                 User          @relation("ClockInRegularizationAuthor", fields: [authorId], references: [id])
+
+  @@index([clockInRecordId])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 model Report {

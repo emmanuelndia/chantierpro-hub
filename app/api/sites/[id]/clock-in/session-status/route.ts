@@ -3,7 +3,7 @@ import { withAuth } from '@/lib/auth/with-auth';
 import {
   getActivePause,
   getAccessibleClockInSite,
-  getOpenSession,
+  getOpenSessionForUser,
   isTechnician,
   jsonClockInError,
   serializeSessionStatus,
@@ -28,7 +28,7 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
     );
   }
 
-  const openSession = await getOpenSession(prisma, site.id, user.id);
-  const activePause = await getActivePause(prisma, site.id, user.id);
+  const openSession = await getOpenSessionForUser(prisma, user.id);
+  const activePause = openSession ? await getActivePause(prisma, openSession.siteId, user.id) : null;
   return Response.json(serializeSessionStatus(openSession, activePause));
 });

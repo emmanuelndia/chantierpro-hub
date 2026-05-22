@@ -26,6 +26,7 @@ export const GET = withAuth(async ({ user }) => {
       .map((record) => ({
         id: record.id,
         siteId: record.siteId,
+        userId: record.userId,
         type: record.type,
         status: record.status,
         timestampLocal: record.timestampLocal,

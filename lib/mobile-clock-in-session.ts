@@ -3,6 +3,7 @@ import type { OfflineClockInItem } from '@/lib/mobile-offline-db';
 
 type ClockInEvent = {
   siteId: string;
+  siteName: string;
   type: ClockInRecordItem['type'];
   timestampLocal: string;
 };
@@ -16,34 +17,39 @@ export function buildLocalSessionStatus(
     ...serverItems.filter((item) => item.status === 'VALID').map(toClockInEvent),
     ...pendingItems.map(toClockInEvent),
   ]
-    .filter((item) => item.siteId === siteId)
     .sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal));
 
   let arrivalTime: string | null = null;
+  let openSiteId: string | null = null;
+  let openSiteName: string | null = null;
   let pauseStartedAt: string | null = null;
   let accumulatedPauseSeconds = 0;
 
   for (const event of events) {
     if (event.type === 'ARRIVAL') {
       arrivalTime = event.timestampLocal;
+      openSiteId = event.siteId;
+      openSiteName = event.siteName;
       pauseStartedAt = null;
       accumulatedPauseSeconds = 0;
       continue;
     }
 
-    if (event.type === 'PAUSE_START' && arrivalTime && !pauseStartedAt) {
+    if (event.type === 'PAUSE_START' && arrivalTime && openSiteId === event.siteId && !pauseStartedAt) {
       pauseStartedAt = event.timestampLocal;
       continue;
     }
 
-    if (event.type === 'PAUSE_END' && arrivalTime && pauseStartedAt) {
+    if (event.type === 'PAUSE_END' && arrivalTime && openSiteId === event.siteId && pauseStartedAt) {
       accumulatedPauseSeconds += elapsedSeconds(pauseStartedAt, event.timestampLocal);
       pauseStartedAt = null;
       continue;
     }
 
-    if (event.type === 'DEPARTURE' && arrivalTime) {
+    if (event.type === 'DEPARTURE' && arrivalTime && openSiteId === event.siteId) {
       arrivalTime = null;
+      openSiteId = null;
+      openSiteName = null;
       pauseStartedAt = null;
       accumulatedPauseSeconds = 0;
     }
@@ -56,6 +62,8 @@ export function buildLocalSessionStatus(
       duration: null,
       pauseActive: false,
       pauseDuration: 0,
+      openSessionSiteId: null,
+      openSessionSiteName: null,
     };
   }
 
@@ -69,12 +77,15 @@ export function buildLocalSessionStatus(
     duration: Math.max(0, elapsedSeconds(arrivalTime, now) - pauseDuration),
     pauseActive: Boolean(pauseStartedAt),
     pauseDuration,
+    openSessionSiteId: openSiteId,
+    openSessionSiteName: openSiteName,
   };
 }
 
 function toClockInEvent(item: ClockInRecordItem | OfflineClockInItem): ClockInEvent {
   return {
     siteId: item.siteId,
+    siteName: item.siteName,
     type: item.type,
     timestampLocal: item.timestampLocal,
   };

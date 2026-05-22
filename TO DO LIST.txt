@@ -27,3 +27,22 @@ Retour chef projet:
 Quand on finit d'assigner les ressources aux chantiers on doit pouvoir télécharger le recap du planning 
 
 Possibilité de suivre l'évolution des projets
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

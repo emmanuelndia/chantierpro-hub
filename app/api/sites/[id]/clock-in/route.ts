@@ -9,7 +9,7 @@ import {
   getActivePause,
   getAccessibleClockInSite,
   getClockInHistoryForSiteAndUser,
-  getOpenSession,
+  getOpenSessionForUser,
   isTechnician,
   isWithinSiteRadius,
   jsonClockInError,
@@ -69,9 +69,24 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonClockInError('GPS_SPOOFING_SUSPECTED', 400, gpsValidationError);
   }
 
-  const openSession = await getOpenSession(prisma, site.id, user.id);
+  const openSession = await getOpenSessionForUser(prisma, user.id);
 
   if (input.type === 'ARRIVAL' && openSession) {
+    if (openSession.siteId !== site.id) {
+      return jsonClockInError(
+        'SESSION_ALREADY_OPEN',
+        409,
+        `Session ouverte sur ${openSession.site.name} depuis ${formatTime(openSession.timestampLocal)}. Pointez votre sortie avant de changer de chantier.`,
+        {
+          openSession: {
+            siteId: openSession.siteId,
+            siteName: openSession.site.name,
+            arrivalAt: openSession.timestampLocal.toISOString(),
+          },
+        },
+      );
+    }
+
     return jsonClockInError(
       'SESSION_ALREADY_OPEN',
       400,
@@ -79,7 +94,10 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     );
   }
 
-  if ((input.type === 'DEPARTURE' || input.type === 'INTERMEDIATE') && !openSession) {
+  if (
+    (input.type === 'DEPARTURE' || input.type === 'INTERMEDIATE') &&
+    openSession?.siteId !== site.id
+  ) {
     return jsonClockInError(
       'NO_OPEN_SESSION',
       400,
@@ -89,7 +107,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const activePause = await getActivePause(prisma, site.id, user.id);
 
-  if (input.type === 'PAUSE_START' && !openSession) {
+  if (input.type === 'PAUSE_START' && openSession?.siteId !== site.id) {
     return jsonClockInError(
       'NO_OPEN_SESSION',
       400,
@@ -115,10 +133,14 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const distanceKm = calculateDistanceToSite(site, input);
   const withinRadius = isWithinSiteRadius(site, distanceKm);
+  const remoteCheckoutSite =
+    input.type === ClockInType.DEPARTURE && !withinRadius
+      ? await findRemoteCheckoutTarget(site.id, user.id, input)
+      : null;
   const remoteDepartureAllowed =
     input.type === ClockInType.DEPARTURE &&
     !withinRadius &&
-    (await canCloseSessionRemotely(site.id, user.id, input.timestampLocal));
+    Boolean(remoteCheckoutSite);
   const status = withinRadius || remoteDepartureAllowed ? ClockInStatus.VALID : ClockInStatus.REJECTED;
   const recordInput = remoteDepartureAllowed
     ? {
@@ -131,12 +153,13 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     : input;
 
   const record = await createClockInRecord(prisma, {
-    siteId: site.id,
-    userId: user.id,
-    input: recordInput,
-    distanceKm,
-    status,
-  });
+      siteId: site.id,
+      userId: user.id,
+      input: recordInput,
+      distanceKm,
+      status,
+      isRemoteCheckout: remoteDepartureAllowed,
+    });
 
   if (!withinRadius && !remoteDepartureAllowed) {
     return jsonClockInError(
@@ -153,59 +176,49 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
   return Response.json({ record }, { status: 201 });
 });
 
-async function canCloseSessionRemotely(siteId: string, userId: string, timestampLocal: string) {
-  const clockInDate = new Date(`${new Date(timestampLocal).toISOString().slice(0, 10)}T00:00:00.000Z`);
-  const [otherAssignment, otherRecords] = await Promise.all([
-    prisma.planningAssignment.findFirst({
-      where: {
-        supervisorId: userId,
-        date: clockInDate,
-        deletedAt: null,
-        siteId: {
-          not: siteId,
+async function findRemoteCheckoutTarget(
+  siteId: string,
+  userId: string,
+  input: {
+    latitude: number;
+    longitude: number;
+    timestampLocal: string;
+  },
+) {
+  const clockInDate = new Date(`${new Date(input.timestampLocal).toISOString().slice(0, 10)}T00:00:00.000Z`);
+  const assignments = await prisma.planningAssignment.findMany({
+    where: {
+      supervisorId: userId,
+      date: clockInDate,
+      deletedAt: null,
+      siteId: {
+        not: siteId,
+      },
+    },
+    select: {
+      site: {
+        select: {
+          id: true,
+          name: true,
+          latitude: true,
+          longitude: true,
+          radiusKm: true,
         },
       },
-      select: {
-        id: true,
-      },
-    }),
-    prisma.clockInRecord.findMany({
-      where: {
-        userId,
-        clockInDate,
-        status: ClockInStatus.VALID,
-        siteId: {
-          not: siteId,
-        },
-      },
-      orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
-      select: {
-        siteId: true,
-        type: true,
-      },
-    }),
-  ]);
+    },
+  });
 
-  if (otherAssignment) {
-    return true;
-  }
-
-  const openSites = new Set<string>();
-  for (const record of otherRecords) {
-    if (record.type === ClockInType.ARRIVAL) {
-      openSites.add(record.siteId);
-      continue;
-    }
-
-    if (record.type === ClockInType.DEPARTURE) {
-      openSites.delete(record.siteId);
-    }
-  }
-
-  return openSites.size > 0;
+  return assignments.find((assignment) => {
+    const distance = calculateDistanceToSite(assignment.site, input);
+    return isWithinSiteRadius(assignment.site, distance);
+  })?.site ?? null;
 }
 
 function appendClockInComment(existing: string | null | undefined, note: string) {
   const trimmed = existing?.trim();
   return trimmed ? `${note}\n${trimmed}` : note;
+}
+
+function formatTime(value: Date) {
+  return value.toISOString().slice(11, 16);
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
@@ -30,6 +30,7 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [siteIds, setSiteIds] = useState<string[]>([]);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const monthOptions = useMemo(() => buildMonthOptions(), []);
 
@@ -93,6 +94,24 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
       return (await response.json()) as RhUserPresenceDetail;
     },
     enabled: expandedUserId !== null,
+  });
+
+  const regularizeMutation = useMutation({
+    mutationFn: async (payload: { arrivalRecordId: string; correctedDepartureTime: string; comment: string }) => {
+      const response = await authFetch('/api/rh/presences/regularize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Regularisation impossible.');
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['rh-presences'] });
+      await queryClient.invalidateQueries({ queryKey: ['rh-presence-detail'] });
+    },
   });
 
   const visibleSites = useMemo(() => {
@@ -307,6 +326,26 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
                     onToggle={() =>
                       setExpandedUserId((current) => (current === item.userId ? null : item.userId))
                     }
+                    onRegularize={(session) => {
+                      const time = window.prompt(
+                        'Heure de sortie corrigee (format HH:MM)',
+                        session.departureTime ?? '17:00',
+                      );
+                      if (!time) {
+                        return;
+                      }
+
+                      const comment = window.prompt('Commentaire obligatoire de regularisation');
+                      if (!comment?.trim()) {
+                        return;
+                      }
+
+                      regularizeMutation.mutate({
+                        arrivalRecordId: session.arrivalRecordId,
+                        correctedDepartureTime: `${session.date}T${time}:00.000Z`,
+                        comment: comment.trim(),
+                      });
+                    }}
                     row={item}
                   />
                 ))
@@ -325,12 +364,14 @@ function ResourcePresenceRow({
   loadingDetail,
   detail,
   onToggle,
+  onRegularize,
 }: Readonly<{
   row: RhPresenceSummaryItem;
   expanded: boolean;
   loadingDetail: boolean;
   detail: RhUserPresenceDetail | null;
   onToggle: () => void;
+  onRegularize: (session: RhUserPresenceDetail['sessions'][number]) => void;
 }>) {
   return (
     <>
@@ -376,6 +417,7 @@ function ResourcePresenceRow({
                         <th className="px-4 py-3 font-semibold">Duree reelle</th>
                         <th className="px-4 py-3 font-semibold">Commentaire</th>
                         <th className="px-4 py-3 font-semibold">Statut</th>
+                        <th className="px-4 py-3 font-semibold">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -391,9 +433,32 @@ function ResourcePresenceRow({
                           </td>
                           <td className="px-4 py-3 text-slate-600">{session.comment ?? '-'}</td>
                           <td className="px-4 py-3">
-                            <Badge tone={session.incomplete ? 'warning' : 'success'}>
-                              {session.incomplete ? 'Incomplete' : 'Valide'}
+                            <Badge tone={session.incomplete || session.status === 'TO_REVIEW_RH' ? 'warning' : 'success'}>
+                              {sessionLabel(session.status)}
                             </Badge>
+                            {session.isRemoteCheckout ? (
+                              <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-[10px] font-bold uppercase text-orange-700">
+                                Distance
+                              </span>
+                            ) : null}
+                            {session.isRegularized ? (
+                              <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
+                                Regularise
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-3">
+                            {session.incomplete || session.status === 'TO_REVIEW_RH' ? (
+                              <button
+                                className="rounded-full border border-orange-200 px-3 py-2 text-xs font-bold text-orange-700 transition hover:bg-orange-50"
+                                onClick={() => onRegularize(session)}
+                                type="button"
+                              >
+                                Regulariser
+                              </button>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -466,4 +531,18 @@ function formatDateOnly(value: string) {
   return new Intl.DateTimeFormat('fr-FR', {
     dateStyle: 'medium',
   }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function sessionLabel(status: RhUserPresenceDetail['sessions'][number]['status']) {
+  switch (status) {
+    case 'COMPLETE':
+      return 'Valide';
+    case 'TO_REVIEW_RH':
+      return 'A verifier RH';
+    case 'TO_REGULARIZE':
+      return 'A regulariser';
+    case 'INCOMPLETE_SESSION':
+    default:
+      return 'Incomplete';
+  }
 }
