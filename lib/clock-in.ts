@@ -43,6 +43,9 @@ export const clockInRecordSelect = {
   status: true,
   comment: true,
   timestampLocal: true,
+  isRemoteCheckout: true,
+  isAutoClosed: true,
+  isRegularized: true,
   createdAt: true,
   site: {
     select: {
@@ -54,6 +57,7 @@ export const clockInRecordSelect = {
 const openSessionSelect = {
   id: true,
   siteId: true,
+  userId: true,
   type: true,
   status: true,
   timestampLocal: true,
@@ -295,6 +299,20 @@ export async function getOpenSession(prisma: PrismaClient, siteId: string, userI
   return findOpenSessionFromRecords(records);
 }
 
+export async function getOpenSessionForUser(prisma: PrismaClient, userId: string) {
+  const records = await prisma.clockInRecord.findMany({
+    where: {
+      userId,
+      status: ClockInStatus.VALID,
+      isAutoClosed: false,
+    },
+    orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    select: openSessionSelect,
+  });
+
+  return findOpenSessionFromRecords(records);
+}
+
 export async function getActivePause(prisma: PrismaClient, siteId: string, userId: string) {
   const records = await prisma.clockInRecord.findMany({
     where: {
@@ -369,6 +387,9 @@ export function serializeClockInRecord(record: SerializableClockInRecord): Clock
     status: record.status,
     comment: record.comment,
     timestampLocal: record.timestampLocal.toISOString(),
+    isRemoteCheckout: record.isRemoteCheckout,
+    isAutoClosed: record.isAutoClosed,
+    isRegularized: record.isRegularized,
     createdAt: record.createdAt.toISOString(),
   };
 }
@@ -400,6 +421,8 @@ export function serializeSessionStatus(
       duration: null,
       pauseActive: false,
       pauseDuration: 0,
+      openSessionSiteId: null,
+      openSessionSiteName: null,
     };
   }
 
@@ -409,6 +432,8 @@ export function serializeSessionStatus(
     duration: durationSince(openSession.timestampLocal),
     pauseActive: Boolean(activePause),
     pauseDuration: activePause ? durationSince(activePause.timestampLocal) : 0,
+    openSessionSiteId: openSession.siteId,
+    openSessionSiteName: openSession.site.name,
   };
 }
 
@@ -447,6 +472,9 @@ export async function createClockInRecord(
     input: ClockInInput;
     distanceKm: number;
     status: ClockInStatus;
+    isRemoteCheckout?: boolean;
+    isAutoClosed?: boolean;
+    isRegularized?: boolean;
   },
 ) {
   const timestampLocal = new Date(payload.input.timestampLocal);
@@ -466,6 +494,9 @@ export async function createClockInRecord(
       status: payload.status,
       comment: payload.input.comment ?? null,
       timestampLocal,
+      isRemoteCheckout: payload.isRemoteCheckout ?? false,
+      isAutoClosed: payload.isAutoClosed ?? false,
+      isRegularized: payload.isRegularized ?? false,
     },
     select: clockInRecordSelect,
   });
@@ -481,6 +512,9 @@ export async function createBatchClockInRecord(
     input: BatchSyncItemInput;
     distanceKm: number;
     status: ClockInStatus;
+    isRemoteCheckout?: boolean;
+    isAutoClosed?: boolean;
+    isRegularized?: boolean;
   },
 ) {
   const timestampLocal = new Date(payload.input.timestampLocal);
@@ -500,6 +534,9 @@ export async function createBatchClockInRecord(
       status: payload.status,
       comment: null,
       timestampLocal,
+      isRemoteCheckout: payload.isRemoteCheckout ?? false,
+      isAutoClosed: payload.isAutoClosed ?? false,
+      isRegularized: payload.isRegularized ?? false,
     },
     select: {
       id: true,

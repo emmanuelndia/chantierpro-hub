@@ -343,6 +343,13 @@ export function MobileClockInPage() {
       : sessionStatusQuery.data;
   const selectedSiteSessionLoaded = sessionStatus !== undefined || sessionStatusQuery.isError;
   const hasOpenSession = selectedSite ? Boolean(sessionStatus?.sessionOpen) : Boolean(activeSession);
+  const openSessionDifferentSite =
+    Boolean(
+      selectedSite &&
+        sessionStatus?.sessionOpen &&
+        sessionStatus.openSessionSiteId &&
+        sessionStatus.openSessionSiteId !== selectedSite.id,
+    );
   const pauseActive = Boolean(sessionStatus?.pauseActive);
   const pauseSeconds = pauseActive ? elapsedSeconds(null, now, sessionStatus?.pauseDuration) : 0;
   const siteIntent = selectedSite && !sessionStatus?.sessionOpen ? 'arrival' : selectedIntent;
@@ -353,6 +360,7 @@ export function MobileClockInPage() {
   const remoteDeparture =
     currentType === 'DEPARTURE' &&
     hasOpenSession &&
+    !openSessionDifferentSite &&
     selectedDistance !== null &&
     selectedSite !== null &&
     selectedDistance > selectedSite.radiusKm;
@@ -644,6 +652,29 @@ export function MobileClockInPage() {
           {!selectedSiteSessionLoaded ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center text-sm font-bold text-slate-600">
               Verification de la session du chantier...
+            </div>
+          ) : openSessionDifferentSite ? (
+            <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50 p-4">
+              <p className="text-sm font-bold text-orange-900">
+                Session ouverte sur {sessionStatus?.openSessionSiteName ?? 'un autre chantier'} depuis{' '}
+                {sessionStatus?.arrivalTime ? formatTime(sessionStatus.arrivalTime) : '--:--'}.
+              </p>
+              <p className="text-xs font-semibold text-orange-800">
+                Pointez votre sortie avant de changer de chantier.
+              </p>
+              <ActionButton
+                busy={false}
+                disabled={!sessionStatus?.openSessionSiteId}
+                label="Pointer ma sortie sur le chantier ouvert"
+                onClick={() => {
+                  if (sessionStatus?.openSessionSiteId) {
+                    setSelectedSiteId(sessionStatus.openSessionSiteId);
+                    setManualMode(true);
+                    setSelectedIntent('departure');
+                  }
+                }}
+                tone="danger"
+              />
             </div>
           ) : hasOpenSession ? (
             <>

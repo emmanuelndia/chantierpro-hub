@@ -27,6 +27,8 @@ export type RhPresencesResponse = {
 };
 
 export type RhPresenceSessionItem = {
+  arrivalRecordId: string;
+  departureRecordId: string | null;
   date: string;
   siteId: string;
   siteName: string;
@@ -36,8 +38,11 @@ export type RhPresenceSessionItem = {
   pauseDurationHours: number;
   distanceMeters: number;
   comment: string | null;
-  status: 'VALID' | 'INCOMPLETE_SESSION';
+  status: 'COMPLETE' | 'INCOMPLETE_SESSION' | 'TO_REGULARIZE' | 'TO_REVIEW_RH';
   incomplete: boolean;
+  isRemoteCheckout: boolean;
+  isAutoClosed: boolean;
+  isRegularized: boolean;
 };
 
 export type RhUserPresenceDetail = {

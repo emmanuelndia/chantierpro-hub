@@ -10,7 +10,7 @@ import {
   getClockInGpsValidationError,
   getActivePause,
   getAccessibleClockInSite,
-  getOpenSession,
+  getOpenSessionForUser,
   isTechnician,
   isWithinSiteRadius,
   jsonClockInError,
@@ -20,6 +20,8 @@ import {
 import type { BatchSyncItemInput, BatchSyncItemResult, ClockInApiErrorCode } from '@/types/clock-in';
 
 type SessionState = {
+  openSiteId: string | null;
+  openSiteName: string | null;
   hasOpenSession: boolean;
   hasActivePause: boolean;
 };
@@ -95,7 +97,6 @@ async function processBatchItem(payload: {
   const withinRadius = isWithinSiteRadius(site, distanceKm);
   const sessionState = await getOrLoadSessionState(
     payload.sessionStates,
-    payload.item.siteId,
     payload.userId,
   );
 
@@ -111,10 +112,12 @@ async function processBatchItem(payload: {
     return buildErrorResult(
       payload.item,
       ClockInStatus.ANOMALY,
-      'SESSION_ALREADY_OPEN',
-      false,
-      {
-        message: 'Une session est deja ouverte sur ce chantier.',
+        'SESSION_ALREADY_OPEN',
+        false,
+        {
+        message: sessionState.openSiteName
+          ? `Session ouverte sur ${sessionState.openSiteName}. Pointez votre sortie avant de changer de chantier.`
+          : 'Une session est deja ouverte.',
         recordId: anomaly.id,
       },
     );
@@ -122,7 +125,7 @@ async function processBatchItem(payload: {
 
   if (
     payload.item.type === 'DEPARTURE' &&
-    !sessionState.hasOpenSession
+    (!sessionState.hasOpenSession || sessionState.openSiteId !== payload.item.siteId)
   ) {
     const anomaly = await createBatchClockInRecord(prisma, {
       siteId: site.id,
@@ -147,7 +150,10 @@ async function processBatchItem(payload: {
     });
   }
 
-  if (payload.item.type === 'INTERMEDIATE' && !sessionState.hasOpenSession) {
+  if (
+    payload.item.type === 'INTERMEDIATE' &&
+    (!sessionState.hasOpenSession || sessionState.openSiteId !== payload.item.siteId)
+  ) {
     const anomaly = await createBatchClockInRecord(prisma, {
       siteId: site.id,
       userId: payload.userId,
@@ -162,7 +168,10 @@ async function processBatchItem(payload: {
     });
   }
 
-  if (payload.item.type === 'PAUSE_START' && !sessionState.hasOpenSession) {
+  if (
+    payload.item.type === 'PAUSE_START' &&
+    (!sessionState.hasOpenSession || sessionState.openSiteId !== payload.item.siteId)
+  ) {
     const anomaly = await createBatchClockInRecord(prisma, {
       siteId: site.id,
       userId: payload.userId,
@@ -222,7 +231,13 @@ async function processBatchItem(payload: {
     });
   }
 
-  if (!withinRadius) {
+  const remoteCheckoutSite =
+    payload.item.type === 'DEPARTURE' && !withinRadius
+      ? await findRemoteCheckoutTarget(site.id, payload.userId, payload.item)
+      : null;
+  const remoteCheckoutAllowed = Boolean(remoteCheckoutSite);
+
+  if (!withinRadius && !remoteCheckoutAllowed) {
     const rejected = await createBatchClockInRecord(prisma, {
       siteId: site.id,
       userId: payload.userId,
@@ -243,12 +258,17 @@ async function processBatchItem(payload: {
     input: payload.item,
     distanceKm,
     status: ClockInStatus.VALID,
+    isRemoteCheckout: remoteCheckoutAllowed,
   });
 
   if (payload.item.type === 'ARRIVAL') {
     sessionState.hasOpenSession = true;
+    sessionState.openSiteId = payload.item.siteId;
+    sessionState.openSiteName = site.name;
   } else if (payload.item.type === 'DEPARTURE') {
     sessionState.hasOpenSession = false;
+    sessionState.openSiteId = null;
+    sessionState.openSiteName = null;
     sessionState.hasActivePause = false;
   } else if (payload.item.type === 'PAUSE_START') {
     sessionState.hasActivePause = true;
@@ -266,25 +286,60 @@ async function processBatchItem(payload: {
   };
 }
 
-async function getOrLoadSessionState(
-  states: Map<string, SessionState>,
+async function findRemoteCheckoutTarget(
   siteId: string,
   userId: string,
+  input: Pick<BatchSyncItemInput, 'latitude' | 'longitude' | 'timestampLocal'>,
 ) {
-  const cached = states.get(siteId);
+  const clockInDate = new Date(`${new Date(input.timestampLocal).toISOString().slice(0, 10)}T00:00:00.000Z`);
+  const assignments = await prisma.planningAssignment.findMany({
+    where: {
+      supervisorId: userId,
+      date: clockInDate,
+      deletedAt: null,
+      siteId: {
+        not: siteId,
+      },
+    },
+    select: {
+      site: {
+        select: {
+          id: true,
+          latitude: true,
+          longitude: true,
+          radiusKm: true,
+        },
+      },
+    },
+  });
+
+  return assignments.find((assignment) => {
+    const distance = calculateDistanceToSite(assignment.site, input);
+    return isWithinSiteRadius(assignment.site, distance);
+  })?.site ?? null;
+}
+
+async function getOrLoadSessionState(
+  states: Map<string, SessionState>,
+  userId: string,
+) {
+  const cacheKey = userId;
+  const cached = states.get(cacheKey);
 
   if (cached) {
     return cached;
   }
 
-  const openSession = await getOpenSession(prisma, siteId, userId);
-  const activePause = await getActivePause(prisma, siteId, userId);
+  const openSession = await getOpenSessionForUser(prisma, userId);
+  const activePause = openSession ? await getActivePause(prisma, openSession.siteId, userId) : null;
   const state = {
+    openSiteId: openSession?.siteId ?? null,
+    openSiteName: openSession?.site.name ?? null,
     hasOpenSession: Boolean(openSession),
     hasActivePause: Boolean(activePause),
   };
 
-  states.set(siteId, state);
+  states.set(cacheKey, state);
   return state;
 }
 

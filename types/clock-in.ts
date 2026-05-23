@@ -15,6 +15,9 @@ export type ClockInRecordItem = {
   status: ClockInStatus;
   comment: string | null;
   timestampLocal: string;
+  isRemoteCheckout: boolean;
+  isAutoClosed: boolean;
+  isRegularized: boolean;
   createdAt: string;
 };
 
@@ -39,6 +42,8 @@ export type SessionStatus = {
   duration: number | null;
   pauseActive: boolean;
   pauseDuration: number;
+  openSessionSiteId?: string | null;
+  openSessionSiteName?: string | null;
 };
 
 export type AttendancePersonItem = {
@@ -93,4 +98,5 @@ export type ClockInApiErrorCode =
   | 'PAUSE_END_BEFORE_PAUSE_START'
   | 'NO_ACTIVE_PAUSE'
   | 'SITE_INACTIVE'
-  | 'PERMISSION_DENIED';
+  | 'PERMISSION_DENIED'
+  | 'REMOTE_CHECKOUT_NOT_ALLOWED';
