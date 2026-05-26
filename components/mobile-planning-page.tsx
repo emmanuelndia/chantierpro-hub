@@ -723,10 +723,24 @@ function AssignmentBottomSheet({
   isSubmitting: boolean;
 }>) {
   const [siteSearch, setSiteSearch] = useState('');
+  const [resourceSearch, setResourceSearch] = useState('');
   const hasAvailableSites = availableSites.length > 0;
   const hasAvailableSupervisors = availableSupervisors.length > 0;
   const canSubmit = Boolean(formData.supervisorId && formData.siteId && formData.action.trim() && hasAvailableSites && hasAvailableSupervisors);
+  const normalizedResourceSearch = resourceSearch.trim().toLowerCase();
   const normalizedSiteSearch = siteSearch.trim().toLowerCase();
+  const filteredSupervisors = normalizedResourceSearch
+    ? availableSupervisors.filter((supervisor) =>
+        `${supervisor.firstName} ${supervisor.name} ${supervisor.email} ${supervisor.availabilityLabel}`
+          .toLowerCase()
+          .includes(normalizedResourceSearch),
+      )
+    : availableSupervisors;
+  const selectedSupervisor = availableSupervisors.find((supervisor) => supervisor.id === formData.supervisorId);
+  const displayedSupervisors =
+    selectedSupervisor && !filteredSupervisors.some((supervisor) => supervisor.id === selectedSupervisor.id)
+      ? [selectedSupervisor, ...filteredSupervisors]
+      : filteredSupervisors;
   const filteredSites = normalizedSiteSearch
     ? availableSites.filter((site) =>
         `${site.project.name} ${site.name} ${site.address}`.toLowerCase().includes(normalizedSiteSearch),
@@ -763,6 +777,17 @@ function AssignmentBottomSheet({
         <div className="mt-4 space-y-4">
           <label className="block text-sm font-semibold text-slate-700">
             Ressource terrain
+            {availableSupervisors.length > 4 ? (
+              <input
+                type="search"
+                value={resourceSearch}
+                onChange={(event) => {
+                  setResourceSearch(event.currentTarget.value);
+                }}
+                className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                placeholder="Rechercher une ressource..."
+              />
+            ) : null}
             <select
               value={formData.supervisorId}
               onChange={(event) => {
@@ -772,7 +797,12 @@ function AssignmentBottomSheet({
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
             >
               <option value="">Sélectionner une ressource</option>
-              {availableSupervisors.map((supervisor) => (
+              {displayedSupervisors.length === 0 ? (
+                <option value="" disabled>
+                  Aucune ressource ne correspond à la recherche
+                </option>
+              ) : null}
+              {displayedSupervisors.map((supervisor) => (
                 <option key={supervisor.id} value={supervisor.id}>
                   {supervisor.firstName} {supervisor.name} ({supervisor.availabilityLabel})
                 </option>

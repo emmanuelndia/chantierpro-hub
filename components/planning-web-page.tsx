@@ -845,6 +845,9 @@ function ResourcesPanel({
   canMutate: boolean;
   onAssign: (resourceId: string) => void;
 }>) {
+  const [resourceSearch, setResourceSearch] = useState('');
+  const filteredResources = filterAssignableResources(resources, resourceSearch);
+
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
       <div className="flex items-center justify-between gap-3">
@@ -854,8 +857,19 @@ function ResourcesPanel({
         </div>
         <Badge tone="info">{resources.length}</Badge>
       </div>
+      {resources.length > 4 ? (
+        <div className="mt-4">
+          <input
+            className={filterClassName}
+            onChange={(event) => setResourceSearch(event.target.value)}
+            placeholder="Rechercher une ressource par nom, email ou disponibilité..."
+            type="search"
+            value={resourceSearch}
+          />
+        </div>
+      ) : null}
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {resources.map((resource) => (
+        {filteredResources.map((resource) => (
           <article className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 p-4" key={resource.id}>
             <div className="min-w-0">
               <p className="truncate font-semibold text-slate-950">
@@ -876,6 +890,11 @@ function ResourcesPanel({
             ) : null}
           </article>
         ))}
+        {filteredResources.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500 md:col-span-2 xl:col-span-3">
+            Aucune ressource ne correspond à cette recherche.
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -906,7 +925,14 @@ function AssignmentDrawer({
   onCancel: () => void;
   onSubmit: () => void;
 }>) {
+  const [resourceSearch, setResourceSearch] = useState('');
   const filteredSites = sites.filter((site) => !form.projectId || site.project.id === form.projectId);
+  const filteredResources = filterAssignableResources(resources, resourceSearch);
+  const selectedResource = resources.find((resource) => resource.id === form.supervisorId);
+  const displayedResources =
+    selectedResource && !filteredResources.some((resource) => resource.id === selectedResource.id)
+      ? [selectedResource, ...filteredResources]
+      : filteredResources;
   const progressNumber = form.targetProgress === '' ? null : Number(form.targetProgress);
   const progressValid = progressNumber === null || (Number.isInteger(progressNumber) && progressNumber >= 0 && progressNumber <= 100);
   const canSubmit = Boolean(form.action.trim() && form.date);
@@ -932,6 +958,16 @@ function AssignmentDrawer({
             />
           </Field>
           <Field label="Ressource">
+            {resources.length > 4 ? (
+              <input
+                className={`${filterClassName} mb-2`}
+                disabled={!canEditIdentity}
+                onChange={(event) => setResourceSearch(event.target.value)}
+                placeholder="Rechercher une ressource..."
+                type="search"
+                value={resourceSearch}
+              />
+            ) : null}
             <select
               className={filterClassName}
               disabled={!canEditIdentity}
@@ -939,7 +975,12 @@ function AssignmentDrawer({
               value={form.supervisorId}
             >
               <option value="">Selectionner</option>
-              {resources.map((resource) => (
+              {displayedResources.length === 0 ? (
+                <option value="" disabled>
+                  Aucune ressource ne correspond à la recherche
+                </option>
+              ) : null}
+              {displayedResources.map((resource) => (
                 <option key={resource.id} value={resource.id}>
                   {resource.firstName} {resource.name} - {resource.availabilityLabel}
                 </option>
@@ -1345,6 +1386,19 @@ function getCentralizedOptions(items: CentralizedPlanningAssignment[]) {
     resources: [...resources.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
     roles: [...roles.values()].sort((a, b) => formatRoleLabel(a).localeCompare(formatRoleLabel(b))),
   };
+}
+
+function filterAssignableResources(resources: UnassignedSupervisor[], search: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) {
+    return resources;
+  }
+
+  return resources.filter((resource) =>
+    `${resource.firstName} ${resource.name} ${resource.email} ${resource.availabilityLabel}`
+      .toLowerCase()
+      .includes(normalizedSearch),
+  );
 }
 
 function createEmptyForm(date: string): AssignmentFormState {

@@ -1,0 +1,277 @@
+RECETTE - COMMENTAIRES ET TAGS RAPIDES SUR LES PHOTOS
+=====================================================
+
+Objectif
+--------
+Rendre les photos plus exploitables dans ChantierPro :
+- ajouter un commentaire libre sur une photo ;
+- ajouter des tags rapides ;
+- garder le lien avec une tache planning ;
+- conserver ces informations en mode offline ;
+- les afficher dans la galerie et dans les rapports.
+
+
+1. Modifications faites
+-----------------------
+
+Base de donnees / Prisma
+- Ajout de l'enum Prisma PhotoTag :
+  - TASK_START
+  - TASK_END
+  - BLOCKAGE
+  - WORK_PROOF
+  - INCIDENT
+- Ajout du champ Photo.tags avec valeur par defaut [].
+- Migration ajoutee :
+  prisma/migrations/20260526143000_photo_tags/migration.sql
+
+Types
+- types/photos.ts
+  - PhotoItem expose maintenant tags.
+  - CreatePhotoInput accepte tags.
+- types/mobile-session-report.ts
+- types/mobile-history-reports.ts
+- types/mobile-reports.ts
+- types/mobile-management-reports.ts
+- types/mobile-general-supervisor-reports.ts
+- types/mobile-site-supervision.ts
+- types/reports.ts
+  - Les photos de rapports/detail exposent maintenant tags, description et tache liee quand disponible.
+
+API photos
+- lib/photos.ts
+  - POST /api/photos accepte maintenant tags en JSON ou CSV.
+  - Les tags invalides sont refuses.
+  - Les listes photos acceptent le filtre tag.
+  - Les serializers renvoient tags.
+- app/api/sites/[id]/photos/route.ts
+  - transmet le filtre tag.
+- app/api/projects/[id]/photos/route.ts
+  - transmet le filtre tag.
+- app/api/mobile/photos/gallery/route.ts
+  - filtre et renvoie tags pour la galerie mobile.
+
+Mobile photo
+- components/mobile-photo-camera-page.tsx
+  - Ajout d'un champ commentaire visible avant l'envoi.
+  - Ajout des tags rapides :
+    - Debut tache
+    - Fin tache
+    - Blocage
+    - Preuve travaux
+    - Incident
+  - La tache planning selectionnee reste rattachee a la photo.
+  - Le recap avant envoi affiche commentaire et tags.
+
+Offline
+- lib/mobile-offline-db.ts
+  - PendingMobilePhoto conserve maintenant description et tags.
+  - La synchronisation offline envoie ces informations a /api/photos.
+  - Les anciennes photos en attente restent compatibles : tags absents = [].
+
+Galerie web et mobile
+- components/photo-gallery.tsx
+  - Affichage des tags sur les cartes et dans la lightbox.
+  - Filtre par tag ajoute.
+  - Upload web enrichi avec tags.
+- components/mobile-photo-gallery-page.tsx
+  - Affichage des tags.
+  - Filtre par tag ajoute.
+  - Description visible dans le detail/lightbox mobile.
+
+Rapports
+- app/api/mobile/session-report/[sessionId]/route.ts
+- app/api/mobile/history/reports/[id]/route.ts
+- app/api/mobile/coordinator/reports/[id]/route.ts
+- lib/mobile-management-reports.ts
+- lib/mobile-general-supervisor-reports.ts
+- lib/reports.ts
+  - Les photos associees aux rapports renvoient maintenant tags, commentaire et tache liee.
+- components/report-detail-page.tsx
+  - Les photos du rapport sont regroupees par tache.
+  - Les photos sans tache sont dans le groupe "Photos chantier".
+  - Tags et commentaires sont affiches.
+- components/mobile-report-detail-page.tsx
+- components/mobile-management-report-detail-page.tsx
+- components/mobile-general-supervisor-report-detail-page.tsx
+  - Tags, commentaire et action/tache sont visibles sur les photos.
+
+
+2. Commandes de verification deja executees
+-------------------------------------------
+
+Les commandes suivantes sont passees :
+
+npx prisma generate
+npm run lint
+npm run build
+
+Remarque :
+Le build a du etre relance hors sandbox a cause d'une erreur Windows "spawn EPERM".
+Le build final est passe.
+
+
+3. Action obligatoire avant test en production
+----------------------------------------------
+
+Avant de tester sur Vercel/Neon, appliquer la migration :
+
+npx prisma migrate deploy
+
+Sans cette migration, la base Neon ne connaitra pas :
+- l'enum PhotoTag ;
+- la colonne Photo.tags.
+
+
+4. Comment tester sur mobile - photo avec tags
+----------------------------------------------
+
+Preconditions :
+- Se connecter avec une ressource terrain autorisee a prendre des photos.
+- Avoir au moins un chantier du jour.
+- Idealement avoir une tache planning sur ce chantier.
+
+Scenario :
+1. Ouvrir la version mobile.
+2. Aller dans Photo.
+3. Selectionner le chantier.
+4. Selectionner une tache si elle est proposee.
+5. Saisir un commentaire, par exemple :
+   "Debut des travaux sur la zone A".
+6. Selectionner un ou plusieurs tags :
+   - Debut tache
+   - Preuve travaux
+7. Prendre la photo.
+8. Confirmer l'envoi.
+
+Resultat attendu :
+- La photo est envoyee.
+- Le commentaire est conserve.
+- Les tags sont conserves.
+- La tache planning reste liee a la photo si elle a ete selectionnee.
+
+
+5. Comment tester sur mobile - galerie
+--------------------------------------
+
+Scenario :
+1. Ouvrir la galerie mobile.
+2. Verifier que la photo envoyee apparait.
+3. Ouvrir le detail/lightbox de la photo.
+4. Verifier que les tags sont visibles.
+5. Verifier que le commentaire est visible.
+6. Utiliser le filtre par tag, par exemple "Preuve travaux".
+
+Resultat attendu :
+- La photo apparait avec ses badges.
+- Le filtre par tag affiche uniquement les photos correspondantes.
+
+
+6. Comment tester sur web - galerie
+-----------------------------------
+
+Scenario :
+1. Ouvrir la galerie photos web.
+2. Rechercher la photo prise depuis le mobile.
+3. Ouvrir la lightbox.
+4. Verifier les tags et le commentaire.
+5. Utiliser le filtre par tag.
+
+Resultat attendu :
+- Les tags sont visibles sur les cartes et dans le detail.
+- Le commentaire est visible.
+- Le filtre par tag fonctionne.
+
+
+7. Comment tester une photo liee a une tache dans un rapport
+------------------------------------------------------------
+
+Preconditions :
+- Une ressource a une tache planning sur un chantier.
+- Elle prend une photo en selectionnant cette tache.
+- Elle soumet ensuite son rapport de session.
+
+Scenario web :
+1. Ouvrir le detail du rapport.
+2. Descendre a la section Photos liees.
+3. Verifier que les photos sont regroupees.
+
+Resultat attendu :
+- Les photos liees a une tache apparaissent sous un groupe "Tache - ...".
+- Les photos sans tache apparaissent dans "Photos chantier".
+- Les tags et commentaires sont visibles.
+
+Scenario mobile :
+1. Ouvrir le detail du rapport cote mobile, selon le role :
+   - Coordinateur ;
+   - GS ;
+   - PM/Direction via rapports de gestion.
+2. Verifier les photos associees.
+
+Resultat attendu :
+- L'action/tache apparait quand elle existe.
+- Les tags sont visibles.
+- Le commentaire photo est visible.
+
+
+8. Comment tester le mode offline
+---------------------------------
+
+Preconditions :
+- Le mode offline terrain est prepare.
+- Le chantier et les taches du jour sont disponibles hors ligne.
+
+Scenario :
+1. Couper internet.
+2. Aller dans Photo.
+3. Selectionner le chantier.
+4. Ajouter un commentaire.
+5. Ajouter un ou plusieurs tags.
+6. Prendre la photo.
+7. Confirmer l'enregistrement offline.
+8. Retablir internet.
+9. Lancer la synchronisation.
+
+Resultat attendu :
+- La photo offline est synchronisee.
+- Les tags sont conserves.
+- Le commentaire est conserve.
+- La tache liee est conservee si elle etait selectionnee.
+
+
+9. Comment tester la validation API
+-----------------------------------
+
+Cas a verifier :
+- Photo sans tag : acceptee, tags = [].
+- Photo avec un tag valide : acceptee.
+- Photo avec plusieurs tags valides : acceptee.
+- Photo avec un tag invalide : refusee en 400.
+
+Exemples de formats acceptes par l'API :
+- tags en JSON :
+  ["TASK_START","WORK_PROOF"]
+- tags en CSV :
+  TASK_START,WORK_PROOF
+
+
+10. Points de non-regression
+----------------------------
+
+Verifier que :
+- les anciennes photos sans tags s'affichent toujours ;
+- la suppression de photo fonctionne toujours ;
+- le telechargement de photo fonctionne toujours ;
+- la galerie projet fonctionne toujours ;
+- la galerie chantier fonctionne toujours ;
+- les photos restent stockees dans R2 ;
+- PhotoCategory continue d'exister et n'est pas remplace par les tags.
+
+
+11. Limites de cette version
+----------------------------
+
+- Les tags sont une liste fermee en v1.
+- Les tags ne remplacent pas les categories techniques de photo.
+- Les rapports regroupent les photos par tache quand l'information existe.
+- Les photos sans tache restent classees comme photos chantier.

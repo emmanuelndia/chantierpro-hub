@@ -1,0 +1,525 @@
+RECETTE GLOBALE - MODIFICATIONS IMPLEMENTEES AUJOURD'HUI
+=========================================================
+
+Date de reference : 26/05/2026
+
+Objectif du document
+--------------------
+Ce fichier recapitule les grandes modifications implementees aujourd'hui dans ChantierPro, ou les trouver, et comment les tester rapidement.
+
+Commandes techniques deja passees avec succes :
+- npx prisma generate
+- npm run lint
+- npm run build
+
+Remarque :
+Le build local a d'abord ete bloque par une erreur Windows "spawn EPERM" dans le sandbox, puis il est passe hors sandbox.
+
+Action obligatoire avant test sur Neon/Vercel :
+- executer npx prisma migrate deploy
+
+Migrations ajoutees aujourd'hui :
+- prisma/migrations/20260526093000_site_polygon_geofence/
+- prisma/migrations/20260526110000_document_attachments/
+- prisma/migrations/20260526113000_business_planning_roles/
+- prisma/migrations/20260526121000_task_progress_updates/
+- prisma/migrations/20260526133000_operational_site_types/
+- prisma/migrations/20260526143000_photo_tags/
+
+
+1. Import Excel / CSV des chantiers
+-----------------------------------
+
+Ce qui a ete fait :
+- Ajout d'un import de chantiers depuis le detail web d'un projet.
+- Ajout d'un modele Excel telechargeable.
+- Ajout d'une previsualisation avec lignes valides, erreurs et warnings.
+- Ajout d'un commit qui cree uniquement les lignes valides.
+- Validation ligne par ligne :
+  - nom obligatoire ;
+  - latitude / longitude valides ;
+  - surface obligatoire ;
+  - date debut obligatoire ;
+  - responsable_gs_email obligatoire et doit etre un GS actif ;
+  - adresse facultative ;
+  - description facultative ;
+  - rayon par defaut si vide ;
+  - doublons de nom bloques.
+
+Ou regarder :
+- components/project-detail-page.tsx
+- lib/site-import.ts
+- app/api/projects/[id]/sites/import/template/route.ts
+- app/api/projects/[id]/sites/import/preview/route.ts
+- app/api/projects/[id]/sites/import/commit/route.ts
+- types/projects.ts
+
+Comment tester :
+1. Se connecter en PROJECT_MANAGER, DIRECTION ou ADMIN.
+2. Ouvrir un projet web.
+3. Cliquer sur Importer des chantiers.
+4. Telecharger le modele.
+5. Remplir 2 ou 3 lignes valides.
+6. Uploader le fichier.
+7. Verifier la previsualisation.
+8. Cliquer sur Importer les lignes valides.
+
+Resultat attendu :
+- Les chantiers valides sont crees.
+- Les lignes invalides restent bloquees avec un message clair.
+- Un PM ne peut importer que dans ses propres projets.
+
+Tests d'erreurs a faire :
+- latitude invalide ;
+- responsable_gs_email inexistant ;
+- responsable qui n'est pas GENERAL_SUPERVISOR ;
+- deux lignes avec le meme nom ;
+- nom deja existant dans le projet.
+
+
+2. Limites avancees de chantier par polygone
+--------------------------------------------
+
+Ce qui a ete fait :
+- Ajout du geofencing avance :
+  - RADIUS par defaut ;
+  - POLYGON optionnel.
+- Ajout de geofenceType et geofencePolygon sur Site.
+- Extension du SiteLocationPicker pour dessiner une limite precise.
+- Le pointage utilise le polygone si le chantier en a un.
+- Sinon, le rayon existant continue de fonctionner.
+- Compatibilite gardee avec les anciens chantiers.
+
+Ou regarder :
+- prisma/schema.prisma
+- components/site-location-picker.tsx
+- components/project-detail-page.tsx
+- components/mobile-site-form-page.tsx
+- lib/projects.ts
+- lib/clock-in.ts
+- app/api/sites/[id]/clock-in/route.ts
+- app/api/sync/batch/route.ts
+- types/projects.ts
+
+Comment tester :
+1. Creer un chantier normalement sans dessiner de limite.
+2. Verifier qu'il reste en mode rayon.
+3. Creer ou modifier un autre chantier.
+4. Activer Dessiner la limite.
+5. Placer au moins 3 points.
+6. Fermer la limite.
+7. Enregistrer.
+8. Tester le pointage :
+   - dans le polygone : autorise ;
+   - hors du polygone : refuse.
+
+Resultat attendu :
+- Les anciens chantiers continuent avec le rayon.
+- Les nouveaux chantiers polygonaux utilisent la limite precise.
+- Le message hors zone indique que l'utilisateur est hors de la limite precise.
+
+
+3. Pieces jointes sur projets, chantiers et rapports
+----------------------------------------------------
+
+Ce qui a ete fait :
+- Ajout d'un modele DocumentAttachment.
+- Stockage R2 reutilise pour les fichiers.
+- Ajout de documents rattaches a :
+  - projet ;
+  - chantier ;
+  - rapport.
+- Formats acceptes :
+  - PDF ;
+  - Excel ;
+  - Word ;
+  - PNG/JPG/JPEG.
+- Taille max : 20 Mo.
+- Suppression soft delete avec log / motif.
+- Rapport terrain : le texte peut etre vide si au moins un fichier est fourni.
+
+Ou regarder :
+- prisma/schema.prisma
+- lib/documents.ts
+- components/document-attachments-panel.tsx
+- app/api/documents/
+- lib/reports.ts
+- app/api/reports/route.ts
+- components/report-detail-page.tsx
+- components/project-detail-page.tsx
+- components/mobile-session-report-page.tsx
+- types/documents.ts
+- types/reports.ts
+
+Comment tester sur projet :
+1. Ouvrir un projet web.
+2. Aller dans la section documents / pieces jointes.
+3. Ajouter un fichier Excel.
+4. Verifier qu'il apparait dans la liste.
+5. Telecharger le fichier.
+
+Comment tester sur chantier :
+1. Ouvrir un chantier/detail site.
+2. Ajouter un PDF.
+3. Verifier affichage et telechargement.
+
+Comment tester sur rapport :
+1. Faire une session terrain.
+2. Soumettre un rapport avec texte seul : accepte.
+3. Soumettre un rapport avec fichier seul : accepte.
+4. Soumettre sans texte ni fichier : refuse.
+
+Resultat attendu :
+- Les documents sont prives et accessibles selon le perimetre.
+- Les formats interdits sont refuses.
+- La suppression demande un motif.
+
+
+4. Roles metier : Negociation et Parc Auto
+------------------------------------------
+
+Ce qui a ete fait :
+- Ajout des roles :
+  - NEGOTIATION_MANAGER ;
+  - NEGOTIATION_RESOURCE ;
+  - FLEET_MANAGER ;
+  - DRIVER.
+- Generalisation du modele BE :
+  - un manager metier voit tous les projets/sites actifs ;
+  - il planifie uniquement ses ressources metier ;
+  - les ressources terrain voient leurs taches du jour ;
+  - les taches ON_SITE declenchent le flux terrain ;
+  - les taches OFFICE restent visibles sans pointage obligatoire.
+- Mise a jour des libelles UI :
+  - Responsable Negociation ;
+  - Ressource Negociation ;
+  - Responsable Parc Auto ;
+  - Chauffeur.
+
+Ou regarder :
+- prisma/schema.prisma
+- lib/field-roles.ts
+- lib/auth/constants.ts
+- lib/navigation.ts
+- lib/role-labels.ts
+- components/admin-users-page.tsx
+- components/dashboard-page.tsx
+- components/planning-web-page.tsx
+- lib/mobile-planning.ts
+- lib/dashboard.ts
+
+Comment tester :
+1. En ADMIN, creer :
+   - un Responsable Negociation ;
+   - une Ressource Negociation ;
+   - un Responsable Parc Auto ;
+   - un Chauffeur.
+2. Se connecter comme Responsable Negociation.
+3. Ouvrir Planning.
+4. Verifier qu'il voit tous les projets/sites actifs.
+5. Verifier que le select ressource ne propose que les Ressources Negociation.
+6. Creer une tache ON_SITE.
+7. Se connecter comme Ressource Negociation.
+8. Verifier que la tache apparait dans les taches/chantiers du jour.
+
+Meme test pour Parc Auto :
+- Responsable Parc Auto assigne un Chauffeur.
+
+Resultat attendu :
+- Les managers metier ne voient pas Perimetres GS.
+- Ils ne peuvent pas assigner les ressources des autres cellules metier.
+- Les ressources terrain peuvent pointer/photo/rapport si tache ON_SITE.
+
+
+5. Planning centralise pour les chefs projets
+---------------------------------------------
+
+Ce qui a ete fait :
+- Ajout de l'onglet Centralise dans le planning web.
+- Acces :
+  - PROJECT_MANAGER ;
+  - DIRECTION ;
+  - ADMIN.
+- Les chefs projets voient les affectations des autres projets en lecture seule.
+- Les droits de modification restent dans le planning normal, sur leur propre perimetre.
+- Ajout de filtres :
+  - periode ;
+  - projet ;
+  - chantier ;
+  - ressource ;
+  - role ;
+  - type terrain/bureau.
+- Ajout d'un indicateur si une ressource est deja occupee ailleurs le meme jour.
+
+Ou regarder :
+- app/api/planning/centralized/route.ts
+- lib/planning-centralized.ts
+- components/planning-web-page.tsx
+- types/planning-web.ts
+- lib/mobile-planning.ts
+
+Comment tester :
+1. Creer une tache pour une ressource dans le projet d'un PM A.
+2. Se connecter comme PM B.
+3. Ouvrir Planning web.
+4. Aller dans l'onglet Centralise.
+5. Verifier que la tache du PM A est visible.
+6. Verifier qu'elle est en lecture seule.
+7. Filtrer par ressource, projet, chantier.
+
+Resultat attendu :
+- PM B voit l'occupation de la ressource.
+- PM B ne peut pas modifier une tache hors de ses projets.
+- DIRECTION et ADMIN voient tout.
+
+
+6. Suivi des objectifs journaliers et progression reelle
+--------------------------------------------------------
+
+Ce qui a ete fait :
+- Ajout de objectiveText sur PlanningAssignment.
+- Ajout du modele TaskProgressUpdate.
+- Le manager peut saisir :
+  - progression cible % ;
+  - objectif qualitatif.
+- La ressource peut declarer depuis mobile :
+  - progression realisee ;
+  - commentaire ;
+  - blocage ;
+  - tache terminee.
+- Le statut objectif est calcule :
+  - Non demarre ;
+  - Partiel ;
+  - Atteint ;
+  - Bloque.
+- Les dashboards managers affichent des compteurs d'objectifs.
+- Le rapport de session reprend la progression.
+- Les updates sont compatibles offline.
+
+Ou regarder :
+- prisma/schema.prisma
+- prisma/migrations/20260526121000_task_progress_updates/
+- lib/mobile-planning.ts
+- components/mobile-planning-page.tsx
+- components/mobile-office-assignments-section.tsx
+- components/planning-web-page.tsx
+- app/api/mobile/planning/assignment/[id]/progress/route.ts
+- lib/mobile-offline-db.ts
+- app/api/mobile/session-report/[sessionId]/route.ts
+- app/api/mobile/session-report/route.ts
+- types/mobile-planning.ts
+- types/planning-web.ts
+
+Comment tester :
+1. En PM/GS/manager metier, creer une tache avec cible 80%.
+2. Ajouter un objectif texte.
+3. Se connecter avec la ressource.
+4. Ouvrir Planning mobile.
+5. Cliquer sur Mettre a jour l'avancement.
+6. Declarer 50%.
+
+Resultat attendu :
+- Statut Partiel.
+- Ecart -30%.
+
+Suite :
+1. Declarer 80% ou plus.
+2. Verifier statut Atteint.
+3. Cocher Blocage avec commentaire.
+4. Verifier statut Bloque.
+5. Soumettre le rapport de session.
+
+Resultat attendu :
+- Le rapport reprend la progression et le blocage.
+- Les dashboards indiquent les objectifs atteints/partiels/bloques.
+
+Test offline :
+1. Couper internet.
+2. Declarer une progression mobile.
+3. Reconnecter.
+4. Synchroniser.
+
+Resultat attendu :
+- L'update remonte au serveur.
+
+
+7. Lieux operationnels non chantier
+-----------------------------------
+
+Ce qui a ete fait :
+- Ajout d'un type de lieu sur Site :
+  - WORKSITE ;
+  - WAREHOUSE ;
+  - MATERIAL_PICKUP ;
+  - OFFICE ;
+  - CLIENT_SITE ;
+  - OTHER.
+- Ajout de requiresClockIn.
+- L'UI evolue vers la notion de lieu / chantier.
+- Les lieux sans pointage peuvent servir au planning sans flux terrain.
+- Les lieux avec pointage utilisent GPS/rayon/polygone.
+
+Ou regarder :
+- prisma/schema.prisma
+- prisma/migrations/20260526133000_operational_site_types/
+- components/project-detail-page.tsx
+- components/mobile-site-form-page.tsx
+- lib/projects.ts
+- lib/mobile-sites.ts
+- app/api/users/me/sites/today/route.ts
+- types/projects.ts
+- types/mobile-sites.ts
+
+Comment tester :
+1. Creer un lieu de type Point d'enlevement materiel avec GPS et pointage requis.
+2. Assigner une ressource en tache ON_SITE.
+3. Verifier que le lieu apparait dans les chantiers/lieux du jour.
+4. Tester le pointage.
+
+Puis :
+1. Creer un lieu de type Bureau sans pointage requis.
+2. Assigner une tache OFFICE.
+3. Verifier qu'elle apparait comme tache bureau.
+4. Verifier qu'elle ne demande pas de pointage/photo obligatoire.
+
+Resultat attendu :
+- Les vrais chantiers existants restent WORKSITE.
+- Les lieux annexes sont planifiables.
+- Seuls les lieux avec pointage requis entrent dans le flux terrain.
+
+
+8. Commentaires et tags rapides sur les photos
+----------------------------------------------
+
+Ce qui a ete fait :
+- Ajout de l'enum PhotoTag :
+  - TASK_START ;
+  - TASK_END ;
+  - BLOCKAGE ;
+  - WORK_PROOF ;
+  - INCIDENT.
+- Ajout de Photo.tags.
+- Upload photo enrichi avec :
+  - commentaire ;
+  - tags ;
+  - tache planning liee.
+- Galerie web/mobile :
+  - affichage des badges ;
+  - filtre par tag.
+- Rapports :
+  - affichage des tags/commentaires ;
+  - regroupement web par tache.
+- Offline :
+  - tags et commentaire conserves dans la file.
+
+Ou regarder :
+- prisma/schema.prisma
+- prisma/migrations/20260526143000_photo_tags/
+- lib/photos.ts
+- lib/mobile-offline-db.ts
+- components/mobile-photo-camera-page.tsx
+- components/photo-gallery.tsx
+- components/mobile-photo-gallery-page.tsx
+- components/report-detail-page.tsx
+- components/mobile-report-detail-page.tsx
+- types/photos.ts
+- types/reports.ts
+
+Comment tester :
+1. Se connecter comme ressource terrain.
+2. Aller sur Photo mobile.
+3. Selectionner un chantier.
+4. Selectionner une tache si disponible.
+5. Saisir un commentaire.
+6. Ajouter les tags Debut tache et Preuve travaux.
+7. Envoyer la photo.
+8. Ouvrir galerie mobile ou web.
+
+Resultat attendu :
+- Les tags sont visibles.
+- Le commentaire est visible.
+- Le filtre par tag fonctionne.
+
+Test rapport :
+1. Soumettre un rapport de session.
+2. Ouvrir le detail du rapport.
+
+Resultat attendu :
+- Les photos liees a une tache sont regroupees.
+- Les photos sans tache sont dans Photos chantier.
+
+
+9. Points de regression generaux a verifier
+-------------------------------------------
+
+Authentification / roles :
+- connexion ADMIN ;
+- connexion PROJECT_MANAGER ;
+- connexion GENERAL_SUPERVISOR ;
+- connexion Responsable BE ;
+- connexion Responsable Negociation ;
+- connexion Responsable Parc Auto ;
+- connexion ressource terrain.
+
+Planning :
+- creation tache ON_SITE ;
+- creation tache OFFICE ;
+- modification tache ;
+- suppression tache ;
+- export planning ;
+- onglet Jour ;
+- onglet Semaine ;
+- onglet Centralise.
+
+Pointage :
+- chantier rayon ;
+- chantier polygone ;
+- lieu sans pointage ;
+- offline si prepare.
+
+Rapports :
+- rapport texte seul ;
+- rapport fichier seul ;
+- rapport texte + fichier ;
+- rapport avec photos taguees.
+
+Galerie :
+- filtre par chantier ;
+- filtre par auteur ;
+- filtre par categorie ;
+- filtre par tag ;
+- suppression photo avec motif.
+
+Documents :
+- upload PDF ;
+- upload Excel ;
+- download ;
+- suppression avec motif.
+
+
+10. Ordre conseille pour la recette
+-----------------------------------
+
+1. Executer les migrations en environnement de test.
+2. Tester les roles et droits.
+3. Tester creation projet/lieu/chantier.
+4. Tester import Excel.
+5. Tester planning normal.
+6. Tester planning centralise.
+7. Tester objectif/progression.
+8. Tester pointage rayon.
+9. Tester pointage polygone.
+10. Tester rapports et pieces jointes.
+11. Tester photos tags/commentaires.
+12. Tester offline terrain.
+13. Tester exports.
+
+
+11. A surveiller pendant les tests
+----------------------------------
+
+- Erreur Prisma indiquant une migration non appliquee.
+- Ancien cache PWA sur mobile : vider cache ou ouvrir en navigation privee si les anciens ecrans persistent.
+- Droits par role : un role ne doit pas voir/modifier hors perimetre.
+- Les fichiers R2 necessitent les variables d'environnement de stockage.
+- Les photos offline avec tags doivent attendre la synchronisation pour apparaitre en galerie.

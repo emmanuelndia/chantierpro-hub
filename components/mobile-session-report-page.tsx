@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, Camera, CheckCircle2, Clock3, FileUp, MapPin, Send, Target, X } from 'lucide-react';
 import { authFetch } from '@/lib/auth/client-session';
 import {
   createOfflineId,
@@ -12,9 +13,9 @@ import {
 } from '@/lib/mobile-offline-db';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type {
-  SubmitReportRequest,
   ReportSubmissionResponse,
   SessionReportData,
+  SubmitReportRequest,
 } from '@/types/mobile-session-report';
 import '@/styles/slider.css';
 
@@ -32,10 +33,8 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   const [blockageNote, setBlockageNote] = useState('');
   const [reportFile, setReportFile] = useState<File | null>(null);
 
-  // Récupérer l'ID de session depuis les paramètres URL
   const sessionId = searchParams.get('sessionId');
 
-  // Query pour les données de la session
   const sessionQuery = useQuery({
     queryKey: ['mobile-session-report', sessionId],
     queryFn: async () => {
@@ -46,7 +45,6 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
       const response = await authFetch(`/api/mobile/session-report/${sessionId}`);
 
       if (!response.ok) {
-        // Essayer de récupérer depuis le cache offline
         const cached = await getMobileOfflineCache<SessionReportData>(`session-report-${sessionId}`);
         if (cached) {
           return cached.payload;
@@ -55,22 +53,20 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
       }
 
       const payload = (await response.json()) as SessionReportData;
-      await setMobileOfflineCache(`session-report-${sessionId}`, payload, 60 * 60 * 1000); // 1 heure
+      await setMobileOfflineCache(`session-report-${sessionId}`, payload, 60 * 60 * 1000);
       return payload;
     },
-    enabled: !!sessionId,
+    enabled: Boolean(sessionId),
     refetchInterval: 30_000,
     staleTime: 30_000,
   });
 
-  // Mutation pour soumettre le rapport
   const submitMutation = useMutation({
     mutationFn: async ({ data, file }: { data: SubmitReportRequest; file: File | null }) => {
       if (file && typeof navigator !== 'undefined' && !navigator.onLine) {
         throw new Error('Connectez-vous pour envoyer un fichier. Le texte seul reste disponible hors ligne.');
       }
 
-      // Essayer de soumettre en ligne
       try {
         const response = file
           ? await authFetch('/api/mobile/session-report', {
@@ -87,7 +83,7 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
 
         if (!response.ok) {
           const errorData = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
-          throw new Error(errorData.error ?? errorData.message ?? `Erreur ${response.status}: Échec de la soumission du rapport`);
+          throw new Error(errorData.error ?? errorData.message ?? `Erreur ${response.status}: échec de la soumission du rapport`);
         }
 
         return (await response.json()) as ReportSubmissionResponse;
@@ -97,8 +93,7 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
         if (file) {
           throw error;
         }
-        
-        // Si échec, sauvegarder en offline
+
         const clientId = createOfflineId();
         await enqueueOfflineSessionReport({
           clientId,
@@ -122,22 +117,18 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
       void queryClient.invalidateQueries({ queryKey: ['mobile-session-report', sessionId] });
       void queryClient.invalidateQueries({ queryKey: ['mobile-session-report-pending'] });
       void queryClient.invalidateQueries({ queryKey: ['mobile-history'] });
-      
-      if (response.isOffline) {
-        // Notification offline
-        if ('serviceWorker' in navigator && 'PushManager' in window) {
-          // Afficher notification offline
-          console.log('Rapport sauvegardé hors ligne');
-        }
+
+      if (response.isOffline && 'serviceWorker' in navigator && 'PushManager' in window) {
+        console.log('Rapport sauvegardé hors ligne');
       }
 
-      // Rediriger vers l'accueil
       router.push('/mobile/home');
     },
   });
 
   const data = sessionQuery.data;
   const loading = sessionQuery.isLoading;
+  const canSubmit = Boolean(content.trim() || reportFile);
 
   useEffect(() => {
     if (!data?.assignment) return;
@@ -160,7 +151,7 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   }, [data?.assignment?.id]);
 
   const handleSubmit = () => {
-    if (!data || !sessionId) return;
+    if (!data || !sessionId || !canSubmit) return;
 
     const reportData: SubmitReportRequest = {
       clockInRecordId: data.session.clockInRecordId,
@@ -188,14 +179,13 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
     return `${minutes}min`;
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Intl.DateTimeFormat('fr-FR', {
+  const formatDateTime = (dateString: string) =>
+    new Intl.DateTimeFormat('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
     }).format(new Date(dateString));
-  };
 
   if (loading) {
     return <ReportLoadingState />;
@@ -203,7 +193,7 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
 
   if (!sessionId || sessionQuery.isError || !data) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
         Impossible de charger les données de la session. Veuillez réessayer.
       </div>
     );
@@ -212,20 +202,16 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   if (data.hasExistingReport) {
     return (
       <div className="space-y-4">
-        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-            Rapport deja soumis
-          </p>
-          <h2 className="mt-2 text-xl font-black text-emerald-950">
-            Cette session a deja un rapport
-          </h2>
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Rapport déjà soumis</p>
+          <h2 className="mt-2 text-xl font-black text-emerald-950">Cette session a déjà un rapport</h2>
           <p className="mt-2 text-sm leading-6 text-emerald-900">
             Le rapport n&apos;est plus modifiable depuis l&apos;application terrain.
           </p>
         </section>
 
         <button
-          className="flex min-h-14 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-black text-white"
+          className="flex min-h-14 w-full items-center justify-center rounded-2xl bg-primary px-4 text-sm font-black text-white shadow-lg shadow-orange-200"
           onClick={() => router.push('/mobile/history')}
           type="button"
         >
@@ -236,216 +222,224 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   }
 
   return (
-    <div className="space-y-5 pb-20">
-      {/* En-tête récapitulatif de la session */}
-      <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-        <h2 className="text-lg font-bold text-emerald-950 mb-3">Récapitulatif de la session</h2>
-        
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-sm text-emerald-700">Site:</span>
-            <span className="text-sm font-semibold text-emerald-900">{data.session.siteName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-emerald-700">Date:</span>
-            <span className="text-sm font-semibold text-emerald-900">
-              {formatDateTime(data.session.date)}
+    <div className="space-y-5 pb-28">
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-panel">
+        <div className="border-b border-slate-100 bg-slate-950 p-5 text-white">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-orange-300">Rapport de session</p>
+          <h1 className="mt-2 text-2xl font-black tracking-tight">{data.session.siteName}</h1>
+          <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <MapPin className="h-4 w-4 text-orange-300" />
+            {data.session.siteAddress}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 p-4">
+          <SessionMetric icon={<Clock3 className="h-4 w-4" />} label="Arrivée" value={formatDateTime(data.session.arrivalAt)} />
+          <SessionMetric icon={<Clock3 className="h-4 w-4" />} label="Départ" value={formatDateTime(data.session.departureAt)} />
+          <SessionMetric label="Durée" value={formatDuration(data.session.effectiveDurationSeconds)} />
+          <SessionMetric icon={<Camera className="h-4 w-4" />} label="Photos" value={String(data.session.photoCount)} />
+        </div>
+      </section>
+
+      {data.assignment ? (
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-primary">
+              <Target className="h-5 w-5" />
             </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-emerald-700">Arrivée:</span>
-            <span className="text-sm font-semibold text-emerald-900">
-              {formatDateTime(data.session.arrivalAt)}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-emerald-700">Départ:</span>
-            <span className="text-sm font-semibold text-emerald-900">
-              {formatDateTime(data.session.departureAt)}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm text-emerald-700">Durée effective:</span>
-            <span className="text-sm font-semibold text-emerald-900">
-              {formatDuration(data.session.effectiveDurationSeconds)}
-            </span>
-          </div>
-          {data.session.pauseDurationSeconds > 0 && (
-            <div className="flex justify-between">
-              <span className="text-sm text-emerald-700">Durée pauses:</span>
-              <span className="text-sm font-semibold text-emerald-900">
-                {formatDuration(data.session.pauseDurationSeconds)}
-              </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Tâche du jour</p>
+              <h2 className="mt-1 text-lg font-black leading-tight text-slate-950">{data.assignment.action}</h2>
+              {data.assignment.objectiveText ? (
+                <p className="mt-2 text-sm leading-6 text-slate-600">{data.assignment.objectiveText}</p>
+              ) : null}
             </div>
-          )}
-          <div className="flex justify-between">
-            <span className="text-sm text-emerald-700">Photos prises:</span>
-            <span className="text-sm font-semibold text-emerald-900">
-              {data.session.photoCount}
-            </span>
           </div>
-        </div>
-      </section>
-
-      {/* Assignation du jour */}
-      {data.assignment && (
-        <section className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-blue-500 mb-2">
-            Assignation du jour
-          </h3>
-          <div className="bg-white rounded-lg p-3">
-            <p className="text-sm font-medium text-blue-900">
-              Action prévue : {data.assignment.action}
-            </p>
-            {data.assignment.targetProgress && (
-              <p className="text-xs text-blue-700 mt-1">
-                Cible de progression : {data.assignment.targetProgress}%
-              </p>
-            )}
-            {data.assignment.objectiveText ? (
-              <p className="mt-1 text-xs text-blue-700">Objectif : {data.assignment.objectiveText}</p>
-            ) : null}
-            {data.assignment.actualProgress !== null && data.assignment.actualProgress !== undefined ? (
-              <p className="mt-1 text-xs font-semibold text-blue-800">
-                Dernier avancement déclaré : {data.assignment.actualProgress}%
-                {data.assignment.latestProgressBlocked ? ' - blocage signalé' : ''}
-              </p>
-            ) : null}
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <MiniInfo label="Cible" value={data.assignment.targetProgress !== undefined ? `${data.assignment.targetProgress}%` : 'Libre'} />
+            <MiniInfo
+              label="Dernier avancement"
+              value={data.assignment.actualProgress !== null && data.assignment.actualProgress !== undefined ? `${data.assignment.actualProgress}%` : 'Non déclaré'}
+            />
           </div>
+          {data.assignment.latestProgressBlocked ? (
+            <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50 p-3 text-sm font-semibold text-orange-800">
+              Blocage signalé sur cette tâche.
+            </div>
+          ) : null}
         </section>
-      )}
+      ) : null}
 
-      {/* Zone de saisie du rapport */}
-      <section className="space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-          Rapport de la journée
-        </h3>
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Décrivez les travaux réalisés, l'avancement, les difficultés rencontrées..."
-            className="w-full h-32 resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700 placeholder-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            rows={6}
-          />
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-panel">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Compte rendu</p>
+            <h2 className="mt-1 text-lg font-black text-slate-950">Ce qui a été réalisé</h2>
+          </div>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">
+            Optionnel si fichier
+          </span>
         </div>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Décrivez les travaux réalisés, l'avancement, les difficultés rencontrées..."
+          className="mt-4 h-36 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700 placeholder-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          rows={6}
+        />
       </section>
 
-      <section className="space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-          Fichier de rapport (optionnel)
-        </h3>
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-panel">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Pièce jointe</p>
+        <h2 className="mt-1 text-lg font-black text-slate-950">Ajouter un fichier</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          PDF, Excel, Word ou image. Les fichiers demandent une connexion.
+        </p>
+        <label className="mt-4 flex min-h-20 cursor-pointer items-center justify-center gap-3 rounded-2xl border border-dashed border-orange-300 bg-orange-50 px-4 text-sm font-black text-primary">
+          <FileUp className="h-5 w-5" />
+          {reportFile ? 'Remplacer le fichier' : 'Choisir un fichier'}
           <input
             accept=".pdf,.xlsx,.xls,.docx,.png,.jpg,.jpeg"
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+            className="sr-only"
             onChange={(event) => setReportFile(event.target.files?.[0] ?? null)}
             type="file"
           />
-          <p className="mt-2 text-xs font-semibold text-slate-500">
-            PDF, Excel, Word ou image. Les fichiers demandent une connexion.
-          </p>
-          {reportFile ? <p className="mt-2 text-sm font-bold text-primary">{reportFile.name}</p> : null}
+        </label>
+        {reportFile ? (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <span className="min-w-0 truncate text-sm font-bold text-slate-700">{reportFile.name}</span>
+            <button
+              aria-label="Retirer le fichier"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm"
+              onClick={() => setReportFile(null)}
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-panel">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Progression</p>
+            <h2 className="mt-1 text-lg font-black text-slate-950">Avancement réalisé</h2>
+          </div>
+          <span className="text-3xl font-black text-primary">{progressPercentage}%</span>
+        </div>
+        <div className="mt-5 space-y-4">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={progressPercentage}
+            onChange={(e) => setProgressPercentage(parseInt(e.target.value))}
+            className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200"
+          />
+          <div className="flex justify-between text-xs font-bold text-slate-400">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={progressPercentage}
+              onChange={(e) => setProgressPercentage(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+              className="h-12 w-24 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-center text-sm font-black text-slate-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <span className="text-sm font-bold text-slate-500">% réalisé aujourd&apos;hui</span>
+          </div>
+          {data.assignment?.targetProgress !== undefined ? (
+            <p className="rounded-2xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+              Cible planning : {data.assignment.targetProgress}%
+            </p>
+          ) : null}
         </div>
       </section>
 
-      {/* Champ progression */}
-      <section className="space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-          Progression réalisée
-        </h3>
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">Progression aujourd&apos;hui :</span>
-              <span className="text-lg font-bold text-primary">{progressPercentage}%</span>
-            </div>
-            
-            {/* Slider */}
-            <div className="relative">
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={progressPercentage}
-                onChange={(e) => setProgressPercentage(parseInt(e.target.value))}
-                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider"
-              />
-              <div className="flex justify-between text-xs text-slate-500 mt-1">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
-
-            {/* Champ numérique alternatif */}
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={progressPercentage}
-                onChange={(e) => setProgressPercentage(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-center font-medium focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-              <span className="text-sm text-slate-600">%</span>
-            </div>
-
-            {data.assignment?.targetProgress && (
-              <div className="text-xs text-slate-500">
-                Cible planning : {data.assignment.targetProgress}%
-              </div>
-            )}
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-panel">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-50 text-primary">
+            <AlertTriangle className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Blocage</p>
+            <h2 className="text-lg font-black text-slate-950">Remarque optionnelle</h2>
           </div>
         </div>
+        <input
+          type="text"
+          value={blockageNote}
+          onChange={(e) => setBlockageNote(e.target.value)}
+          placeholder="Ex : accès coupé, matériel manquant..."
+          className="mt-4 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700 placeholder-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
       </section>
 
-      {/* Champ blocage / remarque */}
-      <section className="space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-          Blocage / Remarque (optionnel)
-        </h3>
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
-          <input
-            type="text"
-            value={blockageNote}
-            onChange={(e) => setBlockageNote(e.target.value)}
-            placeholder="Ex : Accès route coupée, matériel manquant..."
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-        </div>
-      </section>
+      {submitMutation.data?.isOffline ? (
+        <section className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+          <CheckCircle2 className="h-5 w-5 shrink-0" />
+          Rapport sauvegardé hors ligne. Il sera synchronisé automatiquement lorsque vous serez connecté.
+        </section>
+      ) : null}
 
-      {/* Boutons d'action */}
-      <section className="space-y-3">
+      {submitMutation.isError ? (
+        <section className="flex gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          {submitMutation.error instanceof Error ? submitMutation.error.message : "Le rapport n'a pas pu être soumis."}
+        </section>
+      ) : null}
+
+      <section className="sticky bottom-3 z-10 space-y-3 rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur">
         <button
           onClick={handleSubmit}
-          disabled={(!content.trim() && !reportFile) || submitMutation.isPending}
-          className="flex w-full items-center justify-center rounded-lg bg-primary px-5 py-4 text-center text-base font-black text-white shadow-lg transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!canSubmit || submitMutation.isPending}
+          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-center text-base font-black text-white shadow-lg shadow-orange-200 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
+          <Send className="h-5 w-5" />
           {submitMutation.isPending ? 'Soumission...' : 'Soumettre le rapport'}
         </button>
-        
+
         <button
           onClick={handleSkip}
           disabled={submitMutation.isPending}
-          className="flex w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-4 text-center text-base font-semibold text-slate-700 shadow-lg transition active:scale-[0.98] disabled:opacity-50"
+          className="flex min-h-12 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-center text-sm font-black text-slate-700 transition active:scale-[0.98] disabled:opacity-50"
         >
           Passer
         </button>
       </section>
+    </div>
+  );
+}
 
-      {/* Message offline */}
-      {submitMutation.data?.isOffline && (
-        <section className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm font-semibold text-orange-700">
-          ✅ Rapport sauvegardé hors ligne. Il sera synchronisé automatiquement lorsque vous serez connecté.
-        </section>
-      )}
-      {submitMutation.isError ? (
-        <section className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-          {submitMutation.error instanceof Error ? submitMutation.error.message : "Le rapport n'a pas pu être soumis."}
-        </section>
-      ) : null}
+function SessionMetric({
+  icon,
+  label,
+  value,
+}: Readonly<{
+  icon?: ReactNode;
+  label: string;
+  value: string;
+}>) {
+  return (
+    <div className="min-h-20 rounded-2xl bg-slate-50 p-3">
+      <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">
+        {icon}
+        {label}
+      </p>
+      <p className="mt-2 break-words text-sm font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function MiniInfo({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-3">
+      <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">{label}</p>
+      <p className="mt-1 break-words text-sm font-black text-slate-950">{value}</p>
     </div>
   );
 }
@@ -461,15 +455,12 @@ function buildReportFormData(data: SubmitReportRequest, file: File) {
   return formData;
 }
 
-
 function ReportLoadingState() {
   return (
     <div className="space-y-5">
-      <div className="h-40 animate-pulse rounded-lg bg-slate-100" />
-      <div className="space-y-3">
-        <div className="h-5 w-32 animate-pulse rounded bg-slate-100" />
-        <div className="h-32 animate-pulse rounded-lg bg-slate-100" />
-      </div>
+      <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
+      <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />
+      <div className="h-32 animate-pulse rounded-3xl bg-slate-100" />
     </div>
   );
 }
