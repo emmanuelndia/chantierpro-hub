@@ -1,21 +1,25 @@
 import { ClockInStatus, ClockInType, PlanningAssignmentStatus, PlanningWorkLocationType, ReportStatus, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { createDocumentAttachment } from '@/lib/documents';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import type { ReportSubmissionResponse, SubmitReportRequest } from '@/types/mobile-session-report';
 
-const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
+const allowedRoles: readonly Role[] = FIELD_USER_ROLES;
 
 export const POST = withAuth(async ({ user, req }) => {
   if (!allowedRoles.includes(user.role)) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
-  const body = (await req.json().catch(() => null)) as SubmitReportRequest | null;
-  const content = body?.content?.trim();
+  const parsed = await parseSessionReportRequest(req);
+  const body = parsed?.body ?? null;
+  const file = parsed?.file ?? null;
+  const content = body?.content?.trim() ?? '';
 
-  if (!body?.clockInRecordId || !content) {
+  if (!body?.clockInRecordId || (!content && !file)) {
     return Response.json(
-      { code: 'INVALID_REQUEST', message: 'Champs obligatoires manquants' },
+      { code: 'INVALID_REQUEST', message: 'Ajoutez un texte ou un fichier au rapport.' },
       { status: 400 },
     );
   }
@@ -120,10 +124,42 @@ export const POST = withAuth(async ({ user, req }) => {
       },
     });
 
+    if (file) {
+      const documentResult = await createDocumentAttachment(prisma, {
+        user,
+        file,
+        context: {
+          projectId: null,
+          siteId: null,
+          reportId: report.id,
+        },
+      });
+
+      if (documentResult.code) {
+        await prisma.report.delete({ where: { id: report.id } }).catch(() => null);
+        const status = documentResult.code === 'UPLOAD_FAILED' ? 500 : 400;
+        return Response.json(
+          { code: documentResult.code, message: "Le fichier du rapport n'a pas pu etre ajoute." },
+          { status },
+        );
+      }
+    }
+
     if (body.assignmentId) {
       await prisma.planningAssignment.update({
         where: { id: body.assignmentId },
         data: { status: PlanningAssignmentStatus.COMPLETED },
+      });
+
+      await prisma.taskProgressUpdate.create({
+        data: {
+          assignmentId: body.assignmentId,
+          progress: body.progressPercentage,
+          comment: content.trim() ? content : (body.blockageNote?.trim() ?? null),
+          blocked: Boolean(body.blockageNote?.trim()),
+          completed: true,
+          createdById: user.id,
+        },
       });
     }
 
@@ -143,3 +179,49 @@ export const POST = withAuth(async ({ user, req }) => {
     );
   }
 });
+
+async function parseSessionReportRequest(req: Request): Promise<{ body: SubmitReportRequest; file: File | null } | null> {
+  const contentType = req.headers.get('content-type') ?? '';
+
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await req.formData().catch(() => null);
+    if (!formData) {
+      return null;
+    }
+
+    const fileValue = formData.get('file');
+    return {
+      file: fileValue instanceof File ? fileValue : null,
+      body: {
+        clockInRecordId: stringValue(formData.get('clockInRecordId')),
+        content: stringValue(formData.get('content')),
+        progressPercentage: numberValue(formData.get('progressPercentage')),
+        blockageNote: optionalStringValue(formData.get('blockageNote')),
+        assignmentId: optionalStringValue(formData.get('assignmentId')),
+      },
+    };
+  }
+
+  return {
+    file: null,
+    body: ((await req.json().catch(() => null)) as SubmitReportRequest | null) ?? {
+      clockInRecordId: '',
+      content: '',
+      progressPercentage: 0,
+    },
+  };
+}
+
+function stringValue(value: FormDataEntryValue | null) {
+  return typeof value === 'string' ? value : '';
+}
+
+function optionalStringValue(value: FormDataEntryValue | null) {
+  const text = stringValue(value).trim();
+  return text || undefined;
+}
+
+function numberValue(value: FormDataEntryValue | null) {
+  const parsed = Number(stringValue(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+}

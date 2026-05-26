@@ -10,17 +10,26 @@ import {
   type PrismaClient,
 } from '@prisma/client';
 import type {
+  CreateTaskProgressUpdateRequest,
   CreateAssignmentRequest,
   DuplicateAssignmentsResponse,
   PlanningAssignment,
   PlanningClockInStatusItem,
   PlanningClockInStatus,
   PlanningDayResponse,
+  TaskProgressUpdateItem,
+  TaskProgressUpdateResponse,
   UpdateAssignmentRequest,
   SupervisorMyAssignmentsResponse,
 } from '@/types/mobile-planning';
 import { createInternalPhotoUrl } from '@/lib/photos';
-import { BE_FIELD_USER_ROLES, CLASSIC_FIELD_USER_ROLES, FIELD_USER_ROLES } from '@/lib/field-roles';
+import {
+  BUSINESS_MANAGER_ROLES,
+  CLASSIC_FIELD_USER_ROLES,
+  FIELD_USER_ROLES,
+  getBusinessManagedResourceRoles,
+  isBusinessManagerRole,
+} from '@/lib/field-roles';
 import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 
 type AuthLikeUser = {
@@ -32,6 +41,10 @@ type PlanningAssignmentRow = Prisma.PlanningAssignmentGetPayload<{
   select: typeof planningAssignmentSelect;
 }>;
 
+type SupervisorAssignmentRow = Prisma.PlanningAssignmentGetPayload<{
+  select: typeof supervisorAssignmentSelect;
+}>;
+
 type ClockInRow = {
   siteId: string;
   userId: string;
@@ -41,7 +54,7 @@ type ClockInRow = {
 };
 
 export function canAccessMobilePlanning(role: Role) {
-  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, Role.BE_MANAGER, Role.PROJECT_MANAGER];
+  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, ...BUSINESS_MANAGER_ROLES, Role.PROJECT_MANAGER];
 
   return allowedRoles.includes(role);
 }
@@ -49,7 +62,7 @@ export function canAccessMobilePlanning(role: Role) {
 export function canAccessWebPlanning(role: Role) {
   const allowedRoles: readonly Role[] = [
     Role.GENERAL_SUPERVISOR,
-    Role.BE_MANAGER,
+    ...BUSINESS_MANAGER_ROLES,
     Role.PROJECT_MANAGER,
     Role.DIRECTION,
     Role.ADMIN,
@@ -59,7 +72,7 @@ export function canAccessWebPlanning(role: Role) {
 }
 
 export function canMutateWebPlanning(role: Role) {
-  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, Role.BE_MANAGER, Role.PROJECT_MANAGER];
+  const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, ...BUSINESS_MANAGER_ROLES, Role.PROJECT_MANAGER];
 
   return allowedRoles.includes(role);
 }
@@ -207,6 +220,8 @@ export async function getPlanningDay(
       id: site.id,
       name: site.name,
       address: site.address,
+      siteType: site.siteType,
+      requiresClockIn: site.requiresClockIn,
       status: site.status,
       project: {
         id: site.project.id,
@@ -249,6 +264,7 @@ export async function createPlanningAssignment(
         siteId: normalized.siteId,
         action: normalized.action,
         targetProgress: normalized.targetProgress,
+        objectiveText: normalized.objectiveText,
         workLocationType: normalized.workLocationType,
         status: PlanningAssignmentStatus.ASSIGNED,
         createdById: user.id,
@@ -296,6 +312,7 @@ export async function updatePlanningAssignment(
 
   const action = normalizeOptionalAction(input.action);
   const targetProgress = normalizeTargetProgress(input.targetProgress);
+  const objectiveText = normalizeOptionalText(input.objectiveText);
   const status = normalizePlanningStatus(input.status);
   const workLocationType = normalizeWorkLocationType(input.workLocationType);
 
@@ -320,6 +337,7 @@ export async function updatePlanningAssignment(
     data: {
       ...(action ? { action } : {}),
       ...(input.targetProgress !== undefined ? { targetProgress } : {}),
+      ...(input.objectiveText !== undefined ? { objectiveText } : {}),
       ...(status ? { status } : {}),
       ...(workLocationType ? { workLocationType } : {}),
     },
@@ -347,54 +365,78 @@ export async function getSupervisorMyAssignments(
       deletedAt: null,
     },
     orderBy: [{ site: { name: 'asc' } }, { id: 'asc' }],
-    select: {
-      id: true,
-      date: true,
-      siteId: true,
-      action: true,
-      targetProgress: true,
-      status: true,
-      workLocationType: true,
-      site: {
-        select: {
-          name: true,
-          address: true,
-        },
-      },
-      photos: {
-        where: {
-          uploadedById: user.id,
-          isDeleted: false,
-        },
-        orderBy: [{ takenAt: 'desc' }, { id: 'desc' }],
-        select: {
-          id: true,
-          filename: true,
-          takenAt: true,
-        },
-      },
-    },
+    select: supervisorAssignmentSelect,
   });
 
   return {
     date: formatPlanningDate(parsedDate),
-    assignments: assignments.map((assignment) => ({
-      id: assignment.id,
-      date: formatPlanningDate(assignment.date),
-      siteId: assignment.siteId,
-      siteName: assignment.site.name,
-      siteAddress: assignment.site.address,
-      action: assignment.action,
-      targetProgress: assignment.targetProgress,
-      status: assignment.status,
-      workLocationType: assignment.workLocationType,
-      photos: assignment.photos.map((photo) => ({
-        id: photo.id,
-        filename: photo.filename,
-        takenAt: photo.takenAt.toISOString(),
-        url: createInternalPhotoUrl(photo.id),
-      })),
-    })),
+    assignments: assignments.map(serializeSupervisorAssignment),
+  };
+}
+
+export async function getTaskProgressUpdates(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
+  const assignment = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
+  if (!assignment) {
+    return planningError('NOT_FOUND', 'Assignation introuvable.', 404);
+  }
+
+  return {
+    assignment: serializeSupervisorAssignment(assignment),
+    updates: assignment.progressUpdates.map(serializeTaskProgressUpdate),
+  };
+}
+
+export async function createTaskProgressUpdate(
+  prisma: PrismaClient,
+  user: AuthLikeUser,
+  assignmentId: string,
+  input: CreateTaskProgressUpdateRequest,
+): Promise<TaskProgressUpdateResponse | Response> {
+  const assignment = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
+  if (!assignment) {
+    return planningError('NOT_FOUND', 'Assignation introuvable.', 404);
+  }
+
+  const progress = normalizeActualProgress(input.progress);
+  if (progress instanceof Response) return progress;
+
+  const comment = normalizeOptionalText(input.comment);
+  const blocked = Boolean(input.blocked);
+  const completed = Boolean(input.completed);
+
+  if (blocked && !comment) {
+    return planningError('BLOCKAGE_COMMENT_REQUIRED', 'Un commentaire est requis pour signaler un blocage.', 400);
+  }
+
+  const update = await prisma.taskProgressUpdate.create({
+    data: {
+      assignmentId,
+      progress,
+      comment,
+      blocked,
+      completed,
+      createdById: user.id,
+    },
+    select: taskProgressUpdateSelect,
+  });
+
+  if (completed && assignment.status !== PlanningAssignmentStatus.COMPLETED) {
+    await prisma.planningAssignment.update({
+      where: { id: assignmentId },
+      data: { status: PlanningAssignmentStatus.COMPLETED },
+    });
+  } else if (!completed && assignment.status === PlanningAssignmentStatus.ASSIGNED && (progress !== null || blocked || comment)) {
+    await prisma.planningAssignment.update({
+      where: { id: assignmentId },
+      data: { status: PlanningAssignmentStatus.IN_PROGRESS },
+    });
+  }
+
+  const refreshed = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
+
+  return {
+    update: serializeTaskProgressUpdate(update),
+    assignment: refreshed ? serializeSupervisorAssignment(refreshed) : serializeSupervisorAssignment(assignment),
   };
 }
 
@@ -552,6 +594,7 @@ export async function duplicatePlanningAssignments(
           siteId: assignment.siteId,
           action: assignment.action,
           targetProgress: assignment.targetProgress,
+          objectiveText: assignment.objectiveText,
           workLocationType: assignment.workLocationType,
           status: PlanningAssignmentStatus.ASSIGNED,
           createdById: user.id,
@@ -574,15 +617,26 @@ function getScopedPlanningAssignment(prisma: PrismaClient, user: AuthLikeUser, a
       id: assignmentId,
       deletedAt: null,
       site: operationalPlanningSiteWhere(user),
-      ...(user.role === Role.BE_MANAGER
+      ...(isBusinessManagerRole(user.role)
         ? {
             supervisor: {
-              role: Role.BE_RESOURCE,
+              role: { in: [...getBusinessManagedResourceRoles(user.role)] },
             },
           }
         : {}),
     },
     select: planningAssignmentSelect,
+  });
+}
+
+function getAccessibleSupervisorAssignment(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
+  return prisma.planningAssignment.findFirst({
+    where: {
+      id: assignmentId,
+      supervisorId: user.id,
+      deletedAt: null,
+    },
+    select: supervisorAssignmentSelect,
   });
 }
 
@@ -599,6 +653,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   const siteId = normalizeId(input.siteId);
   const action = normalizeOptionalAction(input.action);
   const targetProgress = normalizeTargetProgress(input.targetProgress);
+  const objectiveText = normalizeOptionalText(input.objectiveText);
   const workLocationType = normalizeWorkLocationType(input.workLocationType) ?? PlanningWorkLocationType.ON_SITE;
 
   if (!supervisorId || !siteId || !action) {
@@ -632,12 +687,13 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
     siteId,
     action,
     targetProgress,
+    objectiveText,
     workLocationType,
   };
 }
 
 async function getScopedSupervisorIds(prisma: PrismaClient, user: AuthLikeUser, _date: Date) {
-  const roles = user.role === Role.BE_MANAGER ? BE_FIELD_USER_ROLES : CLASSIC_FIELD_USER_ROLES;
+  const roles = isBusinessManagerRole(user.role) ? getBusinessManagedResourceRoles(user.role) : CLASSIC_FIELD_USER_ROLES;
   const supervisors = await prisma.user.findMany({
     where: {
       role: {
@@ -794,6 +850,7 @@ const planningAssignmentSelect = {
   siteId: true,
   action: true,
   targetProgress: true,
+  objectiveText: true,
   status: true,
   workLocationType: true,
   createdAt: true,
@@ -819,12 +876,49 @@ const planningAssignmentSelect = {
       role: true,
     },
   },
+  progressUpdates: {
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 1,
+    select: {
+      id: true,
+      progress: true,
+      comment: true,
+      blocked: true,
+      completed: true,
+      createdAt: true,
+      createdBy: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+  },
 } satisfies Prisma.PlanningAssignmentSelect;
+
+const taskProgressUpdateSelect = {
+  id: true,
+  progress: true,
+  comment: true,
+  blocked: true,
+  completed: true,
+  createdAt: true,
+  createdBy: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+    },
+  },
+} satisfies Prisma.TaskProgressUpdateSelect;
 
 const availableSiteSelect = {
   id: true,
   name: true,
   address: true,
+  siteType: true,
+  requiresClockIn: true,
   status: true,
   project: {
     select: {
@@ -834,7 +928,43 @@ const availableSiteSelect = {
   },
 } satisfies Prisma.SiteSelect;
 
+const supervisorAssignmentSelect = {
+  id: true,
+  date: true,
+  siteId: true,
+  action: true,
+  targetProgress: true,
+  objectiveText: true,
+  status: true,
+  workLocationType: true,
+  site: {
+    select: {
+      name: true,
+      address: true,
+    },
+  },
+  photos: {
+    where: {
+      isDeleted: false,
+    },
+    orderBy: [{ takenAt: 'desc' }, { id: 'desc' }],
+    select: {
+      id: true,
+      filename: true,
+      takenAt: true,
+    },
+  },
+  progressUpdates: {
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 20,
+    select: taskProgressUpdateSelect,
+  },
+} satisfies Prisma.PlanningAssignmentSelect;
+
 function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns: ClockInRow[]): PlanningAssignment {
+  const latestProgressUpdate = assignment.progressUpdates[0] ? serializeTaskProgressUpdate(assignment.progressUpdates[0]) : null;
+  const objective = buildObjectiveState(assignment.targetProgress, latestProgressUpdate);
+
   return {
     id: assignment.id,
     supervisorId: assignment.supervisorId,
@@ -845,6 +975,11 @@ function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns
     siteAddress: assignment.site.address,
     action: assignment.action,
     targetProgress: assignment.targetProgress,
+    objectiveText: assignment.objectiveText,
+    actualProgress: objective.actualProgress,
+    progressDelta: objective.progressDelta,
+    objectiveStatus: objective.objectiveStatus,
+    latestProgressUpdate,
     assignedAt: assignment.date.toISOString(),
     status: assignment.status,
     workLocationType: assignment.workLocationType,
@@ -856,6 +991,68 @@ function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns
       role: assignment.createdBy.role,
     },
   };
+}
+
+function serializeSupervisorAssignment(assignment: SupervisorAssignmentRow) {
+  const latestProgressUpdate = assignment.progressUpdates[0] ? serializeTaskProgressUpdate(assignment.progressUpdates[0]) : null;
+  const objective = buildObjectiveState(assignment.targetProgress, latestProgressUpdate);
+
+  return {
+    id: assignment.id,
+    date: formatPlanningDate(assignment.date),
+    siteId: assignment.siteId,
+    siteName: assignment.site.name,
+    siteAddress: assignment.site.address,
+    action: assignment.action,
+    targetProgress: assignment.targetProgress,
+    objectiveText: assignment.objectiveText,
+    actualProgress: objective.actualProgress,
+    progressDelta: objective.progressDelta,
+    objectiveStatus: objective.objectiveStatus,
+    latestProgressUpdate,
+    status: assignment.status,
+    workLocationType: assignment.workLocationType,
+    photos: assignment.photos.map((photo) => ({
+      id: photo.id,
+      filename: photo.filename,
+      takenAt: photo.takenAt.toISOString(),
+      url: createInternalPhotoUrl(photo.id),
+    })),
+  };
+}
+
+function serializeTaskProgressUpdate(update: Prisma.TaskProgressUpdateGetPayload<{ select: typeof taskProgressUpdateSelect }>): TaskProgressUpdateItem {
+  return {
+    id: update.id,
+    progress: update.progress,
+    comment: update.comment,
+    blocked: update.blocked,
+    completed: update.completed,
+    createdAt: update.createdAt.toISOString(),
+    createdBy: {
+      id: update.createdBy.id,
+      firstName: update.createdBy.firstName,
+      lastName: update.createdBy.lastName,
+    },
+  };
+}
+
+function buildObjectiveState(targetProgress: number | null, latestProgressUpdate: TaskProgressUpdateItem | null) {
+  const actualProgress = latestProgressUpdate?.progress ?? null;
+  const progressDelta = targetProgress !== null && actualProgress !== null ? actualProgress - targetProgress : null;
+  const objectiveStatus = latestProgressUpdate?.blocked
+    ? 'BLOCKED'
+    : latestProgressUpdate?.completed || (targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
+      ? 'ACHIEVED'
+      : actualProgress !== null || latestProgressUpdate
+        ? 'PARTIAL'
+        : 'NOT_STARTED';
+
+  return {
+    actualProgress,
+    progressDelta,
+    objectiveStatus,
+  } as const;
 }
 
 function buildClockInStatuses(assignments: PlanningAssignmentRow[], clockIns: ClockInRow[]): PlanningClockInStatusItem[] {
@@ -925,12 +1122,29 @@ function normalizeOptionalAction(value: string | undefined) {
   return trimmed;
 }
 
+function normalizeOptionalText(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed;
+}
+
 function normalizeTargetProgress(value: number | null | undefined): number | null | Response {
   if (value === undefined || value === null) return null;
 
   const numberValue = Number(value);
   if (!Number.isInteger(numberValue) || numberValue < 0 || numberValue > 100) {
     return planningError('INVALID_PROGRESS', 'La progression cible doit être comprise entre 0 et 100.', 400);
+  }
+
+  return numberValue;
+}
+
+function normalizeActualProgress(value: number | null | undefined): number | null | Response {
+  if (value === undefined || value === null) return null;
+
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue) || numberValue < 0 || numberValue > 100) {
+    return planningError('INVALID_PROGRESS', 'La progression réalisée doit être comprise entre 0 et 100.', 400);
   }
 
   return numberValue;

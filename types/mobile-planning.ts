@@ -1,6 +1,21 @@
-import type { PlanningAssignmentStatus, PlanningWorkLocationType, SiteStatus } from '@prisma/client';
+import type { PlanningAssignmentStatus, PlanningWorkLocationType, SiteStatus, SiteType } from '@prisma/client';
 
 export type PlanningClockInStatus = 'CLOCKED_IN' | 'CLOCKED_OUT' | 'ON_PAUSE';
+export type PlanningObjectiveStatus = 'NOT_STARTED' | 'PARTIAL' | 'ACHIEVED' | 'BLOCKED';
+
+export type TaskProgressUpdateItem = {
+  id: string;
+  progress: number | null;
+  comment: string | null;
+  blocked: boolean;
+  completed: boolean;
+  createdAt: string;
+  createdBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+};
 
 export type PlanningAssignment = {
   id: string;
@@ -12,6 +27,11 @@ export type PlanningAssignment = {
   siteAddress: string;
   action: string;
   targetProgress: number | null;
+  objectiveText: string | null;
+  actualProgress: number | null;
+  progressDelta: number | null;
+  objectiveStatus: PlanningObjectiveStatus;
+  latestProgressUpdate: TaskProgressUpdateItem | null;
   assignedAt: string;
   status: PlanningAssignmentStatus;
   workLocationType: PlanningWorkLocationType;
@@ -46,6 +66,8 @@ export type AvailableSite = {
   id: string;
   name: string;
   address: string;
+  siteType: SiteType;
+  requiresClockIn: boolean;
   status: SiteStatus;
   project: {
     id: string;
@@ -70,6 +92,7 @@ export type CreateAssignmentRequest = {
   targetProgress: number | null;
   date: string;
   workLocationType?: PlanningWorkLocationType;
+  objectiveText?: string | null;
 };
 
 export type UpdateAssignmentRequest = {
@@ -77,6 +100,7 @@ export type UpdateAssignmentRequest = {
   targetProgress?: number | null;
   status?: PlanningAssignmentStatus;
   workLocationType?: PlanningWorkLocationType;
+  objectiveText?: string | null;
 };
 
 export type DuplicateAssignmentsRequest = {
@@ -109,6 +133,11 @@ export type SupervisorMyAssignment = {
   siteAddress: string;
   action: string;
   targetProgress: number | null;
+  objectiveText: string | null;
+  actualProgress: number | null;
+  progressDelta: number | null;
+  objectiveStatus: PlanningObjectiveStatus;
+  latestProgressUpdate: TaskProgressUpdateItem | null;
   status: PlanningAssignmentStatus;
   workLocationType: PlanningWorkLocationType;
   photos: SupervisorTaskPhoto[];
@@ -117,4 +146,16 @@ export type SupervisorMyAssignment = {
 export type SupervisorMyAssignmentsResponse = {
   date: string;
   assignments: SupervisorMyAssignment[];
+};
+
+export type CreateTaskProgressUpdateRequest = {
+  progress?: number | null;
+  comment?: string | null;
+  blocked?: boolean;
+  completed?: boolean;
+};
+
+export type TaskProgressUpdateResponse = {
+  update: TaskProgressUpdateItem;
+  assignment: SupervisorMyAssignment;
 };

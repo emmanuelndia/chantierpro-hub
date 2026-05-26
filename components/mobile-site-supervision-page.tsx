@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
+import { DocumentAttachmentsPanel } from '@/components/document-attachments-panel';
 import { SignedImage } from '@/components/mobile/SignedImage';
 import { haversineDistanceKm } from '@/lib/haversine';
 import type {
@@ -16,7 +17,7 @@ type MobileSiteSupervisionPageProps = Readonly<{
   siteId: string;
 }>;
 
-type TabId = 'presence' | 'photos' | 'reports';
+type TabId = 'presence' | 'photos' | 'reports' | 'documents';
 
 type GeoState =
   | { status: 'loading' }
@@ -88,15 +89,24 @@ export function MobileSiteSupervisionPage({ siteId }: MobileSiteSupervisionPageP
         </div>
       </section>
 
-      <nav className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+      <nav className="grid grid-cols-4 gap-1 rounded-lg bg-slate-100 p-1">
         <TabButton active={activeTab === 'presence'} label="Presences" onClick={() => setActiveTab('presence')} />
         <TabButton active={activeTab === 'photos'} label="Photos" onClick={() => setActiveTab('photos')} />
         <TabButton active={activeTab === 'reports'} label="Rapports" onClick={() => setActiveTab('reports')} />
+        <TabButton active={activeTab === 'documents'} label="Docs" onClick={() => setActiveTab('documents')} />
       </nav>
 
       {activeTab === 'presence' ? <PresenceTab items={data.presence.items} /> : null}
       {activeTab === 'photos' ? <PhotosTab onOpen={setActivePhoto} photos={data.photos} siteId={siteId} /> : null}
       {activeTab === 'reports' ? <ReportsTab reports={data.reports} /> : null}
+      {activeTab === 'documents' ? (
+        <DocumentAttachmentsPanel
+          compact
+          context={{ siteId }}
+          description="Documents rattachés à ce chantier."
+          title="Documents chantier"
+        />
+      ) : null}
 
       <Link
         className="fixed right-4 z-40 flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition active:scale-[0.98]"

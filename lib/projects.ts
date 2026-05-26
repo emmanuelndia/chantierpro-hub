@@ -1,4 +1,4 @@
-import { Prisma, ProjectStatus, Role, SiteStatus, TeamMemberStatus, type PrismaClient } from '@prisma/client';
+import { Prisma, ProjectStatus, Role, SiteGeofenceType, SiteStatus, SiteType, TeamMemberStatus, type PrismaClient } from '@prisma/client';
 import type {
   CreateProjectInput,
   CreateSiteInput,
@@ -9,6 +9,7 @@ import type {
   ProjectPresenceSiteItem,
   ProjectPresenceSummary,
   SiteDetail,
+  SiteGeofencePolygon,
   TodaySiteItem,
   UpdateProjectInput,
   UpdateSiteInput,
@@ -23,9 +24,13 @@ export const sitePublicSelect = {
   projectId: true,
   name: true,
   address: true,
+  siteType: true,
+  requiresClockIn: true,
   latitude: true,
   longitude: true,
   radiusKm: true,
+  geofenceType: true,
+  geofencePolygon: true,
   description: true,
   status: true,
   area: true,
@@ -222,9 +227,13 @@ export function serializeSite(site: SerializableSite): SiteDetail {
     projectId: site.projectId,
     name: site.name,
     address: site.address,
+    siteType: site.siteType,
+    requiresClockIn: site.requiresClockIn,
     latitude: site.latitude.toNumber(),
     longitude: site.longitude.toNumber(),
     radiusKm: site.radiusKm.toNumber(),
+    geofenceType: site.geofenceType,
+    geofencePolygon: serializeGeofencePolygon(site.geofencePolygon),
     description: site.description,
     status: site.status,
     area: site.area.toNumber(),
@@ -344,6 +353,8 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
 
   const name = sanitizeProjectName(body.name);
   const address = sanitizeString(body.address) ?? SITE_ADDRESS_NOT_PROVIDED;
+  const siteType = parseSiteType(body.siteType) ?? SiteType.WORKSITE;
+  const requiresClockIn = parseBoolean(body.requiresClockIn) ?? defaultRequiresClockIn(siteType);
   const description = sanitizeString(body.description);
   const siteManagerId = sanitizeString(body.siteManagerId);
   const startDate = sanitizeDateString(body.startDate);
@@ -355,16 +366,17 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
   const radiusKmProvided = body.radiusKm !== undefined && body.radiusKm !== null;
   const radiusKm =
     radiusKmProvided ? sanitizeNumber(body.radiusKm) : 2.0;
+  const geofence = parseSiteGeofenceInput(body);
 
   if (
     !name ||
     !siteManagerId ||
     !startDate ||
     !status ||
-    latitude === null ||
-    longitude === null ||
+    (requiresClockIn && !validateSiteGps(latitude, longitude)) ||
     area === null ||
-    radiusKm === null
+    radiusKm === null ||
+    !geofence
   ) {
     return null;
   }
@@ -372,10 +384,14 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
   return {
     name,
     address,
-    latitude,
-    longitude,
+    siteType,
+    requiresClockIn,
+    latitude: latitude ?? 0,
+    longitude: longitude ?? 0,
     radiusKm,
     radiusKmProvided,
+    geofenceType: geofence.type,
+    geofencePolygon: geofence.polygon,
     description: description ?? '',
     status,
     area,
@@ -406,6 +422,18 @@ export function parseUpdateSiteInput(body: unknown): UpdateSiteInput | null {
 
   if ('address' in body) {
     input.address = sanitizeString(body.address) ?? SITE_ADDRESS_NOT_PROVIDED;
+  }
+
+  if ('siteType' in body) {
+    const siteType = parseSiteType(body.siteType);
+    if (!siteType) return null;
+    input.siteType = siteType;
+  }
+
+  if ('requiresClockIn' in body) {
+    const requiresClockIn = parseBoolean(body.requiresClockIn);
+    if (requiresClockIn === null) return null;
+    input.requiresClockIn = requiresClockIn;
   }
 
   if ('description' in body) {
@@ -461,6 +489,13 @@ export function parseUpdateSiteInput(body: unknown): UpdateSiteInput | null {
     input.radiusKmProvided = true;
   }
 
+  if ('geofenceType' in body || 'geofencePolygon' in body) {
+    const geofence = parseSiteGeofenceInput(body);
+    if (!geofence) return null;
+    input.geofenceType = geofence.type;
+    input.geofencePolygon = geofence.polygon;
+  }
+
   return hasUpdateFields(input) ? input : null;
 }
 
@@ -474,6 +509,20 @@ export function validateDateRange(startDate: string, endDate: string | null) {
 
 export function validateRadius(radiusKm: number) {
   return radiusKm >= 0.5 && radiusKm <= 10;
+}
+
+export function validateSiteGps(latitude: number | null, longitude: number | null) {
+  return Boolean(
+    latitude !== null &&
+      longitude !== null &&
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180 &&
+      (Math.abs(latitude) > 0.01 || Math.abs(longitude) > 0.01),
+  );
 }
 
 export function assertCreateSiteRadiusAllowed(user: AuthLikeUser, input: CreateSiteInput) {
@@ -620,9 +669,13 @@ export function serializeTodaySiteItems(
     projectId: string;
     name: string;
     address: string;
+    siteType: SiteType;
+    requiresClockIn: boolean;
     latitude: Prisma.Decimal;
     longitude: Prisma.Decimal;
     radiusKm: Prisma.Decimal;
+    geofenceType: SiteGeofenceType;
+    geofencePolygon: Prisma.JsonValue | null;
     status: SiteStatus;
     hasOpenSession: boolean;
     assignmentIds?: string[];
@@ -635,9 +688,13 @@ export function serializeTodaySiteItems(
       projectId: site.projectId,
       name: site.name,
       address: site.address,
+      siteType: site.siteType,
+      requiresClockIn: site.requiresClockIn,
       latitude: site.latitude.toNumber(),
       longitude: site.longitude.toNumber(),
       radiusKm: site.radiusKm.toNumber(),
+      geofenceType: site.geofenceType,
+      geofencePolygon: serializeGeofencePolygon(site.geofencePolygon),
       status: site.status,
       hasOpenSession: site.hasOpenSession,
     };
@@ -705,6 +762,101 @@ function parseSiteStatus(value: unknown) {
   return typeof value === 'string' && Object.values(SiteStatus).includes(value as SiteStatus)
     ? (value as SiteStatus)
     : null;
+}
+
+function parseSiteType(value: unknown) {
+  return typeof value === 'string' && Object.values(SiteType).includes(value as SiteType)
+    ? (value as SiteType)
+    : null;
+}
+
+function parseBoolean(value: unknown) {
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return null;
+}
+
+function defaultRequiresClockIn(siteType: SiteType) {
+  return siteType !== SiteType.OFFICE;
+}
+
+function parseSiteGeofenceType(value: unknown) {
+  return typeof value === 'string' && Object.values(SiteGeofenceType).includes(value as SiteGeofenceType)
+    ? (value as SiteGeofenceType)
+    : null;
+}
+
+function parseSiteGeofenceInput(body: Record<string, unknown>) {
+  const type = parseSiteGeofenceType(body.geofenceType) ?? SiteGeofenceType.RADIUS;
+
+  if (type === SiteGeofenceType.RADIUS) {
+    return {
+      type,
+      polygon: null,
+    };
+  }
+
+  const polygon = normalizeGeofencePolygon(body.geofencePolygon);
+  return polygon
+    ? {
+        type,
+        polygon,
+      }
+    : null;
+}
+
+export function normalizeGeofencePolygon(value: unknown): SiteGeofencePolygon | null {
+  if (!isRecord(value) || value.type !== 'Polygon' || !Array.isArray(value.coordinates)) {
+    return null;
+  }
+
+  const coordinates = value.coordinates as unknown[];
+  const ring = coordinates[0];
+  if (!Array.isArray(ring)) {
+    return null;
+  }
+
+  const points: [number, number][] = [];
+  for (const point of ring) {
+    if (!Array.isArray(point) || point.length < 2) {
+      return null;
+    }
+
+    const lng = sanitizeNumber(point[0]);
+    const lat = sanitizeNumber(point[1]);
+    if (lng === null || lat === null || lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+      return null;
+    }
+
+    points.push([Number(lng.toFixed(6)), Number(lat.toFixed(6))]);
+  }
+
+  const openPoints = removeClosingPoint(points);
+  const uniquePoints = new Set(openPoints.map((point) => `${point[0]}:${point[1]}`));
+
+  if (openPoints.length < 3 || uniquePoints.size < 3) {
+    return null;
+  }
+
+  return {
+    type: 'Polygon',
+    coordinates: [[...openPoints, openPoints[0]!]],
+  };
+}
+
+function serializeGeofencePolygon(value: Prisma.JsonValue | null): SiteGeofencePolygon | null {
+  return normalizeGeofencePolygon(value);
+}
+
+function removeClosingPoint(points: [number, number][]) {
+  if (points.length < 2) {
+    return points;
+  }
+
+  const first = points[0]!;
+  const last = points[points.length - 1]!;
+  return first[0] === last[0] && first[1] === last[1] ? points.slice(0, -1) : points;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

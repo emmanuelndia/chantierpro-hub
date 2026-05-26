@@ -42,7 +42,8 @@ Chantier : ${report.siteName}
 Date : ${submittedAt.toLocaleDateString('fr-FR')}
 Session : ${report.session.date} ${report.session.time}
 ---
-${report.content}
+${report.content.trim() || 'Aucun texte saisi.'}
+${report.attachments.length > 0 ? `\nPièces jointes : ${report.attachments.map((item) => item.filename).join(', ')}` : ''}
 ===================================
   `.trim();
 
@@ -80,7 +81,7 @@ function generatePDFReport(report: ReportDetail) {
 
   pdf.setFontSize(11);
   pdf.setFont('helvetica', 'normal');
-  const lines = pdf.splitTextToSize(report.content, pageWidth - 2 * margin) as string[];
+  const lines = pdf.splitTextToSize(report.content.trim() || 'Aucun texte saisi.', pageWidth - 2 * margin) as string[];
 
   for (const line of lines) {
     if (y > 270) {
@@ -89,6 +90,22 @@ function generatePDFReport(report: ReportDetail) {
     }
     pdf.text(line, margin, y);
     y += 6;
+  }
+
+  if (report.attachments.length > 0) {
+    y += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Pièces jointes', margin, y);
+    y += 7;
+    pdf.setFont('helvetica', 'normal');
+    for (const attachment of report.attachments) {
+      if (y > 270) {
+        pdf.addPage();
+        y = margin;
+      }
+      pdf.text(`- ${attachment.filename}`, margin, y);
+      y += 6;
+    }
   }
 
   const pdfBytes = pdf.output('arraybuffer');

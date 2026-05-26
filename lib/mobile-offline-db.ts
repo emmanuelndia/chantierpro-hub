@@ -1,4 +1,4 @@
-import type { ClockInType } from '@prisma/client';
+import type { ClockInType, PhotoTag } from '@prisma/client';
 import { authFetch } from '@/lib/auth/client-session';
 import type { BatchSyncItemInput, BatchSyncItemResult } from '@/types/clock-in';
 
@@ -55,7 +55,11 @@ export type OfflineSessionReportItem = {
 export type OfflineTaskUpdateItem = {
   id: string;
   assignmentId: string;
-  status: 'COMPLETED';
+  status?: 'COMPLETED';
+  progress?: number | null;
+  comment?: string | null;
+  blocked?: boolean;
+  completed?: boolean;
   timestampLocal: string;
 };
 
@@ -65,6 +69,8 @@ export type PendingMobilePhoto = {
   filename: string;
   siteId: string;
   planningAssignmentId?: string | null;
+  description?: string;
+  tags?: PhotoTag[];
   timestampLocal: string;
   latitude: number | null;
   longitude: number | null;
@@ -244,7 +250,8 @@ export function buildPhotoFormData(photo: PendingMobilePhoto) {
   formData.set('file', new File([photo.blob], photo.filename, { type: photo.blob.type || 'image/jpeg' }));
   formData.set('siteId', photo.siteId);
   formData.set('category', 'PROGRESS');
-  formData.set('description', '');
+  formData.set('description', photo.description ?? '');
+  formData.set('tags', JSON.stringify(photo.tags ?? []));
   formData.set('timestampLocal', photo.timestampLocal);
 
   if (photo.planningAssignmentId) {
@@ -461,11 +468,27 @@ async function syncTaskUpdates(errors: string[]) {
   db.close();
 
   for (const update of updates.sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal))) {
-    const response = await authFetch(`/api/mobile/planning/assignment/${update.assignmentId}`, {
-      method: 'PATCH',
+    const isProgressUpdate =
+      update.progress !== undefined || update.comment !== undefined || update.blocked !== undefined || update.completed !== undefined;
+    const response = await authFetch(
+      isProgressUpdate
+        ? `/api/mobile/planning/assignment/${update.assignmentId}/progress`
+        : `/api/mobile/planning/assignment/${update.assignmentId}`,
+      {
+      method: isProgressUpdate ? 'POST' : 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: update.status }),
-    });
+      body: JSON.stringify(
+        isProgressUpdate
+          ? {
+              progress: update.progress,
+              comment: update.comment,
+              blocked: update.blocked,
+              completed: update.completed,
+            }
+          : { status: update.status },
+      ),
+    },
+    );
 
     if (response.ok) {
       const nextDb = await openDb();

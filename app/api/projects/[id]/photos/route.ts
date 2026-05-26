@@ -10,6 +10,7 @@ export const GET = withAuth<{ id: string }>(async ({ params, req, user }) => {
     page: query.page,
     uploadedByIds: query.uploadedByIds,
     category: query.category,
+    tag: query.tag,
     from: query.from,
     to: query.to,
     sort: query.sort,

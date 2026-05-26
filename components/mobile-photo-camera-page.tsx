@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { PlanningAssignmentStatus } from '@prisma/client';
+import { PhotoTag, PlanningAssignmentStatus } from '@prisma/client';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch, getAccessToken } from '@/lib/auth/client-session';
 import {
@@ -52,8 +52,18 @@ type CapturedPhoto = {
   longitude: number | null;
   site: MobilePhotoSiteOption;
   planningAssignment: SupervisorMyAssignment | null;
+  description: string;
+  tags: PhotoTag[];
 };
 type PhotoMode = 'site' | 'task';
+
+const PHOTO_TAG_OPTIONS: readonly { value: PhotoTag; label: string }[] = [
+  { value: PhotoTag.TASK_START, label: 'Début tâche' },
+  { value: PhotoTag.TASK_END, label: 'Fin tâche' },
+  { value: PhotoTag.BLOCKAGE, label: 'Blocage' },
+  { value: PhotoTag.WORK_PROOF, label: 'Preuve travaux' },
+  { value: PhotoTag.INCIDENT, label: 'Incident' },
+];
 
 export function MobilePhotoCameraPage() {
   const searchParams = useSearchParams();
@@ -77,6 +87,8 @@ export function MobilePhotoCameraPage() {
   const [pendingCount, setPendingCount] = useState(0);
   const [completingAssignment, setCompletingAssignment] = useState(false);
   const [usingOfflinePhotoData, setUsingOfflinePhotoData] = useState(false);
+  const [description, setDescription] = useState('');
+  const [selectedTags, setSelectedTags] = useState<PhotoTag[]>([]);
   const todayKey = formatDateKey(new Date());
 
   const sitesQuery = useQuery({
@@ -417,6 +429,8 @@ export function MobilePhotoCameraPage() {
         longitude: gpsState.status === 'ready' ? gpsState.longitude : null,
         site: selectedSite,
         planningAssignment: photoMode === 'task' ? selectedAssignment : null,
+        description: description.trim(),
+        tags: selectedTags,
       });
       setConfirmationMessage(null);
       setUploadProgress(0);
@@ -637,7 +651,13 @@ export function MobilePhotoCameraPage() {
           </IconButton>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+        <div className="absolute inset-x-0 bottom-0 space-y-3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+          <PhotoMetadataPanel
+            description={description}
+            onDescriptionChange={setDescription}
+            onToggleTag={(tag) => setSelectedTags((current) => togglePhotoTag(current, tag))}
+            selectedTags={selectedTags}
+          />
           <button
             aria-label="Declencher la photo"
             className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-white/20 disabled:opacity-40"
@@ -705,6 +725,8 @@ function PhotoConfirmation({
             <SummaryRow label="Chantier" value={photo.site.name} />
             <SummaryRow label="Type" value={photo.planningAssignment ? 'Photo liée à une tâche' : 'Photo chantier'} />
             {photo.planningAssignment ? <SummaryRow label="Tâche" value={photo.planningAssignment.action} /> : null}
+            <SummaryRow label="Commentaire" value={photo.description || 'Aucun'} />
+            <SummaryRow label="Tags" value={photo.tags.length > 0 ? photo.tags.map(formatPhotoTag).join(', ') : 'Aucun'} />
             <SummaryRow label="Heure" value={formatDateTime(photo.timestampLocal)} />
             <SummaryRow label="GPS" value={photo.latitude === null || photo.longitude === null ? 'Indisponible' : `${photo.latitude.toFixed(5)}, ${photo.longitude.toFixed(5)}`} />
           </div>
@@ -825,6 +847,46 @@ function ModeButton({ active, label, onClick }: Readonly<{ active: boolean; labe
   );
 }
 
+function PhotoMetadataPanel({
+  description,
+  onDescriptionChange,
+  onToggleTag,
+  selectedTags,
+}: Readonly<{
+  description: string;
+  onDescriptionChange: (value: string) => void;
+  onToggleTag: (tag: PhotoTag) => void;
+  selectedTags: PhotoTag[];
+}>) {
+  return (
+    <div className="rounded-lg bg-white/15 p-3 backdrop-blur">
+      <textarea
+        className="min-h-16 w-full resize-none rounded-md border border-white/20 bg-slate-950/60 px-3 py-2 text-sm font-semibold text-white outline-none placeholder:text-white/50"
+        onChange={(event) => onDescriptionChange(event.target.value)}
+        placeholder="Commentaire photo"
+        value={description}
+      />
+      <div className="mt-2 flex flex-wrap gap-2">
+        {PHOTO_TAG_OPTIONS.map((tag) => {
+          const selected = selectedTags.includes(tag.value);
+          return (
+            <button
+              className={`rounded-full border px-3 py-1.5 text-[11px] font-black ${
+                selected ? 'border-primary bg-primary text-white' : 'border-white/20 bg-white/10 text-white'
+              }`}
+              key={tag.value}
+              onClick={() => onToggleTag(tag.value)}
+              type="button"
+            >
+              {tag.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function TaskSelector({
   assignments,
   error,
@@ -923,6 +985,8 @@ function toPendingPhoto(photo: CapturedPhoto): PendingMobilePhoto {
     filename: `photo-${photo.timestampLocal.replace(/[:.]/g, '-')}.jpg`,
     siteId: photo.site.id,
     planningAssignmentId: photo.planningAssignment?.id ?? null,
+    description: photo.description,
+    tags: photo.tags,
     timestampLocal: photo.timestampLocal,
     latitude: photo.latitude,
     longitude: photo.longitude,
@@ -1006,6 +1070,14 @@ function formatDateTime(value: string) {
 
 function formatDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function togglePhotoTag(tags: PhotoTag[], tag: PhotoTag) {
+  return tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag];
+}
+
+function formatPhotoTag(tag: PhotoTag) {
+  return PHOTO_TAG_OPTIONS.find((item) => item.value === tag)?.label ?? tag;
 }
 
 function Spinner({ className }: Readonly<{ className: string }>) {

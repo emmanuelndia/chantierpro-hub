@@ -42,6 +42,12 @@ const roleLabels: Partial<Record<Role, string>> = {
   GENERAL_SUPERVISOR: 'Superviseur général',
   SUPERVISOR: 'Superviseur terrain',
   COORDINATOR: 'Coordinatrice',
+  BE_MANAGER: "Responsable Bureau d'étude",
+  BE_RESOURCE: "Ressource Bureau d'étude",
+  NEGOTIATION_MANAGER: 'Responsable Négociation',
+  NEGOTIATION_RESOURCE: 'Ressource Négociation',
+  FLEET_MANAGER: 'Responsable Parc Auto',
+  DRIVER: 'Chauffeur',
 };
 
 export function parsePlanningExportQuery(searchParams: URLSearchParams): PlanningExportQuery | null {

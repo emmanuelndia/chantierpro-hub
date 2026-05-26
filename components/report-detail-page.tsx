@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import type { PhotoTag } from '@prisma/client';
 import { Badge } from '@/components/badge';
+import { DocumentAttachmentsPanel } from '@/components/document-attachments-panel';
 import { EmptyState } from '@/components/empty-state';
 import { authFetch } from '@/lib/auth/client-session';
 import type { ReportDetail } from '@/types/reports';
@@ -33,6 +35,7 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
   }
 
   const report = query.data.report;
+  const photoGroups = groupReportPhotos(report.photos);
 
   return (
     <div className="space-y-6">
@@ -51,7 +54,13 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
             </p>
           </div>
           <Badge tone={report.validationStatus === 'VALIDATED_FOR_CLIENT' ? 'success' : 'warning'}>
-            {report.validationStatus === 'VALIDATED_FOR_CLIENT' ? 'Valide client' : 'En attente validation'}
+            {report.hasText && report.hasAttachments
+              ? 'Texte + fichier'
+              : report.hasAttachments
+                ? 'Fichier'
+                : report.validationStatus === 'VALIDATED_FOR_CLIENT'
+                  ? 'Valide client'
+                  : 'Texte'}
           </Badge>
         </div>
       </section>
@@ -82,7 +91,13 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
 
         <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
           <h2 className="text-xl font-semibold text-slate-950">Contenu du rapport</h2>
-          <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-700">{report.content}</p>
+          {report.hasText ? (
+            <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-700">{report.content}</p>
+          ) : (
+            <p className="mt-5 rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+              Aucun texte saisi. Ce rapport contient uniquement des pièces jointes.
+            </p>
+          )}
           {report.session.comment ? (
             <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Commentaire session</p>
@@ -92,6 +107,12 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
         </article>
       </section>
 
+      <DocumentAttachmentsPanel
+        context={{ reportId }}
+        description="Fichiers transmis avec ce rapport terrain."
+        title="Pièces jointes du rapport"
+      />
+
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
         <h2 className="text-xl font-semibold text-slate-950">Photos liees</h2>
         {report.photos.length === 0 ? (
@@ -99,16 +120,27 @@ export function ReportDetailPage({ reportId }: ReportDetailPageProps) {
             Aucune photo rattachee a ce rapport.
           </p>
         ) : (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {report.photos.map((photo) => (
-              <article key={photo.id} className="overflow-hidden rounded-3xl border border-slate-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt={photo.filename} className="h-40 w-full object-cover" src={photo.url} />
-                <div className="p-4">
-                  <p className="truncate text-sm font-semibold text-slate-900">{photo.filename}</p>
-                  <p className="mt-1 text-xs text-slate-500">{formatDateTime(photo.takenAt)}</p>
+          <div className="mt-5 space-y-5">
+            {photoGroups.map((group) => (
+              <div key={group.label} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <h3 className="text-sm font-bold text-slate-900">{group.label}</h3>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {group.photos.map((photo) => (
+                    <article key={photo.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img alt={photo.filename} className="h-40 w-full object-cover" src={photo.url} />
+                      <div className="space-y-2 p-4">
+                        <p className="truncate text-sm font-semibold text-slate-900">{photo.filename}</p>
+                        <p className="text-xs text-slate-500">{formatDateTime(photo.takenAt)}</p>
+                        <PhotoTagBadges tags={photo.tags} />
+                        {photo.description ? (
+                          <p className="text-xs leading-5 text-slate-600">{photo.description}</p>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              </article>
+              </div>
             ))}
           </div>
         )}
@@ -141,4 +173,46 @@ function formatDateTime(value: string) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+}
+
+function groupReportPhotos(photos: ReportDetail['photos']) {
+  const groups = new Map<string, ReportDetail['photos']>();
+
+  for (const photo of photos) {
+    const label = photo.assignmentAction ? `Tache - ${photo.assignmentAction}` : 'Photos chantier';
+    groups.set(label, [...(groups.get(label) ?? []), photo]);
+  }
+
+  return [...groups.entries()].map(([label, groupedPhotos]) => ({
+    label,
+    photos: groupedPhotos,
+  }));
+}
+
+function PhotoTagBadges({ tags }: Readonly<{ tags: PhotoTag[] }>) {
+  if (tags.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {tags.map((tag) => (
+        <span key={tag} className="rounded-full bg-orange-50 px-2 py-1 text-[11px] font-bold text-orange-700">
+          {formatPhotoTag(tag)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function formatPhotoTag(tag: PhotoTag) {
+  const labels: Record<PhotoTag, string> = {
+    TASK_START: 'Debut tache',
+    TASK_END: 'Fin tache',
+    BLOCKAGE: 'Blocage',
+    WORK_PROOF: 'Preuve travaux',
+    INCIDENT: 'Incident',
+  };
+
+  return labels[tag];
 }

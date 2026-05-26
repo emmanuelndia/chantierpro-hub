@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ProjectStatus, Role, SiteStatus } from '@prisma/client';
+import type { ProjectStatus, Role, SiteGeofenceType, SiteStatus, SiteType } from '@prisma/client';
 import { Badge } from '@/components/badge';
 import { ConfirmModal } from '@/components/confirm-modal';
+import { DocumentAttachmentsPanel } from '@/components/document-attachments-panel';
 import { EmptyState } from '@/components/empty-state';
 import { PhotoGallery } from '@/components/photo-gallery';
 import { SiteLocationPicker } from '@/components/site-location-picker';
@@ -18,6 +19,10 @@ import type {
   ProjectPresenceSummary,
   ProjectSiteItem,
   ProjectTeamSummaryResponse,
+  SiteGeofencePolygon,
+  SiteImportCommitResponse,
+  SiteImportPreviewResponse,
+  SiteImportPreviewRow,
 } from '@/types/projects';
 
 type ProjectDetailPageProps = Readonly<{
@@ -31,9 +36,13 @@ type ProjectDetailPageProps = Readonly<{
 type SiteFormValues = {
   name: string;
   address: string;
+  siteType: SiteType;
+  requiresClockIn: boolean;
   latitude: string;
   longitude: string;
   radiusKm: number;
+  geofenceType: SiteGeofenceType;
+  geofencePolygon: SiteGeofencePolygon | null;
   description: string;
   status: SiteStatus;
   area: string;
@@ -45,9 +54,13 @@ type SiteFormValues = {
 type SiteMutationBody = Partial<{
   name: string;
   address: string;
+  siteType: SiteType;
+  requiresClockIn: boolean;
   latitude: number;
   longitude: number;
   radiusKm: number;
+  geofenceType: SiteGeofenceType;
+  geofencePolygon: SiteGeofencePolygon | null;
   description: string;
   status: SiteStatus;
   area: number;
@@ -60,8 +73,9 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'sites' | 'team' | 'presences' | 'photos'>('sites');
+  const [activeTab, setActiveTab] = useState<'sites' | 'team' | 'presences' | 'photos' | 'documents'>('sites');
   const [siteDrawerOpen, setSiteDrawerOpen] = useState(false);
+  const [siteImportOpen, setSiteImportOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<ProjectSiteItem | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
@@ -180,7 +194,13 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
-    if (requestedTab === 'sites' || requestedTab === 'team' || requestedTab === 'presences' || requestedTab === 'photos') {
+    if (
+      requestedTab === 'sites' ||
+      requestedTab === 'team' ||
+      requestedTab === 'presences' ||
+      requestedTab === 'photos' ||
+      requestedTab === 'documents'
+    ) {
       setActiveTab(requestedTab);
     }
   }, [searchParams]);
@@ -191,6 +211,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
       { id: 'team', label: 'Equipe' },
       { id: 'presences', label: 'Presences' },
       { id: 'photos', label: 'Photos' },
+      { id: 'documents', label: 'Documents' },
     ] as const,
     [],
   );
@@ -240,6 +261,13 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
             >
               Créer chantier
             </button>
+            <button
+              className="rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+              onClick={() => setSiteImportOpen(true)}
+              type="button"
+            >
+              Importer des chantiers
+            </button>
             <Link
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               href={`/web/teams/new?projectId=${encodeURIComponent(projectId)}`}
@@ -283,7 +311,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
             </div>
           ) : (
             project.sites.map((site) => (
-              <article key={site.id} className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+              <article key={site.id} className="space-y-4 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
@@ -293,8 +321,18 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                       </Badge>
                     </div>
                     <p className="mt-3 text-sm text-slate-500">{site.address}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge tone="info">{siteTypeLabel(site.siteType)}</Badge>
+                      <Badge tone={site.requiresClockIn ? 'success' : 'neutral'}>
+                        {site.requiresClockIn ? 'Pointage requis' : 'Pointage non requis'}
+                      </Badge>
+                    </div>
                     <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
-                      Geofencing {site.radiusKm.toFixed(1)} km • Surface {site.area.toFixed(2)}
+                      {site.requiresClockIn
+                        ? site.geofenceType === 'POLYGON'
+                          ? 'Limite précise'
+                          : `Pointage par rayon ${site.radiusKm.toFixed(1)} km`
+                        : 'Lieu planifiable sans flux terrain'} - Surface {site.area.toFixed(2)}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -334,6 +372,13 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                     </button>
                   </div>
                 </div>
+                <DocumentAttachmentsPanel
+                  canUpload={viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN'}
+                  compact
+                  context={{ siteId: site.id }}
+                  description="Documents rattachés à ce chantier."
+                  title="Documents chantier"
+                />
               </article>
             ))
           )}
@@ -435,6 +480,15 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
         />
       ) : null}
 
+      {activeTab === 'documents' ? (
+        <DocumentAttachmentsPanel
+          canUpload={viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN'}
+          context={{ projectId }}
+          description="Documents, PV, Excel et livrables rattachés au projet."
+          title={`Documents - ${project.name}`}
+        />
+      ) : null}
+
       <SiteFormDrawer
         canManageRadius={canManageRadius}
         initialSite={editingSite}
@@ -448,6 +502,15 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
         pending={saveSiteMutation.isPending}
       />
 
+      <SiteImportModal
+        onClose={() => setSiteImportOpen(false)}
+        onImported={() => {
+          void queryClient.invalidateQueries({ queryKey: ['project-detail', projectId] });
+        }}
+        open={siteImportOpen}
+        projectId={projectId}
+      />
+
       <ConfirmModal
         cancelLabel="Annuler"
         confirmLabel="Archiver le projet"
@@ -458,6 +521,262 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
         open={archiveOpen}
         title="Archiver ce projet ?"
       />
+    </div>
+  );
+}
+
+function SiteImportModal({
+  open,
+  projectId,
+  onImported,
+  onClose,
+}: Readonly<{
+  open: boolean;
+  projectId: string;
+  onImported: () => void;
+  onClose: () => void;
+}>) {
+  const { pushToast } = useToast();
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<SiteImportPreviewResponse | null>(null);
+  const [commitResult, setCommitResult] = useState<SiteImportCommitResponse | null>(null);
+
+  const previewMutation = useMutation({
+    mutationFn: async (selectedFile: File) => {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const response = await authFetch(`/api/projects/${projectId}/sites/import/preview`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorBody = (await safeJson(response)) as { message?: string } | null;
+        throw new Error(errorBody?.message ?? "Impossible d'analyser ce fichier.");
+      }
+
+      return (await response.json()) as SiteImportPreviewResponse;
+    },
+    onSuccess: (data) => {
+      setPreview(data);
+      setCommitResult(null);
+      pushToast({
+        type: data.errorRows > 0 ? 'warning' : 'success',
+        title: 'Prévisualisation prête',
+        message: `${data.validRows} ligne(s) valide(s), ${data.errorRows} ligne(s) en erreur.`,
+      });
+    },
+    onError: (error) => {
+      pushToast({
+        type: 'error',
+        title: 'Analyse impossible',
+        message: error instanceof Error ? error.message : "Le fichier n'a pas pu etre analyse.",
+      });
+    },
+  });
+
+  const commitMutation = useMutation({
+    mutationFn: async (rows: SiteImportPreviewRow[]) => {
+      const response = await authFetch(`/api/projects/${projectId}/sites/import/commit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rows: rows.map((row) => row.normalized) }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await safeJson(response)) as { message?: string } | null;
+        throw new Error(errorBody?.message ?? "Impossible d'importer les chantiers.");
+      }
+
+      return (await response.json()) as SiteImportCommitResponse;
+    },
+    onSuccess: (data) => {
+      setCommitResult(data);
+      setPreview({
+        projectId: data.projectId,
+        totalRows: data.rows.length,
+        validRows: data.rows.filter((row) => row.valid).length,
+        errorRows: data.rows.filter((row) => row.errors.length > 0).length,
+        warningRows: data.rows.filter((row) => row.warnings.length > 0).length,
+        rows: data.rows,
+      });
+      onImported();
+      pushToast({
+        type: 'success',
+        title: 'Import terminé',
+        message: `${data.createdCount} chantier(s) créé(s), ${data.skippedCount} ligne(s) ignorée(s).`,
+      });
+    },
+    onError: (error) => {
+      pushToast({
+        type: 'error',
+        title: 'Import impossible',
+        message: error instanceof Error ? error.message : "Les chantiers n'ont pas pu etre importes.",
+      });
+    },
+  });
+
+  if (!open) {
+    return null;
+  }
+
+  const validRows = preview?.rows.filter((row) => row.valid) ?? [];
+
+  return (
+    <div className="fixed inset-0 z-[78] flex items-center justify-center bg-slate-950/55 p-4">
+      <div className="custom-scrollbar max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">
+              Import chantiers
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold text-slate-950">Importer des chantiers en masse</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Téléchargez le modèle, remplissez les lignes puis importez le fichier. Les lignes en erreur restent ignorées.
+            </p>
+          </div>
+          <button
+            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            onClick={onClose}
+            type="button"
+          >
+            Fermer
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">1. Modèle</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Le modèle contient toutes les colonnes attendues pour créer les chantiers.
+            </p>
+            <a
+              className="mt-4 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              href={`/api/projects/${projectId}/sites/import/template`}
+            >
+              Télécharger le modèle
+            </a>
+          </article>
+
+          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">2. Fichier</p>
+            <input
+              accept=".xlsx,.csv"
+              className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+              onChange={(event) => {
+                setFile(event.target.files?.[0] ?? null);
+                setPreview(null);
+                setCommitResult(null);
+              }}
+              type="file"
+            />
+            <button
+              className="mt-4 rounded-full bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!file || previewMutation.isPending}
+              onClick={() => file && previewMutation.mutate(file)}
+              type="button"
+            >
+              {previewMutation.isPending ? 'Analyse...' : 'Prévisualiser'}
+            </button>
+          </article>
+
+          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">3. Import</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Importez uniquement les lignes valides après vérification.
+            </p>
+            <button
+              className="mt-4 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={validRows.length === 0 || commitMutation.isPending}
+              onClick={() => commitMutation.mutate(validRows)}
+              type="button"
+            >
+              {commitMutation.isPending ? 'Import...' : 'Importer les lignes valides'}
+            </button>
+          </article>
+        </div>
+
+        {preview ? (
+          <div className="mt-6 space-y-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              <MetricCard label="Total lignes" value={preview.totalRows} />
+              <MetricCard label="Valides" value={preview.validRows} />
+              <MetricCard label="Erreurs" value={preview.errorRows} />
+              <MetricCard label="Warnings" value={preview.warningRows} />
+            </div>
+
+            {commitResult ? (
+              <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+                {commitResult.createdCount} chantier(s) créé(s). {commitResult.skippedCount} ligne(s) ignorée(s).
+              </div>
+            ) : null}
+
+            <div className="overflow-hidden rounded-3xl border border-slate-200">
+              <div className="custom-scrollbar max-h-[48vh] overflow-auto">
+                <table className="min-w-[980px] divide-y divide-slate-200 text-left text-sm">
+                  <thead className="sticky top-0 bg-slate-50 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Ligne</th>
+                      <th className="px-4 py-3">Statut</th>
+                      <th className="px-4 py-3">Chantier</th>
+                      <th className="px-4 py-3">Responsable GS</th>
+                      <th className="px-4 py-3">GPS</th>
+                      <th className="px-4 py-3">Messages</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {preview.rows.map((row) => (
+                      <tr key={row.rowNumber}>
+                        <td className="px-4 py-3 font-semibold text-slate-900">{row.rowNumber}</td>
+                        <td className="px-4 py-3">
+                          <Badge tone={row.valid ? (row.warnings.length > 0 ? 'warning' : 'success') : 'error'}>
+                            {row.valid ? 'Valide' : 'Erreur'}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-950">{row.normalized.nom || '-'}</p>
+                          <p className="text-xs text-slate-500">{row.normalized.adresse_ou_repere || 'Adresse non renseignée'}</p>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{row.normalized.responsable_gs_email || '-'}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {row.normalized.latitude || '-'}, {row.normalized.longitude || '-'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <ImportMessages row={row} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ImportMessages({ row }: Readonly<{ row: SiteImportPreviewRow }>) {
+  const messages = [
+    ...row.errors.map((error) => ({ tone: 'text-red-700', message: `${error.field}: ${error.message}` })),
+    ...row.warnings.map((warning) => ({ tone: 'text-orange-700', message: `${warning.field}: ${warning.message}` })),
+  ];
+
+  if (messages.length === 0) {
+    return <span className="text-slate-400">Aucun message</span>;
+  }
+
+  return (
+    <div className="space-y-1">
+      {messages.map((item, index) => (
+        <p key={`${item.message}-${index}`} className={`text-xs font-semibold ${item.tone}`}>
+          {item.message}
+        </p>
+      ))}
     </div>
   );
 }
@@ -539,12 +858,54 @@ function SiteFormDrawer({
             />
           </Field>
 
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Type de lieu">
+              <select
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+                onChange={(event) => {
+                  const siteType = event.target.value as SiteType;
+                  setValues((current) => ({
+                    ...current,
+                    siteType,
+                    requiresClockIn: defaultRequiresClockInForSiteType(siteType),
+                  }));
+                }}
+                value={values.siteType}
+              >
+                <option value="WORKSITE">Chantier</option>
+                <option value="WAREHOUSE">Entrepôt</option>
+                <option value="MATERIAL_PICKUP">Point d&apos;enlèvement matériel</option>
+                <option value="OFFICE">Bureau</option>
+                <option value="CLIENT_SITE">Site client</option>
+                <option value="OTHER">Autre lieu</option>
+              </select>
+            </Field>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
+                <input
+                  checked={values.requiresClockIn}
+                  className="mt-1 accent-orange-600"
+                  onChange={(event) => setValues((current) => ({ ...current, requiresClockIn: event.target.checked }))}
+                  type="checkbox"
+                />
+                <span>
+                  Pointage GPS requis
+                  <span className="mt-1 block text-xs font-normal text-slate-500">
+                    Désactivez pour un bureau ou une tâche logistique qui ne doit pas apparaître dans le pointage.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+
           <SiteLocationPicker
             address={values.address}
             latitude={values.latitude}
             longitude={values.longitude}
             onChange={(nextValues) => setValues((current) => ({ ...current, ...nextValues }))}
             radiusKm={values.radiusKm}
+            geofenceType={values.geofenceType}
+            geofencePolygon={values.geofencePolygon}
           />
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -701,9 +1062,13 @@ function buildInitialSiteFormValues(site: ProjectSiteItem | null): SiteFormValue
     return {
       name: site.name,
       address: site.address,
+      siteType: site.siteType,
+      requiresClockIn: site.requiresClockIn,
       latitude: String(site.latitude),
       longitude: String(site.longitude),
       radiusKm: site.radiusKm,
+      geofenceType: site.geofenceType,
+      geofencePolygon: site.geofencePolygon,
       description: site.description,
       status: site.status,
       area: String(site.area),
@@ -716,9 +1081,13 @@ function buildInitialSiteFormValues(site: ProjectSiteItem | null): SiteFormValue
   return {
     name: '',
     address: '',
+    siteType: 'WORKSITE',
+    requiresClockIn: true,
     latitude: '',
     longitude: '',
     radiusKm: 2,
+    geofenceType: 'RADIUS',
+    geofencePolygon: null,
     description: '',
     status: 'ACTIVE',
     area: '',
@@ -732,14 +1101,18 @@ function buildCreateSiteMutationBody(values: SiteFormValues, canManageRadius: bo
   return {
     name: values.name,
     address: values.address,
-    latitude: Number(values.latitude),
-    longitude: Number(values.longitude),
+    siteType: values.siteType,
+    requiresClockIn: values.requiresClockIn,
+    latitude: numberOrZero(values.latitude),
+    longitude: numberOrZero(values.longitude),
     description: values.description,
     status: values.status,
     area: Number(values.area),
     startDate: values.startDate,
     endDate: values.endDate || null,
     siteManagerId: values.siteManagerId,
+    geofenceType: values.geofenceType,
+    geofencePolygon: values.geofenceType === 'POLYGON' ? values.geofencePolygon : null,
     ...(canManageRadius ? { radiusKm: values.radiusKm } : {}),
   };
 }
@@ -748,8 +1121,10 @@ function buildPartialSiteMutationBody(values: SiteFormValues, initialSite: Proje
   const body: SiteMutationBody = {};
   setStringChange(body, 'name', values.name, initialSite.name);
   setStringChange(body, 'address', values.address, initialSite.address);
-  setNumberChange(body, 'latitude', Number(values.latitude), initialSite.latitude);
-  setNumberChange(body, 'longitude', Number(values.longitude), initialSite.longitude);
+  setStringChange(body, 'siteType', values.siteType, initialSite.siteType);
+  setBooleanChange(body, 'requiresClockIn', values.requiresClockIn, initialSite.requiresClockIn);
+  setNumberChange(body, 'latitude', numberOrZero(values.latitude), initialSite.latitude);
+  setNumberChange(body, 'longitude', numberOrZero(values.longitude), initialSite.longitude);
   setStringChange(body, 'description', values.description, initialSite.description);
   setStringChange(body, 'status', values.status, initialSite.status);
   setNumberChange(body, 'area', Number(values.area), initialSite.area);
@@ -762,6 +1137,11 @@ function buildPartialSiteMutationBody(values: SiteFormValues, initialSite: Proje
   }
 
   setStringChange(body, 'siteManagerId', values.siteManagerId, initialSite.siteManagerId);
+  setStringChange(body, 'geofenceType', values.geofenceType, initialSite.geofenceType);
+
+  if (values.geofenceType !== initialSite.geofenceType || !samePolygon(values.geofencePolygon, initialSite.geofencePolygon)) {
+    body.geofencePolygon = values.geofenceType === 'POLYGON' ? values.geofencePolygon : null;
+  }
 
   if (canManageRadius) {
     setNumberChange(body, 'radiusKm', values.radiusKm, initialSite.radiusKm);
@@ -792,20 +1172,65 @@ function setNumberChange<T extends keyof SiteMutationBody>(
   }
 }
 
+function setBooleanChange<T extends keyof SiteMutationBody>(
+  body: SiteMutationBody,
+  key: T,
+  nextValue: boolean,
+  previousValue: boolean,
+) {
+  if (nextValue !== previousValue) {
+    body[key] = nextValue as SiteMutationBody[T];
+  }
+}
+
+function numberOrZero(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function samePolygon(left: SiteGeofencePolygon | null, right: SiteGeofencePolygon | null) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 function canSubmitSiteForm(values: SiteFormValues) {
   const latitude = Number(values.latitude);
   const longitude = Number(values.longitude);
+  const hasValidGps =
+    Number.isFinite(latitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    Number.isFinite(longitude) &&
+    longitude >= -180 &&
+    longitude <= 180 &&
+    (Math.abs(latitude) > 0.01 || Math.abs(longitude) > 0.01);
 
   return Boolean(
     values.name.trim() &&
-      Number.isFinite(latitude) &&
-      latitude >= -90 &&
-      latitude <= 90 &&
-      Number.isFinite(longitude) &&
-      longitude >= -180 &&
-      longitude <= 180 &&
-      (Math.abs(latitude) > 0.01 || Math.abs(longitude) > 0.01),
+      (!values.requiresClockIn || hasValidGps),
   );
+}
+
+function defaultRequiresClockInForSiteType(siteType: SiteType) {
+  return siteType !== 'OFFICE';
+}
+
+function siteTypeLabel(siteType: SiteType) {
+  switch (siteType) {
+    case 'WORKSITE':
+      return 'Chantier';
+    case 'WAREHOUSE':
+      return 'Entrepôt';
+    case 'MATERIAL_PICKUP':
+      return "Point d'enlèvement";
+    case 'OFFICE':
+      return 'Bureau';
+    case 'CLIENT_SITE':
+      return 'Site client';
+    case 'OTHER':
+      return 'Autre lieu';
+    default:
+      return siteType;
+  }
 }
 
 function humanizeProjectStatus(status: ProjectStatus) {

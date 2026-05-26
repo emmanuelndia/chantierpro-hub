@@ -131,14 +131,12 @@ function DashboardContent({ data }: Readonly<{ data: DashboardResponse }>) {
       );
     case 'GENERAL_SUPERVISOR':
     case 'BE_MANAGER':
+    case 'NEGOTIATION_MANAGER':
+    case 'FLEET_MANAGER':
       return (
         <DashboardFrame
-          title={data.role === 'BE_MANAGER' ? "Bureau d'etude" : 'Coordination sites confies'}
-          description={
-            data.role === 'BE_MANAGER'
-              ? "Planning des ressources BE, suivi des sites concernes et remontees attendues."
-              : 'Pilotage des chantiers confies, des assignations du jour et des remontees attendues.'
-          }
+          title={getOperationalDashboardTitle(data.role)}
+          description={getOperationalDashboardDescription(data.role)}
         >
           <StatsGrid stats={data.stats} />
           <GeneralSupervisorSitesPanel items={data.entrustedSites} />
@@ -161,6 +159,29 @@ function DashboardContent({ data }: Readonly<{ data: DashboardResponse }>) {
         />
       );
   }
+}
+
+function getOperationalDashboardTitle(role: 'GENERAL_SUPERVISOR' | 'BE_MANAGER' | 'NEGOTIATION_MANAGER' | 'FLEET_MANAGER') {
+  if (role === 'BE_MANAGER') {
+    return "Bureau d'etude";
+  }
+  if (role === 'NEGOTIATION_MANAGER') {
+    return 'Negociation';
+  }
+  if (role === 'FLEET_MANAGER') {
+    return 'Parc auto';
+  }
+  return 'Coordination sites confies';
+}
+
+function getOperationalDashboardDescription(
+  role: 'GENERAL_SUPERVISOR' | 'BE_MANAGER' | 'NEGOTIATION_MANAGER' | 'FLEET_MANAGER',
+) {
+  if (role === 'GENERAL_SUPERVISOR') {
+    return 'Pilotage des chantiers confies, des assignations du jour et des remontees attendues.';
+  }
+
+  return 'Planning des ressources metier, suivi des sites concernes et remontees attendues.';
 }
 
 function DashboardFrame({
@@ -360,9 +381,20 @@ function GeneralSupervisorAssignmentsPanel({
                 <Badge tone={planningStatusTone(assignment.status)}>{planningStatusLabel(assignment.status)}</Badge>
               </div>
               <p className="mt-3 text-sm leading-6 text-slate-600">{assignment.action}</p>
-              <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Objectif {assignment.targetProgress ?? 0} %
-              </p>
+              {assignment.objectiveText ? <p className="mt-2 text-xs font-semibold text-slate-500">{assignment.objectiveText}</p> : null}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge tone={objectiveStatusTone(assignment.objectiveStatus)}>{objectiveStatusLabel(assignment.objectiveStatus)}</Badge>
+                {assignment.targetProgress !== null ? <Badge tone="info">Cible {assignment.targetProgress}%</Badge> : null}
+                {assignment.actualProgress !== null ? <Badge tone="neutral">Reel {assignment.actualProgress}%</Badge> : null}
+                {assignment.progressDelta !== null ? (
+                  <Badge tone={assignment.progressDelta >= 0 ? 'success' : 'warning'}>
+                    Ecart {assignment.progressDelta >= 0 ? '+' : ''}{assignment.progressDelta}%
+                  </Badge>
+                ) : null}
+              </div>
+              {assignment.latestProgressUpdate?.comment ? (
+                <p className="mt-2 line-clamp-2 text-xs text-slate-500">{assignment.latestProgressUpdate.comment}</p>
+              ) : null}
             </article>
           ))}
         </div>
@@ -785,6 +817,34 @@ function planningStatusTone(status: string) {
     case 'COMPLETED':
       return 'success' as const;
     case 'CANCELLED':
+      return 'error' as const;
+    default:
+      return 'neutral' as const;
+  }
+}
+
+function objectiveStatusLabel(status: GeneralSupervisorAssignmentDashboardItem['objectiveStatus']) {
+  switch (status) {
+    case 'ACHIEVED':
+      return 'Atteint';
+    case 'PARTIAL':
+      return 'Partiel';
+    case 'BLOCKED':
+      return 'Bloque';
+    case 'NOT_STARTED':
+      return 'Non demarre';
+    default:
+      return status;
+  }
+}
+
+function objectiveStatusTone(status: GeneralSupervisorAssignmentDashboardItem['objectiveStatus']) {
+  switch (status) {
+    case 'ACHIEVED':
+      return 'success' as const;
+    case 'PARTIAL':
+      return 'warning' as const;
+    case 'BLOCKED':
       return 'error' as const;
     default:
       return 'neutral' as const;

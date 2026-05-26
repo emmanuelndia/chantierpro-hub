@@ -14,7 +14,14 @@ import { formatRoleLabel } from '@/lib/role-labels';
 import type { PaginatedUsersResponse, UserDetail, UserListItem } from '@/types/users';
 
 const ROLE_OPTIONS = Object.values(Role);
-const HISTORY_RESOURCE_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
+const HISTORY_RESOURCE_ROLES: readonly Role[] = [
+  Role.SUPERVISOR,
+  Role.COORDINATOR,
+  Role.GENERAL_SUPERVISOR,
+  Role.BE_RESOURCE,
+  Role.NEGOTIATION_RESOURCE,
+  Role.DRIVER,
+];
 
 type UserFormValues = {
   email: string;

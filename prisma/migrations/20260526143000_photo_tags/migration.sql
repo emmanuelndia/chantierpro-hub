@@ -1,0 +1,8 @@
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PhotoTag') THEN
+        CREATE TYPE "PhotoTag" AS ENUM ('TASK_START', 'TASK_END', 'BLOCKAGE', 'WORK_PROOF', 'INCIDENT');
+    END IF;
+END $$;
+
+ALTER TABLE "Photo" ADD COLUMN IF NOT EXISTS "tags" "PhotoTag"[] NOT NULL DEFAULT ARRAY[]::"PhotoTag"[];

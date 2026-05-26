@@ -1,4 +1,4 @@
-import type { ReportValidationStatus, Role } from '@prisma/client';
+import type { PhotoTag, ReportValidationStatus, Role } from '@prisma/client';
 
 export type MobileManagementReportStatusFilter = 'ALL' | ReportValidationStatus;
 
@@ -48,6 +48,10 @@ export type MobileManagementReportDetailPhoto = {
   filename: string;
   url: string;
   takenAt: string;
+  tags: PhotoTag[];
+  planningAssignmentId: string | null;
+  assignmentAction?: string;
+  description?: string;
 };
 
 export type MobileManagementReportDetailResponse = {

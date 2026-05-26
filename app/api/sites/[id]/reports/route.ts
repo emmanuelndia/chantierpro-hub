@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { BUSINESS_FIELD_RESOURCE_ROLES } from '@/lib/field-roles';
 import { Prisma, ReportStatus, Role } from '@prisma/client';
 
 type CreateSiteReportBody = {
@@ -78,7 +79,7 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
   try {
     // Filtre selon le rôle
     const where: Prisma.ReportWhereInput = { siteId: params.id };
-    if (user.role === Role.SUPERVISOR || user.role === Role.BE_RESOURCE) {
+    if (user.role === Role.SUPERVISOR || BUSINESS_FIELD_RESOURCE_ROLES.includes(user.role)) {
       where.userId = user.id; // ne voit que ses propres rapports
     }
 

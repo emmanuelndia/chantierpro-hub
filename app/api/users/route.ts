@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { Prisma, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import {
+  BUSINESS_MANAGER_ROLES,
+  FIELD_USER_ROLES,
+  getBusinessManagedResourceRoles,
+  isBusinessManagerRole,
+} from '@/lib/field-roles';
 import {
   USERS_PAGE_SIZE,
   buildUserListWhere,
@@ -69,7 +74,7 @@ export const GET = withAuth(
       }),
     );
   },
-  [Role.ADMIN, Role.DIRECTION, Role.GENERAL_SUPERVISOR, Role.BE_MANAGER, Role.PROJECT_MANAGER, Role.COORDINATOR],
+  [Role.ADMIN, Role.DIRECTION, Role.GENERAL_SUPERVISOR, ...BUSINESS_MANAGER_ROLES, Role.PROJECT_MANAGER, Role.COORDINATOR],
 );
 
 export const POST = withAuth(
@@ -119,6 +124,15 @@ function canReadUserList(
 
   if (status !== 'active') {
     return false;
+  }
+
+  if (isBusinessManagerRole(userRole)) {
+    const allowedRoles = getBusinessManagedResourceRoles(userRole);
+    if (rolesFilter.length > 0) {
+      return rolesFilter.every((role) => allowedRoles.includes(role));
+    }
+
+    return Boolean(roleFilter && allowedRoles.includes(roleFilter));
   }
 
   if (rolesFilter.length > 0) {

@@ -1,6 +1,7 @@
 import { ClockInStatus, ClockInType, Role, SiteStatus, type PrismaClient } from '@prisma/client';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import { getOperationalSiteIds } from '@/lib/dashboard';
+import { BUSINESS_MANAGER_ROLES, getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
 import type {
   MobileSitePhotoItem,
   MobileSitePresenceItem,
@@ -24,7 +25,7 @@ type PresenceRecord = {
 const MOBILE_SITE_SUPERVISION_ROLES: readonly Role[] = [
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
-  Role.BE_MANAGER,
+  ...BUSINESS_MANAGER_ROLES,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
 ];
@@ -83,6 +84,14 @@ export async function getMobileSiteSupervision(
         filename: true,
         storageKey: true,
         timestampLocal: true,
+        tags: true,
+        description: true,
+        planningAssignmentId: true,
+        planningAssignment: {
+          select: {
+            action: true,
+          },
+        },
         uploadedBy: {
           select: {
             firstName: true,
@@ -120,6 +129,8 @@ export async function getMobileSiteSupervision(
       latitude: scopedSite.latitude.toNumber(),
       longitude: scopedSite.longitude.toNumber(),
       radiusKm: scopedSite.radiusKm.toNumber(),
+      geofenceType: scopedSite.geofenceType,
+      geofencePolygon: scopedSite.geofencePolygon as MobileSiteSupervisionResponse['site']['geofencePolygon'],
       projectName: scopedSite.project.name,
     },
     presence: {
@@ -140,7 +151,7 @@ async function getScopedSupervisionSite(prisma: PrismaClient, user: AuthLikeUser
     }
   }
 
-  if (user.role === Role.BE_MANAGER) {
+  if (isBusinessManagerRole(user.role)) {
     const site = await prisma.site.findFirst({
       where: {
         id: siteId,
@@ -149,7 +160,7 @@ async function getScopedSupervisionSite(prisma: PrismaClient, user: AuthLikeUser
           some: {
             deletedAt: null,
             supervisor: {
-              role: Role.BE_RESOURCE,
+              role: { in: [...getBusinessManagedResourceRoles(user.role)] },
               isActive: true,
             },
           },
@@ -183,6 +194,8 @@ async function getScopedSupervisionSite(prisma: PrismaClient, user: AuthLikeUser
       latitude: true,
       longitude: true,
       radiusKm: true,
+      geofenceType: true,
+      geofencePolygon: true,
       project: {
         select: {
           name: true,
@@ -288,6 +301,12 @@ function serializePhoto(photo: {
   filename: string;
   storageKey: string;
   timestampLocal: Date;
+  tags: import('@prisma/client').PhotoTag[];
+  description: string | null;
+  planningAssignmentId: string | null;
+  planningAssignment: {
+    action: string;
+  } | null;
   uploadedBy: {
     firstName: string;
     lastName: string;
@@ -299,6 +318,10 @@ function serializePhoto(photo: {
     url: createInternalPhotoUrl(photo.id),
     uploadedByName: `${photo.uploadedBy.firstName} ${photo.uploadedBy.lastName}`,
     timestampLocal: photo.timestampLocal.toISOString(),
+    tags: photo.tags,
+    description: photo.description,
+    planningAssignmentId: photo.planningAssignmentId,
+    assignmentAction: photo.planningAssignment?.action ?? null,
   };
 }
 

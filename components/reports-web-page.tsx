@@ -405,7 +405,11 @@ function ReportsTable({
                 <td className="px-4 py-4 text-slate-700">{item.projectName}</td>
                 <td className="px-4 py-4 text-slate-700">{item.siteName}</td>
                 <td className="px-4 py-4">
-                  <ProgressValue value={item.progression} />
+                  <div className="space-y-2">
+                    <ProgressValue value={item.progression} />
+                    {item.hasAttachments ? <Badge tone="info">{item.attachmentsCount} fichier(s)</Badge> : null}
+                    {!item.hasText && item.hasAttachments ? <Badge tone="warning">Sans texte</Badge> : null}
+                  </div>
                 </td>
                 <td className="px-4 py-4">
                   <Badge tone="neutral">{reportStatusLabel(item.status)}</Badge>

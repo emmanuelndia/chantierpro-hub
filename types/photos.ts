@@ -1,9 +1,10 @@
-import type { PhotoCategory, Role } from '@prisma/client';
+import type { PhotoCategory, PhotoTag, Role } from '@prisma/client';
 
 export type CreatePhotoInput = {
   siteId: string;
   planningAssignmentId: string | null;
   category: PhotoCategory;
+  tags: PhotoTag[];
   description: string;
   latitude: number | null;
   longitude: number | null;
@@ -26,6 +27,7 @@ export type PhotoItem = {
   assignmentAction: string | null;
   assignmentStatus: string | null;
   category: PhotoCategory;
+  tags: PhotoTag[];
   description: string;
   filename: string;
   fileSize: number;

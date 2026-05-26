@@ -355,6 +355,7 @@ function AssignmentCard({
   const [editData, setEditData] = useState<UpdateAssignmentRequest>({
     action: assignment.action,
     targetProgress: assignment.targetProgress,
+    objectiveText: assignment.objectiveText,
     status: assignment.status,
     workLocationType: assignment.workLocationType,
   });
@@ -403,6 +404,20 @@ function AssignmentCard({
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
+            Objectif qualitatif (facultatif)
+            <textarea
+              value={editData.objectiveText ?? ''}
+              onChange={(event) => {
+                const objectiveText = event.currentTarget.value;
+                setEditData((prev) => ({ ...prev, objectiveText }));
+              }}
+              rows={2}
+              className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+              placeholder="Ex : finaliser les reprises, préparer le PV..."
+            />
+          </label>
+
+          <label className="block text-sm font-semibold text-slate-700">
             Statut
             <select
               value={editData.status ?? PlanningAssignmentStatus.ASSIGNED}
@@ -419,7 +434,6 @@ function AssignmentCard({
               ))}
             </select>
           </label>
-
           <label className="block text-sm font-semibold text-slate-700">
             Type de tâche
             <select
@@ -487,6 +501,7 @@ function AssignmentCard({
       </div>
 
       <p className="mt-3 text-sm text-slate-800">{assignment.action}</p>
+      {assignment.objectiveText ? <p className="mt-2 text-xs font-semibold text-slate-600">{assignment.objectiveText}</p> : null}
 
       {assignment.targetProgress !== null ? (
         <div className="mt-3 flex items-center gap-2">
@@ -496,6 +511,7 @@ function AssignmentCard({
           <span className="text-xs font-bold text-sky-700">{assignment.targetProgress}%</span>
         </div>
       ) : null}
+      <ObjectiveStatusPill assignment={assignment} />
 
       <div className="mt-3 flex flex-wrap gap-2">
         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${clockStatus.className}`}>{clockStatus.label}</span>
@@ -601,6 +617,7 @@ function AssignmentTaskRow({
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Tâche {index + 1}</p>
           <p className="mt-1 text-sm leading-6 text-slate-800">{assignment.action}</p>
+          {assignment.objectiveText ? <p className="mt-1 text-xs font-semibold text-slate-500">{assignment.objectiveText}</p> : null}
         </div>
         <IconButton label="Modifier" onClick={onEdit}>
           <EditIcon className="h-4 w-4" />
@@ -615,6 +632,7 @@ function AssignmentTaskRow({
           <span className="text-xs font-bold text-sky-700">{assignment.targetProgress}%</span>
         </div>
       ) : null}
+      <ObjectiveStatusPill assignment={assignment} />
 
       <div className="mt-3">
         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${planningStatus.className}`}>
@@ -640,6 +658,25 @@ function AssignmentIdentity({ assignment, initials }: Readonly<{ assignment: Pla
         </h3>
         <p className="truncate text-sm text-slate-600">{assignment.siteName}</p>
       </div>
+    </div>
+  );
+}
+
+function ObjectiveStatusPill({ assignment }: Readonly<{ assignment: PlanningAssignment }>) {
+  const config = objectiveStatusConfig[assignment.objectiveStatus];
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${config.className}`}>{config.label}</span>
+      {assignment.actualProgress !== null ? (
+        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700">
+          Réel {assignment.actualProgress}%
+          {assignment.progressDelta !== null ? ` (${assignment.progressDelta >= 0 ? '+' : ''}${assignment.progressDelta}%)` : ''}
+        </span>
+      ) : null}
+      {assignment.latestProgressUpdate?.comment ? (
+        <span className="line-clamp-1 text-xs font-semibold text-slate-500">{assignment.latestProgressUpdate.comment}</span>
+      ) : null}
     </div>
   );
 }
@@ -834,6 +871,20 @@ function AssignmentBottomSheet({
               Bureau signifie que la tâche n&apos;exige pas de pointage chantier.
             </p>
           </label>
+
+          <label className="block text-sm font-semibold text-slate-700">
+            Objectif qualitatif (facultatif)
+            <textarea
+              value={formData.objectiveText ?? ''}
+              onChange={(event) => {
+                const objectiveText = event.currentTarget.value;
+                setFormData((prev) => ({ ...prev, objectiveText }));
+              }}
+              rows={2}
+              className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+              placeholder="Ex : finaliser les reprises, préparer le PV..."
+            />
+          </label>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
@@ -930,12 +981,20 @@ const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
   OFFICE: 'Tâche bureau / coordination',
 };
 
+const objectiveStatusConfig: Record<PlanningAssignment['objectiveStatus'], { label: string; className: string }> = {
+  NOT_STARTED: { label: 'Non démarré', className: 'bg-slate-100 text-slate-700' },
+  PARTIAL: { label: 'Partiel', className: 'bg-orange-100 text-orange-700' },
+  ACHIEVED: { label: 'Atteint', className: 'bg-emerald-100 text-emerald-700' },
+  BLOCKED: { label: 'Bloqué', className: 'bg-red-100 text-red-700' },
+};
+
 function createEmptyForm(date: string): CreateAssignmentRequest {
   return {
     supervisorId: '',
     siteId: '',
     action: '',
     targetProgress: null,
+    objectiveText: null,
     date,
     workLocationType: PlanningWorkLocationType.ON_SITE,
   };

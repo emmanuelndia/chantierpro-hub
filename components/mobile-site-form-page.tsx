@@ -1,6 +1,6 @@
 'use client';
 
-import { SiteStatus } from '@prisma/client';
+import { SiteStatus, type SiteGeofenceType, type SiteType } from '@prisma/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import { SiteLocationPicker } from '@/components/site-location-picker';
 import { authFetch } from '@/lib/auth/client-session';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { MobileSiteFormOptionsResponse, MobileSiteFormResponse } from '@/types/mobile-sites';
-import type { SiteDetail } from '@/types/projects';
+import type { SiteDetail, SiteGeofencePolygon } from '@/types/projects';
 
 type MobileSiteFormMode = 'create' | 'edit';
 
@@ -22,10 +22,14 @@ type SiteFormValues = {
   projectId: string;
   name: string;
   address: string;
+  siteType: SiteType;
+  requiresClockIn: boolean;
   description: string;
   latitude: string;
   longitude: string;
   radiusKm: string;
+  geofenceType: SiteGeofenceType;
+  geofencePolygon: SiteGeofencePolygon | null;
   area: string;
   status: SiteStatus;
   startDate: string;
@@ -43,10 +47,14 @@ const initialValues: SiteFormValues = {
   projectId: '',
   name: '',
   address: '',
+  siteType: 'WORKSITE',
+  requiresClockIn: true,
   description: '',
   latitude: '',
   longitude: '',
   radiusKm: '2',
+  geofenceType: 'RADIUS',
+  geofencePolygon: null,
   area: '',
   status: SiteStatus.ACTIVE,
   startDate: '',
@@ -109,10 +117,14 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
         projectId: site.projectId,
         name: site.name,
         address: site.address,
+        siteType: site.siteType,
+        requiresClockIn: site.requiresClockIn,
         description: site.description,
         latitude: String(site.latitude),
         longitude: String(site.longitude),
         radiusKm: String(site.radiusKm),
+        geofenceType: site.geofenceType,
+        geofencePolygon: site.geofencePolygon,
         area: String(site.area),
         status: site.status,
         startDate: site.startDate.slice(0, 10),
@@ -236,6 +248,43 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
           />
         </Field>
 
+        <Field label="Type de lieu" error={errors.siteType}>
+          <select
+            className={inputClass}
+            onChange={(event) => {
+              const siteType = event.target.value as SiteType;
+              setValues((current) => ({
+                ...current,
+                siteType,
+                requiresClockIn: defaultRequiresClockInForSiteType(siteType),
+              }));
+            }}
+            value={values.siteType}
+          >
+            <option value="WORKSITE">Chantier</option>
+            <option value="WAREHOUSE">Entrepôt</option>
+            <option value="MATERIAL_PICKUP">Point d&apos;enlèvement matériel</option>
+            <option value="OFFICE">Bureau</option>
+            <option value="CLIENT_SITE">Site client</option>
+            <option value="OTHER">Autre lieu</option>
+          </select>
+        </Field>
+
+        <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800">
+          <input
+            checked={values.requiresClockIn}
+            className="mt-1 accent-primary"
+            onChange={(event) => setValues((current) => ({ ...current, requiresClockIn: event.target.checked }))}
+            type="checkbox"
+          />
+          <span>
+            Pointage GPS requis
+            <span className="mt-1 block text-xs font-semibold text-slate-500">
+              Désactivez pour les bureaux ou lieux planifiés sans flux terrain.
+            </span>
+          </span>
+        </label>
+
         <div className="space-y-2">
           <SiteLocationPicker
             address={values.address}
@@ -244,6 +293,8 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
             longitude={values.longitude}
             onChange={(nextValues) => setValues((current) => ({ ...current, ...nextValues }))}
             radiusKm={values.radiusKm}
+            geofenceType={values.geofenceType}
+            geofencePolygon={values.geofencePolygon}
           />
           {errors.latitude ? <span className="block text-xs font-bold text-red-600">{errors.latitude}</span> : null}
           {errors.longitude ? <span className="block text-xs font-bold text-red-600">{errors.longitude}</span> : null}
@@ -403,8 +454,10 @@ function validateValues(values: SiteFormValues, radiusRequired: boolean): SiteFo
   const area = Number(values.area);
   const radiusKm = Number(values.radiusKm);
 
-  if (!Number.isFinite(latitude)) nextErrors.latitude = 'Latitude invalide.';
-  if (!Number.isFinite(longitude)) nextErrors.longitude = 'Longitude invalide.';
+  if (values.requiresClockIn) {
+    if (!Number.isFinite(latitude)) nextErrors.latitude = 'Latitude invalide.';
+    if (!Number.isFinite(longitude)) nextErrors.longitude = 'Longitude invalide.';
+  }
   if (!Number.isFinite(area) || area <= 0) nextErrors.area = 'Surface invalide.';
 
   if (radiusRequired && (!Number.isFinite(radiusKm) || radiusKm < 0.5 || radiusKm > 10)) {
@@ -423,14 +476,27 @@ function buildPayload(values: SiteFormValues, includeRadius: boolean) {
     projectId: values.projectId,
     name: values.name.trim(),
     address: values.address.trim(),
+    siteType: values.siteType,
+    requiresClockIn: values.requiresClockIn,
     description: values.description.trim(),
-    latitude: Number(values.latitude),
-    longitude: Number(values.longitude),
+    latitude: numberOrZero(values.latitude),
+    longitude: numberOrZero(values.longitude),
     ...(includeRadius ? { radiusKm: Number(values.radiusKm) } : {}),
+    geofenceType: values.geofenceType,
+    geofencePolygon: values.geofenceType === 'POLYGON' ? values.geofencePolygon : null,
     area: Number(values.area),
     status: values.status,
     startDate: values.startDate,
     endDate: values.endDate || null,
     siteManagerId: values.siteManagerId,
   };
+}
+
+function numberOrZero(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function defaultRequiresClockInForSiteType(siteType: SiteType) {
+  return siteType !== 'OFFICE';
 }

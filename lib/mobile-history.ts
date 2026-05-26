@@ -1,4 +1,5 @@
 import { ClockInStatus, ClockInType, Role, type PrismaClient } from '@prisma/client';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import type {
   MobileHistoryDay,
@@ -57,7 +58,7 @@ type DraftSession = {
   records: ClockInRow[];
 };
 
-const FIELD_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
+const FIELD_ROLES: readonly Role[] = FIELD_USER_ROLES;
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 30;
 

@@ -1,6 +1,7 @@
 import { ClockInStatus, ClockInType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
 import type {
   GeneralSupervisorDashboardResponse,
   PriorityAlert,
@@ -8,7 +9,7 @@ import type {
 } from '@/types/mobile-general-supervisor';
 
 export const GET = withAuth(async ({ user }) => {
-  if (user.role !== Role.GENERAL_SUPERVISOR && user.role !== Role.BE_MANAGER) {
+  if (user.role !== Role.GENERAL_SUPERVISOR && !isBusinessManagerRole(user.role)) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
@@ -22,10 +23,10 @@ export const GET = withAuth(async ({ user }) => {
       where: {
         date: today,
         deletedAt: null,
-        ...(user.role === Role.BE_MANAGER
+        ...(isBusinessManagerRole(user.role)
           ? {
               supervisor: {
-                role: Role.BE_RESOURCE,
+                role: { in: [...getBusinessManagedResourceRoles(user.role)] },
                 isActive: true,
               },
             }
@@ -39,6 +40,16 @@ export const GET = withAuth(async ({ user }) => {
         supervisorId: true,
         siteId: true,
         targetProgress: true,
+        objectiveText: true,
+        progressUpdates: {
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+          select: {
+            progress: true,
+            blocked: true,
+            completed: true,
+          },
+        },
         supervisor: {
           select: {
             firstName: true,
@@ -108,6 +119,20 @@ export const GET = withAuth(async ({ user }) => {
     const now = new Date();
     const alerts: PriorityAlert[] = [];
     const todayAssignments: TodayAssignment[] = assignments.map((assignment) => {
+      const latestProgressUpdate = assignment.progressUpdates[0] ?? null;
+      const actualProgress = latestProgressUpdate?.progress ?? null;
+      const progressDelta =
+        assignment.targetProgress !== null && actualProgress !== null
+          ? actualProgress - assignment.targetProgress
+          : null;
+      const objectiveStatus = latestProgressUpdate?.blocked
+        ? 'BLOCKED'
+        : latestProgressUpdate?.completed ||
+            (assignment.targetProgress !== null && actualProgress !== null && actualProgress >= assignment.targetProgress)
+          ? 'ACHIEVED'
+          : actualProgress !== null || latestProgressUpdate
+            ? 'PARTIAL'
+            : 'NOT_STARTED';
       const assignmentRecords = records.filter(
         (record) => record.userId === assignment.supervisorId && record.siteId === assignment.siteId,
       );
@@ -126,7 +151,9 @@ export const GET = withAuth(async ({ user }) => {
       );
 
       let progressPercentage = 0;
-      if (report) {
+      if (actualProgress !== null) {
+        progressPercentage = actualProgress;
+      } else if (report) {
         progressPercentage = 100;
       } else if (departureRecord) {
         progressPercentage = 75;
@@ -207,6 +234,11 @@ export const GET = withAuth(async ({ user }) => {
         siteName: assignment.site.name,
         siteAddress: assignment.site.address,
         progressPercentage,
+        targetProgress: assignment.targetProgress,
+        objectiveText: assignment.objectiveText,
+        objectiveStatus,
+        actualProgress,
+        progressDelta,
         isClockedIn,
         hasAlert: assignmentAlerts.length > 0,
         ...(assignmentAlerts[0] ? { alertType: assignmentAlerts[0].type } : {}),
@@ -233,6 +265,13 @@ export const GET = withAuth(async ({ user }) => {
             isPaused: latestGeneralSupervisorRecord.type === ClockInType.PAUSE_START,
           }
         : null;
+    const objectiveCounts = todayAssignments.reduce(
+      (counts, assignment) => {
+        counts[assignment.objectiveStatus] += 1;
+        return counts;
+      },
+      { NOT_STARTED: 0, PARTIAL: 0, ACHIEVED: 0, BLOCKED: 0 },
+    );
 
     const dashboard: GeneralSupervisorDashboardResponse = {
       kpis: {
@@ -242,6 +281,10 @@ export const GET = withAuth(async ({ user }) => {
         reportsReceived: todayReports.length,
         reportsExpected: assignments.length,
         alertCount: alerts.length,
+        objectivesAchieved: objectiveCounts.ACHIEVED,
+        objectivesPartial: objectiveCounts.PARTIAL,
+        objectivesBlocked: objectiveCounts.BLOCKED,
+        objectivesNotStarted: objectiveCounts.NOT_STARTED,
       },
       todayAssignments,
       priorityAlerts: alerts.sort((a, b) => {

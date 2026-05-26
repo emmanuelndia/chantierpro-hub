@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
@@ -30,6 +30,7 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   const [content, setContent] = useState('');
   const [progressPercentage, setProgressPercentage] = useState(50);
   const [blockageNote, setBlockageNote] = useState('');
+  const [reportFile, setReportFile] = useState<File | null>(null);
 
   // Récupérer l'ID de session depuis les paramètres URL
   const sessionId = searchParams.get('sessionId');
@@ -64,16 +65,25 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
 
   // Mutation pour soumettre le rapport
   const submitMutation = useMutation({
-    mutationFn: async (data: SubmitReportRequest) => {
+    mutationFn: async ({ data, file }: { data: SubmitReportRequest; file: File | null }) => {
+      if (file && typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('Connectez-vous pour envoyer un fichier. Le texte seul reste disponible hors ligne.');
+      }
+
       // Essayer de soumettre en ligne
       try {
-        const response = await authFetch('/api/mobile/session-report', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(data),
-        });
+        const response = file
+          ? await authFetch('/api/mobile/session-report', {
+              method: 'POST',
+              body: buildReportFormData(data, file),
+            })
+          : await authFetch('/api/mobile/session-report', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(data),
+            });
 
         if (!response.ok) {
           const errorData = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
@@ -83,6 +93,10 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
         return (await response.json()) as ReportSubmissionResponse;
       } catch (error) {
         console.error('Report submission error:', error);
+
+        if (file) {
+          throw error;
+        }
         
         // Si échec, sauvegarder en offline
         const clientId = createOfflineId();
@@ -125,6 +139,26 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   const data = sessionQuery.data;
   const loading = sessionQuery.isLoading;
 
+  useEffect(() => {
+    if (!data?.assignment) return;
+
+    if (typeof data.assignment.actualProgress === 'number') {
+      setProgressPercentage(data.assignment.actualProgress);
+    } else if (typeof data.assignment.targetProgress === 'number') {
+      setProgressPercentage(data.assignment.targetProgress);
+    }
+
+    if (data.assignment.latestProgressComment && !content.trim()) {
+      setContent(data.assignment.latestProgressComment);
+    }
+
+    if (data.assignment.latestProgressBlocked && data.assignment.latestProgressComment && !blockageNote.trim()) {
+      setBlockageNote(data.assignment.latestProgressComment);
+    }
+    // Prefill only when the session payload changes; user edits stay local afterward.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.assignment?.id]);
+
   const handleSubmit = () => {
     if (!data || !sessionId) return;
 
@@ -136,7 +170,7 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
       assignmentId: data.assignment?.id,
     };
 
-    submitMutation.mutate(reportData);
+    submitMutation.mutate({ data: reportData, file: reportFile });
   };
 
   const handleSkip = () => {
@@ -268,6 +302,15 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
                 Cible de progression : {data.assignment.targetProgress}%
               </p>
             )}
+            {data.assignment.objectiveText ? (
+              <p className="mt-1 text-xs text-blue-700">Objectif : {data.assignment.objectiveText}</p>
+            ) : null}
+            {data.assignment.actualProgress !== null && data.assignment.actualProgress !== undefined ? (
+              <p className="mt-1 text-xs font-semibold text-blue-800">
+                Dernier avancement déclaré : {data.assignment.actualProgress}%
+                {data.assignment.latestProgressBlocked ? ' - blocage signalé' : ''}
+              </p>
+            ) : null}
           </div>
         </section>
       )}
@@ -285,6 +328,24 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
             className="w-full h-32 resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700 placeholder-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             rows={6}
           />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
+          Fichier de rapport (optionnel)
+        </h3>
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+          <input
+            accept=".pdf,.xlsx,.xls,.docx,.png,.jpg,.jpeg"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+            onChange={(event) => setReportFile(event.target.files?.[0] ?? null)}
+            type="file"
+          />
+          <p className="mt-2 text-xs font-semibold text-slate-500">
+            PDF, Excel, Word ou image. Les fichiers demandent une connexion.
+          </p>
+          {reportFile ? <p className="mt-2 text-sm font-bold text-primary">{reportFile.name}</p> : null}
         </div>
       </section>
 
@@ -359,7 +420,7 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
       <section className="space-y-3">
         <button
           onClick={handleSubmit}
-          disabled={!content.trim() || submitMutation.isPending}
+          disabled={(!content.trim() && !reportFile) || submitMutation.isPending}
           className="flex w-full items-center justify-center rounded-lg bg-primary px-5 py-4 text-center text-base font-black text-white shadow-lg transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitMutation.isPending ? 'Soumission...' : 'Soumettre le rapport'}
@@ -380,8 +441,24 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
           ✅ Rapport sauvegardé hors ligne. Il sera synchronisé automatiquement lorsque vous serez connecté.
         </section>
       )}
+      {submitMutation.isError ? (
+        <section className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          {submitMutation.error instanceof Error ? submitMutation.error.message : "Le rapport n'a pas pu être soumis."}
+        </section>
+      ) : null}
     </div>
   );
+}
+
+function buildReportFormData(data: SubmitReportRequest, file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('clockInRecordId', data.clockInRecordId);
+  formData.append('content', data.content);
+  formData.append('progressPercentage', String(data.progressPercentage));
+  if (data.blockageNote) formData.append('blockageNote', data.blockageNote);
+  if (data.assignmentId) formData.append('assignmentId', data.assignmentId);
+  return formData;
 }
 
 

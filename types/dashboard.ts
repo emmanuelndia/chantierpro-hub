@@ -1,4 +1,5 @@
 import type { Role } from '@prisma/client';
+import type { PlanningObjectiveStatus, TaskProgressUpdateItem } from '@/types/mobile-planning';
 import type { AdminDeletionLogItem } from '@/types/admin-logs';
 import type {
   DirectionAlertsResponse,
@@ -14,7 +15,9 @@ export type DashboardSupportedRole =
   | 'ADMIN'
   | 'COORDINATOR'
   | 'GENERAL_SUPERVISOR'
-  | 'BE_MANAGER';
+  | 'BE_MANAGER'
+  | 'NEGOTIATION_MANAGER'
+  | 'FLEET_MANAGER';
 
 export type DashboardStat = {
   label: string;
@@ -106,6 +109,11 @@ export type GeneralSupervisorAssignmentDashboardItem = {
   projectName: string;
   action: string;
   targetProgress: number | null;
+  objectiveText: string | null;
+  actualProgress: number | null;
+  progressDelta: number | null;
+  objectiveStatus: PlanningObjectiveStatus;
+  latestProgressUpdate: TaskProgressUpdateItem | null;
   status: string;
 };
 
@@ -190,7 +198,7 @@ export type CoordinatorDashboardData = {
 };
 
 export type GeneralSupervisorDashboardData = {
-  role: 'GENERAL_SUPERVISOR' | 'BE_MANAGER';
+  role: 'GENERAL_SUPERVISOR' | 'BE_MANAGER' | 'NEGOTIATION_MANAGER' | 'FLEET_MANAGER';
   generatedAt: string;
   stats: DashboardStat[];
   entrustedSites: GeneralSupervisorSiteDashboardItem[];

@@ -13,6 +13,10 @@ enum Role {
   GENERAL_SUPERVISOR
   BE_MANAGER
   BE_RESOURCE
+  NEGOTIATION_MANAGER
+  NEGOTIATION_RESOURCE
+  FLEET_MANAGER
+  DRIVER
   PROJECT_MANAGER
   DIRECTION
   HR
@@ -30,6 +34,20 @@ enum SiteStatus {
   ACTIVE
   COMPLETED
   ON_HOLD
+}
+
+enum SiteGeofenceType {
+  RADIUS
+  POLYGON
+}
+
+enum SiteType {
+  WORKSITE
+  WAREHOUSE
+  MATERIAL_PICKUP
+  OFFICE
+  CLIENT_SITE
+  OTHER
 }
 
 enum TeamStatus {
@@ -65,6 +83,14 @@ enum PhotoCategory {
   PROGRESS
   INCIDENT
   OTHER
+}
+
+enum PhotoTag {
+  TASK_START
+  TASK_END
+  BLOCKAGE
+  WORK_PROOF
+  INCIDENT
 }
 
 enum RhExportFormat {
@@ -126,6 +152,10 @@ model User {
   deletedPhotos      Photo[]             @relation("PhotoDeleter")
   deletedPhotoLogs   PhotoDeletionLog[]  @relation("PhotoDeletionActor")
   originalPhotoLogs  PhotoDeletionLog[]  @relation("PhotoDeletionOriginalAuthor")
+  uploadedDocuments  DocumentAttachment[] @relation("DocumentUploader")
+  deletedDocuments   DocumentAttachment[] @relation("DocumentDeleter")
+  deletedDocumentLogs DocumentDeletionLog[] @relation("DocumentDeletionActor")
+  originalDocumentLogs DocumentDeletionLog[] @relation("DocumentDeletionOriginalAuthor")
   reports            Report[]
   reportsValidated   Report[]            @relation("ReportValidator")
   rhExportsCreated   RhExportHistory[]    @relation("RhExportCreator")
@@ -135,6 +165,7 @@ model User {
   loginAttempts      LoginAttempt[]
   planningAssignments        PlanningAssignment[] @relation("PlanningAssignmentSupervisor")
   createdPlanningAssignments PlanningAssignment[] @relation("PlanningAssignmentCreator")
+  taskProgressUpdates        TaskProgressUpdate[]
   generalSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeGeneralSupervisor")
   managedGeneralSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeProjectManager")
 }
@@ -154,6 +185,7 @@ model Project {
   projectManager   User          @relation("ProjectManager", fields: [projectManagerId], references: [id])
   createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
   sites            Site[]
+  documentAttachments DocumentAttachment[]
 
   @@index([projectManagerId])
   @@index([createdById])
@@ -164,9 +196,13 @@ model Site {
   projectId      String
   name           String
   address        String
+  siteType       SiteType     @default(WORKSITE)
+  requiresClockIn Boolean     @default(true)
   latitude       Decimal      @db.Decimal(9, 6)
   longitude      Decimal      @db.Decimal(9, 6)
   radiusKm       Decimal      @default(2.0) @db.Decimal(4, 2)
+  geofenceType   SiteGeofenceType @default(RADIUS)
+  geofencePolygon Json?
   description    String
   status         SiteStatus
   area           Decimal      @db.Decimal(10, 2)
@@ -182,6 +218,7 @@ model Site {
   clockInRecords ClockInRecord[]
   photos         Photo[]
   reports        Report[]
+  documentAttachments DocumentAttachment[]
   planningAssignments PlanningAssignment[]
   generalSupervisorScopes GeneralSupervisorSiteScope[]
 
@@ -287,6 +324,7 @@ model Report {
   validatedForClientBy     User?                  @relation("ReportValidator", fields: [validatedForClientById], references: [id])
   submittedAt              DateTime               @default(now())
   createdAt                DateTime               @default(now())
+  documentAttachments      DocumentAttachment[]
 
   @@index([siteId])
   @@index([userId])
@@ -302,6 +340,7 @@ model PlanningAssignment {
   siteId         String
   action         String
   targetProgress Int?
+  objectiveText  String?
   status         PlanningAssignmentStatus @default(ASSIGNED)
   workLocationType PlanningWorkLocationType @default(ON_SITE)
   createdById    String
@@ -312,6 +351,7 @@ model PlanningAssignment {
   site           Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   createdBy      User                     @relation("PlanningAssignmentCreator", fields: [createdById], references: [id])
   photos         Photo[]
+  progressUpdates TaskProgressUpdate[]
 
   @@index([date])
   @@index([siteId])
@@ -347,6 +387,7 @@ model Photo {
   uploadedById String
   planningAssignmentId String?
   category    PhotoCategory
+  tags        PhotoTag[]         @default([])
   description String
   filename    String
   storageKey  String             @unique
@@ -386,6 +427,70 @@ model PhotoDeletionLog {
   originalAuthor   User     @relation("PhotoDeletionOriginalAuthor", fields: [originalAuthorId], references: [id])
 
   @@index([photoId])
+  @@index([deletedById])
+  @@index([originalAuthorId])
+}
+
+model TaskProgressUpdate {
+  id           String             @id @default(cuid())
+  assignmentId String
+  progress     Int?
+  comment      String?
+  blocked      Boolean            @default(false)
+  completed    Boolean            @default(false)
+  createdById  String
+  createdAt    DateTime           @default(now())
+  assignment   PlanningAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  createdBy    User               @relation(fields: [createdById], references: [id])
+
+  @@index([assignmentId])
+  @@index([createdById])
+  @@index([createdAt])
+}
+
+model DocumentAttachment {
+  id          String   @id @default(cuid())
+  projectId   String?
+  siteId      String?
+  reportId    String?
+  uploadedById String
+  filename    String
+  storageKey  String   @unique
+  url         String
+  fileSize    Int
+  contentType String
+  extension   String
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+  deletedById String?
+  createdAt   DateTime @default(now())
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  site        Site?    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  report      Report?  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  uploadedBy  User     @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  deletedBy   User?    @relation("DocumentDeleter", fields: [deletedById], references: [id])
+  deletionLogs DocumentDeletionLog[]
+
+  @@index([projectId])
+  @@index([siteId])
+  @@index([reportId])
+  @@index([uploadedById])
+  @@index([deletedById])
+  @@index([isDeleted])
+}
+
+model DocumentDeletionLog {
+  id               String   @id @default(cuid())
+  documentId       String
+  deletedById      String
+  originalAuthorId String
+  reason           String
+  deletedAt        DateTime @default(now())
+  document         DocumentAttachment @relation(fields: [documentId], references: [id])
+  deletedBy        User     @relation("DocumentDeletionActor", fields: [deletedById], references: [id])
+  originalAuthor   User     @relation("DocumentDeletionOriginalAuthor", fields: [originalAuthorId], references: [id])
+
+  @@index([documentId])
   @@index([deletedById])
   @@index([originalAuthorId])
 }

@@ -1,4 +1,4 @@
-import type { SiteStatus } from '@prisma/client';
+import type { SiteStatus, SiteType } from '@prisma/client';
 import type { ProjectFormUserOption, SiteDetail } from '@/types/projects';
 
 export type MobileSiteStatusFilter = 'ALL' | SiteStatus;
@@ -13,6 +13,8 @@ export type MobileSiteManagementItem = {
   projectId: string;
   name: string;
   address: string;
+  siteType: SiteType;
+  requiresClockIn: boolean;
   status: SiteStatus;
   latitude: number;
   longitude: number;

@@ -1,4 +1,9 @@
-import type { ProjectStatus, Role, SiteStatus } from '@prisma/client';
+import type { ProjectStatus, Role, SiteGeofenceType, SiteStatus, SiteType } from '@prisma/client';
+
+export type SiteGeofencePolygon = {
+  type: 'Polygon';
+  coordinates: [number, number][][];
+};
 
 export type ProjectListItem = {
   id: string;
@@ -22,9 +27,13 @@ export type ProjectSiteItem = {
   projectId: string;
   name: string;
   address: string;
+  siteType: SiteType;
+  requiresClockIn: boolean;
   latitude: number;
   longitude: number;
   radiusKm: number;
+  geofenceType: SiteGeofenceType;
+  geofencePolygon: SiteGeofencePolygon | null;
   description: string;
   status: SiteStatus;
   area: number;
@@ -131,9 +140,13 @@ export type TodaySiteItem = {
   projectId: string;
   name: string;
   address: string;
+  siteType: SiteType;
+  requiresClockIn: boolean;
   latitude: number;
   longitude: number;
   radiusKm: number;
+  geofenceType: SiteGeofenceType;
+  geofencePolygon: SiteGeofencePolygon | null;
   status: SiteStatus;
   hasOpenSession: boolean;
   assignmentIds?: string[];
@@ -193,10 +206,14 @@ export type UpdateProjectInput = Partial<CreateProjectInput>;
 export type CreateSiteInput = {
   name: string;
   address: string;
+  siteType: SiteType;
+  requiresClockIn: boolean;
   latitude: number;
   longitude: number;
   radiusKm: number;
   radiusKmProvided: boolean;
+  geofenceType: SiteGeofenceType;
+  geofencePolygon: SiteGeofencePolygon | null;
   description: string;
   status: SiteStatus;
   area: number;
@@ -208,6 +225,68 @@ export type CreateSiteInput = {
 export type UpdateSiteInput = Partial<Omit<CreateSiteInput, 'radiusKm' | 'radiusKmProvided'>> & {
   radiusKm?: number;
   radiusKmProvided: boolean;
+};
+
+export type SiteImportColumnKey =
+  | 'nom'
+  | 'adresse_ou_repere'
+  | 'latitude'
+  | 'longitude'
+  | 'rayon_km'
+  | 'surface'
+  | 'date_debut'
+  | 'date_fin'
+  | 'responsable_gs_email'
+  | 'statut'
+  | 'description';
+
+export type SiteImportFieldError = {
+  field: SiteImportColumnKey | 'row';
+  message: string;
+};
+
+export type SiteImportWarning = {
+  field: SiteImportColumnKey | 'row';
+  message: string;
+};
+
+export type SiteImportNormalizedRow = {
+  rowNumber: number;
+  nom: string;
+  adresse_ou_repere: string;
+  latitude: string;
+  longitude: string;
+  rayon_km: string;
+  surface: string;
+  date_debut: string;
+  date_fin: string;
+  responsable_gs_email: string;
+  statut: string;
+  description: string;
+};
+
+export type SiteImportPreviewRow = {
+  rowNumber: number;
+  normalized: SiteImportNormalizedRow;
+  errors: SiteImportFieldError[];
+  warnings: SiteImportWarning[];
+  valid: boolean;
+};
+
+export type SiteImportPreviewResponse = {
+  projectId: string;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  warningRows: number;
+  rows: SiteImportPreviewRow[];
+};
+
+export type SiteImportCommitResponse = {
+  projectId: string;
+  createdCount: number;
+  skippedCount: number;
+  rows: SiteImportPreviewRow[];
 };
 
 export type ProjectApiErrorCode =

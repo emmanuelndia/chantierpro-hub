@@ -28,6 +28,30 @@ Quand on finit d'assigner les ressources aux chantiers on doit pouvoir télécha
 
 Possibilité de suivre l'évolution des projets
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+Permettre d'uploader un excel ou quelque chose avec les coordonnées d'un ou plusieurs sites pour créer les chantiers de manière facile par exemple si y'a 200 sites c'est fastidieux de créer 200 sites un à un ainsi j'uploade les données gps, nom, adresse et autres ou quelque chose comme ça et l'application les prends en compte et crée les sites de manière simple
+Implémenter les limites du chantier 
+Uploader les rapports sur l'application dans des formats 
+
+responsable negociation qui fait le planning de ses ressources sur tous les projets comme le bureau d'études et responsable parc auto qui fait le planning de ses chauffeurs, faudra créer leur rôles, 
+
+
+
+Possibilité de voir les plannings d'autre chefs de projets pour une visibilité
+Exemple tous les chefs projets voit tous les plannings des ressources planning centralisé par projets pour savoir quel ressource est assigné à quelle tâche pour voir la disponibilité et la faisabilité de la multi assignation par exemple je veux assigner un superviseur qui est déjà sur un chantier d'un autre PM mais je veux savoir quel tâche il fait actuellement pour voir si c'est possible de le faire
+Permettre à une ressource de dire qu'il a fini une tâche, pas seulement à la prise de photo 
+
+Pouvoir voir si l'objectif assigné aujourd'hui est atteint, les tâches et autres  
+
+Prévoire les sites d'enlèvement matériel,  les entrepôts, ou les lieux dont les chefs projets n'ont pas de coordonnées du genre une ressource d'un chef projet va sur un site d'enlèvement matériel mais au niveau du pointage comment ça va se faire, faudra t'il insérer des coordonnées à la création du site comme lieu rattaché au déroulement du chantier ? ou créer le lieu d'enlèvement matériel comme site dans l'application ou que faire      
+
+
+Mettre des commentaires sur les photos pour dire par Exemple je débute cette tâche ou je fini cette tâche
+
+
+
 
 
 

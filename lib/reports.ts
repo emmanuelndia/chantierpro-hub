@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 import {
   GeneralSupervisorSiteScopeStatus,
+  PhotoTag,
   Prisma,
   ReportStatus,
   ReportValidationStatus,
@@ -10,6 +11,13 @@ import {
   type PrismaClient,
 } from '@prisma/client';
 import { getOperationalSiteIds } from '@/lib/dashboard';
+import { documentAttachmentSelect, serializeDocumentAttachment } from '@/lib/documents';
+import {
+  BUSINESS_FIELD_RESOURCE_ROLES,
+  BUSINESS_MANAGER_ROLES,
+  getBusinessManagedResourceRoles,
+  isBusinessManagerRole,
+} from '@/lib/field-roles';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import { projectAccessWhere } from '@/lib/projects';
 import type {
@@ -28,13 +36,13 @@ export const REPORT_CREATE_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
-  Role.BE_RESOURCE,
+  ...BUSINESS_FIELD_RESOURCE_ROLES,
 ];
 
 export const REPORT_READ_ALL_ROLES: readonly Role[] = [
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
-  Role.BE_MANAGER,
+  ...BUSINESS_MANAGER_ROLES,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,
@@ -93,6 +101,15 @@ export const reportSelect = {
           id: true,
           name: true,
           projectManagerId: true,
+        },
+      },
+    },
+  },
+  _count: {
+    select: {
+      documentAttachments: {
+        where: {
+          isDeleted: false,
         },
       },
     },
@@ -185,12 +202,12 @@ export function parseCreateReportInput(body: unknown): CreateReportInput | null 
   const content = sanitizeString(body.content);
   const clockInRecordId = sanitizeString(body.clockInRecordId);
 
-  if (!content || !clockInRecordId) {
+  if (!clockInRecordId) {
     return null;
   }
 
   return {
-    content,
+    content: content ?? '',
     clockInRecordId,
   };
 }
@@ -584,7 +601,8 @@ export async function getAccessibleReportById(
   }
 
   const submittedDay = dayRange(report.submittedAt);
-  const photos = await prisma.photo.findMany({
+  const [photos, attachments] = await Promise.all([
+    prisma.photo.findMany({
     where: {
       siteId: report.siteId,
       uploadedById: report.userId,
@@ -600,10 +618,27 @@ export async function getAccessibleReportById(
       id: true,
       filename: true,
       timestampLocal: true,
+      tags: true,
+      description: true,
+      planningAssignmentId: true,
+      planningAssignment: {
+        select: {
+          action: true,
+        },
+      },
     },
-  });
+    }),
+    prisma.documentAttachment.findMany({
+      where: {
+        reportId: report.id,
+        isDeleted: false,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: documentAttachmentSelect,
+    }),
+  ]);
 
-  return serializeReportDetail(report, photos);
+  return serializeReportDetail(report, photos, attachments);
 }
 
 export async function validateReportForClient(
@@ -664,6 +699,9 @@ export function serializeReport(report: SerializableReport): ReportItem {
     projectName: report.site.project.name,
     userId: report.userId,
     content: report.content,
+    hasText: report.content.trim().length > 0,
+    hasAttachments: report._count.documentAttachments > 0,
+    attachmentsCount: report._count.documentAttachments,
     progression: report.progression,
     blocage: report.blocage,
     status: report.status,
@@ -698,7 +736,16 @@ export function serializeReport(report: SerializableReport): ReportItem {
 
 export function serializeReportDetail(
   report: SerializableReport,
-  photos: { id: string; filename: string; timestampLocal: Date }[] = [],
+  photos: {
+    id: string;
+    filename: string;
+    timestampLocal: Date;
+    tags: PhotoTag[];
+    description: string | null;
+    planningAssignmentId: string | null;
+    planningAssignment: { action: string } | null;
+  }[] = [],
+  attachments: Prisma.DocumentAttachmentGetPayload<{ select: typeof documentAttachmentSelect }>[] = [],
 ): ReportDetail {
   return {
     ...serializeReport(report),
@@ -707,7 +754,12 @@ export function serializeReportDetail(
       filename: photo.filename,
       url: createInternalPhotoUrl(photo.id),
       takenAt: photo.timestampLocal.toISOString(),
+      tags: photo.tags,
+      planningAssignmentId: photo.planningAssignmentId,
+      ...(photo.planningAssignment ? { assignmentAction: photo.planningAssignment.action } : {}),
+      ...(photo.description ? { description: photo.description } : {}),
     })),
+    attachments: attachments.map(serializeDocumentAttachment),
   };
 }
 
@@ -728,13 +780,13 @@ async function getWebReportSiteWhere(prisma: PrismaClient, user: AuthLikeUser): 
     };
   }
 
-  if (user.role === Role.BE_MANAGER) {
+  if (isBusinessManagerRole(user.role)) {
     return {
       planningAssignments: {
         some: {
           deletedAt: null,
           supervisor: {
-            role: Role.BE_RESOURCE,
+            role: { in: [...getBusinessManagedResourceRoles(user.role)] },
             isActive: true,
           },
         },
@@ -819,11 +871,17 @@ function serializeWebReportItem(report: SerializableReport): WebReportItem {
     status: report.status,
     validationStatus: report.validationStatus,
     excerpt: buildExcerpt(report.content),
+    hasText: report.content.trim().length > 0,
+    hasAttachments: report._count.documentAttachments > 0,
+    attachmentsCount: report._count.documentAttachments,
   };
 }
 
 function buildExcerpt(content: string) {
   const compact = content.replace(/\s+/g, ' ').trim();
+  if (!compact) {
+    return 'Rapport avec pièce jointe';
+  }
   return compact.length > 160 ? `${compact.slice(0, 157)}...` : compact;
 }
 

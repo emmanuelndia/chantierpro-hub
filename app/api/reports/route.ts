@@ -3,12 +3,17 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { Prisma, Role } from '@prisma/client';
 import { getOperationalSiteIds } from '@/lib/dashboard';
+import {
+  BUSINESS_FIELD_RESOURCE_ROLES,
+  getBusinessManagedResourceRoles,
+  isBusinessManagerRole,
+} from '@/lib/field-roles';
 
 export const GET = withAuth(async ({ user }) => {
   try {
     const where: Prisma.ReportWhereInput = {};
     
-    if (user.role === Role.SUPERVISOR || user.role === Role.BE_RESOURCE) {
+    if (user.role === Role.SUPERVISOR || BUSINESS_FIELD_RESOURCE_ROLES.includes(user.role)) {
       where.userId = user.id;
     }
 
@@ -17,13 +22,13 @@ export const GET = withAuth(async ({ user }) => {
       where.siteId = { in: siteIds };
     }
 
-    if (user.role === Role.BE_MANAGER) {
+    if (isBusinessManagerRole(user.role)) {
       where.site = {
         planningAssignments: {
           some: {
             deletedAt: null,
             supervisor: {
-              role: Role.BE_RESOURCE,
+              role: { in: [...getBusinessManagedResourceRoles(user.role)] },
               isActive: true,
             },
           },

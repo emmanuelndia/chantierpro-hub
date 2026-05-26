@@ -1,3 +1,5 @@
+import type { PhotoTag } from '@prisma/client';
+
 export type ReportStatus = 'RECU' | 'EN_REVUE' | 'VALIDE' | 'ENVOYE';
 
 export type ReportFilter = 'all' | 'pending' | 'received' | 'site';
@@ -54,6 +56,9 @@ export type ReportPhoto = {
   filename: string;
   url: string;
   takenAt: string;
+  tags: PhotoTag[];
+  planningAssignmentId: string | null;
+  assignmentAction?: string;
   description?: string;
 };
 

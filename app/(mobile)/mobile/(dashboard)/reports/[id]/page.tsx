@@ -24,7 +24,12 @@ export default async function MobileReportDetailRoute({
     return <MobileManagementReportDetailPage reportId={id} />;
   }
 
-  if (session.role === 'GENERAL_SUPERVISOR' || session.role === 'BE_MANAGER') {
+  if (
+    session.role === 'GENERAL_SUPERVISOR' ||
+    session.role === 'BE_MANAGER' ||
+    session.role === 'NEGOTIATION_MANAGER' ||
+    session.role === 'FLEET_MANAGER'
+  ) {
     return <MobileGeneralSupervisorReportDetailPage reportId={id} />;
   }
 

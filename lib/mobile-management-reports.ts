@@ -145,6 +145,14 @@ export async function getMobileManagementReportDetail(
       id: true,
       filename: true,
       timestampLocal: true,
+      tags: true,
+      description: true,
+      planningAssignmentId: true,
+      planningAssignment: {
+        select: {
+          action: true,
+        },
+      },
     },
   });
 
@@ -171,6 +179,10 @@ export async function getMobileManagementReportDetail(
       filename: photo.filename,
       url: createInternalPhotoUrl(photo.id),
       takenAt: photo.timestampLocal.toISOString(),
+      tags: photo.tags,
+      planningAssignmentId: photo.planningAssignmentId,
+      ...(photo.planningAssignment ? { assignmentAction: photo.planningAssignment.action } : {}),
+      ...(photo.description ? { description: photo.description } : {}),
     })),
   };
 }

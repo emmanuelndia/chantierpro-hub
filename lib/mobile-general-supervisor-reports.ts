@@ -8,6 +8,7 @@ import {
   type PrismaClient,
 } from '@prisma/client';
 import { createInternalPhotoUrl } from '@/lib/photos';
+import { getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
 import type {
   GeneralSupervisorMissingReportItem,
   GeneralSupervisorReportDetailResponse,
@@ -38,7 +39,7 @@ type DepartureRow = Prisma.ClockInRecordGetPayload<{
 }>;
 
 export function canAccessGeneralSupervisorReports(role: Role) {
-  return role === Role.GENERAL_SUPERVISOR || role === Role.BE_MANAGER;
+  return role === Role.GENERAL_SUPERVISOR || isBusinessManagerRole(role);
 }
 
 export async function getGeneralSupervisorReports(
@@ -57,10 +58,9 @@ export async function getGeneralSupervisorReports(
   const supervisorId = cleanString(filters.supervisorId);
   const status = normalizeStatus(filters.status ?? null);
   const query = cleanString(filters.q);
-  const resourceRoles =
-    user.role === Role.BE_MANAGER
-      ? [Role.BE_RESOURCE]
-      : [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
+  const resourceRoles = isBusinessManagerRole(user.role)
+    ? getBusinessManagedResourceRoles(user.role)
+    : [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
 
   const scopedSiteWhere: Prisma.SiteWhereInput = {
     ...siteWhere,
@@ -99,7 +99,7 @@ export async function getGeneralSupervisorReports(
     user: {
       isActive: true,
       role: {
-        in: resourceRoles,
+        in: [...resourceRoles],
       },
     },
   };
@@ -117,7 +117,7 @@ export async function getGeneralSupervisorReports(
       where: {
         isActive: true,
         role: {
-          in: resourceRoles,
+          in: [...resourceRoles],
         },
         OR: [
           {
@@ -224,6 +224,14 @@ export async function getGeneralSupervisorReportDetail(
       id: true,
       filename: true,
       timestampLocal: true,
+      tags: true,
+      description: true,
+      planningAssignmentId: true,
+      planningAssignment: {
+        select: {
+          action: true,
+        },
+      },
     },
   });
 
@@ -250,18 +258,22 @@ export async function getGeneralSupervisorReportDetail(
       filename: photo.filename,
       url: createInternalPhotoUrl(photo.id),
       takenAt: photo.timestampLocal.toISOString(),
+      tags: photo.tags,
+      planningAssignmentId: photo.planningAssignmentId,
+      ...(photo.planningAssignment ? { assignmentAction: photo.planningAssignment.action } : {}),
+      ...(photo.description ? { description: photo.description } : {}),
     })),
   };
 }
 
 function operationalSiteWhere(user: AuthLikeUser): Prisma.SiteWhereInput {
-  if (user.role === Role.BE_MANAGER) {
+  if (isBusinessManagerRole(user.role)) {
     return {
       planningAssignments: {
         some: {
           deletedAt: null,
           supervisor: {
-            role: Role.BE_RESOURCE,
+            role: { in: [...getBusinessManagedResourceRoles(user.role)] },
             isActive: true,
           },
         },

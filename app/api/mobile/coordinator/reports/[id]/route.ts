@@ -78,7 +78,14 @@ export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
         id: true,
         filename: true,
         takenAt: true,
+        tags: true,
         description: true,
+        planningAssignmentId: true,
+        planningAssignment: {
+          select: {
+            action: true,
+          },
+        },
       },
     });
 
@@ -109,6 +116,9 @@ export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
         filename: photo.filename,
         url: createInternalPhotoUrl(photo.id),
         takenAt: photo.takenAt.toISOString(),
+        tags: photo.tags,
+        planningAssignmentId: photo.planningAssignmentId,
+        ...(photo.planningAssignment ? { assignmentAction: photo.planningAssignment.action } : {}),
         description: photo.description ?? undefined,
       })),
     };

@@ -8,6 +8,8 @@ const mobileCameraRoles: readonly Role[] = [
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
   Role.BE_RESOURCE,
+  Role.NEGOTIATION_RESOURCE,
+  Role.DRIVER,
 ];
 
 export default async function MobilePhotoPage() {

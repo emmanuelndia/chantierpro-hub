@@ -1,3 +1,5 @@
+import type { PlanningObjectiveStatus } from '@/types/mobile-planning';
+
 export type GeneralSupervisorKPIs = {
   deployedSupervisors: number;
   totalSupervisors: number;
@@ -5,6 +7,10 @@ export type GeneralSupervisorKPIs = {
   reportsReceived: number;
   reportsExpected: number;
   alertCount: number;
+  objectivesAchieved: number;
+  objectivesPartial: number;
+  objectivesBlocked: number;
+  objectivesNotStarted: number;
 };
 
 export type TodayAssignment = {
@@ -16,6 +22,11 @@ export type TodayAssignment = {
   siteName: string;
   siteAddress: string;
   progressPercentage: number;
+  targetProgress: number | null;
+  objectiveText: string | null;
+  objectiveStatus: PlanningObjectiveStatus;
+  actualProgress: number | null;
+  progressDelta: number | null;
   isClockedIn: boolean;
   hasAlert: boolean;
   alertType?: 'ABSENCE' | 'LONG_SESSION' | 'MISSING_REPORT';

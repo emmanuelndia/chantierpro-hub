@@ -1,9 +1,10 @@
 import { ClockInStatus, ClockInType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import type { PendingSessionReportsResponse } from '@/types/mobile-session-report';
 
-const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
+const allowedRoles: readonly Role[] = FIELD_USER_ROLES;
 
 export const GET = withAuth(async ({ user }) => {
   if (!allowedRoles.includes(user.role)) {

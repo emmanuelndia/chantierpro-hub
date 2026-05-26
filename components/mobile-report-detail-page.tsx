@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { SignedImage } from './mobile/SignedImage';
+import type { PhotoTag } from '@prisma/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import type { ReportDetail, ReportPhoto, ReportStatus } from '@/types/mobile-reports';
@@ -292,22 +293,55 @@ function PhotoCard({ photo }: Readonly<{ photo: ReportPhoto }>) {
     <Link
       href={`/api/photos/${encodeURIComponent(photo.id)}/content`}
       target="_blank"
-      className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
+      className="relative min-h-44 overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
     >
-      <SignedImage
-        photoId={photo.id}
-        alt={photo.filename}
-        className="object-cover"
-        fill
-        sizes="(max-width: 768px) 50vw, 25vw"
-      />
-      <div className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-1.5 py-1 text-[10px] font-semibold text-white">
-        <span className="block truncate">
-          {formatTime(photo.takenAt)}
-        </span>
+      <div className="relative aspect-square">
+        <SignedImage
+          photoId={photo.id}
+          alt={photo.filename}
+          className="object-cover"
+          fill
+          sizes="(max-width: 768px) 50vw, 25vw"
+        />
+        <div className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-1.5 py-1 text-[10px] font-semibold text-white">
+          <span className="block truncate">{formatTime(photo.takenAt)}</span>
+        </div>
+      </div>
+      <div className="space-y-1 bg-white p-2">
+        {photo.assignmentAction ? <p className="line-clamp-2 text-[11px] font-bold text-slate-700">{photo.assignmentAction}</p> : null}
+        <PhotoTagBadges tags={photo.tags} />
+        {photo.description ? <p className="line-clamp-2 text-[11px] text-slate-500">{photo.description}</p> : null}
       </div>
     </Link>
   );
+}
+
+function PhotoTagBadges({ tags }: Readonly<{ tags: PhotoTag[] }>) {
+  if (tags.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {tags.map((tag) => (
+        <span key={tag} className="rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-black text-orange-700">
+          {formatPhotoTag(tag)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function formatPhotoTag(tag: PhotoTag) {
+  const labels: Record<PhotoTag, string> = {
+    TASK_START: 'Debut',
+    TASK_END: 'Fin',
+    BLOCKAGE: 'Blocage',
+    WORK_PROOF: 'Preuve',
+    INCIDENT: 'Incident',
+  };
+
+  return labels[tag];
 }
 
 function ReportDetailLoadingState() {

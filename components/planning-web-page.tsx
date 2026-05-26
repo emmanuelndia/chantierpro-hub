@@ -10,7 +10,11 @@ import { EmptyState } from '@/components/empty-state';
 import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
+import { formatRoleLabel } from '@/lib/role-labels';
 import type {
+  CentralizedPlanningAssignment,
+  CentralizedPlanningFilters,
+  CentralizedPlanningResponse,
   PlanningWebAssignment,
   PlanningWebCreateRequest,
   PlanningWebDayResponse,
@@ -26,7 +30,7 @@ type PlanningWebPageProps = Readonly<{
   };
 }>;
 
-type ViewMode = 'day' | 'week';
+type ViewMode = 'day' | 'week' | 'centralized';
 type DrawerMode = 'create' | 'edit';
 type PlanningAssignmentGroup = {
   supervisorId: string;
@@ -43,6 +47,7 @@ type AssignmentFormState = {
   date: string;
   action: string;
   targetProgress: string;
+  objectiveText: string;
   status: PlanningAssignmentStatus;
   workLocationType: PlanningWorkLocationType;
 };
@@ -65,16 +70,38 @@ const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
   OFFICE: 'Tâche bureau / coordination',
 };
 
+const objectiveStatusConfig = {
+  NOT_STARTED: { label: 'Non démarré', tone: 'neutral' },
+  PARTIAL: { label: 'Partiel', tone: 'warning' },
+  ACHIEVED: { label: 'Atteint', tone: 'success' },
+  BLOCKED: { label: 'Bloqué', tone: 'error' },
+} as const;
+
 export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [filters, setFilters] = useState<PlanningWebFilters>({ projectId: '', siteId: '', resourceId: '' });
+  const [centralizedFilters, setCentralizedFilters] = useState<CentralizedPlanningFilters>({
+    from: todayKey,
+    to: todayKey,
+    projectId: '',
+    siteId: '',
+    resourceId: '',
+    role: '',
+    workLocationType: '',
+  });
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [form, setForm] = useState<AssignmentFormState>(() => createEmptyForm(selectedDate));
   const [deleteTarget, setDeleteTarget] = useState<PlanningWebAssignment | null>(null);
-  const canMutate = viewer.role === 'GENERAL_SUPERVISOR' || viewer.role === 'BE_MANAGER' || viewer.role === 'PROJECT_MANAGER';
+  const canMutate =
+    viewer.role === 'GENERAL_SUPERVISOR' ||
+    viewer.role === 'BE_MANAGER' ||
+    viewer.role === 'NEGOTIATION_MANAGER' ||
+    viewer.role === 'FLEET_MANAGER' ||
+    viewer.role === 'PROJECT_MANAGER';
+  const canAccessCentralized = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
 
   const dayQuery = useQuery({
     queryKey: ['web-planning', selectedDate],
@@ -91,6 +118,27 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       enabled: viewMode === 'week',
       staleTime: 30_000,
     })),
+  });
+  const centralizedQuery = useQuery({
+    queryKey: ['web-planning-centralized', centralizedFilters],
+    queryFn: () => fetchCentralizedPlanning(centralizedFilters),
+    enabled: canAccessCentralized && viewMode === 'centralized',
+    staleTime: 30_000,
+  });
+  const assignmentConflictsQuery = useQuery({
+    queryKey: ['web-planning-resource-conflicts', form.date, form.supervisorId],
+    queryFn: () =>
+      fetchCentralizedPlanning({
+        from: form.date,
+        to: form.date,
+        projectId: '',
+        siteId: '',
+        resourceId: form.supervisorId,
+        role: '',
+        workLocationType: '',
+      }),
+    enabled: canAccessCentralized && Boolean(drawerMode && form.date && form.supervisorId),
+    staleTime: 30_000,
   });
 
   const createMutation = useMutation({
@@ -131,11 +179,23 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const projects = useMemo(() => getProjectOptions(data?.availableSites ?? []), [data]);
   const sites = data?.availableSites ?? [];
   const resources = data?.unassignedSupervisors ?? [];
+  const centralizedItems = useMemo(() => centralizedQuery.data?.items ?? [], [centralizedQuery.data?.items]);
+  const centralizedOptions = useMemo(() => getCentralizedOptions(centralizedItems), [centralizedItems]);
   const selectedDateObject = parseDateKey(selectedDate);
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const assignmentConflicts =
+    assignmentConflictsQuery.data?.items.filter((item) => item.id !== form.id && item.siteId !== form.siteId) ?? [];
 
   function setFilter(key: keyof PlanningWebFilters, value: string) {
     setFilters((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === 'projectId' ? { siteId: '' } : {}),
+    }));
+  }
+
+  function setCentralizedFilter(key: keyof CentralizedPlanningFilters, value: string) {
+    setCentralizedFilters((current) => ({
       ...current,
       [key]: value,
       ...(key === 'projectId' ? { siteId: '' } : {}),
@@ -165,6 +225,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       date: selectedDate,
       action: assignment.action,
       targetProgress: assignment.targetProgress === null ? '' : String(assignment.targetProgress),
+      objectiveText: assignment.objectiveText ?? '',
       status: assignment.status,
       workLocationType: assignment.workLocationType,
     });
@@ -185,6 +246,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         siteId: form.siteId,
         action: form.action,
         targetProgress,
+        objectiveText: form.objectiveText.trim() || null,
         date: form.date,
         workLocationType: form.workLocationType,
       };
@@ -198,6 +260,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         data: {
           action: form.action,
           targetProgress,
+          objectiveText: form.objectiveText.trim() || null,
           status: form.status,
           workLocationType: form.workLocationType,
         },
@@ -295,11 +358,111 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
             <SegmentedButton active={viewMode === 'week'} onClick={() => setViewMode('week')}>
               Semaine
             </SegmentedButton>
+            {canAccessCentralized ? (
+              <SegmentedButton active={viewMode === 'centralized'} onClick={() => setViewMode('centralized')}>
+                Centralisé
+              </SegmentedButton>
+            ) : null}
           </div>
         </div>
       </section>
 
-      {data ? (
+      {viewMode === 'centralized' ? (
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
+            <Field label="Du">
+              <input
+                className={filterClassName}
+                onChange={(event) => setCentralizedFilter('from', event.target.value)}
+                type="date"
+                value={centralizedFilters.from}
+              />
+            </Field>
+            <Field label="Au">
+              <input
+                className={filterClassName}
+                onChange={(event) => setCentralizedFilter('to', event.target.value)}
+                type="date"
+                value={centralizedFilters.to}
+              />
+            </Field>
+            <Field label="Projet">
+              <select
+                className={filterClassName}
+                onChange={(event) => setCentralizedFilter('projectId', event.target.value)}
+                value={centralizedFilters.projectId}
+              >
+                <option value="">Tous</option>
+                {centralizedOptions.projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Chantier">
+              <select
+                className={filterClassName}
+                onChange={(event) => setCentralizedFilter('siteId', event.target.value)}
+                value={centralizedFilters.siteId}
+              >
+                <option value="">Tous</option>
+                {centralizedOptions.sites
+                  .filter((site) => !centralizedFilters.projectId || site.projectId === centralizedFilters.projectId)
+                  .map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <Field label="Ressource">
+              <select
+                className={filterClassName}
+                onChange={(event) => setCentralizedFilter('resourceId', event.target.value)}
+                value={centralizedFilters.resourceId}
+              >
+                <option value="">Toutes</option>
+                {centralizedOptions.resources.map((resource) => (
+                  <option key={resource.id} value={resource.id}>
+                    {resource.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Rôle">
+              <select
+                className={filterClassName}
+                onChange={(event) => setCentralizedFilter('role', event.target.value)}
+                value={centralizedFilters.role}
+              >
+                <option value="">Tous</option>
+                {centralizedOptions.roles.map((role) => (
+                  <option key={role} value={role}>
+                    {formatRoleLabel(role)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Type">
+              <select
+                className={filterClassName}
+                onChange={(event) => setCentralizedFilter('workLocationType', event.target.value)}
+                value={centralizedFilters.workLocationType}
+              >
+                <option value="">Tous</option>
+                {Object.values(PlanningWorkLocationType).map((type) => (
+                  <option key={type} value={type}>
+                    {type === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </section>
+      ) : null}
+
+      {data && viewMode !== 'centralized' ? (
         <section className="grid gap-4 md:grid-cols-4">
           <MetricCard label="Tâches" value={data.assignments.length} />
           <MetricCard label="Ressources actives" value={data.unassignedSupervisors.length} />
@@ -308,7 +471,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         </section>
       ) : null}
 
-      {canMutate && data ? (
+      {canMutate && data && viewMode !== 'centralized' ? (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Actions planning</h2>
@@ -340,11 +503,11 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         </section>
       ) : null}
 
-      {dayQuery.isError ? (
+      {dayQuery.isError && viewMode !== 'centralized' ? (
         <EmptyState title="Planning indisponible" description="Le planning n'a pas pu etre charge. Verifie ta session puis reessaie." />
       ) : null}
 
-      {dayQuery.isLoading ? <LoadingState /> : null}
+      {dayQuery.isLoading && viewMode !== 'centralized' ? <LoadingState /> : null}
 
       {data && viewMode === 'day' ? (
         <DayPlanningCards
@@ -369,7 +532,15 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         />
       ) : null}
 
-      {data ? (
+      {viewMode === 'centralized' ? (
+        <CentralizedPlanningTable
+          items={centralizedItems}
+          isError={centralizedQuery.isError}
+          isLoading={centralizedQuery.isLoading}
+        />
+      ) : null}
+
+      {data && viewMode !== 'centralized' ? (
         <ResourcesPanel
           canMutate={canMutate}
           resources={resources}
@@ -389,6 +560,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           onCancel={closeDrawer}
           onChange={setForm}
           onSubmit={submitForm}
+          conflicts={assignmentConflicts}
         />
       ) : null}
 
@@ -457,12 +629,14 @@ function DayPlanningCards({
                   </PlanningTaskField>
                   <PlanningTaskField label="Tâche">
                     <p className="text-slate-700">{assignment.action}</p>
+                    {assignment.objectiveText ? <p className="mt-1 text-xs text-slate-500">Objectif : {assignment.objectiveText}</p> : null}
                     <p className="mt-1 text-xs text-slate-500">
                       Créé par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
                     </p>
                   </PlanningTaskField>
                   <PlanningTaskField label="Progression">
                     <ProgressValue value={assignment.targetProgress} />
+                    <ObjectiveSummary assignment={assignment} />
                   </PlanningTaskField>
                   <PlanningTaskField label="Statut">
                     <div className="space-y-2">
@@ -564,6 +738,104 @@ function WeekPlanningGrid({
   );
 }
 
+function CentralizedPlanningTable({
+  items,
+  isLoading,
+  isError,
+}: Readonly<{
+  items: CentralizedPlanningAssignment[];
+  isLoading: boolean;
+  isError: boolean;
+}>) {
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        title="Planning centralisé indisponible"
+        description="La vue centralisée n'a pas pu etre chargée. Vérifie ta session puis réessaie."
+      />
+    );
+  }
+
+  if (items.length === 0) {
+    return <EmptyState title="Aucune affectation" description="Aucune ligne ne correspond aux filtres centralisés." />;
+  }
+
+  return (
+    <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-panel">
+      <div className="border-b border-slate-100 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">Planning centralisé</h2>
+            <p className="mt-1 text-sm text-slate-600">Lecture globale des affectations pour arbitrer les disponibilités.</p>
+          </div>
+          <Badge tone="info">{items.length} ligne(s)</Badge>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-100 text-sm">
+          <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+            <tr>
+              <th className="px-5 py-3">Date</th>
+              <th className="px-5 py-3">Projet</th>
+              <th className="px-5 py-3">Chantier</th>
+              <th className="px-5 py-3">Ressource</th>
+              <th className="px-5 py-3">Tâche</th>
+              <th className="px-5 py-3">Type</th>
+              <th className="px-5 py-3">Progression</th>
+              <th className="px-5 py-3">Statut</th>
+              <th className="px-5 py-3">Créateur</th>
+              <th className="px-5 py-3">Droit</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {items.map((item) => (
+              <tr className="align-top" key={item.id}>
+                <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-900">{formatShortDate(parseDateKey(item.date))}</td>
+                <td className="px-5 py-4 text-slate-700">{item.projectName}</td>
+                <td className="px-5 py-4">
+                  <p className="font-semibold text-slate-900">{item.siteName}</p>
+                  <p className="mt-1 text-xs text-slate-500">{item.siteAddress}</p>
+                </td>
+                <td className="px-5 py-4">
+                  <p className="font-semibold text-slate-900">{item.resourceName}</p>
+                  <p className="mt-1 text-xs text-slate-500">{formatRoleLabel(item.resourceRole)}</p>
+                </td>
+                <td className="min-w-64 px-5 py-4 text-slate-700">
+                  <p>{item.action}</p>
+                  {item.objectiveText ? <p className="mt-1 text-xs text-slate-500">Objectif : {item.objectiveText}</p> : null}
+                </td>
+                <td className="px-5 py-4">
+                  <Badge tone={item.workLocationType === 'OFFICE' ? 'neutral' : 'info'}>
+                    {item.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                  </Badge>
+                </td>
+                <td className="px-5 py-4">
+                  <ProgressValue value={item.targetProgress} />
+                  <ObjectiveSummary assignment={item} />
+                </td>
+                <td className="px-5 py-4">
+                  <Badge tone={statusTone(item.status)}>{planningStatusLabel[item.status]}</Badge>
+                </td>
+                <td className="px-5 py-4">
+                  <p className="font-medium text-slate-800">{item.createdBy.name}</p>
+                  <p className="mt-1 text-xs text-slate-500">{formatRoleLabel(item.createdBy.role)}</p>
+                </td>
+                <td className="px-5 py-4">
+                  <Badge tone={item.canEdit ? 'success' : 'neutral'}>{item.canEdit ? 'Dans votre périmètre' : 'Lecture seule'}</Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function ResourcesPanel({
   resources,
   canMutate,
@@ -615,6 +887,7 @@ function AssignmentDrawer({
   projects,
   sites,
   resources,
+  conflicts,
   canEditIdentity,
   isSubmitting,
   onChange,
@@ -626,6 +899,7 @@ function AssignmentDrawer({
   projects: { id: string; name: string }[];
   sites: AvailableSite[];
   resources: UnassignedSupervisor[];
+  conflicts: CentralizedPlanningAssignment[];
   canEditIdentity: boolean;
   isSubmitting: boolean;
   onChange: (form: AssignmentFormState) => void;
@@ -671,6 +945,18 @@ function AssignmentDrawer({
                 </option>
               ))}
             </select>
+            {conflicts.length > 0 ? (
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <p className="font-bold">Cette ressource est deja occupee ailleurs ce jour.</p>
+                <ul className="mt-2 space-y-1">
+                  {conflicts.slice(0, 3).map((conflict) => (
+                    <li key={conflict.id}>
+                      {conflict.projectName} - {conflict.siteName} : {conflict.action}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </Field>
           <Field label="Projet">
             <select
@@ -722,6 +1008,14 @@ function AssignmentDrawer({
               Laissez vide si aucune progression cible n&apos;est définie.
             </p>
             {!progressValid ? <p className="mt-2 text-xs font-semibold text-red-600">La progression doit etre entre 0 et 100.</p> : null}
+          </Field>
+          <Field label="Objectif qualitatif (facultatif)">
+            <textarea
+              className={`${filterClassName} min-h-24`}
+              onChange={(event) => onChange({ ...form, objectiveText: event.target.value })}
+              placeholder="Ex : finaliser les reprises, preparer le PV, suivre les validations..."
+              value={form.objectiveText}
+            />
           </Field>
           <Field label="Type de tâche">
             <select
@@ -854,6 +1148,32 @@ function ProgressValue({ value }: Readonly<{ value: number | null }>) {
   );
 }
 
+function ObjectiveSummary({
+  assignment,
+}: Readonly<{
+  assignment: Pick<
+    PlanningWebAssignment,
+    'actualProgress' | 'progressDelta' | 'objectiveStatus' | 'latestProgressUpdate'
+  >;
+}>) {
+  const config = objectiveStatusConfig[assignment.objectiveStatus];
+
+  return (
+    <div className="mt-2 space-y-1">
+      <Badge tone={config.tone}>{config.label}</Badge>
+      {assignment.actualProgress !== null ? (
+        <p className="text-xs font-semibold text-slate-600">
+          Réel {assignment.actualProgress}%
+          {assignment.progressDelta !== null ? ` (${assignment.progressDelta >= 0 ? '+' : ''}${assignment.progressDelta}%)` : ''}
+        </p>
+      ) : null}
+      {assignment.latestProgressUpdate?.comment ? (
+        <p className="line-clamp-2 text-xs text-slate-500">{assignment.latestProgressUpdate.comment}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function LoadingState() {
   return (
     <div className="space-y-4">
@@ -869,6 +1189,24 @@ async function fetchPlanningDay(date: string) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de charger le planning.'));
   }
   return (await response.json()) as PlanningWebDayResponse;
+}
+
+async function fetchCentralizedPlanning(filters: CentralizedPlanningFilters) {
+  const searchParams = new URLSearchParams();
+  searchParams.set('from', filters.from);
+  searchParams.set('to', filters.to);
+  if (filters.projectId) searchParams.set('projectId', filters.projectId);
+  if (filters.siteId) searchParams.set('siteId', filters.siteId);
+  if (filters.resourceId) searchParams.set('resourceId', filters.resourceId);
+  if (filters.role) searchParams.set('role', filters.role);
+  if (filters.workLocationType) searchParams.set('workLocationType', filters.workLocationType);
+
+  const response = await authFetch(`/api/planning/centralized?${searchParams.toString()}`, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Impossible de charger le planning centralisé.'));
+  }
+
+  return (await response.json()) as CentralizedPlanningResponse;
 }
 
 async function createAssignment(data: PlanningWebCreateRequest) {
@@ -988,6 +1326,27 @@ function getProjectOptions(sites: AvailableSite[]) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function getCentralizedOptions(items: CentralizedPlanningAssignment[]) {
+  const projects = new Map<string, string>();
+  const sites = new Map<string, { id: string; name: string; projectId: string }>();
+  const resources = new Map<string, string>();
+  const roles = new Set<Role>();
+
+  for (const item of items) {
+    projects.set(item.projectId, item.projectName);
+    sites.set(item.siteId, { id: item.siteId, name: item.siteName, projectId: item.projectId });
+    resources.set(item.resourceId, item.resourceName);
+    roles.add(item.resourceRole);
+  }
+
+  return {
+    projects: [...projects.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+    sites: [...sites.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    resources: [...resources.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+    roles: [...roles.values()].sort((a, b) => formatRoleLabel(a).localeCompare(formatRoleLabel(b))),
+  };
+}
+
 function createEmptyForm(date: string): AssignmentFormState {
   return {
     supervisorId: '',
@@ -996,6 +1355,7 @@ function createEmptyForm(date: string): AssignmentFormState {
     date,
     action: '',
     targetProgress: '',
+    objectiveText: '',
     status: PlanningAssignmentStatus.ASSIGNED,
     workLocationType: PlanningWorkLocationType.ON_SITE,
   };

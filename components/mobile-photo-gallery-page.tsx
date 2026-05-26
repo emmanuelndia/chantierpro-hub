@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { PhotoTag } from '@prisma/client';
 import { authFetch } from '@/lib/auth/client-session';
 import { SignedImage } from '@/components/mobile/SignedImage';
 import type { MobilePhotoSiteOption, MobilePhotoSitesResponse } from '@/types/mobile-photo';
@@ -18,11 +19,20 @@ type LightboxState = {
   touchStartX: number | null;
 };
 
+const PHOTO_TAG_OPTIONS: readonly { value: PhotoTag; label: string }[] = [
+  { value: PhotoTag.TASK_START, label: 'Début tâche' },
+  { value: PhotoTag.TASK_END, label: 'Fin tâche' },
+  { value: PhotoTag.BLOCKAGE, label: 'Blocage' },
+  { value: PhotoTag.WORK_PROOF, label: 'Preuve travaux' },
+  { value: PhotoTag.INCIDENT, label: 'Incident' },
+];
+
 export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: MobilePhotoGalleryPageProps) {
   const [siteId, setSiteId] = useState(initialSiteId ?? '');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [authorIds, setAuthorIds] = useState<string[]>([]);
+  const [tag, setTag] = useState('');
   const [siteSheetOpen, setSiteSheetOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
@@ -52,7 +62,7 @@ export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: Mobi
   }, [selectedSite, siteId]);
 
   const photosQuery = useInfiniteQuery({
-    queryKey: ['mobile-gallery-photos', selectedSite?.id ?? '', from, to, authorIds],
+    queryKey: ['mobile-gallery-photos', selectedSite?.id ?? '', from, to, authorIds, tag],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       if (!selectedSite) {
@@ -74,6 +84,9 @@ export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: Mobi
 
       if (authorIds.length > 0) {
         searchParams.set('uploadedBy', authorIds.join(','));
+      }
+      if (tag) {
+        searchParams.set('tag', tag);
       }
 
       const response = await authFetch(`/api/sites/${selectedSite.id}/photos?${searchParams.toString()}`);
@@ -116,6 +129,7 @@ export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: Mobi
     setFrom('');
     setTo('');
     setAuthorIds([]);
+    setTag('');
   }
 
   function moveLightbox(delta: number) {
@@ -176,6 +190,7 @@ export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: Mobi
             <DateField label="Au" onChange={setTo} value={to} />
           </div>
           <AuthorMultiSelect authors={authors} selectedIds={authorIds} setSelectedIds={setAuthorIds} />
+          <PhotoTagSelect onChange={setTag} value={tag} />
           <button
             className="min-h-12 w-full rounded-lg border border-slate-300 px-4 text-sm font-bold text-slate-700"
             onClick={resetFilters}
@@ -318,6 +333,26 @@ function AuthorMultiSelect({
   );
 }
 
+function PhotoTagSelect({ onChange, value }: Readonly<{ onChange: (value: string) => void; value: string }>) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Tag</span>
+      <select
+        className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none focus:border-primary"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
+        <option value="">Tous les tags</option>
+        {PHOTO_TAG_OPTIONS.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function PhotoTile({ onOpen, photo }: Readonly<{ onOpen: () => void; photo: PhotoItem }>) {
   return (
     <button
@@ -337,6 +372,7 @@ function PhotoTile({ onOpen, photo }: Readonly<{ onOpen: () => void; photo: Phot
       <div className="p-3">
         <p className="truncate text-sm font-black text-slate-950">{formatAuthor(photo)}</p>
         <p className="mt-1 text-xs font-semibold text-slate-500">{formatDateTime(photo.timestampLocal)}</p>
+        <PhotoTags tags={photo.tags} />
       </div>
     </button>
   );
@@ -429,6 +465,7 @@ function GalleryLightbox({
         <div className="min-w-0 text-right">
           <p className="truncate text-sm font-black">{formatAuthor(photo)}</p>
           <p className="text-xs text-white/60">{formatDateTime(photo.timestampLocal)} - {photo.siteName ?? 'Chantier'}</p>
+          <PhotoTags tags={photo.tags} dark />
         </div>
       </header>
       <div className="relative flex min-h-0 flex-1 items-center justify-center p-4">
@@ -459,6 +496,7 @@ function GalleryLightbox({
         </button>
       </div>
       <footer className="space-y-2 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] text-center">
+        {photo.description ? <p className="text-sm font-semibold text-white">{photo.description}</p> : null}
         <p className="text-sm font-semibold text-white/80">Suppression disponible sur l&apos;application web</p>
       </footer>
     </div>
@@ -511,6 +549,31 @@ function formatDateTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function PhotoTags({ tags, dark = false }: Readonly<{ tags: PhotoTag[]; dark?: boolean }>) {
+  if (tags.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1">
+      {tags.map((tag) => (
+        <span
+          className={`rounded-full px-2 py-1 text-[10px] font-black ${
+            dark ? 'bg-white/15 text-white' : 'bg-primary/10 text-primary'
+          }`}
+          key={tag}
+        >
+          {formatPhotoTag(tag)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function formatPhotoTag(tag: PhotoTag) {
+  return PHOTO_TAG_OPTIONS.find((item) => item.value === tag)?.label ?? tag;
 }
 
 function CameraIcon({ className }: Readonly<{ className: string }>) {

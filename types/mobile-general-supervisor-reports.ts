@@ -1,4 +1,4 @@
-import type { ClockInType, ReportValidationStatus, Role } from '@prisma/client';
+import type { ClockInType, PhotoTag, ReportValidationStatus, Role } from '@prisma/client';
 
 export type GeneralSupervisorReportStatusFilter = 'ALL' | ReportValidationStatus;
 
@@ -57,6 +57,10 @@ export type GeneralSupervisorReportDetailPhoto = {
   filename: string;
   url: string;
   takenAt: string;
+  tags: PhotoTag[];
+  planningAssignmentId: string | null;
+  assignmentAction?: string;
+  description?: string;
 };
 
 export type GeneralSupervisorReportDetailResponse = {

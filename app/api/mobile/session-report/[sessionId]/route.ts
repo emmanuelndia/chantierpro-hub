@@ -1,10 +1,11 @@
 import { ClockInStatus, ClockInType, PlanningWorkLocationType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import type { SessionReportData } from '@/types/mobile-session-report';
 
-const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
+const allowedRoles: readonly Role[] = FIELD_USER_ROLES;
 
 export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
   if (!allowedRoles.includes(user.role)) {
@@ -80,6 +81,7 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
           id: true,
           filename: true,
           takenAt: true,
+          tags: true,
           description: true,
           planningAssignmentId: true,
           planningAssignment: {
@@ -110,10 +112,21 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
           id: true,
           action: true,
           targetProgress: true,
+          objectiveText: true,
           siteId: true,
           site: {
             select: {
               name: true,
+            },
+          },
+          progressUpdates: {
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            take: 1,
+            select: {
+              progress: true,
+              comment: true,
+              blocked: true,
+              completed: true,
             },
           },
         },
@@ -127,6 +140,23 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
     );
     const pauseDurationSeconds = 0;
     const effectiveDurationSeconds = durationSeconds - pauseDurationSeconds;
+    const latestProgress = assignment?.progressUpdates[0] ?? null;
+    const progressDelta =
+      assignment?.targetProgress !== null && assignment?.targetProgress !== undefined && latestProgress?.progress !== null && latestProgress?.progress !== undefined
+        ? latestProgress.progress - assignment.targetProgress
+        : null;
+    const objectiveStatus = latestProgress?.blocked
+      ? 'BLOCKED'
+      : latestProgress?.completed ||
+          (assignment?.targetProgress !== null &&
+            assignment?.targetProgress !== undefined &&
+            latestProgress?.progress !== null &&
+            latestProgress?.progress !== undefined &&
+            latestProgress.progress >= assignment.targetProgress)
+        ? 'ACHIEVED'
+        : latestProgress
+          ? 'PARTIAL'
+          : 'NOT_STARTED';
 
     const sessionData: SessionReportData = {
       session: {
@@ -150,9 +180,15 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
             assignment: {
               id: assignment.id,
               action: assignment.action,
+              ...(assignment.objectiveText ? { objectiveText: assignment.objectiveText } : {}),
               ...(assignment.targetProgress !== null
                 ? { targetProgress: assignment.targetProgress }
                 : {}),
+              actualProgress: latestProgress?.progress ?? null,
+              progressDelta,
+              objectiveStatus,
+              latestProgressComment: latestProgress?.comment ?? null,
+              latestProgressBlocked: latestProgress?.blocked ?? false,
               siteId: assignment.siteId,
               siteName: assignment.site.name,
             },
@@ -163,6 +199,7 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
         filename: photo.filename,
         url: createInternalPhotoUrl(photo.id),
         takenAt: photo.takenAt.toISOString(),
+        tags: photo.tags,
         planningAssignmentId: photo.planningAssignmentId,
         ...(photo.planningAssignment
           ? {

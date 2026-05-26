@@ -1,4 +1,5 @@
-import type { ReportStatus, ReportValidationStatus, Role } from '@prisma/client';
+import type { PhotoTag, ReportStatus, ReportValidationStatus, Role } from '@prisma/client';
+import type { DocumentAttachmentItem } from '@/types/documents';
 
 export type CreateReportInput = {
   content: string;
@@ -13,6 +14,9 @@ export type ReportItem = {
   projectName: string;
   userId: string;
   content: string;
+  hasText: boolean;
+  hasAttachments: boolean;
+  attachmentsCount: number;
   progression: number | null;
   blocage: string | null;
   status: ReportStatus;
@@ -47,10 +51,15 @@ export type ReportDetailPhoto = {
   filename: string;
   url: string;
   takenAt: string;
+  tags: PhotoTag[];
+  planningAssignmentId: string | null;
+  assignmentAction?: string;
+  description?: string;
 };
 
 export type ReportDetail = ReportItem & {
   photos: ReportDetailPhoto[];
+  attachments: DocumentAttachmentItem[];
 };
 
 export type PaginatedReportsResponse = {
@@ -101,6 +110,9 @@ export type WebReportItem = {
   status: ReportStatus;
   validationStatus: ReportValidationStatus;
   excerpt: string;
+  hasText: boolean;
+  hasAttachments: boolean;
+  attachmentsCount: number;
 };
 
 export type WebReportsResponse = {

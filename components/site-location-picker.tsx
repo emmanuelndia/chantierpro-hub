@@ -2,16 +2,25 @@
 
 import mapboxgl from 'mapbox-gl';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { authFetch } from '@/lib/auth/client-session';
-import type { GeocodingSearchResponse, GeocodingSuggestion } from '@/types/projects';
+import type { SiteGeofenceType } from '@prisma/client';
+import type { GeocodingSearchResponse, GeocodingSuggestion, SiteGeofencePolygon } from '@/types/projects';
 
 type SiteLocationPickerProps = Readonly<{
   address: string;
   latitude: string;
   longitude: string;
   radiusKm: number | string;
-  onChange: (values: Partial<{ address: string; latitude: string; longitude: string }>) => void;
+  geofenceType?: SiteGeofenceType;
+  geofencePolygon?: SiteGeofencePolygon | null;
+  onChange: (values: Partial<{
+    address: string;
+    latitude: string;
+    longitude: string;
+    geofenceType: SiteGeofenceType;
+    geofencePolygon: SiteGeofencePolygon | null;
+  }>) => void;
   compact?: boolean;
 }>;
 
@@ -33,6 +42,8 @@ export function SiteLocationPicker({
   latitude,
   longitude,
   radiusKm,
+  geofenceType = 'RADIUS',
+  geofencePolygon = null,
   onChange,
   compact = false,
 }: SiteLocationPickerProps) {
@@ -45,6 +56,10 @@ export function SiteLocationPicker({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [showSearchFeedback, setShowSearchFeedback] = useState(false);
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [draftPolygonPoints, setDraftPolygonPoints] = useState<[number, number][]>(() =>
+    getOpenPolygonPoints(geofencePolygon),
+  );
 
   const location = useMemo(() => {
     const parsedLatitude = parseCoordinate(latitude);
@@ -128,6 +143,16 @@ export function SiteLocationPicker({
     });
 
     map.on('click', (event) => {
+      if (drawingModeRef.current) {
+        const nextPoints = [...draftPolygonPointsRef.current, [event.lngLat.lng, event.lngLat.lat] as [number, number]];
+        draftPolygonPointsRef.current = nextPoints;
+        setDraftPolygonPoints(nextPoints);
+        if (nextPoints.length >= 3) {
+          syncPolygonGeofence(map, buildPolygonFromOpenPoints(nextPoints));
+        }
+        return;
+      }
+
       markerRef.current ??= marker.addTo(map);
       marker.setLngLat(event.lngLat);
       updateCoordinates(event.lngLat.lat, event.lngLat.lng);
@@ -144,8 +169,10 @@ export function SiteLocationPicker({
       mapRef.current = map;
       markerRef.current = location ? marker : null;
       setMapLoaded(true);
-      if (location) {
-        syncGeofence(map, center.latitude, center.longitude, geofenceRadius);
+      if (geofenceType === 'POLYGON' && geofencePolygon) {
+        syncPolygonGeofence(map, geofencePolygon);
+      } else if (location) {
+        syncCircleGeofence(map, center.latitude, center.longitude, geofenceRadius);
       }
     });
 
@@ -164,6 +191,17 @@ export function SiteLocationPicker({
     // The map must be created once. Later coordinate/radius changes are handled below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const drawingModeRef = useRef(drawingMode);
+  const draftPolygonPointsRef = useRef(draftPolygonPoints);
+
+  useEffect(() => {
+    drawingModeRef.current = drawingMode;
+  }, [drawingMode]);
+
+  useEffect(() => {
+    draftPolygonPointsRef.current = draftPolygonPoints;
+  }, [draftPolygonPoints]);
 
   useEffect(() => {
     if (!mapRef.current || !location) {
@@ -193,8 +231,20 @@ export function SiteLocationPicker({
       return;
     }
 
-    syncGeofence(mapRef.current, location.latitude, location.longitude, geofenceRadius);
-  }, [geofenceRadius, location, mapLoaded]);
+    if (drawingMode) {
+      if (draftPolygonPoints.length >= 3) {
+        syncPolygonGeofence(mapRef.current, buildPolygonFromOpenPoints(draftPolygonPoints));
+      }
+      return;
+    }
+
+    if (geofenceType === 'POLYGON' && geofencePolygon) {
+      syncPolygonGeofence(mapRef.current, geofencePolygon);
+      return;
+    }
+
+    syncCircleGeofence(mapRef.current, location.latitude, location.longitude, geofenceRadius);
+  }, [draftPolygonPoints, drawingMode, geofencePolygon, geofenceRadius, geofenceType, location, mapLoaded]);
 
   useEffect(() => {
     if (!mapRef.current || location) {
@@ -203,8 +253,16 @@ export function SiteLocationPicker({
 
     markerRef.current?.remove();
     markerRef.current = null;
-    removeGeofence(mapRef.current);
-  }, [location]);
+    if (geofenceType !== 'POLYGON') {
+      removeGeofence(mapRef.current);
+    }
+  }, [geofenceType, location]);
+
+  useEffect(() => {
+    if (!drawingMode) {
+      setDraftPolygonPoints(getOpenPolygonPoints(geofencePolygon));
+    }
+  }, [drawingMode, geofencePolygon]);
 
   function selectSuggestion(suggestion: GeocodingSuggestion) {
     setShowSearchFeedback(false);
@@ -238,6 +296,46 @@ export function SiteLocationPicker({
         maximumAge: 30_000,
       },
     );
+  }
+
+  function startDrawingPolygon() {
+    const initialPoints = getOpenPolygonPoints(geofencePolygon);
+    draftPolygonPointsRef.current = initialPoints;
+    setDraftPolygonPoints(initialPoints);
+    setDrawingMode(true);
+  }
+
+  function closePolygon() {
+    if (draftPolygonPoints.length < 3) {
+      return;
+    }
+
+    const polygon = buildPolygonValueFromOpenPoints(draftPolygonPoints);
+    onChange({
+      geofenceType: 'POLYGON',
+      geofencePolygon: polygon,
+    });
+    setDrawingMode(false);
+    if (mapRef.current) {
+      syncPolygonGeofence(mapRef.current, polygon);
+    }
+  }
+
+  function resetPolygon() {
+    draftPolygonPointsRef.current = [];
+    setDraftPolygonPoints([]);
+    setDrawingMode(false);
+    onChange({
+      geofenceType: 'RADIUS',
+      geofencePolygon: null,
+    });
+    if (mapRef.current) {
+      if (location) {
+        syncCircleGeofence(mapRef.current, location.latitude, location.longitude, geofenceRadius);
+      } else {
+        removeGeofence(mapRef.current);
+      }
+    }
   }
 
   return (
@@ -385,9 +483,70 @@ export function SiteLocationPicker({
       ) : null}
 
       <p className="text-xs font-semibold text-slate-500">
-        Rayon de geofencing affiche : {geofenceRadius.toFixed(1)} km. Le cercle suit le marqueur.
+        Rayon de pointage affiche : {geofenceRadius.toFixed(1)} km. Le cercle suit le marqueur.
       </p>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Limite précise optionnelle
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              {geofenceType === 'POLYGON'
+                ? 'Le pointage utilisera la zone polygonale dessinée.'
+                : 'Sans limite précise, le pointage utilise le rayon.'}
+            </p>
+          </div>
+          <BadgeLike active={geofenceType === 'POLYGON'}>
+            {geofenceType === 'POLYGON' ? 'Limite précise' : 'Pointage par rayon'}
+          </BadgeLike>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            className="rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+            onClick={startDrawingPolygon}
+            type="button"
+          >
+            {drawingMode ? 'Dessin en cours' : 'Dessiner la limite'}
+          </button>
+          <button
+            className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={draftPolygonPoints.length < 3}
+            onClick={closePolygon}
+            type="button"
+          >
+            Fermer la limite
+          </button>
+          <button
+            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            onClick={resetPolygon}
+            type="button"
+          >
+            Recommencer / utiliser le rayon
+          </button>
+        </div>
+        <p className="mt-3 text-xs font-semibold text-slate-500">
+          {drawingMode
+            ? `Cliquez sur la carte pour poser les points (${draftPolygonPoints.length}/3 minimum).`
+            : 'Vous pouvez modifier cette limite à tout moment depuis le formulaire.'}
+        </p>
+      </div>
     </div>
+  );
+}
+
+function BadgeLike({ active, children }: Readonly<{ active: boolean; children: ReactNode }>) {
+  return (
+    <span
+      className={[
+        'inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]',
+        active ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700',
+      ].join(' ')}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -416,8 +575,20 @@ function formatCoordinate(value: number) {
   return value.toFixed(6);
 }
 
-function syncGeofence(map: mapboxgl.Map, latitude: number, longitude: number, radiusKm: number) {
+function syncCircleGeofence(map: mapboxgl.Map, latitude: number, longitude: number, radiusKm: number) {
   const feature = buildCircleFeature(latitude, longitude, radiusKm);
+  syncPolygonGeofence(map, feature);
+}
+
+function syncPolygonGeofence(map: mapboxgl.Map, polygon: SiteGeofencePolygon | GeoJSON.Feature<GeoJSON.Polygon>) {
+  const feature: GeoJSON.Feature<GeoJSON.Polygon> =
+    'geometry' in polygon
+      ? polygon
+      : {
+          type: 'Feature',
+          properties: {},
+          geometry: polygon,
+        };
   const source: mapboxgl.GeoJSONSource | undefined = map.getSource(GEOFENCE_SOURCE_ID);
 
   if (source) {
@@ -485,4 +656,30 @@ function buildCircleFeature(latitude: number, longitude: number, radiusKm: numbe
       coordinates: [coordinates],
     },
   };
+}
+
+function buildPolygonFromOpenPoints(points: [number, number][]): GeoJSON.Feature<GeoJSON.Polygon> {
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: buildPolygonValueFromOpenPoints(points),
+  };
+}
+
+function buildPolygonValueFromOpenPoints(points: [number, number][]): SiteGeofencePolygon {
+  return {
+    type: 'Polygon',
+    coordinates: [[...points, points[0]!]],
+  };
+}
+
+function getOpenPolygonPoints(polygon: SiteGeofencePolygon | null): [number, number][] {
+  const ring = polygon?.coordinates[0] ?? [];
+  if (ring.length < 2) {
+    return [];
+  }
+
+  const first = ring[0]!;
+  const last = ring[ring.length - 1]!;
+  return first[0] === last[0] && first[1] === last[1] ? ring.slice(0, -1) : ring;
 }

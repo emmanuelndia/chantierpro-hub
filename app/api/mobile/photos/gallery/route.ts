@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
 import { canUploadPhotos, createInternalPhotoUrl, jsonPhotoError, parsePhotoListQuery } from '@/lib/photos';
 import type { PaginatedPhotosResponse } from '@/types/photos';
-import { Prisma, ProjectStatus, Role, SiteStatus } from '@prisma/client';
+import { Prisma, ProjectStatus, SiteStatus } from '@prisma/client';
 
 const mobileGalleryPhotoSelect = {
   id: true,
@@ -10,6 +11,7 @@ const mobileGalleryPhotoSelect = {
   uploadedById: true,
   planningAssignmentId: true,
   category: true,
+  tags: true,
   description: true,
   filename: true,
   fileSize: true,
@@ -56,6 +58,12 @@ function addPhotoFilters(where: Prisma.PhotoWhereInput, query: MobileGalleryQuer
     where.category = query.category;
   }
 
+  if (query.tag) {
+    where.tags = {
+      has: query.tag,
+    };
+  }
+
   if (query.from || query.to) {
     where.timestampLocal = {};
 
@@ -79,6 +87,7 @@ function serializeMobileGalleryPhoto(photo: MobileGalleryPhoto) {
     assignmentAction: photo.planningAssignment?.action ?? null,
     assignmentStatus: photo.planningAssignment?.status ?? null,
     category: photo.category,
+    tags: photo.tags,
     description: photo.description,
     filename: photo.filename,
     fileSize: photo.fileSize,
@@ -263,7 +272,7 @@ export const GET = withAuth(async ({ user, req }) => {
         };
       }
     }
-    else if (user.role === 'BE_MANAGER') {
+    else if (isBusinessManagerRole(user.role)) {
       const where: Prisma.PhotoWhereInput = {
         isDeleted: false,
         site: {
@@ -272,7 +281,7 @@ export const GET = withAuth(async ({ user, req }) => {
             some: {
               deletedAt: null,
               supervisor: {
-                role: Role.BE_RESOURCE,
+                role: { in: [...getBusinessManagedResourceRoles(user.role)] },
                 isActive: true,
               },
             },

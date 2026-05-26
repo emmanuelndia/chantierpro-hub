@@ -14,6 +14,7 @@ import { getDirectionAlerts, getDirectionKpis, getDirectionProjectsConsolidated 
 import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 import { listAdminDeletionLogs } from '@/lib/photos';
 import { getRhExportHistory, getMonthlyRhPresences } from '@/lib/rh';
+import { BUSINESS_FIELD_RESOURCE_ROLES, BUSINESS_MANAGER_ROLES, getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
 import type {
   DashboardAdminRoleCount,
   DashboardAlertItem,
@@ -22,6 +23,7 @@ import type {
   DashboardStat,
   DashboardSupportedRole,
 } from '@/types/dashboard';
+import type { PlanningObjectiveStatus, TaskProgressUpdateItem } from '@/types/mobile-planning';
 
 const DASHBOARD_ROLES: readonly DashboardSupportedRole[] = [
   Role.PROJECT_MANAGER,
@@ -30,10 +32,10 @@ const DASHBOARD_ROLES: readonly DashboardSupportedRole[] = [
   Role.ADMIN,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
-  Role.BE_MANAGER,
+  ...BUSINESS_MANAGER_ROLES,
 ] as const;
 
-const FIELD_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
+const FIELD_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, ...BUSINESS_FIELD_RESOURCE_ROLES];
 
 type AuthLikeUser = {
   id: string;
@@ -57,6 +59,8 @@ type RecentPhotoRow = {
   createdAt: string;
   url: string | null;
 };
+
+type ObjectiveStatusCounts = Record<PlanningObjectiveStatus, number>;
 
 export function canAccessDashboard(role: Role): role is DashboardSupportedRole {
   return DASHBOARD_ROLES.includes(role as DashboardSupportedRole);
@@ -91,6 +95,8 @@ export async function getDashboardData(prisma: PrismaClient, user: AuthLikeUser)
     case Role.GENERAL_SUPERVISOR:
       return getGeneralSupervisorDashboard(prisma, user.id, user.role);
     case Role.BE_MANAGER:
+    case Role.NEGOTIATION_MANAGER:
+    case Role.FLEET_MANAGER:
       return getGeneralSupervisorDashboard(prisma, user.id, user.role);
     default:
       throw new Error(`Unsupported dashboard role: ${user.role}`);
@@ -119,6 +125,7 @@ async function getProjectManagerDashboard(prisma: PrismaClient, userId: string):
     photos,
     reports,
     alerts,
+    assignmentsToday,
   ] = await Promise.all([
     prisma.clockInRecord.findMany({
       where: {
@@ -210,11 +217,24 @@ async function getProjectManagerDashboard(prisma: PrismaClient, userId: string):
       },
     }),
     getDirectionAlerts(prisma),
+    prisma.planningAssignment.findMany({
+      where: {
+        date: todayRange.from,
+        deletedAt: null,
+        site: {
+          projectId: {
+            in: projectIds,
+          },
+        },
+      },
+      select: objectiveAssignmentSelect,
+    }),
   ]);
 
   const activeProjectCount = projects.filter((project) => project.status === ProjectStatus.IN_PROGRESS).length;
   const latestPhotos = photos.map(serializeDashboardPhoto);
   const latestReports = reports.map(serializeDashboardReport);
+  const objectiveCounts = countObjectiveStatuses(assignmentsToday);
   const relevantAlerts = alerts.sitesWithoutPresence
     .filter((alert) => projectIds.includes(alert.projectId))
     .slice(0, 5)
@@ -234,6 +254,10 @@ async function getProjectManagerDashboard(prisma: PrismaClient, userId: string):
       createStat('users', "Ressources presentes aujourd'hui", presentResourcesToday.length, 'success'),
       createStat('sites', 'Sites actifs cette semaine', activeSitesThisWeek.length, 'warning'),
       createStat('photos', 'Dernieres photos', latestPhotos.length, 'neutral'),
+      createStat('planning', 'Objectifs atteints', objectiveCounts.ACHIEVED, 'success'),
+      createStat('planning', 'Objectifs partiels', objectiveCounts.PARTIAL, 'warning'),
+      createStat('alerts', 'Taches bloquees', objectiveCounts.BLOCKED, 'danger'),
+      createStat('clock', 'Non demarres', objectiveCounts.NOT_STARTED, 'neutral'),
     ],
     latestPhotos,
     latestReports,
@@ -678,19 +702,19 @@ async function getCoordinatorDashboard(prisma: PrismaClient, userId: string): Pr
 async function getGeneralSupervisorDashboard(
   prisma: PrismaClient,
   userId: string,
-  role: 'GENERAL_SUPERVISOR' | 'BE_MANAGER',
+  role: 'GENERAL_SUPERVISOR' | 'BE_MANAGER' | 'NEGOTIATION_MANAGER' | 'FLEET_MANAGER',
 ): Promise<DashboardResponse> {
   const now = new Date();
   const today = dayRange(now);
   const todayDate = today.from;
   const siteWhere =
-    role === Role.BE_MANAGER
+    isBusinessManagerRole(role)
       ? {
           planningAssignments: {
             some: {
               deletedAt: null,
               supervisor: {
-                role: Role.BE_RESOURCE,
+                role: { in: [...getBusinessManagedResourceRoles(role)] },
                 isActive: true,
               },
             },
@@ -743,7 +767,13 @@ async function getGeneralSupervisorDashboard(
           supervisorId: true,
           action: true,
           targetProgress: true,
+          objectiveText: true,
           status: true,
+          progressUpdates: {
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            take: 1,
+            select: taskProgressUpdateSelect,
+          },
           supervisor: {
             select: {
               firstName: true,
@@ -888,6 +918,7 @@ async function getGeneralSupervisorDashboard(
   );
   const presentSiteIds = new Set(presentSiteRecords.map((record) => record.siteId));
   const reportBySiteAndUser = new Set(reportsToday.map((report) => `${report.siteId}:${report.userId}`));
+  const objectiveCounts = countObjectiveStatuses(assignmentsToday);
   const relevantSiteAlerts = directionAlerts.sitesWithoutPresence.filter((item) => siteScope.includes(item.siteId));
   const relevantIncompleteSessions = directionAlerts.incompleteSessions.filter((item) => siteScope.includes(item.siteId));
   const assignmentMissingReportAlerts = assignmentsToday
@@ -930,10 +961,10 @@ async function getGeneralSupervisorDashboard(
     alerts.push({
       id: 'no-entrusted-sites',
       level: 'info',
-      title: role === Role.BE_MANAGER ? 'Aucun chantier BE planifie' : 'Aucun chantier confie',
+      title: isBusinessManagerRole(role) ? 'Aucun chantier planifie' : 'Aucun chantier confie',
       description:
-        role === Role.BE_MANAGER
-          ? "Aucune ressource BE n'est encore assignee sur un chantier."
+        isBusinessManagerRole(role)
+          ? "Aucune ressource metier n'est encore assignee sur un chantier."
           : "Aucun perimetre actif aujourd'hui. Les widgets planning et rapports restent donc vides.",
       badge: 'Scope',
     });
@@ -947,6 +978,10 @@ async function getGeneralSupervisorDashboard(
       createStat('planning', "Assignations aujourd'hui", assignmentsToday.length, 'success'),
       createStat('reports', "Rapports recus aujourd'hui", reportsToday.length, 'neutral'),
       createStat('users', 'Ressources ailleurs', resourcesAssignedElsewhere.length, 'warning'),
+      createStat('planning', 'Objectifs atteints', objectiveCounts.ACHIEVED, 'success'),
+      createStat('planning', 'Objectifs partiels', objectiveCounts.PARTIAL, 'warning'),
+      createStat('alerts', 'Taches bloquees', objectiveCounts.BLOCKED, 'danger'),
+      createStat('clock', 'Non demarres', objectiveCounts.NOT_STARTED, 'neutral'),
     ],
     entrustedSites: entrustedSites.map((site) => ({
       id: site.id,
@@ -958,16 +993,26 @@ async function getGeneralSupervisorDashboard(
       activeTeams: activeTeamsBySite.get(site.id) ?? 0,
       presentToday: presentSiteIds.has(site.id),
     })),
-    assignmentsToday: assignmentsToday.map((assignment) => ({
-      id: assignment.id,
-      supervisorName: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`,
-      supervisorRole: assignment.supervisor.role,
-      siteName: assignment.site.name,
-      projectName: assignment.site.project.name,
-      action: assignment.action,
-      targetProgress: assignment.targetProgress,
-      status: assignment.status,
-    })),
+    assignmentsToday: assignmentsToday.map((assignment) => {
+      const latestProgressUpdate = assignment.progressUpdates[0] ? serializeTaskProgressUpdate(assignment.progressUpdates[0]) : null;
+      const objective = buildObjectiveState(assignment.targetProgress, latestProgressUpdate);
+
+      return {
+        id: assignment.id,
+        supervisorName: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`,
+        supervisorRole: assignment.supervisor.role,
+        siteName: assignment.site.name,
+        projectName: assignment.site.project.name,
+        action: assignment.action,
+        targetProgress: assignment.targetProgress,
+        objectiveText: assignment.objectiveText,
+        actualProgress: objective.actualProgress,
+        progressDelta: objective.progressDelta,
+        objectiveStatus: objective.objectiveStatus,
+        latestProgressUpdate,
+        status: assignment.status,
+      };
+    }),
     resourcesAssignedElsewhere: resourcesAssignedElsewhere.map((assignment) => ({
       id: assignment.id,
       name: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`,
@@ -986,6 +1031,95 @@ async function getGeneralSupervisorDashboard(
     recentReports: recentReports.map(serializeDashboardReport),
     alerts,
   };
+}
+
+const taskProgressUpdateSelect = {
+  id: true,
+  progress: true,
+  comment: true,
+  blocked: true,
+  completed: true,
+  createdAt: true,
+  createdBy: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+    },
+  },
+};
+
+const objectiveAssignmentSelect = {
+  targetProgress: true,
+  progressUpdates: {
+    orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
+    take: 1,
+    select: taskProgressUpdateSelect,
+  },
+};
+
+function countObjectiveStatuses(
+  assignments: {
+    targetProgress: number | null;
+    progressUpdates: Parameters<typeof serializeTaskProgressUpdate>[0][];
+  }[],
+): ObjectiveStatusCounts {
+  const counts: ObjectiveStatusCounts = {
+    NOT_STARTED: 0,
+    PARTIAL: 0,
+    ACHIEVED: 0,
+    BLOCKED: 0,
+  };
+
+  for (const assignment of assignments) {
+    const latestProgressUpdate = assignment.progressUpdates[0] ? serializeTaskProgressUpdate(assignment.progressUpdates[0]) : null;
+    const objective = buildObjectiveState(assignment.targetProgress, latestProgressUpdate);
+    counts[objective.objectiveStatus] += 1;
+  }
+
+  return counts;
+}
+
+function serializeTaskProgressUpdate(update: {
+  id: string;
+  progress: number | null;
+  comment: string | null;
+  blocked: boolean;
+  completed: boolean;
+  createdAt: Date;
+  createdBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+}): TaskProgressUpdateItem {
+  return {
+    id: update.id,
+    progress: update.progress,
+    comment: update.comment,
+    blocked: update.blocked,
+    completed: update.completed,
+    createdAt: update.createdAt.toISOString(),
+    createdBy: {
+      id: update.createdBy.id,
+      firstName: update.createdBy.firstName,
+      lastName: update.createdBy.lastName,
+    },
+  };
+}
+
+function buildObjectiveState(targetProgress: number | null, latestProgressUpdate: TaskProgressUpdateItem | null) {
+  const actualProgress = latestProgressUpdate?.progress ?? null;
+  const progressDelta = targetProgress !== null && actualProgress !== null ? actualProgress - targetProgress : null;
+  const objectiveStatus = latestProgressUpdate?.blocked
+    ? 'BLOCKED'
+    : latestProgressUpdate?.completed || (targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
+      ? 'ACHIEVED'
+      : actualProgress !== null || latestProgressUpdate
+        ? 'PARTIAL'
+        : 'NOT_STARTED';
+
+  return { actualProgress, progressDelta, objectiveStatus } as const;
 }
 
 function createStat(

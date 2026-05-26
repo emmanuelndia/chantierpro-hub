@@ -2,9 +2,10 @@
 
 import { SignedImage } from './mobile/SignedImage';
 import Link from 'next/link';
-import { ReportValidationStatus } from '@prisma/client';
+import { ReportValidationStatus, type PhotoTag } from '@prisma/client';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
+import { DocumentAttachmentsPanel } from '@/components/document-attachments-panel';
 import type { MobileManagementReportDetailResponse } from '@/types/mobile-management-reports';
 
 type MobileManagementReportDetailPageProps = Readonly<{
@@ -77,9 +78,20 @@ export function MobileManagementReportDetailPage({ reportId }: MobileManagementR
       <section className="space-y-3">
         <h2 className="text-sm font-black uppercase tracking-[0.16em] text-slate-500">Contenu</h2>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
-          <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{report.content}</p>
+          {report.content.trim() ? (
+            <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{report.content}</p>
+          ) : (
+            <p className="text-sm font-semibold text-slate-500">Aucun texte saisi. Consultez les pièces jointes du rapport.</p>
+          )}
         </div>
       </section>
+
+      <DocumentAttachmentsPanel
+        compact
+        context={{ reportId }}
+        description="Fichiers transmis avec ce rapport."
+        title="Pièces jointes"
+      />
 
       {report.session.comment ? (
         <section className="space-y-3">
@@ -106,18 +118,25 @@ export function MobileManagementReportDetailPage({ reportId }: MobileManagementR
                 key={photo.id}
                 href={`/api/photos/${encodeURIComponent(photo.id)}/content`}
                 target="_blank"
-                className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
+                className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
               >
-                <SignedImage
-                  photoId={photo.id}
-                  alt={photo.filename}
-                  fill
-                  sizes="50vw"
-                  className="object-cover"
-                />
-                <span className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-2 py-1 text-[10px] font-bold text-white">
-                  {formatDateTime(photo.takenAt)}
-                </span>
+                <div className="relative aspect-square">
+                  <SignedImage
+                    photoId={photo.id}
+                    alt={photo.filename}
+                    fill
+                    sizes="50vw"
+                    className="object-cover"
+                  />
+                  <span className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-2 py-1 text-[10px] font-bold text-white">
+                    {formatDateTime(photo.takenAt)}
+                  </span>
+                </div>
+                <div className="space-y-1 bg-white p-2">
+                  {photo.assignmentAction ? <p className="line-clamp-2 text-[11px] font-bold text-slate-700">{photo.assignmentAction}</p> : null}
+                  <PhotoTagBadges tags={photo.tags} />
+                  {photo.description ? <p className="line-clamp-2 text-[11px] text-slate-500">{photo.description}</p> : null}
+                </div>
               </Link>
             ))}
           </div>
@@ -149,6 +168,34 @@ function Metric({ label, value }: Readonly<{ label: string; value: string }>) {
       <p className="mt-1 break-words text-sm font-black text-slate-950">{value}</p>
     </div>
   );
+}
+
+function PhotoTagBadges({ tags }: Readonly<{ tags: PhotoTag[] }>) {
+  if (tags.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {tags.map((tag) => (
+        <span key={tag} className="rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-black text-orange-700">
+          {formatPhotoTag(tag)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function formatPhotoTag(tag: PhotoTag) {
+  const labels: Record<PhotoTag, string> = {
+    TASK_START: 'Debut',
+    TASK_END: 'Fin',
+    BLOCKAGE: 'Blocage',
+    WORK_PROOF: 'Preuve',
+    INCIDENT: 'Incident',
+  };
+
+  return labels[tag];
 }
 
 function statusLabel(status: ReportValidationStatus) {

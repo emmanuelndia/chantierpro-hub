@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { PhotoCategory, type Role } from '@prisma/client';
+import { PhotoCategory, PhotoTag, type Role } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from '@/components/empty-state';
 import { FilterMultiSelect } from '@/components/filter-multi-select';
@@ -36,10 +36,21 @@ const UPLOAD_ROLES: readonly Role[] = [
   'COORDINATOR',
   'GENERAL_SUPERVISOR',
   'BE_RESOURCE',
+  'NEGOTIATION_RESOURCE',
+  'DRIVER',
   'BE_MANAGER',
+  'NEGOTIATION_MANAGER',
+  'FLEET_MANAGER',
   'PROJECT_MANAGER',
   'DIRECTION',
   'ADMIN',
+];
+const PHOTO_TAG_OPTIONS: readonly { value: PhotoTag; label: string }[] = [
+  { value: PhotoTag.TASK_START, label: 'Début tâche' },
+  { value: PhotoTag.TASK_END, label: 'Fin tâche' },
+  { value: PhotoTag.BLOCKAGE, label: 'Blocage' },
+  { value: PhotoTag.WORK_PROOF, label: 'Preuve travaux' },
+  { value: PhotoTag.INCIDENT, label: 'Incident' },
 ];
 
 export function PhotoGallery({ scope, viewer, title = 'Galerie photos', description }: PhotoGalleryProps) {
@@ -49,6 +60,7 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [authorIds, setAuthorIds] = useState<string[]>([]);
+  const [tag, setTag] = useState('');
   const [sort, setSort] = useState<'asc' | 'desc'>('desc');
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PhotoItem | null>(null);
@@ -56,8 +68,8 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
   const [captureOpen, setCaptureOpen] = useState(false);
 
   const queryKey = useMemo(
-    () => ['photo-gallery', scope.type, scope.type === 'site' ? scope.siteId : scope.projectId, page, from, to, authorIds, sort],
-    [authorIds, from, page, scope, sort, to],
+    () => ['photo-gallery', scope.type, scope.type === 'site' ? scope.siteId : scope.projectId, page, from, to, authorIds, tag, sort],
+    [authorIds, from, page, scope, sort, tag, to],
   );
 
   const photosQuery = useQuery({
@@ -74,6 +86,9 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
       }
       if (authorIds.length > 0) {
         searchParams.set('uploadedBy', authorIds.join(','));
+      }
+      if (tag) {
+        searchParams.set('tag', tag);
       }
 
       const endpoint =
@@ -149,6 +164,7 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
       formData.set('siteId', payload.siteId);
       formData.set('category', payload.category);
       formData.set('description', payload.description);
+      formData.set('tags', JSON.stringify(payload.tags));
       formData.set('timestampLocal', payload.timestampLocal);
       if (payload.latitude !== null) {
         formData.set('lat', String(payload.latitude));
@@ -273,7 +289,7 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
         <div className="mb-5">
           <h2 className="text-lg font-semibold text-slate-950">Filtres galerie</h2>
         </div>
-        <div className="grid gap-4 lg:grid-cols-[0.8fr_0.8fr_1.2fr_0.8fr]">
+        <div className="grid gap-4 lg:grid-cols-[0.8fr_0.8fr_1.2fr_0.8fr_0.8fr]">
           <Field label="Periode du">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
@@ -321,6 +337,23 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
             >
               <option value="desc">Anti-chrono</option>
               <option value="asc">Chrono</option>
+            </select>
+          </Field>
+          <Field label="Tag">
+            <select
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+              onChange={(event) => {
+                setTag(event.target.value);
+                resetPage();
+              }}
+              value={tag}
+            >
+              <option value="">Tous</option>
+              {PHOTO_TAG_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
             </select>
           </Field>
         </div>
@@ -431,6 +464,7 @@ function PhotoTile({
           <p className="truncate text-sm font-semibold text-slate-950">{photo.description || photo.filename}</p>
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{photo.category}</span>
         </div>
+        <PhotoTags tags={photo.tags} />
         <p className="text-xs uppercase tracking-[0.16em] text-slate-400">{photo.siteName ?? formatDateOnly(photo.timestampLocal)}</p>
         <div className="flex flex-wrap gap-2">
           <button className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" onClick={onDownload} type="button">
@@ -516,6 +550,7 @@ function Lightbox({
         {photo ? (
           <div className="border-t border-white/10 px-4 py-3 text-sm text-white/80">
             <p className="font-semibold text-white">{photo.description || photo.filename}</p>
+            <PhotoTags tags={photo.tags} dark />
             <p className="mt-1">
               {formatAuthor(photo)} · {formatDateTime(photo.timestampLocal)} · GPS {formatGps(photo)}
             </p>
@@ -580,6 +615,7 @@ type UploadPayload = {
   file: File;
   siteId: string;
   category: PhotoCategory;
+  tags: PhotoTag[];
   description: string;
   timestampLocal: string;
   latitude: number | null;
@@ -604,6 +640,7 @@ function PhotoCaptureModal({
   const streamRef = useRef<MediaStream | null>(null);
   const [siteId, setSiteId] = useState(defaultSiteId ?? '');
   const [category, setCategory] = useState<PhotoCategory>('PROGRESS');
+  const [tags, setTags] = useState<PhotoTag[]>([]);
   const [description, setDescription] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
 
@@ -669,6 +706,7 @@ function PhotoCaptureModal({
       file,
       siteId,
       category,
+      tags,
       description,
       timestampLocal,
       latitude: position?.coords.latitude ?? null,
@@ -731,6 +769,25 @@ function PhotoCaptureModal({
                 onChange={(event) => setDescription(event.target.value)}
                 value={description}
               />
+            </Field>
+            <Field label="Tags rapides">
+              <div className="flex flex-wrap gap-2">
+                {PHOTO_TAG_OPTIONS.map((item) => {
+                  const selected = tags.includes(item.value);
+                  return (
+                    <button
+                      className={`rounded-full border px-3 py-2 text-xs font-semibold ${
+                        selected ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-slate-200 text-slate-600'
+                      }`}
+                      key={item.value}
+                      onClick={() => setTags((current) => togglePhotoTag(current, item.value))}
+                      type="button"
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
             </Field>
             <button
               className="w-full rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
@@ -835,6 +892,35 @@ function formatGps(photo: PhotoItem) {
   }
 
   return `${photo.latitude.toFixed(5)}, ${photo.longitude.toFixed(5)}`;
+}
+
+function PhotoTags({ tags, dark = false }: Readonly<{ tags: PhotoTag[]; dark?: boolean }>) {
+  if (tags.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {tags.map((tag) => (
+        <span
+          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+            dark ? 'bg-white/15 text-white' : 'bg-orange-50 text-orange-700'
+          }`}
+          key={tag}
+        >
+          {formatPhotoTag(tag)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function togglePhotoTag(tags: PhotoTag[], tag: PhotoTag) {
+  return tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag];
+}
+
+function formatPhotoTag(tag: PhotoTag) {
+  return PHOTO_TAG_OPTIONS.find((item) => item.value === tag)?.label ?? tag;
 }
 
 function buildDownloadFileName(photo: PhotoItem) {

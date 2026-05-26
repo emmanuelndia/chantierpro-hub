@@ -4,7 +4,7 @@ import { withAuth } from '@/lib/auth/with-auth';
 import { notifyClockInSyncAnomaly } from '@/lib/mobile-sync-notifications';
 import {
   buildBatchResult,
-  buildOutsideRadiusMessage,
+  buildOutsideGeofenceMessage,
   calculateDistanceToSite,
   createBatchClockInRecord,
   getClockInGpsValidationError,
@@ -12,7 +12,7 @@ import {
   getAccessibleClockInSite,
   getOpenSessionForUser,
   isTechnician,
-  isWithinSiteRadius,
+  isWithinSiteGeofence,
   jsonClockInError,
   parseBatchSyncInput,
   parseJsonBody,
@@ -76,6 +76,12 @@ async function processBatchItem(payload: {
     });
   }
 
+  if (!site.requiresClockIn) {
+    return buildErrorResult(payload.item, ClockInStatus.ANOMALY, 'PERMISSION_DENIED', false, {
+      message: 'Ce lieu ne demande pas de pointage GPS.',
+    });
+  }
+
   const gpsValidationError = getClockInGpsValidationError(payload.item);
 
   if (gpsValidationError) {
@@ -94,7 +100,7 @@ async function processBatchItem(payload: {
   }
 
   const distanceKm = calculateDistanceToSite(site, payload.item);
-  const withinRadius = isWithinSiteRadius(site, distanceKm);
+  const withinGeofence = isWithinSiteGeofence(site, payload.item, distanceKm);
   const sessionState = await getOrLoadSessionState(
     payload.sessionStates,
     payload.userId,
@@ -232,12 +238,12 @@ async function processBatchItem(payload: {
   }
 
   const remoteCheckoutSite =
-    payload.item.type === 'DEPARTURE' && !withinRadius
+    payload.item.type === 'DEPARTURE' && !withinGeofence
       ? await findRemoteCheckoutTarget(site.id, payload.userId, payload.item)
       : null;
   const remoteCheckoutAllowed = Boolean(remoteCheckoutSite);
 
-  if (!withinRadius && !remoteCheckoutAllowed) {
+  if (!withinGeofence && !remoteCheckoutAllowed) {
     const rejected = await createBatchClockInRecord(prisma, {
       siteId: site.id,
       userId: payload.userId,
@@ -247,7 +253,7 @@ async function processBatchItem(payload: {
     });
 
     return buildErrorResult(payload.item, ClockInStatus.REJECTED, 'OUTSIDE_RADIUS', false, {
-      message: buildOutsideRadiusMessage(distanceKm, site),
+      message: buildOutsideGeofenceMessage(distanceKm, site),
       recordId: rejected.id,
     });
   }
@@ -297,17 +303,24 @@ async function findRemoteCheckoutTarget(
       supervisorId: userId,
       date: clockInDate,
       deletedAt: null,
+      workLocationType: 'ON_SITE',
       siteId: {
         not: siteId,
+      },
+      site: {
+        requiresClockIn: true,
       },
     },
     select: {
       site: {
         select: {
           id: true,
+          requiresClockIn: true,
           latitude: true,
           longitude: true,
           radiusKm: true,
+          geofenceType: true,
+          geofencePolygon: true,
         },
       },
     },
@@ -315,7 +328,7 @@ async function findRemoteCheckoutTarget(
 
   return assignments.find((assignment) => {
     const distance = calculateDistanceToSite(assignment.site, input);
-    return isWithinSiteRadius(assignment.site, distance);
+    return isWithinSiteGeofence(assignment.site, input, distance);
   })?.site ?? null;
 }
 

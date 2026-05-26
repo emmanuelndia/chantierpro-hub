@@ -3,6 +3,7 @@ import { extname } from 'node:path';
 import sharp from 'sharp';
 import {
   PhotoCategory,
+  PhotoTag,
   Prisma,
   Role,
   SiteStatus,
@@ -16,7 +17,13 @@ import {
   removePrivatePhotoObject,
   uploadPrivatePhotoObject,
 } from '@/lib/photo-storage';
-import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import {
+  BUSINESS_FIELD_RESOURCE_ROLES,
+  BUSINESS_MANAGER_ROLES,
+  FIELD_USER_ROLES,
+  getBusinessManagedResourceRoles,
+  isBusinessManagerRole,
+} from '@/lib/field-roles';
 import type {
   AdminDeletionLogItem,
   AdminLogsApiErrorCode,
@@ -38,8 +45,8 @@ const PHOTO_UPLOAD_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
-  Role.BE_MANAGER,
-  Role.BE_RESOURCE,
+  ...BUSINESS_MANAGER_ROLES,
+  ...BUSINESS_FIELD_RESOURCE_ROLES,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,
@@ -50,12 +57,12 @@ const ADMIN_LOG_ROLES: readonly Role[] = [Role.DIRECTION, Role.ADMIN];
 const PHOTO_SITE_FULL_VIEW_ROLES: readonly Role[] = [
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
-  Role.BE_MANAGER,
+  ...BUSINESS_MANAGER_ROLES,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,
 ];
-const PHOTO_OWN_ONLY_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.BE_RESOURCE];
+const PHOTO_OWN_ONLY_ROLES: readonly Role[] = [Role.SUPERVISOR, ...BUSINESS_FIELD_RESOURCE_ROLES];
 const MAX_PHOTO_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const COMPRESS_PHOTO_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const PHOTO_PAGE_SIZE = 20;
@@ -66,6 +73,7 @@ export const photoSelect = {
   uploadedById: true,
   planningAssignmentId: true,
   category: true,
+  tags: true,
   description: true,
   filename: true,
   storageKey: true,
@@ -241,6 +249,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
   const siteId = sanitizeString(formData.get('siteId'));
   const planningAssignmentId = sanitizeString(formData.get('planningAssignmentId'));
   const category = parsePhotoCategory(formData.get('category'));
+  const tags = parsePhotoTags(formData.get('tags'));
   const descriptionValue = formData.get('description');
   const description =
     descriptionValue === null || descriptionValue === undefined
@@ -256,6 +265,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
     !(file instanceof File) ||
     !siteId ||
     !category ||
+    !tags ||
     description === null ||
     !timestampLocal ||
     latitude === undefined ||
@@ -278,6 +288,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
       siteId,
       planningAssignmentId,
       category,
+      tags,
       description,
       latitude,
       longitude,
@@ -291,6 +302,7 @@ export function parsePhotoListQuery(searchParams: URLSearchParams) {
     page: parsePage(searchParams.get('page')),
     uploadedByIds: parseIdList(searchParams.get('uploadedBy')),
     category: parsePhotoCategory(searchParams.get('category')),
+    tag: parsePhotoTag(searchParams.get('tag')),
     from: parseDate(searchParams.get('from')),
     to: parseDate(searchParams.get('to')),
     sort: parseSort(searchParams.get('sort')),
@@ -405,7 +417,7 @@ export async function getAccessibleSiteForPhoto(
     });
   }
 
-  if (user.role === Role.BE_MANAGER) {
+  if (isBusinessManagerRole(user.role)) {
     return prisma.site.findFirst({
       where: {
         id: siteId,
@@ -413,7 +425,7 @@ export async function getAccessibleSiteForPhoto(
           some: {
             deletedAt: null,
             supervisor: {
-              role: Role.BE_RESOURCE,
+              role: { in: [...getBusinessManagedResourceRoles(user.role)] },
               isActive: true,
             },
           },
@@ -585,6 +597,7 @@ export async function createPhoto(
       uploadedById: payload.user.id,
       planningAssignmentId: payload.input.planningAssignmentId,
       category: payload.input.category,
+      tags: payload.input.tags,
       description: payload.input.description,
       filename: prepared.filename,
       storageKey,
@@ -648,7 +661,7 @@ export async function getAccessiblePhotoById(
     if (
       payload.user.role === Role.COORDINATOR ||
       payload.user.role === Role.GENERAL_SUPERVISOR ||
-      payload.user.role === Role.BE_MANAGER
+      isBusinessManagerRole(payload.user.role)
     ) {
       const site = await getAccessibleSiteForPhoto(prisma, photo.siteId, payload.user);
       return site ? serializePhoto(photo) : null;
@@ -668,6 +681,7 @@ export async function listSitePhotos(
     page: number;
     uploadedByIds: string[];
     category: PhotoCategory | null;
+    tag: PhotoTag | null;
     from: Date | null;
     to: Date | null;
     sort: 'asc' | 'desc';
@@ -694,6 +708,12 @@ export async function listSitePhotos(
 
   if (payload.category) {
     where.category = payload.category;
+  }
+
+  if (payload.tag) {
+    where.tags = {
+      has: payload.tag,
+    };
   }
 
   if (payload.from || payload.to) {
@@ -762,6 +782,7 @@ export async function listProjectPhotos(
     page: number;
     uploadedByIds: string[];
     category: PhotoCategory | null;
+    tag: PhotoTag | null;
     from: Date | null;
     to: Date | null;
     sort: 'asc' | 'desc';
@@ -790,6 +811,12 @@ export async function listProjectPhotos(
 
   if (payload.category) {
     where.category = payload.category;
+  }
+
+  if (payload.tag) {
+    where.tags = {
+      has: payload.tag,
+    };
   }
 
   if (payload.from || payload.to) {
@@ -1091,6 +1118,7 @@ export function serializePhoto(
     assignmentAction: photo.planningAssignment?.action ?? null,
     assignmentStatus: photo.planningAssignment?.status ?? null,
     category: photo.category,
+    tags: photo.tags,
     description: photo.description,
     filename: photo.filename,
     fileSize: photo.fileSize,
@@ -1244,7 +1272,7 @@ export async function getAccessiblePhotoStorageById(
     if (
       payload.user.role === Role.COORDINATOR ||
       payload.user.role === Role.GENERAL_SUPERVISOR ||
-      payload.user.role === Role.BE_MANAGER
+      isBusinessManagerRole(payload.user.role)
     ) {
       const site = await getAccessibleSiteForPhoto(prisma, photo.siteId, payload.user);
       return site ? photo : null;
@@ -1264,6 +1292,55 @@ function parsePhotoCategory(value: FormDataEntryValue | string | null) {
   return Object.values(PhotoCategory).includes(value as PhotoCategory)
     ? (value as PhotoCategory)
     : null;
+}
+
+function parsePhotoTag(value: FormDataEntryValue | string | null) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return null;
+  }
+
+  return Object.values(PhotoTag).includes(value as PhotoTag) ? (value as PhotoTag) : null;
+}
+
+function parsePhotoTags(value: FormDataEntryValue | null): PhotoTag[] | null {
+  if (value === null || value === '') {
+    return [];
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const rawTags = value.trim().startsWith('[')
+    ? parseJsonStringArray(value)
+    : value.split(',').map((item) => item.trim()).filter(Boolean);
+
+  if (!rawTags) {
+    return null;
+  }
+
+  const tags = new Set<PhotoTag>();
+  for (const rawTag of rawTags) {
+    const tag = parsePhotoTag(rawTag);
+    if (!tag) {
+      return null;
+    }
+
+    tags.add(tag);
+  }
+
+  return [...tags];
+}
+
+function parseJsonStringArray(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) && parsed.every((item): item is string => typeof item === 'string')
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function sanitizeString(value: unknown) {

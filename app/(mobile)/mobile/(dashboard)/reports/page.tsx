@@ -16,7 +16,12 @@ export default async function MobileReportsPage() {
     return <MobileCoordinatorReportsPage user={session} />;
   }
 
-  if (session.role === 'GENERAL_SUPERVISOR' || session.role === 'BE_MANAGER') {
+  if (
+    session.role === 'GENERAL_SUPERVISOR' ||
+    session.role === 'BE_MANAGER' ||
+    session.role === 'NEGOTIATION_MANAGER' ||
+    session.role === 'FLEET_MANAGER'
+  ) {
     return <MobileGeneralSupervisorReportsPage user={session} />;
   }
 

@@ -24,6 +24,7 @@ export const GET = withAuth(async ({ user }) => {
       OR: [
         {
           status: SiteStatus.ACTIVE,
+          requiresClockIn: true,
           planningAssignments: {
             some: {
               supervisorId: user.id,
@@ -49,9 +50,13 @@ export const GET = withAuth(async ({ user }) => {
       projectId: true,
       name: true,
       address: true,
+      siteType: true,
+      requiresClockIn: true,
       latitude: true,
       longitude: true,
       radiusKm: true,
+      geofenceType: true,
+      geofencePolygon: true,
       status: true,
       planningAssignments: {
         where: {
@@ -93,9 +98,13 @@ export const GET = withAuth(async ({ user }) => {
         projectId: site.projectId,
         name: site.name,
         address: site.address,
+        siteType: site.siteType,
+        requiresClockIn: site.requiresClockIn,
         latitude: site.latitude,
         longitude: site.longitude,
         radiusKm: site.radiusKm,
+        geofenceType: site.geofenceType,
+        geofencePolygon: site.geofencePolygon,
         status: site.status,
         hasOpenSession,
         assignmentIds,

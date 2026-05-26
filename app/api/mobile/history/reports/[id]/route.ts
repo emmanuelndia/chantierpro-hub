@@ -1,10 +1,11 @@
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import type { ReportDetail } from '@/types/mobile-history-reports';
 
-const allowedRoles: readonly Role[] = [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, Role.BE_RESOURCE];
+const allowedRoles: readonly Role[] = FIELD_USER_ROLES;
 
 export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
   if (!allowedRoles.includes(user.role)) {
@@ -69,7 +70,14 @@ export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
         id: true,
         filename: true,
         takenAt: true,
+        tags: true,
         description: true,
+        planningAssignmentId: true,
+        planningAssignment: {
+          select: {
+            action: true,
+          },
+        },
       },
     });
 
@@ -98,6 +106,9 @@ export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
         url: createInternalPhotoUrl(photo.id),
         thumbnail: createInternalPhotoUrl(photo.id),
         takenAt: photo.takenAt.toISOString(),
+        tags: photo.tags,
+        planningAssignmentId: photo.planningAssignmentId,
+        ...(photo.planningAssignment ? { assignmentAction: photo.planningAssignment.action } : {}),
         ...(photo.description ? { description: photo.description } : {}),
       })),
       sessionInfo: {

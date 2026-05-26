@@ -1,0 +1,547 @@
+# Prompts Codex - Retours Reunion Chefs Projets
+
+Ce fichier regroupe les prompts d'implementation issus des retours des chefs projets.
+Chaque bloc peut etre copie-colle tel quel dans Codex pour lancer une evolution precise.
+
+============================================================
+PROMPT 1 - IMPORT EXCEL / CSV DES CHANTIERS DANS UN PROJET
+============================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# Importer Des Chantiers En Masse Depuis Excel Ou CSV
+
+## Summary
+- Permettre a un chef projet, une direction ou un admin de creer plusieurs chantiers d'un projet en important un fichier Excel ou CSV.
+- Eviter la creation manuelle chantier par chantier quand un projet contient des dizaines ou centaines de sites.
+- L'import doit etre controle : previsualisation, validation ligne par ligne, erreurs explicites, creation uniquement des lignes valides.
+
+## Key Changes
+- Ajouter une action `Importer des chantiers` depuis le detail d'un projet web.
+- Accepter les formats `.xlsx` et `.csv`.
+- Fournir un modele telechargeable avec les colonnes :
+  - `nom`
+  - `adresse_ou_repere`
+  - `latitude`
+  - `longitude`
+  - `rayon_km`
+  - `surface`
+  - `date_debut`
+  - `date_fin`
+  - `responsable_gs_email`
+  - `statut`
+  - `description`
+- Ajouter un endpoint d'analyse qui lit le fichier et retourne :
+  - lignes valides;
+  - lignes invalides;
+  - erreurs par ligne;
+  - doublons potentiels dans le projet.
+- Ajouter un endpoint de confirmation qui cree les chantiers valides.
+- Ne pas creer automatiquement les lignes invalides.
+- Garder les validations metier existantes :
+  - nom obligatoire;
+  - coordonnees GPS valides;
+  - responsable chantier actif avec role `GENERAL_SUPERVISOR`;
+  - statut valide;
+  - description facultative.
+- Ajouter une page ou modale de previsualisation :
+  - total lignes;
+  - lignes valides;
+  - lignes en erreur;
+  - bouton `Importer les lignes valides`.
+
+## Public Interfaces / Types
+- Nouveaux endpoints possibles :
+  - `POST /api/projects/[id]/sites/import/preview`
+  - `POST /api/projects/[id]/sites/import/commit`
+  - `GET /api/projects/[id]/sites/import/template`
+- Aucun changement Prisma obligatoire.
+- Utiliser `xlsx` ou une librairie deja disponible si le projet en contient une.
+
+## Test Plan
+- Importer un fichier avec 3 chantiers valides : les 3 sont crees.
+- Importer un fichier avec latitude invalide : la ligne est rejetee avec message clair.
+- Importer un fichier avec responsable non GS : la ligne est rejetee.
+- Importer 200 lignes : l'ecran reste utilisable.
+- Verifier qu'un PM ne peut importer que dans ses projets.
+- Verifier que DIRECTION et ADMIN peuvent importer dans tous les projets.
+- Executer `npm run lint` et `npm run build`.
+
+## Assumptions
+- L'import de masse concerne d'abord la version web.
+- Le mobile garde la creation unitaire.
+- L'adresse reste un repere humain; les coordonnees GPS restent la source du pointage.
+
+
+============================================================
+PROMPT 2 - LIMITES AVANCEES DE CHANTIER SUR CARTE
+============================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# Ajouter Des Limites Avancees De Chantier
+
+## Summary
+- Completer le geofencing actuel `point GPS + rayon` avec une limite chantier plus precise.
+- Garder le rayon comme comportement par defaut.
+- Ajouter une limite polygonale optionnelle pour les chantiers complexes.
+
+## Key Changes
+- Ajouter un champ optionnel de limite geographique sur les chantiers :
+  - type `RADIUS` par defaut;
+  - type `POLYGON` si l'utilisateur dessine une zone.
+- Dans `SiteLocationPicker`, ajouter un mode `Dessiner la limite`.
+- Permettre de :
+  - poser plusieurs points sur la carte;
+  - fermer un polygone;
+  - supprimer/recommencer la limite;
+  - visualiser la zone.
+- Pour le pointage GPS :
+  - si le chantier a une limite `POLYGON`, verifier que la position est dans le polygone;
+  - sinon utiliser le rayon existant.
+- Afficher clairement dans le formulaire :
+  - `Rayon de pointage`;
+  - `Limite precise optionnelle`.
+- Garder la compatibilite avec les anciens chantiers.
+
+## Public Interfaces / Types
+- Ajouter dans Prisma un stockage de limite geographique, par exemple :
+  - `geofenceType: RADIUS | POLYGON`
+  - `geofencePolygon Json?`
+- Etendre les types Site et les serializers.
+- Adapter les endpoints de creation/modification chantier.
+
+## Test Plan
+- Creer un chantier avec rayon uniquement : pointage fonctionne comme avant.
+- Creer un chantier avec polygone : pointage autorise seulement dans la zone.
+- Modifier une limite polygonale existante.
+- Tester un ancien chantier sans polygone.
+- Verifier web et mobile.
+- Executer `npm run lint` et `npm run build`.
+
+## Assumptions
+- Le rayon reste suffisant pour la majorite des chantiers.
+- Le polygone est une option avancee.
+- Les corridors lineaires pourront etre traites plus tard.
+
+
+============================================================
+PROMPT 3 - UPLOAD DE FICHIERS DE RAPPORTS ET LIVRABLES
+============================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+
+# Ajouter Des Pieces Jointes Aux Rapports Et Aux Chantiers
+
+## Summary
+Permettre d'uploader des fichiers externes dans ChantierPro : 
+PDF, Excel, Word, images, PV, livrables client.
+
+Les fichiers doivent pouvoir être rattachés à un projet, 
+un chantier ou un rapport terrain.
+
+Le stockage doit utiliser R2 comme les photos.
+
+Modification importante sur les rapports terrain : 
+le champ texte libre devient optionnel. La ressource 
+a deux options au choix, et au moins une doit être 
+remplie avant de soumettre.
+
+## Key Changes
+
+Rapport terrain :
+- Le textarea de rapport devient optionnel
+- Ajouter une option d'upload de fichier directement 
+  comme rapport (PDF, Word, Excel, image)
+- Les deux options sont équivalentes :
+  soit on remplit le texte, soit on uploade un fichier, 
+  soit les deux
+- Validation : au moins l'une des deux doit être 
+  présente pour soumettre le rapport
+- Côté PM/GS/RH, le rapport affiché indique clairement 
+  s'il contient un texte, un fichier uploadé, ou les deux
+
+Pièces jointes générales :
+- Ajouter une entité DocumentAttachment
+- Supporter les rattachements : projet, chantier, rapport
+- Ajouter un bouton Ajouter un fichier dans :
+  le détail projet, le détail chantier, le détail rapport
+- Afficher la liste des documents avec :
+  nom fichier, type, taille, auteur, date d'upload, 
+  contexte rattaché
+- Autoriser le téléchargement selon les droits du rôle
+- Ajouter une suppression soft delete ou journalisée 
+  si cohérent avec les logs photos
+
+Formats acceptés : .pdf, .xlsx, .xls, .docx, 
+.png, .jpg, .jpeg
+
+## Public Interfaces / Types
+- Nouveau modèle Prisma DocumentAttachment
+- Nouveaux endpoints :
+  POST /api/documents
+  GET /api/documents
+  GET /api/documents/[id]/content
+  DELETE /api/documents/[id]
+- Réutiliser les helpers R2 existants
+
+## Test Plan
+- Soumettre un rapport avec uniquement un fichier uploadé,
+  sans remplir le textarea : doit être accepté
+- Soumettre un rapport avec uniquement le textarea 
+  rempli : doit être accepté comme avant
+- Tenter de soumettre un rapport sans texte ni fichier : 
+  doit être refusé
+- Uploader un PDF sur un chantier : visible et 
+  téléchargeable
+- Uploader un Excel sur un projet : visible dans 
+  le détail projet
+- Refuser un format non autorisé
+- Vérifier les droits par rôle
+- npm run lint et npm run build doivent passer
+
+## Assumptions
+- Les rapports saisis dans l'application restent 
+  la source métier principale
+- Les fichiers uploadés sont des preuves et livrables 
+  complémentaires
+- R2 reste le stockage unique des fichiers privés
+- Le rapport texte et le fichier uploadé sont 
+  deux façons équivalentes de rendre compte, 
+  pas l'une plus importante que l'autre 
+
+
+============================================================
+PROMPT 4 - ROLES NEGOCIATION ET PARC AUTO
+============================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# Generaliser Les Cellules Metier De Planning
+
+## Summary
+- Ajouter les roles lies a la negociation et au parc auto sans dupliquer toute la logique du Bureau d'Etude.
+- Le besoin metier est similaire : un responsable planifie ses propres ressources sur tous les projets/sites actifs.
+- Les ressources terrain associees pointent, prennent des photos et remontent leurs rapports comme les autres roles terrain si la tache est sur site.
+
+## Key Changes
+- Ajouter les roles Prisma :
+  - `NEGOTIATION_MANAGER`
+  - `NEGOTIATION_RESOURCE`
+  - `FLEET_MANAGER`
+  - `DRIVER`
+- Generaliser la logique actuelle de `BE_MANAGER` :
+  - chaque role manager peut voir tous les projets/sites actifs;
+  - chaque manager ne peut assigner que ses ressources metier;
+  - les ressources metier voient leurs taches du jour.
+- Adapter les libelles UI :
+  - Responsable Negociation;
+  - Ressource Negociation;
+  - Responsable Parc Auto;
+  - Chauffeur.
+- Ajouter ces roles dans la gestion utilisateurs.
+- Adapter la navigation :
+  - managers : experience proche GS/BE;
+  - ressources : experience proche superviseur terrain.
+- Ne pas afficher les perimetres GS pour ces managers.
+
+## Public Interfaces / Types
+- Migration Prisma pour ajouter les roles.
+- Etendre les constantes de navigation, permissions planning, dashboard, photo, pointage, rapport.
+- Aucun nouveau modele obligatoire si on generalise la logique via mapping role manager -> roles ressources.
+
+## Test Plan
+- Admin cree un responsable negociation et une ressource negociation.
+- Le responsable negociation planifie uniquement ses ressources.
+- Admin cree un responsable parc auto et un chauffeur.
+- Le responsable parc auto planifie uniquement ses chauffeurs.
+- Une ressource terrain voit sa tache du jour.
+- Les managers ne voient pas les perimetres GS.
+- Executer `npx prisma generate`, `npm run lint`, `npm run build`.
+
+## Assumptions
+- Les managers metier ne dependent pas d'un perimetre donne par un PM.
+- Ils peuvent intervenir sur tous les projets actifs.
+- Le pointage reste requis seulement pour les taches `ON_SITE`.
+
+
+============================================================
+PROMPT 5 - PLANNING CENTRALISE VISIBLE PAR LES CHEFS PROJETS
+============================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# Ajouter Une Vue Planning Centralise Pour Les Chefs Projets
+
+## Summary
+- Permettre aux chefs projets de voir les plannings des autres chefs projets en lecture seule.
+- L'objectif est d'eviter les conflits de disponibilite et de comprendre ce que fait une ressource avant de la reassigner.
+- Un chef projet peut consulter tout le planning, mais ne modifie que les taches de ses propres projets.
+
+## Key Changes
+- Ajouter une vue web `Planning centralise`.
+- Visible pour :
+  - PROJECT_MANAGER;
+  - DIRECTION;
+  - ADMIN;
+  - eventuellement GENERAL_SUPERVISOR en lecture selon besoin.
+- Afficher toutes les affectations du jour/semaine :
+  - date;
+  - projet;
+  - chantier;
+  - ressource;
+  - role/poste;
+  - tache;
+  - type terrain/bureau;
+  - progression;
+  - statut;
+  - createur.
+- Ajouter filtres :
+  - date;
+  - semaine;
+  - projet;
+  - chantier;
+  - ressource;
+  - role;
+  - type de tache.
+- Dans le planning normal du PM :
+  - garder la modification limitee a ses projets;
+  - afficher un indicateur si la ressource est deja occupee ailleurs ce jour.
+- Les taches hors perimetre du PM sont en lecture seule.
+
+## Public Interfaces / Types
+- Nouveau endpoint possible :
+  - `GET /api/planning/centralized`
+- Reutiliser les types de planning existants avec des champs de lecture supplementaires.
+- Aucun changement Prisma obligatoire.
+
+## Test Plan
+- PM A voit une ressource assignee sur un projet de PM B.
+- PM A ne peut pas modifier la tache de PM B.
+- PM A peut modifier une tache de son propre projet.
+- Les filtres date/projet/ressource fonctionnent.
+- DIRECTION voit tout.
+- Executer `npm run lint` et `npm run build`.
+
+## Assumptions
+- Le planning centralise est d'abord web.
+- Il sert a la visibilite et a l'arbitrage, pas a donner tous les droits de modification.
+- La multi-assignation reste autorisee mais mieux informee.
+
+
+============================================================
+PROMPT 6 - CLOTURE MANUELLE D'UNE TACHE PAR UNE RESSOURCE
+============================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# Permettre A Une Ressource De Marquer Une Tache Comme Terminee
+
+## Summary
+- Une ressource doit pouvoir indiquer qu'elle a termine une tache sans devoir obligatoirement prendre une photo.
+- La photo reste une preuve possible, mais la cloture de tache devient une action explicite.
+- Le flux doit fonctionner en ligne et hors ligne.
+
+## Key Changes
+- Sur mobile, dans les taches du jour, ajouter une action `Marquer terminee`.
+- Demander un commentaire optionnel ou obligatoire selon choix metier :
+  - commentaire optionnel par defaut;
+  - photo optionnelle.
+- Enregistrer :
+  - statut `COMPLETED`;
+  - date/heure de completion;
+  - utilisateur;
+  - commentaire de completion.
+- Ajouter un historique visible dans le detail de tache.
+- Adapter le dashboard/planning :
+  - badge `Terminee`;
+  - heure de completion;
+  - commentaire si present.
+- Garder la file offline existante de mise a jour de tache.
+
+## Public Interfaces / Types
+- Etendre `PlanningAssignment` si necessaire avec :
+  - `completedAt`
+  - `completedById`
+  - `completionComment`
+- Ou ajouter un modele d'evenement de tache si l'historique complet est souhaite.
+- Etendre endpoint PATCH de tache mobile/web.
+
+## Test Plan
+- Ressource marque une tache terminee sans photo : statut visible.
+- Ressource marque une tache terminee avec commentaire : commentaire visible.
+- Action faite offline : visible en attente puis synchronisee.
+- PM/GS voit la tache terminee dans le planning.
+- Verifier qu'une tache annulee ne peut pas etre marquee terminee.
+- Executer `npm run lint` et `npm run build`.
+
+## Assumptions
+- La completion d'une tache est independante du pointage.
+- La photo est recommandee mais non obligatoire.
+- Le statut `COMPLETED` existe deja et doit etre reutilise.
+
+
+============================================================
+PROMPT 7 - SUIVI DES OBJECTIFS JOURNALIERS ET PROGRESSION REELLE
+============================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# Suivre Les Objectifs Journaliers Et La Progression Reelle
+
+## Summary
+- Permettre de savoir si l'objectif assigne a une ressource pour la journee est atteint.
+- Ne pas se limiter au statut de tache : suivre aussi la progression declaree et les blocages.
+- Afficher une lecture simple : atteint, partiel, non demarre, bloque.
+
+## Key Changes
+- Dans le planning, clarifier l'objectif :
+  - objectif en pourcentage;
+  - ou objectif texte si non quantifiable.
+- Sur mobile, permettre a la ressource de renseigner :
+  - progression realisee;
+  - commentaire;
+  - blocage;
+  - tache terminee ou non.
+- Ajouter dans le planning web/mobile :
+  - objectif cible;
+  - progression declaree;
+  - ecart;
+  - statut objectif.
+- Ajouter des indicateurs dashboard :
+  - objectifs atteints;
+  - objectifs partiels;
+  - taches bloquees;
+  - taches non demarrees.
+- Les rapports de session doivent reprendre les taches et progressions declarees.
+
+## Public Interfaces / Types
+- Etendre `PlanningAssignment` ou ajouter un modele `TaskProgressUpdate`.
+- Si historique souhaite, preferer un modele d'evenements :
+  - `assignmentId`
+  - `progress`
+  - `comment`
+  - `blocked`
+  - `createdById`
+  - `createdAt`
+- Etendre les API planning et rapport session.
+
+## Test Plan
+- PM assigne une tache avec objectif 80%.
+- Ressource declare 50% : statut partiel.
+- Ressource declare 80% ou plus : objectif atteint.
+- Ressource signale un blocage : dashboard affiche bloque.
+- Les donnees apparaissent dans rapport/session.
+- Executer `npm run lint` et `npm run build`.
+
+## Assumptions
+- Certaines taches ne sont pas quantifiables, donc l'objectif peut rester textuel.
+- La progression declaree par la ressource ne remplace pas la validation manager.
+- L'objectif journalier est rattache a la tache planning.
+
+
+============================================================
+PROMPT 8 - LIEUX OPERATIONNELS : ENTREPOTS, ENLEVEMENT, BUREAUX
+============================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# Ajouter Les Lieux Operationnels Non Chantier
+
+## Summary
+- Gerer les lieux utiles au deroulement des travaux qui ne sont pas toujours des chantiers classiques :
+  - entrepots;
+  - points d'enlevement materiel;
+  - bureaux;
+  - sites clients;
+  - autres lieux annexes.
+- Ces lieux doivent pouvoir etre planifies et, si necessaire, pointes avec GPS.
+
+## Key Changes
+- Faire evoluer la notion de `Site` vers un type de lieu operationnel.
+- Ajouter un champ `siteType` ou equivalent :
+  - `WORKSITE`
+  - `WAREHOUSE`
+  - `MATERIAL_PICKUP`
+  - `OFFICE`
+  - `CLIENT_SITE`
+  - `OTHER`
+- Dans les formulaires chantier/site :
+  - renommer progressivement en `Lieu / chantier`;
+  - demander le type de lieu;
+  - afficher une aide selon le type.
+- Si le lieu demande un pointage :
+  - coordonnees GPS obligatoires;
+  - rayon ou limite obligatoire.
+- Si le lieu ne demande pas de pointage :
+  - autoriser planning bureau/logistique sans flux terrain.
+- Dans le planning :
+  - permettre d'assigner une ressource a un entrepot ou point d'enlevement;
+  - afficher clairement le type de lieu.
+- Dans le pointage :
+  - seuls les lieux avec GPS et pointage requis apparaissent.
+
+## Public Interfaces / Types
+- Migration Prisma :
+  - enum `SiteType`;
+  - champ `siteType` sur `Site`;
+  - eventuellement `requiresClockIn Boolean @default(true)`.
+- Etendre les serializers Site, Planning, Photo, Clock-in.
+- Adapter les libelles UI.
+
+## Test Plan
+- Creer un lieu `Point d'enlevement materiel` avec GPS : pointage possible.
+- Creer un lieu `Bureau` sans pointage requis : visible planning, absent du pointage.
+- Assigner une ressource a un entrepot : tache visible.
+- Verifier que les chantiers existants deviennent `WORKSITE`.
+- Executer `npx prisma generate`, `npm run lint`, `npm run build`.
+
+## Assumptions
+- Tous les lieux ne sont pas des chantiers, mais ils peuvent participer au planning.
+- Le pointage GPS reste possible seulement si le lieu a des coordonnees fiables.
+- Le terme `Site` peut rester technique en base, mais l'UI doit parler de lieux/chantiers.
+
+
+============================================================
+PROMPT 9 - COMMENTAIRES ET TAGS RAPIDES SUR LES PHOTOS
+============================================================
+
+PLEASE IMPLEMENT THIS PLAN:
+# Ajouter Commentaires Et Tags Rapides Sur Les Photos
+
+## Summary
+- Rendre les photos plus exploitables en permettant d'ajouter un commentaire clair et des tags rapides.
+- Exemples : `Debut tache`, `Fin tache`, `Blocage`, `Preuve travaux`, `Incident`.
+- Garder le lien possible entre une photo et une tache planning.
+
+## Key Changes
+- Dans l'ecran photo mobile :
+  - rendre le champ commentaire/description visible avant envoi;
+  - ajouter des tags rapides selectionnables;
+  - permettre de lier la photo a une tache precise.
+- Enregistrer :
+  - description;
+  - tags;
+  - tache liee;
+  - horodatage;
+  - GPS si disponible.
+- Dans la galerie :
+  - afficher les tags;
+  - filtrer par tag;
+  - afficher le commentaire.
+- Dans les rapports :
+  - regrouper les photos par tache et par tag.
+- En offline :
+  - conserver description et tags dans la file photo en attente.
+
+## Public Interfaces / Types
+- Ajouter une enum ou un champ tableau pour les tags photo :
+  - `PhotoTag` ou `tags String[]` selon support Prisma/Postgres.
+- Etendre `PendingMobilePhoto` pour stocker tags et description.
+- Etendre `POST /api/photos`.
+
+## Test Plan
+- Prendre une photo avec tag `Debut tache` : tag visible en galerie.
+- Prendre une photo avec commentaire : commentaire visible.
+- Lier une photo a une tache : visible dans le detail tache/rapport.
+- Prendre photo offline avec tag/commentaire : synchronisation conserve les donnees.
+- Filtrer la galerie par tag.
+- Executer `npm run lint` et `npm run build`.
+
+## Assumptions
+- Les tags rapides ne remplacent pas le commentaire libre.
+- Les photos restent stockees dans R2.
+- Les tags doivent etre simples et stables pour les rapports.

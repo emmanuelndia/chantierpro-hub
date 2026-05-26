@@ -1,3 +1,5 @@
+import type { PhotoTag } from '@prisma/client';
+
 export type SessionSummary = {
   id: string;
   siteId: string;
@@ -17,6 +19,12 @@ export type DayAssignment = {
   id: string;
   action: string;
   targetProgress?: number | undefined;
+  objectiveText?: string | undefined;
+  actualProgress?: number | null | undefined;
+  progressDelta?: number | null | undefined;
+  objectiveStatus?: string | undefined;
+  latestProgressComment?: string | null | undefined;
+  latestProgressBlocked?: boolean | undefined;
   siteId: string;
   siteName: string;
 };
@@ -26,6 +34,7 @@ export type SessionPhoto = {
   filename: string;
   url: string;
   takenAt: string;
+  tags: PhotoTag[];
   planningAssignmentId: string | null;
   assignmentAction?: string | undefined;
   assignmentStatus?: string | undefined;

@@ -66,11 +66,24 @@ export function MobileGeneralSupervisorReportsPage({ user }: MobileGeneralSuperv
     <div className="space-y-5">
       <div>
         <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-          {user.role === 'BE_MANAGER' ? "Bureau d'etude" : 'Général superviseur'}
+          {getReportsContextLabel(user.role)}
         </p>
         <h1 className="mt-1 text-2xl font-black text-slate-950">Rapports terrain</h1>
       </div>
       <MobileReportsList reports={reports} />
     </div>
   );
+}
+
+function getReportsContextLabel(role: string) {
+  if (role === 'BE_MANAGER') {
+    return "Bureau d'etude";
+  }
+  if (role === 'NEGOTIATION_MANAGER') {
+    return 'Negociation';
+  }
+  if (role === 'FLEET_MANAGER') {
+    return 'Parc auto';
+  }
+  return 'Général superviseur';
 }

@@ -1,4 +1,4 @@
-import { Role, SiteStatus, TeamMemberStatus, TeamStatus, type Prisma, type PrismaClient } from '@prisma/client';
+import { Role, SiteStatus, SiteType, TeamMemberStatus, TeamStatus, type Prisma, type PrismaClient } from '@prisma/client';
 import { projectAccessWhere, serializeSite, sitePublicSelect } from '@/lib/projects';
 import { listProjectFormOptions } from '@/lib/project-web';
 import type {
@@ -25,6 +25,8 @@ type SiteManagementRow = {
   projectId: string;
   name: string;
   address: string;
+  siteType: SiteType;
+  requiresClockIn: boolean;
   latitude: Prisma.Decimal;
   longitude: Prisma.Decimal;
   radiusKm: Prisma.Decimal;
@@ -46,7 +48,7 @@ type SiteManagementRow = {
   };
 };
 
-const MOBILE_SITE_MANAGEMENT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION];
+const MOBILE_SITE_MANAGEMENT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
 
 export function canAccessMobileSitesManagement(role: Role) {
   return MOBILE_SITE_MANAGEMENT_ROLES.includes(role);
@@ -103,6 +105,8 @@ export async function getMobileSitesManagement(
         projectId: true,
         name: true,
         address: true,
+        siteType: true,
+        requiresClockIn: true,
         latitude: true,
         longitude: true,
         radiusKm: true,
@@ -228,6 +232,8 @@ function serializeManagementSite(site: SiteManagementRow): MobileSiteManagementI
     projectId: site.projectId,
     name: site.name,
     address: site.address,
+    siteType: site.siteType,
+    requiresClockIn: site.requiresClockIn,
     status: site.status,
     latitude: site.latitude.toNumber(),
     longitude: site.longitude.toNumber(),

@@ -3,11 +3,14 @@
   ClockInType,
   Prisma,
   Role,
+  SiteGeofenceType,
   TeamMemberStatus,
   TeamStatus,
   type PrismaClient,
 } from '@prisma/client';
+import { FIELD_USER_ROLES } from '@/lib/field-roles';
 import { haversineDistanceKm } from '@/lib/haversine';
+import { normalizeGeofencePolygon } from '@/lib/projects';
 import type {
   ActiveClockInSession,
   AttendancePersonItem,
@@ -22,12 +25,7 @@ import type {
   TodayClockInView,
 } from '@/types/clock-in';
 
-export const FIELD_ROLES: readonly Role[] = [
-  Role.SUPERVISOR,
-  Role.COORDINATOR,
-  Role.GENERAL_SUPERVISOR,
-  Role.BE_RESOURCE,
-];
+export const FIELD_ROLES: readonly Role[] = FIELD_USER_ROLES;
 
 export const clockInRecordSelect = {
   id: true,
@@ -92,9 +90,12 @@ type AccessibleSite = {
   id: string;
   name: string;
   status: string;
+  requiresClockIn: boolean;
   latitude: Prisma.Decimal;
   longitude: Prisma.Decimal;
   radiusKm: Prisma.Decimal;
+  geofenceType: SiteGeofenceType;
+  geofencePolygon: Prisma.JsonValue | null;
 };
 
 type AttendanceMember = {
@@ -278,9 +279,12 @@ export async function getAccessibleClockInSite(
       id: true,
       name: true,
       status: true,
+      requiresClockIn: true,
       latitude: true,
       longitude: true,
       radiusKm: true,
+      geofenceType: true,
+      geofencePolygon: true,
     },
   });
 }
@@ -607,6 +611,21 @@ export function isWithinSiteRadius(site: Pick<AccessibleSite, 'radiusKm'>, dista
   return distanceKm <= site.radiusKm.toNumber();
 }
 
+export function isWithinSiteGeofence(
+  site: Pick<AccessibleSite, 'radiusKm' | 'geofenceType' | 'geofencePolygon'>,
+  input: Pick<ClockInInput, 'latitude' | 'longitude'>,
+  distanceKm: number,
+) {
+  if (site.geofenceType === SiteGeofenceType.POLYGON) {
+    const polygon = normalizeGeofencePolygon(site.geofencePolygon);
+    if (polygon) {
+      return pointInPolygon([input.longitude, input.latitude], polygon.coordinates[0]!);
+    }
+  }
+
+  return isWithinSiteRadius(site, distanceKm);
+}
+
 export function buildOutsideRadiusMessage(
   distanceKm: number,
   radiusKm: number | Pick<AccessibleSite, 'radiusKm'>,
@@ -615,6 +634,17 @@ export function buildOutsideRadiusMessage(
     typeof radiusKm === 'number' ? radiusKm : radiusKm.radiusKm.toNumber();
 
   return `vous \u00eates \u00e0 ${distanceKm.toFixed(2)} km du chantier (rayon autoris\u00e9 : ${allowedRadiusKm} km)`;
+}
+
+export function buildOutsideGeofenceMessage(
+  distanceKm: number,
+  site: Pick<AccessibleSite, 'radiusKm' | 'geofenceType' | 'geofencePolygon'>,
+) {
+  if (site.geofenceType === SiteGeofenceType.POLYGON && normalizeGeofencePolygon(site.geofencePolygon)) {
+    return 'Vous etes hors de la limite precise du chantier.';
+  }
+
+  return buildOutsideRadiusMessage(distanceKm, site);
 }
 
 export function buildBatchResult(result: BatchSyncItemResult): BatchSyncItemResult {
@@ -778,6 +808,7 @@ export async function getNearbySites(
   const sites = await prisma.site.findMany({
     where: {
       status: 'ACTIVE',
+      requiresClockIn: true,
     },
     select: {
       id: true,
@@ -786,6 +817,8 @@ export async function getNearbySites(
       latitude: true,
       longitude: true,
       radiusKm: true,
+      geofenceType: true,
+      geofencePolygon: true,
     },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
@@ -801,15 +834,65 @@ export async function getNearbySites(
       );
 
       return {
-        id: site.id,
-        name: site.name,
-        address: site.address,
+        site,
         distance,
-        radiusKm: site.radiusKm.toNumber(),
       };
     })
-    .filter((site) => site.distance <= site.radiusKm)
+    .filter((item) => isWithinSiteGeofence(item.site, { latitude: payload.latitude, longitude: payload.longitude }, item.distance))
+    .map(({ site, distance }) => ({
+      id: site.id,
+      name: site.name,
+      address: site.address,
+      distance,
+      radiusKm: site.radiusKm.toNumber(),
+    }))
     .sort((left, right) => left.distance - right.distance || left.id.localeCompare(right.id));
+}
+
+function pointInPolygon(point: [number, number], ring: [number, number][]) {
+  if (isPointOnPolygonBoundary(point, ring)) {
+    return true;
+  }
+
+  const [x, y] = point;
+  let inside = false;
+
+  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index, index += 1) {
+    const [xi, yi] = ring[index]!;
+    const [xj, yj] = ring[previous]!;
+    const intersects = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+function isPointOnPolygonBoundary(point: [number, number], ring: [number, number][]) {
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    if (isPointOnSegment(point, ring[index]!, ring[index + 1]!)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isPointOnSegment(point: [number, number], start: [number, number], end: [number, number]) {
+  const cross = (point[1] - start[1]) * (end[0] - start[0]) - (point[0] - start[0]) * (end[1] - start[1]);
+  if (Math.abs(cross) > 0.000001) {
+    return false;
+  }
+
+  const dot = (point[0] - start[0]) * (end[0] - start[0]) + (point[1] - start[1]) * (end[1] - start[1]);
+  if (dot < 0) {
+    return false;
+  }
+
+  const squaredLength = (end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2;
+  return dot <= squaredLength;
 }
 
 function serializeAttendancePerson(person: AttendanceMember): AttendancePersonItem {
