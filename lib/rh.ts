@@ -10,6 +10,9 @@ import type {
   RhPresenceSessionItem,
   RhPresenceSummaryItem,
   RhPresencesResponse,
+  RhSitePresenceLiveResource,
+  RhSitePresenceLiveResponse,
+  RhSitePresenceLiveStatus,
   RhUserPresenceDetail,
 } from '@/types/rh';
 
@@ -141,6 +144,16 @@ type ExportQuery = {
   siteIds: string[];
 };
 
+type SitePresenceLiveQuery = {
+  projectId: string | null;
+  siteId: string | null;
+  resourceId: string | null;
+  role: Role | null;
+  status: RhSitePresenceLiveStatus | null;
+  search: string | null;
+  anomaliesOnly: boolean;
+};
+
 type ExportArtifact = {
   contentType: string;
   fileName: string;
@@ -237,6 +250,232 @@ export function parseRhExportInput(body: unknown): RhExportInput | null {
     userId,
     projectId,
     siteIds,
+  };
+}
+
+export function parseSitePresenceLiveQuery(searchParams: URLSearchParams): SitePresenceLiveQuery {
+  return {
+    projectId: sanitizeString(searchParams.get('projectId')),
+    siteId: sanitizeString(searchParams.get('siteId')),
+    resourceId: sanitizeString(searchParams.get('resourceId')),
+    role: parseRole(searchParams.get('role')),
+    status: parseLiveStatus(searchParams.get('status')),
+    search: sanitizeString(searchParams.get('q')),
+    anomaliesOnly: searchParams.get('anomaliesOnly') === 'true',
+  };
+}
+
+export async function getSitePresencesLive(
+  prisma: PrismaClient,
+  query: SitePresenceLiveQuery,
+): Promise<RhSitePresenceLiveResponse> {
+  const today = toDateOnlyDate(new Date());
+  const tomorrow = new Date(today);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+  const siteWhere: Prisma.SiteWhereInput = {
+    status: 'ACTIVE',
+    project: {
+      status: {
+        not: 'ARCHIVED',
+      },
+    },
+    ...(query.projectId ? { projectId: query.projectId } : {}),
+    ...(query.siteId ? { id: query.siteId } : {}),
+  };
+
+  const [sites, assignments, records] = await Promise.all([
+    prisma.site.findMany({
+      where: siteWhere,
+      orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        projectId: true,
+        project: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    }),
+    prisma.planningAssignment.findMany({
+      where: {
+        date: today,
+        deletedAt: null,
+        workLocationType: 'ON_SITE',
+        site: siteWhere,
+        ...(query.resourceId ? { supervisorId: query.resourceId } : {}),
+        ...(query.role ? { supervisor: { role: query.role } } : {}),
+      },
+      orderBy: [{ site: { project: { name: 'asc' } } }, { site: { name: 'asc' } }, { supervisor: { firstName: 'asc' } }],
+      select: {
+        id: true,
+        siteId: true,
+        action: true,
+        supervisorId: true,
+        supervisor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    }),
+    prisma.clockInRecord.findMany({
+      where: {
+        status: ClockInStatus.VALID,
+        site: siteWhere,
+        timestampLocal: {
+          gte: today,
+          lt: tomorrow,
+        },
+        type: {
+          in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
+        },
+        ...(query.resourceId ? { userId: query.resourceId } : {}),
+        ...(query.role ? { user: { role: query.role } } : {}),
+      },
+      orderBy: [{ site: { project: { name: 'asc' } } }, { site: { name: 'asc' } }, { user: { firstName: 'asc' } }, { timestampLocal: 'asc' }],
+      select: {
+        id: true,
+        userId: true,
+        siteId: true,
+        type: true,
+        timestampLocal: true,
+        distanceToSite: true,
+        isRemoteCheckout: true,
+        isAutoClosed: true,
+        isRegularized: true,
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  const siteRows = new Map(
+    sites.map((site) => [
+      site.id,
+      {
+        siteId: site.id,
+        siteName: site.name,
+        siteAddress: site.address,
+        projectId: site.projectId,
+        projectName: site.project.name,
+        expectedCount: 0,
+        presentCount: 0,
+        pausedCount: 0,
+        notClockedCount: 0,
+        leftCount: 0,
+        anomalyCount: 0,
+        lastActivityAt: null as string | null,
+        resources: [] as RhSitePresenceLiveResource[],
+      },
+    ]),
+  );
+
+  const recordsBySiteUser = new Map<string, typeof records>();
+  for (const record of records) {
+    const key = liveResourceKey(record.siteId, record.userId);
+    recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), record]);
+  }
+
+  const assignmentBySiteUser = new Map<string, (typeof assignments)[number]>();
+  for (const assignment of assignments) {
+    const key = liveResourceKey(assignment.siteId, assignment.supervisorId);
+    const existing = assignmentBySiteUser.get(key);
+    assignmentBySiteUser.set(key, existing ? { ...existing, action: `${existing.action} / ${assignment.action}` } : assignment);
+  }
+
+  const allKeys = new Set([...recordsBySiteUser.keys(), ...assignmentBySiteUser.keys()]);
+  const resourcesById = new Map<string, { id: string; label: string; role: Role }>();
+  const roles = new Set<Role>();
+
+  for (const key of allKeys) {
+    const [siteId] = key.split(':');
+    const site = siteId ? siteRows.get(siteId) : null;
+    if (!site) continue;
+
+    const siteRecords = recordsBySiteUser.get(key) ?? [];
+    const assignment = assignmentBySiteUser.get(key) ?? null;
+    const user = assignment?.supervisor ?? siteRecords[0]?.user;
+    if (!user) continue;
+
+    const resource = buildLiveResource(user, assignment?.action ?? null, siteRecords);
+    if (!matchesLiveResourceFilters(resource, query)) continue;
+
+    site.resources.push(resource);
+    roles.add(user.role);
+    resourcesById.set(user.id, {
+      id: user.id,
+      label: `${user.firstName} ${user.lastName}`,
+      role: user.role,
+    });
+
+    if (assignment) site.expectedCount += 1;
+    if (resource.status === 'PRESENT') site.presentCount += 1;
+    if (resource.status === 'PAUSED') site.pausedCount += 1;
+    if (resource.status === 'EXPECTED_NOT_CLOCKED') site.notClockedCount += 1;
+    if (resource.status === 'LEFT') site.leftCount += 1;
+    if (resource.status === 'ANOMALY') site.anomalyCount += 1;
+
+    if (resource.lastClockInAt && (!site.lastActivityAt || resource.lastClockInAt > site.lastActivityAt)) {
+      site.lastActivityAt = resource.lastClockInAt;
+    }
+  }
+
+  const filteredSites = [...siteRows.values()]
+    .filter((site) => !query.anomaliesOnly || site.anomalyCount > 0)
+    .filter((site) => {
+      if (!query.status) return true;
+      return site.resources.some((resource) => resource.status === query.status);
+    })
+    .filter((site) => {
+      if (!query.search) return true;
+      const normalized = query.search.toLowerCase();
+      return `${site.projectName} ${site.siteName} ${site.siteAddress}`.toLowerCase().includes(normalized) || site.resources.length > 0;
+    })
+    .map((site) => ({
+      ...site,
+      resources: site.resources.sort(compareLiveResource),
+    }));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    date: today.toISOString().slice(0, 10),
+    summary: {
+      activeSites: sites.length,
+      expectedResources: filteredSites.reduce((sum, site) => sum + site.expectedCount, 0),
+      presentResources: filteredSites.reduce((sum, site) => sum + site.presentCount, 0),
+      pausedResources: filteredSites.reduce((sum, site) => sum + site.pausedCount, 0),
+      notClockedResources: filteredSites.reduce((sum, site) => sum + site.notClockedCount, 0),
+      anomalies: filteredSites.reduce((sum, site) => sum + site.anomalyCount, 0),
+    },
+    options: {
+      projects: sites
+        .map((site) => ({ id: site.projectId, label: site.project.name }))
+        .filter(uniqueOption)
+        .sort((a, b) => a.label.localeCompare(b.label)),
+      sites: sites
+        .map((site) => ({ id: site.id, label: site.name, projectId: site.projectId }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+      resources: [...resourcesById.values()]
+        .map((resource) => ({ id: resource.id, label: resource.label, role: resource.role }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+      roles: [...roles].sort(),
+    },
+    sites: filteredSites,
   };
 }
 
@@ -1177,4 +1416,113 @@ function matchesRhSearch(session: BuiltSession, search: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function parseRole(value: string | null) {
+  if (!value) return null;
+  return Object.values(Role).includes(value as Role) ? (value as Role) : null;
+}
+
+function parseLiveStatus(value: string | null): RhSitePresenceLiveStatus | null {
+  const statuses: RhSitePresenceLiveStatus[] = ['PRESENT', 'PAUSED', 'EXPECTED_NOT_CLOCKED', 'LEFT', 'ANOMALY'];
+  return statuses.includes(value as RhSitePresenceLiveStatus) ? (value as RhSitePresenceLiveStatus) : null;
+}
+
+function toDateOnlyDate(value: Date) {
+  return new Date(`${value.toISOString().slice(0, 10)}T00:00:00.000Z`);
+}
+
+function liveResourceKey(siteId: string, userId: string) {
+  return `${siteId}:${userId}`;
+}
+
+function buildLiveResource(
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: Role;
+  },
+  taskAction: string | null,
+  records: {
+    type: ClockInType;
+    timestampLocal: Date;
+    distanceToSite: Prisma.Decimal;
+    isRemoteCheckout: boolean;
+    isAutoClosed: boolean;
+    isRegularized: boolean;
+  }[],
+): RhSitePresenceLiveResource {
+  const latest = records.at(-1) ?? null;
+  const arrival = [...records].reverse().find((record) => record.type === ClockInType.ARRIVAL) ?? null;
+  const hasRemoteReview = records.some((record, index) => {
+    if (!record.isRemoteCheckout || record.type !== ClockInType.DEPARTURE) return false;
+    const previousArrival = records
+      .slice(0, index)
+      .reverse()
+      .find((candidate) => candidate.type === ClockInType.ARRIVAL);
+    return previousArrival ? record.timestampLocal.getTime() - previousArrival.timestampLocal.getTime() > 6 * 60 * 60 * 1000 : false;
+  });
+  const hasAnomaly = records.some((record) => record.isAutoClosed) || hasRemoteReview;
+  const status = hasAnomaly ? 'ANOMALY' : getLiveStatusFromLatestRecord(latest);
+
+  return {
+    userId: user.id,
+    name: `${user.firstName} ${user.lastName}`,
+    email: user.email,
+    role: user.role,
+    status,
+    taskAction,
+    arrivalAt: arrival?.timestampLocal.toISOString() ?? null,
+    lastClockInAt: latest?.timestampLocal.toISOString() ?? null,
+    lastClockInType: latest?.type ?? null,
+    distanceKm: latest?.distanceToSite.toNumber() ?? null,
+    isRemoteCheckout: records.some((record) => record.isRemoteCheckout),
+    isAutoClosed: records.some((record) => record.isAutoClosed),
+    isRegularized: records.some((record) => record.isRegularized),
+  };
+}
+
+function getLiveStatusFromLatestRecord(
+  record: { type: ClockInType } | null,
+): RhSitePresenceLiveStatus {
+  if (!record) return 'EXPECTED_NOT_CLOCKED';
+  if (record.type === ClockInType.PAUSE_START) return 'PAUSED';
+  if (record.type === ClockInType.DEPARTURE) return 'LEFT';
+  return 'PRESENT';
+}
+
+function matchesLiveResourceFilters(resource: RhSitePresenceLiveResource, query: SitePresenceLiveQuery) {
+  if (query.status && resource.status !== query.status) return false;
+  if (query.anomaliesOnly && resource.status !== 'ANOMALY') return false;
+
+  if (query.search) {
+    const normalized = query.search.toLowerCase();
+    return `${resource.name} ${resource.email} ${resource.role} ${resource.taskAction ?? ''}`
+      .toLowerCase()
+      .includes(normalized);
+  }
+
+  return true;
+}
+
+function compareLiveResource(left: RhSitePresenceLiveResource, right: RhSitePresenceLiveResource) {
+  return liveStatusRank(left.status) - liveStatusRank(right.status) || left.name.localeCompare(right.name);
+}
+
+function liveStatusRank(status: RhSitePresenceLiveStatus) {
+  const ranks: Record<RhSitePresenceLiveStatus, number> = {
+    ANOMALY: 0,
+    PRESENT: 1,
+    PAUSED: 2,
+    EXPECTED_NOT_CLOCKED: 3,
+    LEFT: 4,
+  };
+
+  return ranks[status];
+}
+
+function uniqueOption<T extends { id: string }>(option: T, index: number, options: T[]) {
+  return options.findIndex((item) => item.id === option.id) === index;
 }

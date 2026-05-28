@@ -108,6 +108,65 @@ export type RhOptionsResponse = {
   resources: RhResourceOption[];
 };
 
+export type RhSitePresenceLiveStatus =
+  | 'PRESENT'
+  | 'PAUSED'
+  | 'EXPECTED_NOT_CLOCKED'
+  | 'LEFT'
+  | 'ANOMALY';
+
+export type RhSitePresenceLiveResource = {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+  status: RhSitePresenceLiveStatus;
+  taskAction: string | null;
+  arrivalAt: string | null;
+  lastClockInAt: string | null;
+  lastClockInType: string | null;
+  distanceKm: number | null;
+  isRemoteCheckout: boolean;
+  isAutoClosed: boolean;
+  isRegularized: boolean;
+};
+
+export type RhSitePresenceLiveSite = {
+  siteId: string;
+  siteName: string;
+  siteAddress: string;
+  projectId: string;
+  projectName: string;
+  expectedCount: number;
+  presentCount: number;
+  pausedCount: number;
+  notClockedCount: number;
+  leftCount: number;
+  anomalyCount: number;
+  lastActivityAt: string | null;
+  resources: RhSitePresenceLiveResource[];
+};
+
+export type RhSitePresenceLiveResponse = {
+  generatedAt: string;
+  date: string;
+  summary: {
+    activeSites: number;
+    expectedResources: number;
+    presentResources: number;
+    pausedResources: number;
+    notClockedResources: number;
+    anomalies: number;
+  };
+  options: {
+    projects: RhFilterOption[];
+    sites: (RhFilterOption & { projectId: string })[];
+    resources: RhResourceOption[];
+    roles: string[];
+  };
+  sites: RhSitePresenceLiveSite[];
+};
+
 export type RhApiErrorCode =
   | 'BAD_REQUEST'
   | 'FORBIDDEN'

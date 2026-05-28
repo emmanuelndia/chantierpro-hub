@@ -38,6 +38,13 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Presences / RH'],
   },
   {
+    href: '/web/rh/presences-chantiers',
+    label: 'Presences chantiers',
+    icon: 'rh',
+    roles: ['HR', 'DIRECTION', 'ADMIN'],
+    breadcrumb: ['Presences / RH', 'Presences chantiers'],
+  },
+  {
     href: '/web/photos',
     label: 'Galerie photos',
     icon: 'photos',
