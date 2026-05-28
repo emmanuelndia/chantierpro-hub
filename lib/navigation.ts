@@ -171,19 +171,19 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/home',
     label: 'Accueil',
     icon: 'home',
-    roles: ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'HR', 'ADMIN'],
+    roles: ['SUPERVISOR', 'RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'HR', 'ADMIN'],
   },
   {
     href: '/mobile/clock-in',
     label: 'Pointer',
     icon: 'clock-in',
-    roles: ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER'],
+    roles: ['SUPERVISOR', 'RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER'],
   },
   {
     href: '/mobile/photo',
     label: 'Photo',
     icon: 'photo',
-    roles: ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER'],
+    roles: ['SUPERVISOR', 'RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER'],
   },
   {
     href: '/mobile/projects',
@@ -225,7 +225,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/history',
     label: 'Historique',
     icon: 'history',
-    roles: ['SUPERVISOR', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER'],
+    roles: ['SUPERVISOR', 'RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER'],
   },
   {
     href: '/mobile/reports',

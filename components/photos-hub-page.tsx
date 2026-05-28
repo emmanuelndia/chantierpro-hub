@@ -26,6 +26,7 @@ type PhotosHubPageProps = Readonly<{
 const PROJECT_SCOPE_ROLES: readonly Role[] = ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'];
 const SITE_SCOPE_ROLES: readonly Role[] = [
   'SUPERVISOR',
+  'RESOURCE',
   'COORDINATOR',
   'GENERAL_SUPERVISOR',
   'BE_RESOURCE',

@@ -31,6 +31,7 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
   const [siteIds, setSiteIds] = useState<string[]>([]);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [regularizationTarget, setRegularizationTarget] = useState<RhUserPresenceDetail['sessions'][number] | null>(null);
+  const [regularizationDate, setRegularizationDate] = useState('');
   const [regularizationTime, setRegularizationTime] = useState('17:00');
   const [regularizationComment, setRegularizationComment] = useState('');
   const [regularizationError, setRegularizationError] = useState<string | null>(null);
@@ -115,6 +116,7 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
     },
     onSuccess: async () => {
       setRegularizationTarget(null);
+      setRegularizationDate('');
       setRegularizationTime('17:00');
       setRegularizationComment('');
       setRegularizationError(null);
@@ -340,7 +342,8 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
                     }
                     onRegularize={(session) => {
                       setRegularizationTarget(session);
-                      setRegularizationTime((session.departureTime ?? '17:00').slice(0, 5));
+                      setRegularizationDate(session.date);
+                      setRegularizationTime(getDefaultRegularizationTime(session));
                       setRegularizationComment('');
                       setRegularizationError(null);
                     }}
@@ -356,19 +359,29 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
       {regularizationTarget ? (
         <RegularizationModal
           comment={regularizationComment}
+          date={regularizationDate}
           error={regularizationError}
           isSubmitting={regularizeMutation.isPending}
           onClose={() => {
             if (regularizeMutation.isPending) return;
             setRegularizationTarget(null);
+            setRegularizationDate('');
             setRegularizationError(null);
           }}
           onCommentChange={(value) => {
             setRegularizationComment(value);
             setRegularizationError(null);
           }}
+          onDateChange={(value) => {
+            setRegularizationDate(value);
+            setRegularizationError(null);
+          }}
           onSubmit={() => {
             const comment = regularizationComment.trim();
+            if (!regularizationDate || !/^\d{4}-\d{2}-\d{2}$/.test(regularizationDate)) {
+              setRegularizationError('Saisis une date de sortie valide.');
+              return;
+            }
             if (!regularizationTime || !/^\d{2}:\d{2}$/.test(regularizationTime)) {
               setRegularizationError('Saisis une heure de sortie valide.');
               return;
@@ -381,7 +394,7 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
             regularizeMutation.mutate({
               arrivalRecordId: regularizationTarget.arrivalRecordId,
               departureRecordId: regularizationTarget.departureRecordId,
-              correctedDepartureTime: `${regularizationTarget.date}T${regularizationTime}:00.000Z`,
+              correctedDepartureTime: `${regularizationDate}T${regularizationTime}:00.000Z`,
               comment,
             });
           }}
@@ -534,20 +547,24 @@ function Field({
 
 function RegularizationModal({
   session,
+  date,
   time,
   comment,
   error,
   isSubmitting,
+  onDateChange,
   onTimeChange,
   onCommentChange,
   onSubmit,
   onClose,
 }: Readonly<{
   session: RhUserPresenceDetail['sessions'][number];
+  date: string;
   time: string;
   comment: string;
   error: string | null;
   isSubmitting: boolean;
+  onDateChange: (value: string) => void;
   onTimeChange: (value: string) => void;
   onCommentChange: (value: string) => void;
   onSubmit: () => void;
@@ -576,6 +593,15 @@ function RegularizationModal({
         </div>
 
         <div className="mt-6 space-y-4">
+          <Field label="Date de sortie corrigée">
+            <input
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+              disabled={isSubmitting}
+              onChange={(event) => onDateChange(event.target.value)}
+              type="date"
+              value={date}
+            />
+          </Field>
           <Field label="Heure de sortie corrigée">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
@@ -656,6 +682,20 @@ function buildMonthOptions() {
       }).format(date),
     };
   });
+}
+
+function getDefaultRegularizationTime(session: RhUserPresenceDetail['sessions'][number]) {
+  if (session.departureTime) {
+    return session.departureTime.slice(0, 5);
+  }
+
+  const [hours = 0, minutes = 0] = session.arrivalTime.split(':').map(Number);
+  if (hours < 17 || (hours === 17 && minutes === 0)) {
+    return '17:00';
+  }
+
+  const nextHour = Math.min(hours + 1, 23);
+  return `${String(nextHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
 function formatDateOnly(value: string) {

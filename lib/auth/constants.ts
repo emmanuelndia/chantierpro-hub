@@ -64,6 +64,7 @@ export const WEB_ROUTE_ROLE_MAP: Record<string, Role[]> = {
   '/web/users': ['ADMIN'],
   '/web/profile': [
     'SUPERVISOR',
+    'RESOURCE',
     'COORDINATOR',
     'GENERAL_SUPERVISOR',
     'BE_RESOURCE',
@@ -79,6 +80,7 @@ export const WEB_ROUTE_ROLE_MAP: Record<string, Role[]> = {
   ],
   '/web/change-password': [
     'SUPERVISOR',
+    'RESOURCE',
     'COORDINATOR',
     'GENERAL_SUPERVISOR',
     'BE_RESOURCE',
@@ -101,6 +103,7 @@ export const WEB_ROUTE_ROLE_MAP: Record<string, Role[]> = {
   '/admin/logs': ['ADMIN'],
   '/settings/profil': [
     'SUPERVISOR',
+    'RESOURCE',
     'COORDINATOR',
     'GENERAL_SUPERVISOR',
     'BE_RESOURCE',

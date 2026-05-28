@@ -5,6 +5,7 @@ import { getCurrentWebSession } from '@/lib/auth/web-session';
 
 const mobileCameraRoles: readonly Role[] = [
   Role.SUPERVISOR,
+  Role.RESOURCE,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
   Role.BE_RESOURCE,

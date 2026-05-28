@@ -2,6 +2,7 @@ import { Role } from '@prisma/client';
 
 export const CLASSIC_FIELD_USER_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
+  Role.RESOURCE,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
 ];

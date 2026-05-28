@@ -586,7 +586,7 @@ export async function regularizeRhSession(
   const correctedDepartureTime = new Date(payload.correctedDepartureTime);
 
   if (!comment || Number.isNaN(correctedDepartureTime.getTime())) {
-    return { code: 'BAD_REQUEST' as const, recordId: null };
+    return { code: 'BAD_REQUEST' as const, reason: 'INVALID_PAYLOAD' as const, recordId: null };
   }
 
   const arrival = await prisma.clockInRecord.findUnique({
@@ -611,7 +611,7 @@ export async function regularizeRhSession(
   }
 
   if (correctedDepartureTime.getTime() <= arrival.timestampLocal.getTime()) {
-    return { code: 'BAD_REQUEST' as const, recordId: null };
+    return { code: 'BAD_REQUEST' as const, reason: 'DEPARTURE_BEFORE_ARRIVAL' as const, recordId: null };
   }
 
   if (payload.departureRecordId) {
@@ -682,7 +682,15 @@ export async function regularizeRhSession(
   });
 
   if (existingDeparture) {
-    return { code: 'BAD_REQUEST' as const, recordId: null };
+    const updated = await regularizeExistingDeparture(prisma, {
+      arrivalId: arrival.id,
+      departureId: existingDeparture.id,
+      correctedDepartureTime,
+      comment,
+      authorId: payload.author.id,
+    });
+
+    return { code: null, recordId: updated.id };
   }
 
   const departure = await prisma.$transaction(async (tx) => {
@@ -724,6 +732,48 @@ export async function regularizeRhSession(
   });
 
   return { code: null, recordId: departure.id };
+}
+
+async function regularizeExistingDeparture(
+  prisma: PrismaClient,
+  payload: {
+    arrivalId: string;
+    departureId: string;
+    correctedDepartureTime: Date;
+    comment: string;
+    authorId: string;
+  },
+) {
+  return prisma.$transaction(async (tx) => {
+    const record = await tx.clockInRecord.update({
+      where: { id: payload.departureId },
+      data: {
+        clockInDate: new Date(`${payload.correctedDepartureTime.toISOString().slice(0, 10)}T00:00:00.000Z`),
+        clockInTime: payload.correctedDepartureTime,
+        timestampLocal: payload.correctedDepartureTime,
+        comment: payload.comment,
+        isRegularized: true,
+      },
+      select: { id: true },
+    });
+
+    await tx.clockInRegularization.create({
+      data: {
+        clockInRecordId: record.id,
+        correctedDepartureTime: payload.correctedDepartureTime,
+        authorId: payload.authorId,
+        comment: payload.comment,
+      },
+    });
+
+    await tx.clockInRecord.update({
+      where: { id: payload.arrivalId },
+      data: { isRegularized: true },
+      select: { id: true },
+    });
+
+    return record;
+  });
 }
 
 

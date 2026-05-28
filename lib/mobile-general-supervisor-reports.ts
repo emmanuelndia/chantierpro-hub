@@ -60,7 +60,7 @@ export async function getGeneralSupervisorReports(
   const query = cleanString(filters.q);
   const resourceRoles = isBusinessManagerRole(user.role)
     ? getBusinessManagedResourceRoles(user.role)
-    : [Role.SUPERVISOR, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
+    : [Role.SUPERVISOR, Role.RESOURCE, Role.COORDINATOR, Role.GENERAL_SUPERVISOR];
 
   const scopedSiteWhere: Prisma.SiteWhereInput = {
     ...siteWhere,

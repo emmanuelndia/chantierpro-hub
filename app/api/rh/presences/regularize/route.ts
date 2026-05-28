@@ -41,6 +41,14 @@ export const POST = withAuth(async ({ req, user }) => {
   }
 
   if (result.code === 'BAD_REQUEST') {
+    if (result.reason === 'DEPARTURE_BEFORE_ARRIVAL') {
+      return jsonRhError(
+        'BAD_REQUEST',
+        400,
+        "L'heure de sortie corrigee doit etre apres l'heure d'entree.",
+      );
+    }
+
     return jsonRhError('BAD_REQUEST', 400, 'Les donnees de regularisation sont invalides.');
   }
 

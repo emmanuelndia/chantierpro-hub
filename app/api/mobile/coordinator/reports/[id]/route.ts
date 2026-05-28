@@ -22,7 +22,7 @@ export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
         id: params.id,
         siteId: { in: siteIds },
         user: {
-          role: Role.SUPERVISOR,
+          role: { in: [Role.SUPERVISOR, Role.RESOURCE] },
         },
       },
       select: {

@@ -120,7 +120,7 @@ export async function getTeamPresences(
   const day = dayRange(query.date);
   const resourceRoles = isBusinessManagerRole(user.role)
     ? getBusinessManagedResourceRoles(user.role)
-    : ([Role.SUPERVISOR] as const);
+    : ([Role.SUPERVISOR, Role.RESOURCE] as const);
 
   const [sites, supervisors, records, fallbackReports] = await Promise.all([
     prisma.site.findMany({

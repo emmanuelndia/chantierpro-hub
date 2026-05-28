@@ -33,7 +33,7 @@ export const PATCH = withAuth<{ id: string }>(async ({ user, params, req }) => {
         id: params.id,
         siteId: { in: siteIds },
         user: {
-          role: Role.SUPERVISOR,
+          role: { in: [Role.SUPERVISOR, Role.RESOURCE] },
         },
       },
       select: {

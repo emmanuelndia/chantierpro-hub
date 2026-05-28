@@ -22,6 +22,7 @@ type MobileAppShellProps = Readonly<{
 
 const fieldRoles: readonly Role[] = [
   'SUPERVISOR',
+  'RESOURCE',
   'COORDINATOR',
   'GENERAL_SUPERVISOR',
   'BE_RESOURCE',

@@ -34,6 +34,7 @@ import type {
 
 export const REPORT_CREATE_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
+  Role.RESOURCE,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
   ...BUSINESS_FIELD_RESOURCE_ROLES,

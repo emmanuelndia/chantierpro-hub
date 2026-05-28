@@ -33,6 +33,7 @@ type PhotoGalleryProps = Readonly<{
 const DELETE_ROLES: readonly Role[] = ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'];
 const UPLOAD_ROLES: readonly Role[] = [
   'SUPERVISOR',
+  'RESOURCE',
   'COORDINATOR',
   'GENERAL_SUPERVISOR',
   'BE_RESOURCE',
