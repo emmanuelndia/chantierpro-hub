@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
+  deactivateManagedUser,
   getUserByIdOrNull,
   jsonUserError,
   parseJsonBody,
   parseUpdateUserStatusInput,
-  revokeUserSessions,
   serializeUserDetail,
   userPublicSelect,
 } from '@/lib/users';
@@ -35,17 +35,15 @@ export const PATCH = withAuth<{ id: string }>(
       return jsonUserError('NOT_FOUND', 404, 'Utilisateur introuvable.');
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: params.id },
-      data: {
-        isActive: input.isActive,
-      },
-      select: userPublicSelect,
-    });
-
-    if (!input.isActive) {
-      await revokeUserSessions(prisma, params.id);
-    }
+    const updatedUser = input.isActive
+      ? await prisma.user.update({
+          where: { id: params.id },
+          data: {
+            isActive: true,
+          },
+          select: userPublicSelect,
+        })
+      : await deactivateManagedUser(prisma, params.id);
 
     return NextResponse.json({ user: serializeUserDetail(updatedUser) });
   },

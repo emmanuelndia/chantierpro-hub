@@ -1,5 +1,12 @@
 import { randomInt } from 'node:crypto';
-import { Prisma, Role, type PrismaClient } from '@prisma/client';
+import {
+  GeneralSupervisorSiteScopeStatus,
+  Prisma,
+  Role,
+  TeamMemberStatus,
+  TeamStatus,
+  type PrismaClient,
+} from '@prisma/client';
 import { PASSWORD_RESET_DEFAULT } from '@/lib/auth/constants';
 import { hashPassword, isStrongPassword, verifyPassword } from '@/lib/auth/password';
 import { FIELD_USER_ROLES } from '@/lib/field-roles';
@@ -321,6 +328,78 @@ export async function revokeUserSessions(prisma: PrismaClient, userId: string) {
       revokedAt: new Date(),
     },
   });
+}
+
+export async function deactivateManagedUser(prisma: PrismaClient, userId: string) {
+  const now = new Date();
+  const today = new Date(`${now.toISOString().slice(0, 10)}T00:00:00.000Z`);
+
+  const updatedUser = await prisma.$transaction(async (tx) => {
+    await tx.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: now,
+      },
+    });
+
+    await tx.teamMember.updateMany({
+      where: {
+        userId,
+        status: TeamMemberStatus.ACTIVE,
+      },
+      data: {
+        status: TeamMemberStatus.INACTIVE,
+        endDate: today,
+      },
+    });
+
+    await tx.team.updateMany({
+      where: {
+        teamLeadId: userId,
+        status: TeamStatus.ACTIVE,
+      },
+      data: {
+        status: TeamStatus.INACTIVE,
+      },
+    });
+
+    await tx.generalSupervisorSiteScope.updateMany({
+      where: {
+        generalSupervisorId: userId,
+        status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+      },
+      data: {
+        status: GeneralSupervisorSiteScopeStatus.INACTIVE,
+        endDate: today,
+      },
+    });
+
+    await tx.planningAssignment.updateMany({
+      where: {
+        supervisorId: userId,
+        deletedAt: null,
+        date: {
+          gte: today,
+        },
+      },
+      data: {
+        deletedAt: now,
+      },
+    });
+
+    return tx.user.update({
+      where: { id: userId },
+      data: {
+        isActive: false,
+      },
+      select: userPublicSelect,
+    });
+  });
+
+  return updatedUser;
 }
 
 export async function getUserByIdOrNull(prisma: PrismaClient, userId: string) {

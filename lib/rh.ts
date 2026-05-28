@@ -572,6 +572,7 @@ export async function regularizeRhSession(
   prisma: PrismaClient,
   payload: {
     arrivalRecordId: string;
+    departureRecordId: string | null;
     correctedDepartureTime: string;
     comment: string;
     author: AuthLikeUser;
@@ -611,6 +612,59 @@ export async function regularizeRhSession(
 
   if (correctedDepartureTime.getTime() <= arrival.timestampLocal.getTime()) {
     return { code: 'BAD_REQUEST' as const, recordId: null };
+  }
+
+  if (payload.departureRecordId) {
+    const departure = await prisma.clockInRecord.findFirst({
+      where: {
+        id: payload.departureRecordId,
+        userId: arrival.userId,
+        siteId: arrival.siteId,
+        status: ClockInStatus.VALID,
+        type: ClockInType.DEPARTURE,
+        timestampLocal: {
+          gt: arrival.timestampLocal,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!departure) {
+      return { code: 'NOT_FOUND' as const, recordId: null };
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const record = await tx.clockInRecord.update({
+        where: { id: departure.id },
+        data: {
+          clockInDate: new Date(`${correctedDepartureTime.toISOString().slice(0, 10)}T00:00:00.000Z`),
+          clockInTime: correctedDepartureTime,
+          timestampLocal: correctedDepartureTime,
+          comment,
+          isRegularized: true,
+        },
+        select: { id: true },
+      });
+
+      await tx.clockInRegularization.create({
+        data: {
+          clockInRecordId: record.id,
+          correctedDepartureTime,
+          authorId: payload.author.id,
+          comment,
+        },
+      });
+
+      await tx.clockInRecord.update({
+        where: { id: arrival.id },
+        data: { isRegularized: true },
+        select: { id: true },
+      });
+
+      return record;
+    });
+
+    return { code: null, recordId: updated.id };
   }
 
   const existingDeparture = await prisma.clockInRecord.findFirst({

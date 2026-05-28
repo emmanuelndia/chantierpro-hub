@@ -30,6 +30,10 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [siteIds, setSiteIds] = useState<string[]>([]);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [regularizationTarget, setRegularizationTarget] = useState<RhUserPresenceDetail['sessions'][number] | null>(null);
+  const [regularizationTime, setRegularizationTime] = useState('17:00');
+  const [regularizationComment, setRegularizationComment] = useState('');
+  const [regularizationError, setRegularizationError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -97,7 +101,7 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
   });
 
   const regularizeMutation = useMutation({
-    mutationFn: async (payload: { arrivalRecordId: string; correctedDepartureTime: string; comment: string }) => {
+    mutationFn: async (payload: { arrivalRecordId: string; departureRecordId: string | null; correctedDepartureTime: string; comment: string }) => {
       const response = await authFetch('/api/rh/presences/regularize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,12 +109,20 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Regularisation impossible.');
+        const error = await response.json().catch(() => null) as { message?: string } | null;
+        throw new Error(error?.message ?? 'Régularisation impossible.');
       }
     },
     onSuccess: async () => {
+      setRegularizationTarget(null);
+      setRegularizationTime('17:00');
+      setRegularizationComment('');
+      setRegularizationError(null);
       await queryClient.invalidateQueries({ queryKey: ['rh-presences'] });
       await queryClient.invalidateQueries({ queryKey: ['rh-presence-detail'] });
+    },
+    onError: (error) => {
+      setRegularizationError(error instanceof Error ? error.message : 'Régularisation impossible.');
     },
   });
 
@@ -327,24 +339,10 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
                       setExpandedUserId((current) => (current === item.userId ? null : item.userId))
                     }
                     onRegularize={(session) => {
-                      const time = window.prompt(
-                        'Heure de sortie corrigee (format HH:MM)',
-                        session.departureTime ?? '17:00',
-                      );
-                      if (!time) {
-                        return;
-                      }
-
-                      const comment = window.prompt('Commentaire obligatoire de regularisation');
-                      if (!comment?.trim()) {
-                        return;
-                      }
-
-                      regularizeMutation.mutate({
-                        arrivalRecordId: session.arrivalRecordId,
-                        correctedDepartureTime: `${session.date}T${time}:00.000Z`,
-                        comment: comment.trim(),
-                      });
+                      setRegularizationTarget(session);
+                      setRegularizationTime((session.departureTime ?? '17:00').slice(0, 5));
+                      setRegularizationComment('');
+                      setRegularizationError(null);
                     }}
                     row={item}
                   />
@@ -354,6 +352,47 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
           </table>
         </div>
       </section>
+
+      {regularizationTarget ? (
+        <RegularizationModal
+          comment={regularizationComment}
+          error={regularizationError}
+          isSubmitting={regularizeMutation.isPending}
+          onClose={() => {
+            if (regularizeMutation.isPending) return;
+            setRegularizationTarget(null);
+            setRegularizationError(null);
+          }}
+          onCommentChange={(value) => {
+            setRegularizationComment(value);
+            setRegularizationError(null);
+          }}
+          onSubmit={() => {
+            const comment = regularizationComment.trim();
+            if (!regularizationTime || !/^\d{2}:\d{2}$/.test(regularizationTime)) {
+              setRegularizationError('Saisis une heure de sortie valide.');
+              return;
+            }
+            if (!comment) {
+              setRegularizationError('Le commentaire de régularisation est obligatoire.');
+              return;
+            }
+
+            regularizeMutation.mutate({
+              arrivalRecordId: regularizationTarget.arrivalRecordId,
+              departureRecordId: regularizationTarget.departureRecordId,
+              correctedDepartureTime: `${regularizationTarget.date}T${regularizationTime}:00.000Z`,
+              comment,
+            });
+          }}
+          onTimeChange={(value) => {
+            setRegularizationTime(value);
+            setRegularizationError(null);
+          }}
+          session={regularizationTarget}
+          time={regularizationTime}
+        />
+      ) : null}
     </div>
   );
 }
@@ -411,10 +450,10 @@ function ResourcePresenceRow({
                       <tr>
                         <th className="px-4 py-3 font-semibold">Date</th>
                         <th className="px-4 py-3 font-semibold">Site</th>
-                        <th className="px-4 py-3 font-semibold">Arrivee</th>
-                        <th className="px-4 py-3 font-semibold">Depart</th>
+                        <th className="px-4 py-3 font-semibold">Arrivée</th>
+                        <th className="px-4 py-3 font-semibold">Départ</th>
                         <th className="px-4 py-3 font-semibold">Pauses</th>
-                        <th className="px-4 py-3 font-semibold">Duree reelle</th>
+                        <th className="px-4 py-3 font-semibold">Durée réelle</th>
                         <th className="px-4 py-3 font-semibold">Commentaire</th>
                         <th className="px-4 py-3 font-semibold">Statut</th>
                         <th className="px-4 py-3 font-semibold">Action</th>
@@ -443,7 +482,7 @@ function ResourcePresenceRow({
                             ) : null}
                             {session.isRegularized ? (
                               <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
-                                Regularise
+                                Régularisé
                               </span>
                             ) : null}
                           </td>
@@ -454,7 +493,7 @@ function ResourcePresenceRow({
                                 onClick={() => onRegularize(session)}
                                 type="button"
                               >
-                                Regulariser
+                                Régulariser
                               </button>
                             ) : (
                               <span className="text-slate-400">-</span>
@@ -490,6 +529,98 @@ function Field({
       <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</span>
       {children}
     </label>
+  );
+}
+
+function RegularizationModal({
+  session,
+  time,
+  comment,
+  error,
+  isSubmitting,
+  onTimeChange,
+  onCommentChange,
+  onSubmit,
+  onClose,
+}: Readonly<{
+  session: RhUserPresenceDetail['sessions'][number];
+  time: string;
+  comment: string;
+  error: string | null;
+  isSubmitting: boolean;
+  onTimeChange: (value: string) => void;
+  onCommentChange: (value: string) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+}>) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm">
+      <section className="w-full max-w-lg rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Régularisation RH</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Corriger la sortie</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              {session.siteName} · {formatDateOnly(session.date)} · entrée {session.arrivalTime.slice(0, 5)}
+            </p>
+          </div>
+          <button
+            aria-label="Fermer"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+            disabled={isSubmitting}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <Field label="Heure de sortie corrigée">
+            <input
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+              disabled={isSubmitting}
+              onChange={(event) => onTimeChange(event.target.value)}
+              type="time"
+              value={time}
+            />
+          </Field>
+          <Field label="Commentaire obligatoire">
+            <textarea
+              className="min-h-28 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+              disabled={isSubmitting}
+              onChange={(event) => onCommentChange(event.target.value)}
+              placeholder="Explique pourquoi la sortie est corrigée."
+              value={comment}
+            />
+          </Field>
+          {error ? (
+            <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            className="rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+            disabled={isSubmitting}
+            onClick={onClose}
+            type="button"
+          >
+            Annuler
+          </button>
+          <button
+            className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isSubmitting}
+            onClick={onSubmit}
+            type="button"
+          >
+            {isSubmitting ? 'Régularisation...' : 'Valider la régularisation'}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -538,11 +669,11 @@ function sessionLabel(status: RhUserPresenceDetail['sessions'][number]['status']
     case 'COMPLETE':
       return 'Valide';
     case 'TO_REVIEW_RH':
-      return 'A verifier RH';
+      return 'A vérifier RH';
     case 'TO_REGULARIZE':
-      return 'A regulariser';
+      return 'A régulariser';
     case 'INCOMPLETE_SESSION':
     default:
-      return 'Incomplete';
+      return 'Incomplète';
   }
 }

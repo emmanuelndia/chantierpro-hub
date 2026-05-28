@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
+  deactivateManagedUser,
   getUserByIdOrNull,
   jsonUserError,
   parseJsonBody,
@@ -57,6 +58,32 @@ export const PUT = withAuth<{ id: string }>(
     });
 
     return NextResponse.json({ user: serializeUserDetail(updatedUser) });
+  },
+  [Role.ADMIN],
+);
+
+export const DELETE = withAuth<{ id: string }>(
+  async ({ params, user }) => {
+    if (user.id === params.id) {
+      return jsonUserError(
+        'SELF_DEACTIVATION_FORBIDDEN',
+        400,
+        "Un administrateur ne peut pas se desactiver lui-meme.",
+      );
+    }
+
+    const existingUser = await getUserByIdOrNull(prisma, params.id);
+
+    if (!existingUser) {
+      return jsonUserError('NOT_FOUND', 404, 'Utilisateur introuvable.');
+    }
+
+    const updatedUser = await deactivateManagedUser(prisma, params.id);
+
+    return NextResponse.json({
+      user: serializeUserDetail(updatedUser),
+      softDeleted: true,
+    });
   },
   [Role.ADMIN],
 );

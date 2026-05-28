@@ -400,6 +400,7 @@ export async function getWebReports(
       }),
       prisma.user.findMany({
         where: {
+          isActive: true,
           reports: {
             some: {
               site: optionsWhere,

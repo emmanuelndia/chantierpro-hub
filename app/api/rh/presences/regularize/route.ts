@@ -16,12 +16,17 @@ export const POST = withAuth(async ({ req, user }) => {
   }
 
   const arrivalRecordId = typeof body.arrivalRecordId === 'string' ? body.arrivalRecordId : '';
+  const departureRecordId =
+    typeof body.departureRecordId === 'string' && body.departureRecordId.trim()
+      ? body.departureRecordId
+      : null;
   const correctedDepartureTime =
     typeof body.correctedDepartureTime === 'string' ? body.correctedDepartureTime : '';
   const comment = typeof body.comment === 'string' ? body.comment : '';
 
   const result = await regularizeRhSession(prisma, {
     arrivalRecordId,
+    departureRecordId,
     correctedDepartureTime,
     comment,
     author: user,

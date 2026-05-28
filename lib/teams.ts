@@ -49,6 +49,9 @@ export const teamPublicSelect = {
   members: {
     where: {
       status: TeamMemberStatus.ACTIVE,
+      user: {
+        isActive: true,
+      },
     },
     orderBy: [{ assignmentDate: 'asc' }, { id: 'asc' }],
     select: teamMemberPublicSelect,

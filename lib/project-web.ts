@@ -150,6 +150,9 @@ export async function listProjectsPage(
     ? await prisma.teamMember.findMany({
         where: {
           status: TeamMemberStatus.ACTIVE,
+          user: {
+            isActive: true,
+          },
           team: {
             status: TeamStatus.ACTIVE,
             site: {
@@ -209,6 +212,9 @@ export async function getProjectDetailForWeb(
   const memberships = await prisma.teamMember.findMany({
     where: {
       status: TeamMemberStatus.ACTIVE,
+      user: {
+        isActive: true,
+      },
       team: {
         status: TeamStatus.ACTIVE,
         site: {
@@ -277,6 +283,9 @@ export async function getProjectTeamSummary(
   const memberships = await prisma.teamMember.findMany({
     where: {
       status: TeamMemberStatus.ACTIVE,
+      user: {
+        isActive: true,
+      },
       team: {
         status: TeamStatus.ACTIVE,
         site: {
