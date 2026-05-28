@@ -99,7 +99,7 @@ type BuiltSession = {
   userId: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
   role: Role;
   siteId: string;
   siteName: string;
@@ -166,7 +166,7 @@ type ExportArtifact = {
 type ExportRow = {
   lastName: string;
   firstName: string;
-  email: string;
+  email: string | null;
   siteName: string;
   date: string;
   arrivalTime: string;
@@ -1471,8 +1471,8 @@ function sanitizeDateTimeString(value: unknown) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
-function escapeCsvValue(value: string) {
-  const normalized = value.replaceAll('"', '""');
+function escapeCsvValue(value: string | null) {
+  const normalized = (value ?? '').replaceAll('"', '""');
   return `"${normalized}"`;
 }
 
@@ -1545,7 +1545,7 @@ function buildLiveResource(
     id: string;
     firstName: string;
     lastName: string;
-    email: string;
+    email: string | null;
     role: Role;
   },
   taskAction: string | null,

@@ -2,7 +2,7 @@ export type RhPresenceSummaryItem = {
   userId: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
   role: string;
   nbDays: number;
   totalHours: number;
@@ -49,7 +49,7 @@ export type RhUserPresenceDetail = {
   userId: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
   month: number;
   year: number;
   sessions: RhPresenceSessionItem[];
@@ -118,7 +118,7 @@ export type RhSitePresenceLiveStatus =
 export type RhSitePresenceLiveResource = {
   userId: string;
   name: string;
-  email: string;
+  email: string | null;
   role: string;
   status: RhSitePresenceLiveStatus;
   taskAction: string | null;

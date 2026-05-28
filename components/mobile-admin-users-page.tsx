@@ -14,6 +14,7 @@ import type { PaginatedUsersResponse, UserDetail, UserListItem } from '@/types/u
 const ROLE_OPTIONS = Object.values(Role);
 
 type UserFormValues = {
+  username: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -51,11 +52,7 @@ export function MobileAdminUsersPage() {
       const response = await authFetch(isEdit ? `/api/users/${editingUser!.id}` : '/api/users', {
         method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          isEdit
-            ? { firstName: values.firstName, lastName: values.lastName, role: values.role }
-            : values,
-        ),
+        body: JSON.stringify({ ...values, email: values.email.trim() || null }),
       });
       if (!response.ok) throw new Error((await readMessage(response)) ?? 'Sauvegarde impossible.');
       return (await response.json()) as { user: UserDetail; temporaryPassword?: string };
@@ -129,7 +126,7 @@ export function MobileAdminUsersPage() {
             setSearch(event.target.value);
             setPage(1);
           }}
-          placeholder="Nom, prenom, email..."
+          placeholder="Nom, prenom, identifiant, email..."
           value={search}
         />
         <div className="grid grid-cols-2 gap-3">
@@ -157,7 +154,8 @@ export function MobileAdminUsersPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="truncate text-base font-black text-slate-950">{user.firstName} {user.lastName}</h2>
-                <p className="mt-1 truncate text-sm text-slate-500">{user.email}</p>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-700">{user.username}</p>
+                {user.email ? <p className="mt-1 truncate text-xs text-slate-500">{user.email}</p> : null}
               </div>
               <Badge tone={user.isActive ? 'success' : 'warning'}>{user.isActive ? 'Actif' : 'Inactif'}</Badge>
             </div>
@@ -228,7 +226,7 @@ function UserFormSheet({ mode, user, pending, onClose, onSubmit }: Readonly<{ mo
   const [values, setValues] = useState<UserFormValues>(() => buildValues(user));
   useEffect(() => setValues(buildValues(user)), [user, mode]);
   if (!mode) return null;
-  const canSubmit = values.email.trim() && values.firstName.trim() && values.lastName.trim();
+  const canSubmit = values.username.trim() && values.firstName.trim() && values.lastName.trim();
   return (
     <div className="fixed inset-0 z-[75] flex items-end bg-slate-950/45">
       <div className="max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl bg-white p-5">
@@ -237,7 +235,8 @@ function UserFormSheet({ mode, user, pending, onClose, onSubmit }: Readonly<{ mo
           <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold" onClick={onClose} type="button">Fermer</button>
         </div>
         <div className="mt-5 space-y-3">
-          <TextField disabled={mode === 'edit'} label="Email" value={values.email} onChange={(email) => setValues((current) => ({ ...current, email }))} />
+          <TextField label="Nom d'utilisateur" value={values.username} onChange={(username) => setValues((current) => ({ ...current, username }))} />
+          <TextField label="Email facultatif" value={values.email} onChange={(email) => setValues((current) => ({ ...current, email }))} />
           <TextField label="Prenom" value={values.firstName} onChange={(firstName) => setValues((current) => ({ ...current, firstName }))} />
           <TextField label="Nom" value={values.lastName} onChange={(lastName) => setValues((current) => ({ ...current, lastName }))} />
           <SelectField label="Role" onChange={(role) => setValues((current) => ({ ...current, role: role as Role }))} value={values.role}>
@@ -282,7 +281,7 @@ function InfoPanel({ text, tone = 'neutral' }: Readonly<{ text: string; tone?: '
 }
 
 function buildValues(user: UserListItem | null): UserFormValues {
-  return { email: user?.email ?? '', firstName: user?.firstName ?? '', lastName: user?.lastName ?? '', role: user?.role ?? Role.SUPERVISOR };
+  return { username: user?.username ?? '', email: user?.email ?? '', firstName: user?.firstName ?? '', lastName: user?.lastName ?? '', role: user?.role ?? Role.SUPERVISOR };
 }
 
 function formatRole(role: Role) { return formatRoleLabel(role); }

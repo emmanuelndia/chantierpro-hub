@@ -201,7 +201,11 @@ async function validateSiteImportRows(
     }),
   ]);
 
-  const siteManagerByEmail = new Map(siteManagers.map((manager) => [manager.email.trim().toLowerCase(), manager.id]));
+  const siteManagerByEmail = new Map(
+    siteManagers
+      .filter((manager) => Boolean(manager.email))
+      .map((manager) => [manager.email!.trim().toLowerCase(), manager.id]),
+  );
   const existingNames = new Set(existingSites.map((site) => normalizeName(site.name)));
   const seenNames = new Map<string, number>();
 

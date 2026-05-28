@@ -27,7 +27,7 @@ function normalizeNextPath(next: string | null) {
 function getInlineErrorMessage(code?: AuthErrorCode, retryAfterSeconds?: number) {
   switch (code) {
     case 'INVALID_CREDENTIALS':
-      return 'Email ou mot de passe incorrect.';
+      return 'Identifiant ou mot de passe incorrect.';
     case 'ACCOUNT_DISABLED':
       return 'Ce compte est desactive. Contactez un administrateur.';
     case 'TOO_MANY_ATTEMPTS':
@@ -51,9 +51,11 @@ function MobileLoginContent() {
   const { accessToken, isAuthenticated, setAccessToken } = useAuth();
   const hydratedRef = useRef(false);
   const [mode, setMode] = useState<AuthMode>('login');
+  const [identifier, setIdentifier] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [identifierTouched, setIdentifierTouched] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -66,9 +68,8 @@ function MobileLoginContent() {
   const normalizedEmail = email.trim().toLowerCase();
   const emailIsValid = emailPattern.test(normalizedEmail);
   const canSubmitLogin =
-    normalizedEmail.length > 0 &&
+    identifier.trim().length > 0 &&
     password.length > 0 &&
-    emailIsValid &&
     !isSubmitting &&
     retryAfterSeconds === 0;
   const canSubmitForgot = normalizedEmail.length > 0 && emailIsValid && !isSubmitting;
@@ -119,13 +120,13 @@ function MobileLoginContent() {
   }, [retryAfterSeconds]);
 
   async function handleLogin() {
-    setEmailTouched(true);
+    setIdentifierTouched(true);
     setPasswordTouched(true);
     setErrorMessage(null);
 
     if (!canSubmitLogin) {
-      if (!emailIsValid) {
-        setErrorMessage('Saisissez une adresse email valide.');
+      if (!identifier.trim()) {
+        setErrorMessage('Saisissez votre identifiant.');
       }
       return;
     }
@@ -140,7 +141,7 @@ function MobileLoginContent() {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          email: normalizedEmail,
+          identifier: identifier.trim(),
           password,
         }),
       });
@@ -183,6 +184,11 @@ function MobileLoginContent() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleIdentifierChange(value: string) {
+    setIdentifier(value);
+    setErrorMessage(null);
   }
 
   function handleEmailChange(value: string) {
@@ -245,16 +251,16 @@ function MobileLoginContent() {
           {mode === 'login' ? (
             <div className="mt-8 flex flex-1 flex-col">
               <MobileTextField
-                autoComplete="email"
-                error={emailTouched && email.length > 0 && !emailIsValid ? 'Email invalide.' : null}
-                inputMode="email"
-                label="Email professionnel"
-                onBlur={() => setEmailTouched(true)}
-                onChange={handleEmailChange}
+                autoComplete="username"
+                error={identifierTouched && identifier.trim().length === 0 ? 'Identifiant requis.' : null}
+                inputMode="text"
+                label="Identifiant"
+                onBlur={() => setIdentifierTouched(true)}
+                onChange={handleIdentifierChange}
                 onKeyDown={handleLoginKeyDown}
-                placeholder="martin.dupont@entreprise.fr"
-                type="email"
-                value={email}
+                placeholder="jean.kouame"
+                type="text"
+                value={identifier}
               />
 
               <div className="mt-5">

@@ -25,6 +25,7 @@ const HISTORY_RESOURCE_ROLES: readonly Role[] = [
 ];
 
 type UserFormValues = {
+  username: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -68,7 +69,8 @@ export function AdminUsersPage() {
   const saveMutation = useMutation({
     mutationFn: async (values: UserFormValues) => {
       const body = {
-        email: values.email,
+        username: values.username,
+        email: values.email.trim() || null,
         firstName: values.firstName,
         lastName: values.lastName,
         role: values.role,
@@ -78,7 +80,7 @@ export function AdminUsersPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editingUser ? { firstName: values.firstName, lastName: values.lastName, role: values.role } : body),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -204,7 +206,7 @@ export function AdminUsersPage() {
                 setSearch(event.target.value);
                 resetFiltersPage();
               }}
-              placeholder="Nom, prenom ou email"
+              placeholder="Nom, prenom, identifiant ou email"
               value={search}
             />
           </Field>
@@ -248,7 +250,7 @@ export function AdminUsersPage() {
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="px-5 py-4 font-semibold">Nom</th>
-                <th className="px-5 py-4 font-semibold">Email</th>
+                <th className="px-5 py-4 font-semibold">Identifiant</th>
                 <th className="px-5 py-4 font-semibold">Role</th>
                 <th className="px-5 py-4 font-semibold">Statut</th>
                 <th className="px-5 py-4 font-semibold">Derniere connexion</th>
@@ -281,7 +283,10 @@ export function AdminUsersPage() {
                     <td className="px-5 py-4 font-semibold text-slate-950">
                       {user.firstName} {user.lastName}
                     </td>
-                    <td className="px-5 py-4 text-slate-600">{user.email}</td>
+                    <td className="px-5 py-4 text-slate-600">
+                      <p className="font-semibold text-slate-900">{user.username}</p>
+                      {user.email ? <p className="mt-1 text-xs text-slate-500">{user.email}</p> : null}
+                    </td>
                     <td className="px-5 py-4">
                       <Badge tone="neutral">{formatRole(user.role)}</Badge>
                     </td>
@@ -495,7 +500,7 @@ function UserDrawer({
     return null;
   }
 
-  const canSubmit = values.email.trim() && values.firstName.trim() && values.lastName.trim() && values.role;
+  const canSubmit = values.username.trim() && values.firstName.trim() && values.lastName.trim() && values.role;
 
   return (
     <div className="fixed inset-0 z-[75] flex justify-end bg-slate-950/45">
@@ -515,11 +520,19 @@ function UserDrawer({
         </div>
 
         <div className="mt-6 grid gap-4">
-          <Field label="Email">
+          <Field label="Nom d'utilisateur">
             <input
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white disabled:text-slate-500"
-              disabled={mode === 'edit'}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+              onChange={(event) => setValues((current) => ({ ...current, username: event.target.value }))}
+              placeholder="jean.kouame"
+              value={values.username}
+            />
+          </Field>
+          <Field label="Email facultatif">
+            <input
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
               onChange={(event) => setValues((current) => ({ ...current, email: event.target.value }))}
+              placeholder="optionnel@entreprise.fr"
               value={values.email}
             />
           </Field>
@@ -614,6 +627,7 @@ function PaginationBar({
 
 function buildInitialValues(user: UserListItem | null): UserFormValues {
   return {
+    username: user?.username ?? '',
     email: user?.email ?? '',
     firstName: user?.firstName ?? '',
     lastName: user?.lastName ?? '',

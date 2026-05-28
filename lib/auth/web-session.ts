@@ -7,7 +7,8 @@ import { verifyRefreshToken } from '@/lib/auth/tokens';
 
 export type WebSessionUser = {
   id: string;
-  email: string;
+  username: string;
+  email: string | null;
   firstName: string;
   lastName: string;
   role: Role;
@@ -27,6 +28,7 @@ export async function getCurrentWebSession() {
       where: { id: payload.sub },
       select: {
         id: true,
+        username: true,
         email: true,
         firstName: true,
         lastName: true,
@@ -42,6 +44,7 @@ export async function getCurrentWebSession() {
 
     return {
       id: user.id,
+      username: user.username,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,

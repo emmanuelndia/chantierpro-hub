@@ -176,7 +176,8 @@ export function SettingsProfilePage() {
           <div className="mt-5 grid gap-4">
             <ReadOnlyField label="Prenom" value={user.firstName} />
             <ReadOnlyField label="Nom" value={user.lastName} />
-            <ReadOnlyField label="Email" value={user.email} />
+            <ReadOnlyField label="Identifiant" value={user.username} />
+            <ReadOnlyField label="Email" value={user.email ?? 'Non renseigné'} />
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Role</p>
               <Badge tone="neutral">{user.role.replaceAll('_', ' ')}</Badge>

@@ -8,7 +8,6 @@ import {
   parseJsonBody,
   parseUpdateUserInput,
   serializeUserDetail,
-  validateImmutableEmail,
   userPublicSelect,
 } from '@/lib/users';
 import { withAuth } from '@/lib/auth/with-auth';
@@ -31,14 +30,6 @@ export const PUT = withAuth<{ id: string }>(
   async ({ params, req }) => {
     const body = await parseJsonBody<unknown>(req);
 
-    if (validateImmutableEmail(body)) {
-      return jsonUserError(
-        'EMAIL_IMMUTABLE',
-        400,
-        "L'email est l'identifiant unique et ne peut pas etre modifie.",
-      );
-    }
-
     const input = parseUpdateUserInput(body); 
 
     if (!input) {
@@ -49,6 +40,21 @@ export const PUT = withAuth<{ id: string }>(
 
     if (!existingUser) {
       return jsonUserError('NOT_FOUND', 404, 'Utilisateur introuvable.');
+    }
+
+    const conflictingUser = await prisma.user.findFirst({
+      where: {
+        id: { not: params.id },
+        OR: [
+          { username: input.username },
+          ...(input.email ? [{ email: input.email }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (conflictingUser) {
+      return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant ou cet email existe deja.');
     }
 
     const updatedUser = await prisma.user.update({

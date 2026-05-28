@@ -87,7 +87,7 @@ export type ProjectFormUserOption = {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
   role: Role;
   contact: string;
 };
@@ -101,7 +101,7 @@ export type ProjectTeamSummaryItem = {
   userId: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
   role: Role;
   contact: string;
   teamNames: string[];

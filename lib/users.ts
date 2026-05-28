@@ -29,6 +29,7 @@ const TEMP_PASSWORD_ALPHABET =
 
 export const userPublicSelect = {
   id: true,
+  username: true,
   email: true,
   firstName: true,
   lastName: true,
@@ -45,7 +46,8 @@ type SerializableUser = Prisma.UserGetPayload<{
 }>;
 
 export type CreateUserInput = {
-  email: string;
+  username: string;
+  email: string | null;
   firstName: string;
   lastName: string;
   role: Role;
@@ -53,6 +55,8 @@ export type CreateUserInput = {
 };
 
 export type UpdateUserInput = {
+  username: string;
+  email: string | null;
   firstName: string;
   lastName: string;
   role: Role;
@@ -103,6 +107,7 @@ export function jsonUserError(
 export function serializeUser(user: SerializableUser): UserListItem {
   return {
     id: user.id,
+    username: user.username,
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
@@ -200,6 +205,7 @@ export function buildUserListWhere(query: UserListQuery): Prisma.UserWhereInput 
           OR: [
             { firstName: { contains: query.search, mode: 'insensitive' } },
             { lastName: { contains: query.search, mode: 'insensitive' } },
+            { username: { contains: query.search, mode: 'insensitive' } },
             { email: { contains: query.search, mode: 'insensitive' } },
           ],
         }
@@ -221,16 +227,18 @@ export function parseCreateUserInput(body: unknown): CreateUserInput | null {
   }
 
   const role = parseRole(body.role);
-  const email = sanitizeEmail(body.email);
+  const username = sanitizeUsername(body.username);
+  const email = sanitizeOptionalEmail(body.email);
   const firstName = sanitizeString(body.firstName);
   const lastName = sanitizeString(body.lastName);
   const contact = sanitizeOptionalString(body.contact) ?? '';
 
-  if (!role || !email || !firstName || !lastName) {
+  if (!role || !username || email === undefined || !firstName || !lastName) {
     return null;
   }
 
   return {
+    username,
     email,
     firstName,
     lastName,
@@ -240,20 +248,24 @@ export function parseCreateUserInput(body: unknown): CreateUserInput | null {
 }
 
 export function parseUpdateUserInput(body: unknown): UpdateUserInput | null {
-  if (!isRecord(body) || 'email' in body || 'isActive' in body) {
+  if (!isRecord(body) || 'isActive' in body) {
     return null;
   }
 
   const role = parseRole(body.role);
+  const username = sanitizeUsername(body.username);
+  const email = sanitizeOptionalEmail(body.email);
   const firstName = sanitizeString(body.firstName);
   const lastName = sanitizeString(body.lastName);
   const contact = sanitizeOptionalString(body.contact) ?? '';
 
-  if (!role || !firstName || !lastName) {
+  if (!role || !username || email === undefined || !firstName || !lastName) {
     return null;
   }
 
   return {
+    username,
+    email,
     firstName,
     lastName,
     role,
@@ -264,6 +276,7 @@ export function parseUpdateUserInput(body: unknown): UpdateUserInput | null {
 export function parseUpdateOwnProfileInput(body: unknown): UpdateOwnProfileInput | null {
   if (
     !isRecord(body) ||
+    'username' in body ||
     'email' in body ||
     'role' in body ||
     'isActive' in body ||
@@ -439,6 +452,7 @@ export async function createManagedUser(
 
   const user = await prisma.user.create({
     data: {
+      username: input.username,
       email: input.email,
       firstName: input.firstName,
       lastName: input.lastName,
@@ -506,6 +520,32 @@ function sanitizeEmail(value: unknown) {
   }
 
   return email;
+}
+
+function sanitizeOptionalEmail(value: unknown) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return sanitizeEmail(trimmed) ?? undefined;
+}
+
+function sanitizeUsername(value: unknown) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const username = value.trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9._-]{2,39}$/.test(username) ? username : null;
 }
 
 function sanitizeString(value: unknown) {

@@ -35,6 +35,7 @@ async function main() {
     prisma.user.upsert({
       where: { email: 'admin@chantierpro.local' },
       update: {
+        username: 'admin',
         firstName: 'Awa',
         lastName: 'Admin',
         role: Role.ADMIN,
@@ -44,6 +45,7 @@ async function main() {
         passwordHash: sharedPasswordHash,
       },
       create: {
+        username: 'admin',
         email: 'admin@chantierpro.local',
         firstName: 'Awa',
         lastName: 'Admin',
@@ -57,6 +59,7 @@ async function main() {
     prisma.user.upsert({
       where: { email: 'manager@chantierpro.local' },
       update: {
+        username: 'manager',
         firstName: 'Moussa',
         lastName: 'Diallo',
         role: Role.PROJECT_MANAGER,
@@ -66,6 +69,7 @@ async function main() {
         passwordHash: sharedPasswordHash,
       },
       create: {
+        username: 'manager',
         email: 'manager@chantierpro.local',
         firstName: 'Moussa',
         lastName: 'Diallo',
@@ -79,6 +83,7 @@ async function main() {
     prisma.user.upsert({
       where: { email: 'rh@chantierpro.local' },
       update: {
+        username: 'rh',
         firstName: 'Fatou',
         lastName: 'Bamba',
         role: Role.HR,
@@ -88,6 +93,7 @@ async function main() {
         passwordHash: sharedPasswordHash,
       },
       create: {
+        username: 'rh',
         email: 'rh@chantierpro.local',
         firstName: 'Fatou',
         lastName: 'Bamba',
@@ -101,6 +107,7 @@ async function main() {
     prisma.user.upsert({
       where: { email: 'direction@chantierpro.local' },
       update: {
+        username: 'direction',
         firstName: 'Aya',
         lastName: 'Konan',
         role: Role.DIRECTION,
@@ -110,6 +117,7 @@ async function main() {
         passwordHash: sharedPasswordHash,
       },
       create: {
+        username: 'direction',
         email: 'direction@chantierpro.local',
         firstName: 'Aya',
         lastName: 'Konan',
@@ -123,6 +131,7 @@ async function main() {
     prisma.user.upsert({
       where: { email: 'superviseur@chantierpro.local' },
       update: {
+        username: 'superviseur',
         firstName: 'Jean',
         lastName: 'Kouame',
         role: Role.SUPERVISOR,
@@ -132,6 +141,7 @@ async function main() {
         passwordHash: sharedPasswordHash,
       },
       create: {
+        username: 'superviseur',
         email: 'superviseur@chantierpro.local',
         firstName: 'Jean',
         lastName: 'Kouame', 
@@ -145,6 +155,7 @@ async function main() {
     prisma.user.upsert({
       where: { email: 'coordinateur@chantierpro.local' },
       update: {
+        username: 'coordinateur',
         firstName: 'Mariam',
         lastName: 'Traore',
         role: Role.COORDINATOR,
@@ -154,6 +165,7 @@ async function main() {
         passwordHash: sharedPasswordHash,
       },
       create: {
+        username: 'coordinateur',
         email: 'coordinateur@chantierpro.local',
         firstName: 'Mariam',
         lastName: 'Traore',
@@ -167,6 +179,7 @@ async function main() {
     prisma.user.upsert({
       where: { email: 'sup.general@chantierpro.local' },
       update: {
+        username: 'sup.general',
         firstName: 'Yao',
         lastName: 'Nguessan',
         role: Role.GENERAL_SUPERVISOR,
@@ -176,6 +189,7 @@ async function main() {
         passwordHash: sharedPasswordHash,
       },
       create: {
+        username: 'sup.general',
         email: 'sup.general@chantierpro.local',
         firstName: 'Yao',
         lastName: 'Nguessan',

@@ -4,7 +4,7 @@ export type GeneralSupervisorScopeUserOption = {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
 };
 
 export type GeneralSupervisorScopeSiteOption = {

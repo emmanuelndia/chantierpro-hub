@@ -216,6 +216,7 @@ async function createUser(
   return prisma.user.create({
     data: {
       ...data,
+      username: data.email.split('@')[0]?.toLowerCase() ?? data.email.toLowerCase(),
       passwordHash,
       isActive: true,
       mustChangePassword: false,

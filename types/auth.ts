@@ -4,7 +4,8 @@ export type AuthRole = Role;
 
 export type AuthUser = {
   id: string;
-  email: string;
+  username: string;
+  email: string | null;
   firstName: string;
   lastName: string;
   role: AuthRole;

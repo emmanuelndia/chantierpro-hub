@@ -86,13 +86,18 @@ export const POST = withAuth(
       return jsonUserError('BAD_REQUEST', 400, 'Le payload utilisateur est invalide.');
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: input.email },
-      select: { id: true },
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: input.username },
+          ...(input.email ? [{ email: input.email }] : []),
+        ],
+      },
+      select: { id: true, username: true, email: true },
     });
 
     if (existingUser) {
-      return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet email existe deja.');
+      return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant ou cet email existe deja.');
     }
 
     try {
@@ -103,7 +108,7 @@ export const POST = withAuth(
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet email existe deja.');
+        return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant ou cet email existe deja.');
       }
 
       throw error;

@@ -23,7 +23,7 @@ export type TeamDetail = {
 
 export type UnassignedUserItem = {
   id: string;
-  email: string;
+  email: string | null;
   firstName: string;
   lastName: string;
   contact: string;

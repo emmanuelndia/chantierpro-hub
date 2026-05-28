@@ -10,9 +10,6 @@ type LoginErrorPayload = {
   retryAfterSeconds?: number;
 };
 
-const emailPattern =
-  /^(?:[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\u0001-\u0008\u000B\u000C\u000E-\u001F\u0021\u0023-\u005B\u005D-\u007F]|\\[\u0001-\u0009\u000B\u000C\u000E-\u007F])*")@(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:\d{1,3}\.){3}\d{1,3})$/;
-
 function normalizeNextPath(next: string | null) {
   if (!next?.startsWith('/web')) {
     return '/web/dashboard';
@@ -46,11 +43,10 @@ function WebLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { accessToken, isAuthenticated, setAccessToken } = useAuth();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [emailTouched, setEmailTouched] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCheckingExistingSession, setIsCheckingExistingSession] = useState(true);
   const hydratedRef = useRef(false);
@@ -59,8 +55,7 @@ function WebLoginContent() {
     () => normalizeNextPath(searchParams.get('next')),
     [searchParams],
   );
-  const emailIsValid = emailPattern.test(email.trim());
-  const canSubmit = email.trim().length > 0 && password.length > 0 && !isLoading;
+  const canSubmit = identifier.trim().length > 0 && password.length > 0 && !isLoading;
 
   useEffect(() => {
     if (hydratedRef.current) {
@@ -99,13 +94,7 @@ function WebLoginContent() {
   }, [accessToken, isAuthenticated, nextPath, router, setAccessToken]);
 
   async function handleLogin() {
-    setEmailTouched(true);
     setErrorMessage(null);
-
-    if (!emailIsValid) {
-      setErrorMessage('Format d email invalide.');
-      return;
-    }
 
     if (!password) {
       return;
@@ -121,7 +110,7 @@ function WebLoginContent() {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          email: email.trim(),
+          identifier: identifier.trim(),
           password,
         }),
       });
@@ -142,8 +131,8 @@ function WebLoginContent() {
     }
   }
 
-  function handleEmailChange(value: string) {
-    setEmail(value);
+  function handleIdentifierChange(value: string) {
+    setIdentifier(value);
     if (errorMessage) {
       setErrorMessage(null);
     }
@@ -185,28 +174,20 @@ function WebLoginContent() {
 
         <div className="mt-6 space-y-5">
           <div>
-            <label className="mb-1 block text-sm font-bold text-slate-700" htmlFor="email">
-              Adresse Email
+            <label className="mb-1 block text-sm font-bold text-slate-700" htmlFor="identifier">
+              Identifiant
             </label>
             <input
               autoFocus
-              className={`w-full rounded-lg border bg-slate-50 px-4 py-2.5 text-slate-900 outline-none transition-all ${
-                emailTouched && email.trim().length > 0 && !emailIsValid
-                  ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-200'
-                  : 'border-slate-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-500'
-              }`}
-              id="email"
-              inputMode="email"
-              onBlur={() => setEmailTouched(true)}
-              onChange={(event) => handleEmailChange(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none transition-all focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
+              id="identifier"
+              inputMode="text"
+              onChange={(event) => handleIdentifierChange(event.target.value)}
               onKeyDown={handleInputKeyDown}
-              placeholder="jean.dupont@entreprise.fr"
-              type="email"
-              value={email}
+              placeholder="jean.kouame ou jean@entreprise.fr"
+              type="text"
+              value={identifier}
             />
-            {emailTouched && email.trim().length > 0 && !emailIsValid ? (
-              <p className="mt-2 text-sm text-red-600">Format d email invalide.</p>
-            ) : null}
           </div>
 
           <div>

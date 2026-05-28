@@ -3,6 +3,7 @@ import type { AuthUser } from '@/types/auth';
 
 export const authUserSelect = {
   id: true,
+  username: true,
   email: true,
   firstName: true,
   lastName: true,
@@ -13,12 +14,13 @@ export const authUserSelect = {
 
 type SerializableAuthUser = Pick<
   User,
-  'id' | 'email' | 'firstName' | 'lastName' | 'role' | 'isActive' | 'mustChangePassword'
+  'id' | 'username' | 'email' | 'firstName' | 'lastName' | 'role' | 'isActive' | 'mustChangePassword'
 >;
 
 export function serializeAuthUser(user: SerializableAuthUser): AuthUser {
   return {
     id: user.id,
+    username: user.username,
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,

@@ -8,6 +8,7 @@ import { authUserSelect } from '@/lib/auth/serializers';
 import { createSessionTokens } from '@/lib/auth/session';
 
 type LoginRequestBody = {
+  identifier?: string;
   email?: string;
   password?: string;
 };
@@ -21,15 +22,15 @@ export async function POST(req: NextRequest) {
     body = {};
   }
 
-  const email = body.email?.trim().toLowerCase() ?? '';
+  const identifier = (body.identifier ?? body.email)?.trim().toLowerCase() ?? '';
   const password = body.password ?? '';
   const ipAddress = getClientIp(req.headers);
 
-  if (!email || !password) {
+  if (!identifier || !password) {
     return jsonError('INVALID_CREDENTIALS', 401);
   }
 
-  const limitState = await getLoginRateLimitState(prisma, email, ipAddress);
+  const limitState = await getLoginRateLimitState(prisma, identifier, ipAddress);
 
   if (limitState.blocked) {
     return NextResponse.json(
@@ -46,8 +47,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { username: identifier },
+        { email: identifier },
+      ],
+    },
     select: {
       ...authUserSelect,
       passwordHash: true,
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
 
   if (!user || !passwordMatches) {
     await recordLoginAttempt(prisma, {
-      emailOrKey: email,
+      emailOrKey: identifier,
       ipAddress,
       success: false,
       ...(user ? { userId: user.id } : {}),
@@ -69,7 +75,7 @@ export async function POST(req: NextRequest) {
 
   if (!user.isActive) {
     await recordLoginAttempt(prisma, {
-      emailOrKey: email,
+      emailOrKey: identifier,
       ipAddress,
       success: false,
       userId: user.id,
@@ -78,7 +84,7 @@ export async function POST(req: NextRequest) {
     return jsonError('ACCOUNT_DISABLED', 403);
   }
 
-  await clearLoginAttempts(prisma, email, ipAddress);
+  await clearLoginAttempts(prisma, identifier, ipAddress);
 
   await prisma.user.update({
     where: { id: user.id },
@@ -93,7 +99,7 @@ export async function POST(req: NextRequest) {
   });
 
   await recordLoginAttempt(prisma, {
-    emailOrKey: email,
+    emailOrKey: identifier,
     ipAddress,
     success: true,
     userId: user.id,

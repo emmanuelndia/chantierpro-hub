@@ -22,7 +22,8 @@ type LoginPayload = {
   expiresIn: number;
   user: {
     id: string;
-    email: string;
+    username: string;
+    email: string | null;
     firstName: string;
     lastName: string;
     role: string;
@@ -45,7 +46,8 @@ type ErrorPayload = {
 type UserPayload = {
   user: {
     id: string;
-    email: string;
+    username: string;
+    email: string | null;
     firstName: string;
     lastName: string;
     role: string;
@@ -839,6 +841,7 @@ async function testAdminUsersCrud() {
       Authorization: `Bearer ${adminLogin.payload.accessToken}`,
     },
     body: {
+      username: 'smoke.user',
       email: smokeUserEmail,
       firstName: 'Smoke',
       lastName: 'User',
@@ -859,6 +862,7 @@ async function testAdminUsersCrud() {
       Authorization: `Bearer ${adminLogin.payload.accessToken}`,
     },
     body: {
+      username: 'smoke.user',
       email: smokeUserEmail,
       firstName: 'Smoke',
       lastName: 'User',
@@ -891,6 +895,8 @@ async function testAdminUserUpdateAndEmailImmutability(context: TestContext) {
       Authorization: `Bearer ${adminLogin.payload.accessToken}`,
     },
     body: {
+      username: 'superviseur',
+      email: 'superviseur@chantierpro.local',
       firstName: 'Tech',
       lastName: 'Updated',
       role: 'SUPERVISOR',
@@ -903,13 +909,15 @@ async function testAdminUserUpdateAndEmailImmutability(context: TestContext) {
   assert.equal(updatePayload.user.lastName, 'Updated');
   assert.equal(updatePayload.user.contact, '+2250700000000');
   assert.equal(updatePayload.user.email, 'superviseur@chantierpro.local');
+  assert.equal(updatePayload.user.username, 'superviseur');
 
-  const immutableResponse = await request(`/api/users/${context.tech1Id}`, {
+  const emailUpdateResponse = await request(`/api/users/${context.tech1Id}`, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${adminLogin.payload.accessToken}`,
     },
     body: {
+      username: 'superviseur',
       email: 'changed@chantierpro.local',
       firstName: 'Tech',
       lastName: 'Updated',
@@ -918,9 +926,7 @@ async function testAdminUserUpdateAndEmailImmutability(context: TestContext) {
     },
   });
 
-  assert.equal(immutableResponse.status, 400);
-  const immutablePayload = (await immutableResponse.json()) as ErrorPayload;
-  assert.equal(immutablePayload.code, 'EMAIL_IMMUTABLE');
+  assert.equal(emailUpdateResponse.status, 200);
 
   await prisma.user.update({
     where: { id: context.tech1Id },
@@ -1137,6 +1143,7 @@ async function testProjectVisibility(context: TestContext) {
   const secondPmPasswordHash = await hash('SecondPm#2026', 10);
   const secondPm = await prisma.user.create({
     data: {
+      username: 'second.pm',
       email: smokePmEmail,
       firstName: 'Second',
       lastName: 'Manager',
@@ -1559,6 +1566,7 @@ async function testTeamsAndMembers(context: TestContext) {
       email: smokeUserEmail,
     },
     update: {
+      username: 'smoke.user',
       firstName: 'Smoke',
       lastName: 'User',
       role: Role.SUPERVISOR,
@@ -1568,6 +1576,7 @@ async function testTeamsAndMembers(context: TestContext) {
       passwordHash: await hash('Smoke#2026', 10),
     },
     create: {
+      username: 'smoke.user',
       email: smokeUserEmail,
       firstName: 'Smoke',
       lastName: 'User',
@@ -3033,6 +3042,7 @@ async function testDirectionModule(context: TestContext) {
 
   const tempProjectManager = await prisma.user.create({
     data: {
+      username: 'smoke.pm',
       email: smokePmEmail,
       passwordHash: await hash(originalPasswords.projectManager, 10),
       firstName: 'Nadia',

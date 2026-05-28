@@ -244,7 +244,8 @@ export function MobileProfilePage() {
             onChange={(value) => setProfileValues((current) => ({ ...current, lastName: value }))}
             value={profileValues.lastName}
           />
-          <ReadOnlyField label="Email" value={user.email} />
+          <ReadOnlyField label="Identifiant" value={user.username} />
+          <ReadOnlyField label="Email" value={user.email ?? 'Non renseigné'} />
           <ReadOnlyField label="Rôle" value={roleLabels[user.role]} />
         </div>
         <button

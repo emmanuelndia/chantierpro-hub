@@ -12,7 +12,8 @@ export async function createSessionTokens(
   prisma: PrismaClient,
   user: {
     id: string;
-    email: string;
+    username: string;
+    email: string | null;
     firstName: string;
     lastName: string;
     role: Role;

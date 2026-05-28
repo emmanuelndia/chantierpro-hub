@@ -55,7 +55,7 @@ export type UnassignedSupervisor = {
   id: string;
   name: string;
   firstName: string;
-  email: string;
+  email: string | null;
   contact: string;
   isActive: boolean;
   availabilityLabel: string;
