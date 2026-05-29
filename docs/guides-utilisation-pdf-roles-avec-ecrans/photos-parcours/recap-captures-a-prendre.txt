@@ -1,0 +1,286 @@
+    Recapitulatif des captures a prendre pour les parcours utilisateur
+
+Consigne de nommage recommandee
+Utilise des noms simples avec un numero devant pour garder l'ordre dans le PDF.
+Exemple : 01-accueil.png, 02-formulaire.png, 03-validation.png
+
+Superviseur
+
+Dossier : superviseur/pointer-sur-un-chantier
+Captures conseillees :
+01-accueil-terrain
+02-detail-chantier-du-jour
+03-ecran-pointage-avant-entree
+04-confirmation-entree
+05-ecran-pointage-session-ouverte
+06-confirmation-sortie
+
+Dossier : superviseur/envoyer-une-photo
+Captures conseillees :
+01-ecran-photo
+02-selection-chantier-ou-tache
+03-photo-avec-commentaire-et-tags
+04-confirmation-envoi-photo
+
+Dossier : superviseur/envoyer-un-rapport
+Captures conseillees :
+01-ecran-rapport-session
+02-rapport-avec-texte
+03-rapport-avec-fichier-ou-piece-jointe
+04-progression-ou-blocage
+05-confirmation-envoi-rapport
+
+Ressource
+
+Dossier : ressource/executer-une-tache-terrain
+Captures conseillees :
+01-accueil-terrain
+02-tache-chantier-du-jour
+03-pointage-entree
+04-mise-a-jour-avancement
+05-photo-de-preuve
+06-pointage-sortie
+07-rapport-session
+
+Dossier : ressource/declarer-une-tache-bureau
+Captures conseillees :
+01-accueil-terrain
+02-section-taches-bureau-du-jour
+03-detail-tache-bureau
+04-mise-a-jour-avancement
+05-commentaire-ou-blocage
+
+Coordinateur
+
+Dossier : coordinateur/traiter-un-rapport-terrain
+Captures conseillees :
+01-liste-rapports-terrain
+02-filtres-rapports
+03-detail-rapport
+04-photos-et-pieces-jointes
+05-validation-rapport
+
+Dossier : coordinateur/relancer-un-superviseur
+Captures conseillees :
+01-rapports-en-attente
+02-detail-rapport-manquant-ou-incomplet
+03-action-relance
+04-confirmation-relance
+
+Superviseur general
+
+Dossier : superviseur-general/creer-une-tache-planning
+Captures conseillees :
+01-planning-web
+02-bouton-nouvelle-tache
+03-selection-date-et-chantier
+04-selection-ressource
+05-formulaire-action-et-type-tache
+06-enregistrement-tache
+
+Dossier : superviseur-general/suivre-les-rapports
+Captures conseillees :
+01-liste-rapports
+02-filtres-date-chantier-ressource
+03-detail-rapport
+04-photos-progression-et-fichiers
+
+Responsable Bureau d'etude
+
+Dossier : responsable-bureau-etude/planifier-une-ressource
+Captures conseillees :
+01-planning
+02-selection-projet-ou-chantier
+03-selection-ressource-be
+04-formulaire-tache
+05-tache-enregistree
+
+Dossier : responsable-bureau-etude/suivre-activite-equipe
+Captures conseillees :
+01-tableau-de-bord-manager
+02-rapports
+03-galerie-photos
+04-presences-equipe
+
+Ressource Bureau d'etude
+
+Dossier : ressource-bureau-etude/realiser-une-tache-chantier
+Captures conseillees :
+01-accueil-terrain
+02-tache-be-chantier
+03-pointage-entree
+04-photo-ou-avancement
+05-pointage-sortie
+06-rapport-session
+
+Dossier : ressource-bureau-etude/suivre-une-tache-bureau
+Captures conseillees :
+01-accueil-terrain
+02-taches-bureau-du-jour
+03-detail-tache-bureau
+04-avancement-commentaire-blocage
+
+Responsable Negociation
+
+Dossier : responsable-negociation/planifier-une-ressource
+Captures conseillees :
+01-planning
+02-selection-projet-ou-chantier
+03-selection-ressource-negociation
+04-formulaire-tache
+05-tache-enregistree
+
+Dossier : responsable-negociation/suivre-activite-equipe
+Captures conseillees :
+01-tableau-de-bord-manager
+02-rapports
+03-galerie-photos
+04-presences-equipe
+
+Ressource Negociation
+
+Dossier : ressource-negociation/realiser-une-tache-chantier
+Captures conseillees :
+01-accueil-terrain
+02-tache-negociation-chantier
+03-pointage-entree
+04-photo-ou-avancement
+05-pointage-sortie
+06-rapport-session
+
+Dossier : ressource-negociation/suivre-une-tache-bureau
+Captures conseillees :
+01-accueil-terrain
+02-taches-bureau-du-jour
+03-detail-tache-bureau
+04-avancement-commentaire-blocage
+
+Responsable Parc Auto
+
+Dossier : responsable-parc-auto/planifier-une-ressource
+Captures conseillees :
+01-planning
+02-selection-projet-chantier-ou-lieu
+03-selection-chauffeur
+04-formulaire-mission
+05-mission-enregistree
+
+Dossier : responsable-parc-auto/suivre-activite-equipe
+Captures conseillees :
+01-tableau-de-bord-manager
+02-rapports
+03-galerie-photos
+04-presences-equipe
+
+Chauffeur
+
+Dossier : chauffeur/realiser-une-tache-chantier
+Captures conseillees :
+01-accueil-terrain
+02-mission-du-jour
+03-pointage-entree
+04-photo-de-preuve-ou-avancement
+05-pointage-sortie
+06-rapport-session
+
+Dossier : chauffeur/suivre-une-tache-bureau
+Captures conseillees :
+01-accueil-terrain
+02-taches-bureau-du-jour
+03-detail-mission-bureau-ou-logistique
+04-avancement-commentaire-blocage
+
+Chef de projet
+
+Dossier : chef-projet/creer-un-chantier
+Captures conseillees :
+01-detail-projet
+02-bouton-nouveau-chantier
+03-formulaire-chantier
+04-carte-et-position-gps
+05-limite-precise-si-utilisee
+06-chantier-cree
+
+Dossier : chef-projet/importer-des-chantiers
+Captures conseillees :
+01-detail-projet
+02-bouton-importer-des-chantiers
+03-telechargement-modele
+04-upload-fichier
+05-previsualisation-lignes
+06-resultat-import
+
+Dossier : chef-projet/planifier-une-ressource
+Captures conseillees :
+01-planning
+02-selection-chantier
+03-recherche-ressource
+04-indicateur-ressource-deja-occupee
+05-formulaire-tache
+06-tache-enregistree
+
+Direction
+
+Dossier : direction/suivre-activite-globale
+Captures conseillees :
+01-tableau-de-bord-direction
+02-liste-projets
+03-rapports-ou-photos
+04-presences
+05-filtres-globaux
+
+Dossier : direction/regulariser-une-presence
+Captures conseillees :
+01-presences-rh
+02-filtre-sessions-a-traiter
+03-detail-session-anormale
+04-formulaire-regularisation
+05-confirmation-regularisation
+
+Ressources humaines
+
+Dossier : rh/suivre-les-presences
+Captures conseillees :
+01-presences-rh
+02-filtres-periode-ressource-projet
+03-detail-ressource
+04-session-avec-anomalie
+
+Dossier : rh/regulariser-une-session
+Captures conseillees :
+01-session-a-regulariser
+02-formulaire-heure-corrigee
+03-commentaire-obligatoire
+04-confirmation-regularisation
+
+Dossier : rh/exporter-les-donnees
+Captures conseillees :
+01-ecran-export-rh
+02-selection-periode-et-filtres
+03-export-en-cours-ou-genere
+04-telechargement-export
+
+Administrateur
+
+Dossier : administrateur/creer-un-utilisateur
+Captures conseillees :
+01-liste-utilisateurs
+02-bouton-nouvel-utilisateur
+03-formulaire-utilisateur
+04-selection-role
+05-utilisateur-cree
+
+Dossier : administrateur/desactiver-un-utilisateur
+Captures conseillees :
+01-liste-utilisateurs
+02-detail-utilisateur
+03-action-desactiver
+04-confirmation-desactivation
+05-utilisateur-inactif-ou-masque
+
+Dossier : administrateur/consulter-les-logs
+Captures conseillees :
+01-ecran-logs
+02-filtres-logs
+03-detail-action-sensible
+04-export-si-disponible

@@ -1,0 +1,20 @@
+Guides PDF d'utilisation par role
+
+Fichiers generes :
+- Superviseur : guide-superviseur.pdf
+- Ressource : guide-ressource.pdf
+- Coordinateur : guide-coordinateur.pdf
+- Superviseur general : guide-superviseur-general.pdf
+- Responsable Bureau d'etude : guide-responsable-bureau-etude.pdf
+- Responsable Negociation : guide-responsable-negociation.pdf
+- Responsable Parc Auto : guide-responsable-parc-auto.pdf
+- Ressource Bureau d'etude : guide-ressource-bureau-etude.pdf
+- Ressource Negociation : guide-ressource-negociation.pdf
+- Chauffeur : guide-chauffeur.pdf
+- Chef de projet : guide-chef-projet.pdf
+- Direction : guide-direction.pdf
+- Ressources humaines : guide-rh.pdf
+- Administrateur : guide-administrateur.pdf
+
+Ces guides sont rediges pour les utilisateurs finaux.
+Ils ne contiennent pas de routes techniques.

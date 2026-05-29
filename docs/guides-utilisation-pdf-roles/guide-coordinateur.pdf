@@ -1,0 +1,835 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 5401
+>>
+stream
+0.5670000000000001 w
+0 G
+0.08 0.29 0.44 rg
+0. 841.8899999999999864 595.2755905511811534 -73.7007874015748143 re
+f
+BT
+/F2 18 Tf
+20.6999999999999993 TL
+1. g
+51.0236220472441033 793.7010236220472734 Td
+(Guide d'utilisation - Coordinateur) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+51.0236220472441033 728.5041732283464171 Td
+(Le coordinateur suit les rapports, les alertes et les presences. Il peut aussi intervenir sur mobile) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+51.0236220472441033 711.4962992125983874 Td
+(comme une ressource terrain lorsqu'il est assigne.) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.078 0.29 0.439 rg
+51.0236220472441033 677.480551181102328 Td
+(Ce role sert a quoi ?) Tj
+ET
+0.08 0.29 0.44 RG
+51.0236220472441033 668.9766141732283131 m
+544.2519685039370643 668.9766141732283131 l
+S
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0. g
+56.6929133858267775 649.1340944881889072 Td
+(Le coordinateur suit les rapports, les alertes et les presences. Il peut) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0. g
+56.6929133858267775 632.1262204724408775 Td
+(aussi intervenir sur mobile comme une ressource terrain lorsqu'il est) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0. g
+56.6929133858267775 615.1183464566928478 Td
+(assigne.) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.078 0.29 0.439 rg
+51.0236220472441033 581.1025984251967884 Td
+(Utilisation sur le web) Tj
+ET
+0.08 0.29 0.44 RG
+51.0236220472441033 572.5986614173227736 m
+544.2519685039370643 572.5986614173227736 l
+S
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 552.7561417322833677 Td
+(Tableau de bord coordinateur) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 538.5829133858267141 Td
+(Voir les priorites et les rapports a traiter.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 524.4096850393700606 Td
+(- Consulter les indicateurs) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 510.2364566929133503 Td
+(- Ouvrir les rapports en attente) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 496.0632283464566399 Td
+(- Suivre les alertes) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 473.3860629921259147 Td
+(Rapports terrain) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 459.2128346456692611 Td
+(Suivre et traiter les rapports accessibles.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 445.0396062992125508 Td
+(- Filtrer les rapports) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 430.8663779527558404 Td
+(- Ouvrir un rapport) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 416.69314960629913 Td
+(- Valider pour client) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 402.5199212598424765 Td
+(- Relancer un superviseur) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 379.8427559055117513 Td
+(Presences equipe) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 365.6695275590550409 Td
+(Consulter les presences des equipes suivies.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 351.4962992125983874 Td
+(- Filtrer les presences) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 337.323070866141677 Td
+(- Ouvrir un detail) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 323.1498425196849666 Td
+(- Verifier les anomalies) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 300.4726771653542983 Td
+(Mon profil) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 286.2994488188975311 Td
+(Gerer les informations personnelles.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 272.1262204724408775 Td
+(- Modifier le nom) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 257.952992125984224 Td
+(- Modifier l'email) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 243.7797637795274568 Td
+(- Changer le mot de passe) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.078 0.29 0.439 rg
+51.0236220472441033 212.5986614173227736 Td
+(Utilisation sur mobile) Tj
+ET
+0.08 0.29 0.44 RG
+51.0236220472441033 204.0947244094487303 m
+544.2519685039370643 204.0947244094487303 l
+S
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 184.2522047244093528 Td
+(Accueil coordinateur) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 170.0789763779526993 Td
+(Voir les priorites operationnelles.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 155.9057480314959321 Td
+(- Voir les alertes) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 141.7325196850392786 Td
+(- Ouvrir les rapports) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 127.559291338582625 Td
+(- Voir les taches si assigne) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 104.882125984251843 Td
+(Rapports) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 90.7088976377951894 Td
+(Traiter rapidement les rapports terrain.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 76.5356692913385359 Td
+(- Lister les rapports) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 62.3624409448817687 Td
+(- Ouvrir un detail) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.431 g
+51.0236220472441033 25.5120472440943331 Td
+(ChantierPro - Guide utilisateur - Page 1/2) Tj
+ET
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/Length 5148
+>>
+stream
+0.5670000000000001 w
+0.08 0.29 0.44 RG
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 773.8585039370078675 Td
+(- Valider) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 759.6852755905511003 Td
+(- Relancer) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 737.0081102362204319 Td
+(Pointer) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 722.8348818897637784 Td
+(Pointer si le coordinateur intervient sur chantier.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 708.6616535433070112 Td
+(- Pointer l'entree) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 694.4884251968503577 Td
+(- Pointer la sortie) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 680.3151968503937042 Td
+(- Gerer les pauses) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 657.6380314960629221 Td
+(Photo) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 643.4648031496062686 Td
+(Ajouter une photo si une intervention terrain le demande.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 629.291574803149615 Td
+(- Prendre une photo) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 615.1183464566928478 Td
+(- Ajouter un commentaire) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 600.9451181102361943 Td
+(- Ajouter un tag) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 578.2679527559055259 Td
+(Historique) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 564.0947244094487587 Td
+(Consulter l'historique terrain personnel.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 549.9214960629921052 Td
+(- Voir l'historique) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 535.748267716535338 Td
+(- Ouvrir un detail) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 513.0711023622046696 Td
+(Profil) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 498.8978740157479592 Td
+(Gerer le compte mobile.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 484.7246456692913057 Td
+(- Modifier les informations) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 470.5514173228345953 Td
+(- Changer le mot de passe) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+79.3700787401574814 456.378188976377885 Td
+(- Se deconnecter) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.078 0.29 0.439 rg
+51.0236220472441033 425.1970866141731449 Td
+(Parcours principaux) Tj
+ET
+0.08 0.29 0.44 RG
+51.0236220472441033 416.69314960629913 m
+544.2519685039370643 416.69314960629913 l
+S
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 396.850629921259781 Td
+(Traiter un rapport terrain) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 382.6774015748030706 Td
+(1. Ouvrir les rapports terrain.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 368.5041732283464171 Td
+(2. Filtrer les rapports en attente.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 354.3309448818897067 Td
+(3. Ouvrir le detail du rapport.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 340.1577165354329964 Td
+(4. Lire le texte, les fichiers et les photos.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 325.9844881889763428 Td
+(5. Valider pour client si le rapport est correct.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 311.8112598425195756 Td
+(6. Resultat : le rapport est pret pour le suivi client.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 289.1340944881889072 Td
+(Relancer un superviseur) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 274.9608661417322537 Td
+(1. Ouvrir les rapports en attente.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 260.7876377952754865 Td
+(2. Identifier le rapport manquant ou incomplet.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 246.614409448818833 Td
+(3. Utiliser l'action de relance.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 232.4411811023621794 Td
+(4. Confirmer la relance.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+68.031496062992133 218.2679527559054122 Td
+(5. Resultat : la relance est enregistree.) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.078 0.29 0.439 rg
+51.0236220472441033 187.086850393700729 Td
+(Conseils pratiques) Tj
+ET
+0.08 0.29 0.44 RG
+51.0236220472441033 178.5829133858266857 m
+544.2519685039370643 178.5829133858266857 l
+S
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+62.3622047244094517 158.7403937007873083 Td
+(- Prioriser les rapports en attente.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+62.3622047244094517 141.7325196850392786 Td
+(- Verifier les pieces jointes et les photos avant validation.) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0. g
+62.3622047244094517 124.7246456692912489 Td
+(- Utiliser les filtres pour aller plus vite.) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.431 g
+51.0236220472441033 25.5120472440943331 Td
+(ChantierPro - Guide utilisateur - Page 2/2) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R ]
+/Count 2
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+19 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+20 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 7 0 R
+/F2 8 0 R
+/F3 9 0 R
+/F4 10 0 R
+/F5 11 0 R
+/F6 12 0 R
+/F7 13 0 R
+/F8 14 0 R
+/F9 15 0 R
+/F10 16 0 R
+/F11 17 0 R
+/F12 18 0 R
+/F13 19 0 R
+/F14 20 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+21 0 obj
+<<
+/Producer (jsPDF 2.5.2)
+/CreationDate (D:20260529113215-00'00')
+>>
+endobj
+22 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 23
+0000000000 65535 f 
+0000010942 00000 n 
+0000012767 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000005605 00000 n 
+0000005742 00000 n 
+0000011005 00000 n 
+0000011130 00000 n 
+0000011260 00000 n 
+0000011393 00000 n 
+0000011531 00000 n 
+0000011655 00000 n 
+0000011784 00000 n 
+0000011916 00000 n 
+0000012052 00000 n 
+0000012180 00000 n 
+0000012307 00000 n 
+0000012436 00000 n 
+0000012569 00000 n 
+0000012671 00000 n 
+0000013017 00000 n 
+0000013103 00000 n 
+trailer
+<<
+/Size 23
+/Root 22 0 R
+/Info 21 0 R
+/ID [ <91B56958D0636C7875A4984255CC8446> <91B56958D0636C7875A4984255CC8446> ]
+>>
+startxref
+13207
+%%EOF

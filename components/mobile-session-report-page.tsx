@@ -32,6 +32,7 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   const [progressPercentage, setProgressPercentage] = useState(50);
   const [blockageNote, setBlockageNote] = useState('');
   const [reportFile, setReportFile] = useState<File | null>(null);
+  const [skipConfirmOpen, setSkipConfirmOpen] = useState(false);
 
   const sessionId = searchParams.get('sessionId');
 
@@ -165,9 +166,12 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
   };
 
   const handleSkip = () => {
-    if (confirm("Vous pourrez encore soumettre ce rapport plus tard depuis l'historique. Passer maintenant ?")) {
-      router.push('/mobile/home');
-    }
+    setSkipConfirmOpen(true);
+  };
+
+  const confirmSkip = () => {
+    setSkipConfirmOpen(false);
+    router.push('/mobile/home');
   };
 
   const formatDuration = (seconds: number) => {
@@ -410,6 +414,75 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
         >
           Passer
         </button>
+      </section>
+
+      <SkipReportDialog
+        open={skipConfirmOpen}
+        onCancel={() => setSkipConfirmOpen(false)}
+        onConfirm={confirmSkip}
+      />
+    </div>
+  );
+}
+
+function SkipReportDialog({
+  onCancel,
+  onConfirm,
+  open,
+}: Readonly<{
+  onCancel: () => void;
+  onConfirm: () => void;
+  open: boolean;
+}>) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 px-4 pb-4 backdrop-blur-sm">
+      <section
+        aria-modal="true"
+        className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+        role="dialog"
+      >
+        <div className="border-b border-slate-100 p-5">
+          <div className="flex items-start gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-primary">
+              <Clock3 className="h-6 w-6" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Rapport plus tard</p>
+              <h2 className="mt-1 text-xl font-black leading-tight text-slate-950">Passer le rapport maintenant ?</h2>
+            </div>
+            <button
+              aria-label="Fermer"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+              onClick={onCancel}
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            Vous pourrez encore soumettre ce rapport plus tard depuis l&apos;historique. Votre session restera visible
+            comme une session terminee sans rapport jusqu&apos;a sa soumission.
+          </p>
+        </div>
+
+        <div className="space-y-3 p-4">
+          <button
+            className="flex min-h-14 w-full items-center justify-center rounded-2xl bg-primary px-4 text-sm font-black text-white shadow-lg shadow-orange-200 transition active:scale-[0.98]"
+            onClick={onConfirm}
+            type="button"
+          >
+            Oui, je ferai le rapport plus tard
+          </button>
+          <button
+            className="flex min-h-12 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition active:scale-[0.98]"
+            onClick={onCancel}
+            type="button"
+          >
+            Continuer le rapport
+          </button>
+        </div>
       </section>
     </div>
   );
