@@ -17,6 +17,13 @@ type WebAppShellProps = Readonly<{
   children: ReactNode;
 }>;
 
+type WebNotification = Readonly<{
+  href: string;
+  message: string;
+  title: string;
+  tone: 'warning' | 'info';
+}>;
+
 const roleTone: Record<Role, 'success' | 'warning' | 'error' | 'neutral' | 'info'> = {
   SUPERVISOR: 'success',
   RESOURCE: 'success',
@@ -38,9 +45,24 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
   const pathname = usePathname();
   const navigation = useMemo(() => getWebNavigationForRole(user.role), [user.role]);
   const breadcrumbs = useMemo(() => getWebBreadcrumbs(pathname), [pathname]);
+  const notifications = useMemo<WebNotification[]>(() => {
+    const items: WebNotification[] = [];
+
+    if (user.mustChangePassword) {
+      items.push({
+        href: '/settings/profil',
+        message: 'Votre mot de passe temporaire doit être changé.',
+        title: 'Mot de passe temporaire',
+        tone: 'warning',
+      });
+    }
+
+    return items;
+  }, [user.mustChangePassword]);
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { pushToast } = useToast();
 
   async function handleLogout() {
@@ -153,20 +175,39 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
 
           <div className="flex items-center gap-3">
             <Badge tone={roleTone[user.role]}>{formatRoleLabel(user.role)}</Badge>
-            <button
-              aria-label="Notifications"
-              className="relative rounded-full border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 hover:text-primary"
-              type="button"
-            >
-              <BellIcon className="h-5 w-5" />
-              <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                3
-              </span>
-            </button>
+            <div className="relative">
+              <button
+                aria-expanded={notificationsOpen}
+                aria-label={notifications.length > 0 ? `${notifications.length} notification(s)` : 'Notifications'}
+                className="relative rounded-full border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 hover:text-primary"
+                onClick={() => {
+                  setNotificationsOpen((current) => !current);
+                  setMenuOpen(false);
+                }}
+                type="button"
+              >
+                <BellIcon className="h-5 w-5" />
+                {notifications.length > 0 ? (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {notifications.length > 9 ? '9+' : notifications.length}
+                  </span>
+                ) : null}
+              </button>
+
+              {notificationsOpen ? (
+                <WebNotificationsPanel
+                  notifications={notifications}
+                  onClose={() => setNotificationsOpen(false)}
+                />
+              ) : null}
+            </div>
             <div className="relative">
               <button
                 className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-1.5 transition hover:bg-slate-50"
-                onClick={() => setMenuOpen((current) => !current)}
+                onClick={() => {
+                  setMenuOpen((current) => !current);
+                  setNotificationsOpen(false);
+                }}
                 type="button"
               >
                 <div className="hidden text-right sm:block">
@@ -210,6 +251,65 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
 <MustChangePasswordBanner href="/settings/profil" show={user.mustChangePassword} />
           {children}
         </main>
+      </div>
+    </div>
+  );
+}
+
+function WebNotificationsPanel({
+  notifications,
+  onClose,
+}: Readonly<{
+  notifications: readonly WebNotification[];
+  onClose: () => void;
+}>) {
+  return (
+    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-80 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-panel">
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-600">Notifications</p>
+          <h2 className="mt-1 text-base font-black text-slate-950">Centre de notifications</h2>
+        </div>
+        <button
+          aria-label="Fermer les notifications"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800"
+          onClick={onClose}
+          type="button"
+        >
+          <CrossIcon className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="max-h-[22rem] overflow-y-auto p-3">
+        {notifications.length > 0 ? (
+          <div className="space-y-2">
+            {notifications.map((notification) => (
+              <Link
+                className="block rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-orange-200 hover:bg-orange-50"
+                href={notification.href}
+                key={`${notification.href}-${notification.title}`}
+                onClick={onClose}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                      notification.tone === 'warning' ? 'bg-orange-500' : 'bg-sky-500'
+                    }`}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-slate-950">{notification.title}</p>
+                    <p className="mt-1 text-sm leading-5 text-slate-600">{notification.message}</p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+            <p className="text-sm font-black text-slate-800">Aucune notification</p>
+            <p className="mt-1 text-sm leading-5 text-slate-500">Les alertes importantes apparaîtront ici.</p>
+          </div>
+        )}
       </div>
     </div>
   );
