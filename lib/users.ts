@@ -77,6 +77,7 @@ export type UserListQuery = {
 export type UpdateOwnProfileInput = {
   firstName: string;
   lastName: string;
+  email?: string | null;
 };
 
 export type UpdateUserStatusInput = {
@@ -277,7 +278,6 @@ export function parseUpdateOwnProfileInput(body: unknown): UpdateOwnProfileInput
   if (
     !isRecord(body) ||
     'username' in body ||
-    'email' in body ||
     'role' in body ||
     'isActive' in body ||
     'contact' in body ||
@@ -288,15 +288,23 @@ export function parseUpdateOwnProfileInput(body: unknown): UpdateOwnProfileInput
 
   const firstName = sanitizeString(body.firstName);
   const lastName = sanitizeString(body.lastName);
+  const hasEmail = 'email' in body;
+  const email = hasEmail ? sanitizeOptionalEmail(body.email) : undefined;
 
-  if (!firstName || !lastName) {
+  if (!firstName || !lastName || (hasEmail && email === undefined)) {
     return null;
   }
 
-  return {
+  const input: UpdateOwnProfileInput = {
     firstName,
     lastName,
   };
+
+  if (hasEmail) {
+    input.email = email ?? null;
+  }
+
+  return input;
 }
 
 export function parseUpdateUserStatusInput(body: unknown): UpdateUserStatusInput | null {
@@ -325,10 +333,6 @@ export function parseChangePasswordInput(body: unknown): ChangePasswordInput | n
     currentPassword,
     newPassword,
   };
-}
-
-export function validateImmutableEmail(body: unknown) {
-  return isRecord(body) && 'email' in body;
 }
 
 export async function revokeUserSessions(prisma: PrismaClient, userId: string) {

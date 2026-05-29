@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
@@ -17,6 +17,7 @@ import type { UserDetail } from '@/types/users';
 type ProfileValues = {
   firstName: string;
   lastName: string;
+  email: string;
 };
 
 type PasswordValues = {
@@ -50,7 +51,7 @@ const roleLabels: Record<Role, string> = {
 
 export function MobileProfilePage() {
   const queryClient = useQueryClient();
-  const [profileValues, setProfileValues] = useState<ProfileValues>({ firstName: '', lastName: '' });
+  const [profileValues, setProfileValues] = useState<ProfileValues>({ firstName: '', lastName: '', email: '' });
   const [passwordValues, setPasswordValues] = useState<PasswordValues>(initialPasswordValues);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -83,6 +84,7 @@ export function MobileProfilePage() {
     setProfileValues({
       firstName: profileQuery.data.firstName,
       lastName: profileQuery.data.lastName,
+      email: profileQuery.data.email ?? '',
     });
   }, [profileQuery.data]);
 
@@ -96,6 +98,7 @@ export function MobileProfilePage() {
         body: JSON.stringify({
           firstName: values.firstName.trim(),
           lastName: values.lastName.trim(),
+          email: values.email.trim() || null,
         }),
       });
 
@@ -108,7 +111,7 @@ export function MobileProfilePage() {
     },
     onSuccess: (user) => {
       setNotice({ tone: 'success', message: 'Profil mis à jour.' });
-      setProfileValues({ firstName: user.firstName, lastName: user.lastName });
+      setProfileValues({ firstName: user.firstName, lastName: user.lastName, email: user.email ?? '' });
       void queryClient.invalidateQueries({ queryKey: ['mobile-profile'] });
       void queryClient.invalidateQueries({ queryKey: ['auth-me'] });
     },
@@ -182,9 +185,11 @@ export function MobileProfilePage() {
     return (
       profileValues.firstName.trim().length > 0 &&
       profileValues.lastName.trim().length > 0 &&
-      (profileValues.firstName.trim() !== user.firstName || profileValues.lastName.trim() !== user.lastName)
+      (profileValues.firstName.trim() !== user.firstName ||
+        profileValues.lastName.trim() !== user.lastName ||
+        profileValues.email.trim().toLowerCase() !== (user.email ?? ''))
     );
-  }, [profileValues.firstName, profileValues.lastName, user]);
+  }, [profileValues.email, profileValues.firstName, profileValues.lastName, user]);
 
   const passwordSubmitDisabled =
     passwordMutation.isPending ||
@@ -245,8 +250,14 @@ export function MobileProfilePage() {
             value={profileValues.lastName}
           />
           <ReadOnlyField label="Identifiant" value={user.username} />
-          <ReadOnlyField label="Email" value={user.email ?? 'Non renseigné'} />
-          <ReadOnlyField label="Rôle" value={roleLabels[user.role]} />
+          <TextField
+            label="Email facultatif"
+            onChange={(value) => setProfileValues((current) => ({ ...current, email: value }))}
+            inputMode="email"
+            type="email"
+            value={profileValues.email}
+          />
+          <ReadOnlyField label="Role" value={roleLabels[user.role]} />
         </div>
         <button
           className="mt-4 flex min-h-14 w-full items-center justify-center rounded-lg bg-slate-950 px-5 text-base font-black text-white disabled:opacity-45"
@@ -391,12 +402,16 @@ function SectionTitle({ title }: Readonly<{ title: string }>) {
 }
 
 function TextField({
+  inputMode,
   label,
   onChange,
+  type = 'text',
   value,
 }: Readonly<{
+  inputMode?: InputHTMLAttributes<HTMLInputElement>['inputMode'];
   label: string;
   onChange: (value: string) => void;
+  type?: 'email' | 'text';
   value: string;
 }>) {
   return (
@@ -404,7 +419,9 @@ function TextField({
       <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
       <input
         className="mt-2 min-h-14 w-full rounded-lg border border-slate-200 bg-white px-4 text-base font-semibold text-slate-950 outline-none focus:border-primary"
+        inputMode={inputMode}
         onChange={(event) => onChange(event.target.value)}
+        type={type}
         value={value}
       />
     </label>

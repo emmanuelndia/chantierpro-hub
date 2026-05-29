@@ -12,6 +12,7 @@ import type { UserDetail } from '@/types/users';
 type ProfileFormValues = {
   firstName: string;
   lastName: string;
+  email: string;
 };
 
 type PasswordFormValues = {
@@ -29,7 +30,7 @@ const initialPasswordValues: PasswordFormValues = {
 export function SettingsProfilePage() {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
-  const [profileValues, setProfileValues] = useState<ProfileFormValues>({ firstName: '', lastName: '' });
+  const [profileValues, setProfileValues] = useState<ProfileFormValues>({ firstName: '', lastName: '', email: '' });
   const [passwordValues, setPasswordValues] = useState<PasswordFormValues>(initialPasswordValues);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
@@ -50,6 +51,7 @@ export function SettingsProfilePage() {
       setProfileValues({
         firstName: profileQuery.data.firstName,
         lastName: profileQuery.data.lastName,
+        email: profileQuery.data.email ?? '',
       });
     }
   }, [profileQuery.data]);
@@ -61,7 +63,11 @@ export function SettingsProfilePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          firstName: values.firstName.trim(),
+          lastName: values.lastName.trim(),
+          email: values.email.trim() || null,
+        }),
       });
 
       if (!response.ok) {
@@ -145,7 +151,9 @@ export function SettingsProfilePage() {
     profileMutation.isPending ||
     !profileValues.firstName.trim() ||
     !profileValues.lastName.trim() ||
-    (profileValues.firstName.trim() === user.firstName && profileValues.lastName.trim() === user.lastName);
+    (profileValues.firstName.trim() === user.firstName &&
+      profileValues.lastName.trim() === user.lastName &&
+      profileValues.email.trim().toLowerCase() === (user.email ?? ''));
   const passwordSubmitDisabled =
     passwordMutation.isPending ||
     !passwordValues.currentPassword ||
@@ -161,7 +169,7 @@ export function SettingsProfilePage() {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Parametres</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Mon profil</h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Consulte tes informations de compte, mets a jour ton nom et change ton mot de passe.
+              Consulte tes informations de compte, mets a jour ton nom, ton email et change ton mot de passe.
             </p>
           </div>
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-xl font-semibold text-white">
@@ -177,7 +185,7 @@ export function SettingsProfilePage() {
             <ReadOnlyField label="Prenom" value={user.firstName} />
             <ReadOnlyField label="Nom" value={user.lastName} />
             <ReadOnlyField label="Identifiant" value={user.username} />
-            <ReadOnlyField label="Email" value={user.email ?? 'Non renseigné'} />
+            <ReadOnlyField label="Email" value={user.email ?? 'Non renseigne'} />
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Role</p>
               <Badge tone="neutral">{user.role.replaceAll('_', ' ')}</Badge>
@@ -187,7 +195,7 @@ export function SettingsProfilePage() {
         </article>
 
         <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-          <h2 className="text-xl font-semibold text-slate-950">Modifier mon nom</h2>
+          <h2 className="text-xl font-semibold text-slate-950">Modifier mes informations</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <Field label="Prenom">
               <input
@@ -201,6 +209,16 @@ export function SettingsProfilePage() {
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
                 onChange={(event) => setProfileValues((current) => ({ ...current, lastName: event.target.value }))}
                 value={profileValues.lastName}
+              />
+            </Field>
+            <Field label="Email facultatif">
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+                inputMode="email"
+                onChange={(event) => setProfileValues((current) => ({ ...current, email: event.target.value }))}
+                placeholder="prenom.nom@example.com"
+                type="email"
+                value={profileValues.email}
               />
             </Field>
           </div>

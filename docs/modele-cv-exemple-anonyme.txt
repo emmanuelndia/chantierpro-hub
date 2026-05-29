@@ -1,0 +1,65 @@
+Modele de CV exemple anonymise
+
+Prenom Exemple NOM EXEMPLE
+
+Profil : Developpeur Full-Stack
+Developpeur passionne par la creation d'applications web robustes, ergonomiques et utiles aux utilisateurs.
+
+Informations personnelles
+Ne(e) le 01/01/2000 a Ville Exemple
+Situation familiale : Celibataire sans enfant
+Portfolio : portfolio-exemple.com
+
+Contact
+Telephone : 0102030405 / 0708091011
+Email : prenom.nom@example.com
+
+Qualites personnelles
+Sociable
+Esprit d'equipe
+Rigoureux
+Respectueux
+
+Langues
+Francais : courant
+Anglais : intermediaire
+
+Activites et centres d'interet
+Football
+Lecture
+Programmation
+
+Formation
+Ecole Superieure Exemple, Abidjan
+2024
+BTS en Informatique Developpeur d'Application
+
+Lycee Exemple, Abidjan
+2022
+Baccalaureat Serie C
+
+College Exemple, Abidjan
+2019
+BEPC
+
+Experiences professionnelles
+Entreprise Exemple
+Janvier 2025 a Janvier 2026
+Stage en developpement et maintenance informatique
+
+Missions realisees
+Participation a la creation d'applications web pour faciliter la gestion des operations internes.
+Contribution a l'analyse des besoins, aux tests fonctionnels et a l'amelioration des outils existants.
+Diagnostic et resolution de pannes materielles et logicielles.
+Configuration de postes utilisateurs et assistance informatique.
+
+Competences techniques
+Developpement web et frameworks
+Frontend : Next.js, React, Vue.js, Tailwind CSS
+Backend : Node.js, Laravel, API REST
+Langages : JavaScript, TypeScript, PHP, Python, HTML5, CSS3
+
+Donnees et infrastructures
+Bases de donnees : PostgreSQL, MySQL, Prisma ORM
+Services API : integration de services tiers, authentification, stockage de fichiers
+Outils : Git, GitHub, environnements de developpement, virtualisation
