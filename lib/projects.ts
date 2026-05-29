@@ -169,14 +169,27 @@ export function canManageGeofencing(role: Role) {
   return GEOFENCING_ROLES.includes(role);
 }
 
+export function canViewArchivedProjects(role: Role) {
+  return role === Role.DIRECTION || role === Role.ADMIN;
+}
+
 export function projectAccessWhere(user: AuthLikeUser): Prisma.ProjectWhereInput {
+  const visibilityWhere = canViewArchivedProjects(user.role)
+    ? {}
+    : {
+        status: {
+          not: ProjectStatus.ARCHIVED,
+        },
+      };
+
   if (user.role === Role.PROJECT_MANAGER) {
     return {
       projectManagerId: user.id,
+      ...visibilityWhere,
     };
   }
 
-  return {};
+  return visibilityWhere;
 }
 
 export async function getScopedProjectById(

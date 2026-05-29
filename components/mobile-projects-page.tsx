@@ -18,7 +18,7 @@ type MobileProjectsPageProps = Readonly<{
   user: WebSessionUser;
 }>;
 
-const statusFilters: { value: MobileProjectStatusFilter; label: string }[] = [
+const baseStatusFilters: { value: MobileProjectStatusFilter; label: string }[] = [
   { value: 'ALL', label: 'Tous' },
   { value: ProjectStatus.IN_PROGRESS, label: 'En cours' },
   { value: ProjectStatus.COMPLETED, label: 'Terminés' },
@@ -29,6 +29,14 @@ const statusFilters: { value: MobileProjectStatusFilter; label: string }[] = [
 export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<MobileProjectStatusFilter>('ALL');
+  const canViewArchivedProjects = user.role === 'DIRECTION' || user.role === 'ADMIN';
+  const statusFilters = useMemo(
+    () =>
+      canViewArchivedProjects
+        ? baseStatusFilters
+        : baseStatusFilters.filter((filter) => filter.value !== ProjectStatus.ARCHIVED),
+    [canViewArchivedProjects],
+  );
 
   const requestPath = useMemo(() => {
     const params = new URLSearchParams();

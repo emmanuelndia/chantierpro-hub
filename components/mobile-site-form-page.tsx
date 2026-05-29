@@ -318,7 +318,7 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
               value={values.radiusKm}
             />
           </Field>
-          <Field label="Surface" error={errors.area}>
+          <Field label="Surface estimee" error={errors.area}>
             <input
               className={inputClass}
               inputMode="decimal"
@@ -455,7 +455,7 @@ function validateValues(values: SiteFormValues, radiusRequired: boolean): SiteFo
     if (!Number.isFinite(latitude)) nextErrors.latitude = 'Latitude invalide.';
     if (!Number.isFinite(longitude)) nextErrors.longitude = 'Longitude invalide.';
   }
-  if (!Number.isFinite(area) || area <= 0) nextErrors.area = 'Surface invalide.';
+  if (!Number.isFinite(area) || area <= 0) nextErrors.area = 'Surface estimee invalide.';
 
   if (radiusRequired && (!Number.isFinite(radiusKm) || radiusKm < 0.5 || radiusKm > 10)) {
     nextErrors.radiusKm = 'Rayon entre 0.5 et 10 km.';

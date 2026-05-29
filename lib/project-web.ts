@@ -118,9 +118,14 @@ export async function listProjectsPage(
   user: AuthLikeUser,
   query: ProjectListQuery,
 ): Promise<PaginatedProjectsResponse> {
+  const periodWhere = buildProjectPeriodWhere(query.periodFrom, query.periodTo);
+  const andClauses = [
+    ...(Array.isArray(periodWhere.AND) ? periodWhere.AND : []),
+    ...(query.status ? [{ status: query.status } satisfies Prisma.ProjectWhereInput] : []),
+  ];
+
   const where: Prisma.ProjectWhereInput = {
     ...projectAccessWhere(user),
-    ...(query.status ? { status: query.status } : {}),
     ...(query.search
       ? {
           OR: [
@@ -131,7 +136,7 @@ export async function listProjectsPage(
           ],
         }
       : {}),
-    ...buildProjectPeriodWhere(query.periodFrom, query.periodTo),
+    ...(andClauses.length ? { AND: andClauses } : {}),
   };
 
   const [items, totalItems] = await prisma.$transaction([

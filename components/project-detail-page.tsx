@@ -348,7 +348,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                         ? site.geofenceType === 'POLYGON'
                           ? 'Limite précise'
                           : `Pointage par rayon ${site.radiusKm.toFixed(1)} km`
-                        : 'Lieu planifiable sans flux terrain'} - Surface {site.area.toFixed(2)}
+                        : 'Lieu planifiable sans flux terrain'} - Surface estimee {site.area.toFixed(2)}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -945,7 +945,7 @@ function SiteFormDrawer({
           />
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Surface">
+            <Field label="Surface estimee">
               <input
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
                 onChange={(event) => setValues((current) => ({ ...current, area: event.target.value }))}

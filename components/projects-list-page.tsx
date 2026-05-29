@@ -50,6 +50,7 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
   const [projectToArchive, setProjectToArchive] = useState<ProjectDetail | null>(null);
 
   const canCreateProject = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
+  const canViewArchivedProjects = viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
   const pageTitle = scope === 'all' ? 'Tous les projets' : 'Mes projets';
   const pageDescription =
     scope === 'all'
@@ -238,7 +239,7 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
               <option value="IN_PROGRESS">En cours</option>
               <option value="COMPLETED">Termine</option>
               <option value="ON_HOLD">En pause</option>
-              <option value="ARCHIVED">Archive</option>
+              {canViewArchivedProjects ? <option value="ARCHIVED">Archive</option> : null}
             </select>
           </label>
           <label className="space-y-2">

@@ -26,7 +26,7 @@ export const SITE_IMPORT_COLUMNS: { key: SiteImportColumnKey; label: string; req
   { key: 'latitude', label: 'latitude', required: true },
   { key: 'longitude', label: 'longitude', required: true },
   { key: 'rayon_km', label: 'rayon_km', required: false },
-  { key: 'surface', label: 'surface', required: true },
+  { key: 'surface', label: 'surface_estimee', required: true },
   { key: 'date_debut', label: 'date_debut', required: true },
   { key: 'date_fin', label: 'date_fin', required: false },
   { key: 'responsable_gs_email', label: 'responsable_gs_email', required: true },
@@ -322,7 +322,7 @@ function addGenericFieldErrors(row: SiteImportNormalizedRow, errors: SiteImportF
     errors.push({ field: 'longitude', message: 'Longitude numerique requise.' });
   }
   if (!row.surface.trim() || Number.isNaN(Number(row.surface))) {
-    errors.push({ field: 'surface', message: 'Surface numerique requise.' });
+    errors.push({ field: 'surface', message: 'Surface estimee numerique requise.' });
   }
   if (!row.date_debut.trim() || Number.isNaN(new Date(row.date_debut).getTime())) {
     errors.push({ field: 'date_debut', message: 'Date de debut requise au format AAAA-MM-JJ.' });
@@ -457,7 +457,16 @@ function normalizeDateValue(value: string) {
 }
 
 function normalizeHeader(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, '_') as SiteImportColumnKey;
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_');
+  if (normalized === 'surface_estimee') {
+    return 'surface';
+  }
+  return normalized as SiteImportColumnKey;
 }
 
 function normalizeName(value: string) {

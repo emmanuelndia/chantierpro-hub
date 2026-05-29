@@ -113,10 +113,10 @@ export async function getMobileProjects(
 
   const now = new Date();
   const status = normalizeStatus(filters.status ?? null);
+  const andClauses = status ? [{ status }] : [];
   const projects = await prisma.project.findMany({
     where: {
-      ...(user.role === Role.PROJECT_MANAGER ? { projectManagerId: user.id } : {}),
-      ...(status ? { status } : {}),
+      ...projectAccessWhere(user),
       ...(filters.q?.trim()
         ? {
             OR: [
@@ -134,6 +134,7 @@ export async function getMobileProjects(
             ],
           }
         : {}),
+      ...(andClauses.length ? { AND: andClauses } : {}),
     },
     select: {
       id: true,
