@@ -1,5 +1,5 @@
 import { Role, SiteStatus, SiteType, TeamMemberStatus, TeamStatus, type Prisma, type PrismaClient } from '@prisma/client';
-import { projectAccessWhere, serializeSite, sitePublicSelect } from '@/lib/projects';
+import { canWriteSites, projectAccessWhere, serializeSite, sitePublicSelect } from '@/lib/projects';
 import { listProjectFormOptions } from '@/lib/project-web';
 import type {
   MobileSiteFormOptionsResponse,
@@ -48,10 +48,8 @@ type SiteManagementRow = {
   };
 };
 
-const MOBILE_SITE_MANAGEMENT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
-
 export function canAccessMobileSitesManagement(role: Role) {
-  return MOBILE_SITE_MANAGEMENT_ROLES.includes(role);
+  return canWriteSites(role);
 }
 
 export async function getMobileSitesManagement(

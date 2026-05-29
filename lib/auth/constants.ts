@@ -41,9 +41,9 @@ export const WEB_ROUTE_ROLE_MAP: Record<string, Role[]> = {
     'ADMIN',
   ],
   '/web/my-projects': ['PROJECT_MANAGER', 'ADMIN'],
-  '/web/projects/': ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
-  '/web/projects': ['DIRECTION', 'ADMIN'],
-  '/web/sites/': ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+  '/web/projects/': ['PROJECT_MANAGER', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'DIRECTION', 'ADMIN'],
+  '/web/projects': ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'DIRECTION', 'ADMIN'],
+  '/web/sites/': ['PROJECT_MANAGER', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'DIRECTION', 'ADMIN'],
   '/web/rh': ['HR', 'DIRECTION', 'ADMIN'],
   '/web/photos': ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
   '/web/reports': [

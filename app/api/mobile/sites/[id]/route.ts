@@ -1,9 +1,10 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, ProjectStatus } from '@prisma/client';
 import { withAuth } from '@/lib/auth/with-auth';
 import { canAccessMobileSitesManagement } from '@/lib/mobile-sites';
 import { prisma } from '@/lib/prisma';
 import {
   assertUpdateSiteRadiusAllowed,
+  getScopedProjectById,
   getScopedSiteById,
   jsonProjectError,
   parseJsonBody,
@@ -70,10 +71,29 @@ export const PATCH = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonProjectError('INVALID_SITE_MANAGER', 400, 'Le responsable de chantier est invalide.');
   }
 
+  const projectId = input.projectId ?? existingSite.projectId;
+
+  if (projectId !== existingSite.projectId) {
+    const targetProject = await getScopedProjectById(prisma, projectId, user);
+
+    if (!targetProject) {
+      return jsonProjectError('NOT_FOUND', 404, 'Projet cible introuvable.');
+    }
+
+    if (targetProject.status === ProjectStatus.ARCHIVED || targetProject.status === ProjectStatus.COMPLETED) {
+      return jsonProjectError(
+        'PROJECT_CLOSED',
+        400,
+        'Impossible de deplacer un chantier vers un projet archive ou termine.',
+      );
+    }
+  }
+
   try {
     const site = await prisma.site.update({
       where: { id: params.id },
       data: {
+        projectId,
         name: input.name ?? existingSite.name,
         address: input.address ?? existingSite.address,
         siteType: input.siteType ?? existingSite.siteType,

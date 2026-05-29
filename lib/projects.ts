@@ -15,8 +15,23 @@ import type {
   UpdateSiteInput,
 } from '@/types/projects';
 
-const PROJECT_READ_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
+const PROJECT_READ_ROLES: readonly Role[] = [
+  Role.PROJECT_MANAGER,
+  Role.BE_MANAGER,
+  Role.NEGOTIATION_MANAGER,
+  Role.FLEET_MANAGER,
+  Role.DIRECTION,
+  Role.ADMIN,
+];
 const PROJECT_WRITE_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
+const SITE_WRITE_ROLES: readonly Role[] = [
+  Role.PROJECT_MANAGER,
+  Role.BE_MANAGER,
+  Role.NEGOTIATION_MANAGER,
+  Role.FLEET_MANAGER,
+  Role.DIRECTION,
+  Role.ADMIN,
+];
 const GEOFENCING_ROLES: readonly Role[] = [Role.DIRECTION, Role.ADMIN];
 
 export const sitePublicSelect = {
@@ -144,6 +159,10 @@ export function canReadProjects(role: Role) {
 
 export function canWriteProjects(role: Role) {
   return PROJECT_WRITE_ROLES.includes(role);
+}
+
+export function canWriteSites(role: Role) {
+  return SITE_WRITE_ROLES.includes(role);
 }
 
 export function canManageGeofencing(role: Role) {
@@ -402,10 +421,6 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
 }
 
 export function parseUpdateSiteInput(body: unknown): UpdateSiteInput | null {
-  if (isRecord(body) && 'projectId' in body) {
-    return null;
-  }
-
   if (!isRecord(body)) {
     return null;
   }
@@ -413,6 +428,12 @@ export function parseUpdateSiteInput(body: unknown): UpdateSiteInput | null {
   const input: UpdateSiteInput = {
     radiusKmProvided: false,
   };
+
+  if ('projectId' in body) {
+    const projectId = sanitizeString(body.projectId);
+    if (!projectId) return null;
+    input.projectId = projectId;
+  }
 
   if ('name' in body) {
     const name = sanitizeProjectName(body.name);

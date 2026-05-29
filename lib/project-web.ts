@@ -239,7 +239,21 @@ export async function listProjectFormOptions(
   prisma: PrismaClient,
   user: AuthLikeUser,
 ): Promise<ProjectFormOptionsResponse> {
-  const [projectManagers, siteManagers] = await Promise.all([
+  const [projects, projectManagers, siteManagers] = await Promise.all([
+    prisma.project.findMany({
+      where: {
+        ...projectAccessWhere(user),
+        status: {
+          notIn: [ProjectStatus.ARCHIVED, ProjectStatus.COMPLETED],
+        },
+      },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        status: true,
+      },
+    }),
     prisma.user.findMany({
       where:
         user.role === Role.PROJECT_MANAGER
@@ -265,6 +279,7 @@ export async function listProjectFormOptions(
   ]);
 
   return {
+    projects,
     projectManagers: projectManagers.map(serializeUserOption),
     siteManagers: siteManagers.map(serializeUserOption),
   };

@@ -1,9 +1,7 @@
-import { Role } from '@prisma/client';
 import { redirect } from 'next/navigation';
 import { MobileSitesManagementPage } from '@/components/mobile-sites-management-page';
+import { canAccessMobileSitesManagement } from '@/lib/mobile-sites';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
-
-const mobileSitesManagementRoles: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION];
 
 export default async function MobileSitesManagementRoutePage() {
   const session = await getCurrentWebSession();
@@ -12,7 +10,7 @@ export default async function MobileSitesManagementRoutePage() {
     redirect('/mobile/login?next=/mobile/sites');
   }
 
-  if (!mobileSitesManagementRoles.includes(session.role)) {
+  if (!canAccessMobileSitesManagement(session.role)) {
     redirect('/mobile/profile');
   }
 

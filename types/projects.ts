@@ -93,6 +93,7 @@ export type ProjectFormUserOption = {
 };
 
 export type ProjectFormOptionsResponse = {
+  projects: Pick<ProjectListItem, 'id' | 'name' | 'status'>[];
   projectManagers: ProjectFormUserOption[];
   siteManagers: ProjectFormUserOption[];
 };
@@ -223,6 +224,7 @@ export type CreateSiteInput = {
 };
 
 export type UpdateSiteInput = Partial<Omit<CreateSiteInput, 'radiusKm' | 'radiusKmProvided'>> & {
+  projectId?: string;
   radiusKm?: number;
   radiusKmProvided: boolean;
 };

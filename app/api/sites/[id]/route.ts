@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
+import { Prisma, ProjectStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import {
   assertUpdateSiteRadiusAllowed,
   canReadProjects,
-  canWriteProjects,
+  canWriteSites,
+  getScopedProjectById,
   getScopedSiteById,
   jsonProjectError,
   parseJsonBody,
@@ -33,7 +34,7 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
 });
 
 export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
-  if (!canWriteProjects(user.role)) {
+  if (!canWriteSites(user.role)) {
     return jsonProjectError('FORBIDDEN', 403, 'Acces refuse a la modification de chantier.');
   }
 
@@ -90,10 +91,29 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonProjectError('INVALID_SITE_MANAGER', 400, 'Le responsable de chantier est invalide.');
   }
 
+  const projectId = input.projectId ?? existingSite.projectId;
+
+  if (projectId !== existingSite.projectId) {
+    const targetProject = await getScopedProjectById(prisma, projectId, user);
+
+    if (!targetProject) {
+      return jsonProjectError('NOT_FOUND', 404, 'Projet cible introuvable.');
+    }
+
+    if (targetProject.status === ProjectStatus.ARCHIVED || targetProject.status === ProjectStatus.COMPLETED) {
+      return jsonProjectError(
+        'PROJECT_CLOSED',
+        400,
+        'Impossible de deplacer un chantier vers un projet archive ou termine.',
+      );
+    }
+  }
+
   try {
     const site = await prisma.site.update({
       where: { id: params.id },
       data: {
+        projectId,
         name: input.name ?? existingSite.name,
         address: input.address ?? existingSite.address,
         siteType: input.siteType ?? existingSite.siteType,

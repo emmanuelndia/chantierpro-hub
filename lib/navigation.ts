@@ -27,7 +27,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/web/projects',
     label: 'Tous les projets',
     icon: 'projects',
-    roles: ['DIRECTION', 'ADMIN'],
+    roles: ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'DIRECTION', 'ADMIN'],
     breadcrumb: ['Tous les projets'],
   },
   {
@@ -190,6 +190,12 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     label: 'Projets',
     icon: 'folder',
     roles: ['PROJECT_MANAGER', 'DIRECTION'],
+  },
+  {
+    href: '/mobile/sites',
+    label: 'Chantiers',
+    icon: 'folder',
+    roles: ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
   },
   {
     href: '/mobile/gallery',

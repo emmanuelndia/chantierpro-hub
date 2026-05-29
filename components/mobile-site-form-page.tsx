@@ -2,7 +2,7 @@
 
 import { SiteStatus, type SiteGeofenceType, type SiteType } from '@prisma/client';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { SiteLocationPicker } from '@/components/site-location-picker';
 import { authFetch } from '@/lib/auth/client-session';
@@ -104,7 +104,7 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
 
   const options = mode === 'edit' ? editQuery.data?.options : optionsQuery.data;
   const site = editQuery.data?.site ?? null;
-  const canEditRadius = user.role === 'DIRECTION';
+  const canEditRadius = user.role === 'DIRECTION' || user.role === 'ADMIN';
   const currentManagerIsOutsideGsOptions = Boolean(
     site?.siteManagerId && !(options?.siteManagers ?? []).some((manager) => manager.id === site.siteManagerId),
   );
@@ -147,8 +147,6 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
       }));
     }
   }, [mode, options, preferredProjectId, site]);
-
-  const selectedProjectIsLocked = useMemo(() => mode === 'edit' || user.role === 'PROJECT_MANAGER', [mode, user.role]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -226,7 +224,6 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
         <Field label="Projet" error={errors.projectId}>
           <select
             className={inputClass}
-            disabled={selectedProjectIsLocked}
             onChange={(event) => setValues((current) => ({ ...current, projectId: event.target.value }))}
             value={values.projectId}
           >

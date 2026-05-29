@@ -34,6 +34,7 @@ type ProjectDetailPageProps = Readonly<{
 }>;
 
 type SiteFormValues = {
+  projectId: string;
   name: string;
   address: string;
   siteType: SiteType;
@@ -52,6 +53,7 @@ type SiteFormValues = {
 };
 
 type SiteMutationBody = Partial<{
+  projectId: string;
   name: string;
   address: string;
   siteType: SiteType;
@@ -128,8 +130,9 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
       const body = editingSite
         ? buildPartialSiteMutationBody(values, editingSite, canManageRadius)
         : buildCreateSiteMutationBody(values, canManageRadius);
+      const targetProjectId = values.projectId || projectId;
 
-      const response = await authFetch(editingSite ? `/api/sites/${editingSite.id}` : `/api/projects/${projectId}/sites`, {
+      const response = await authFetch(editingSite ? `/api/sites/${editingSite.id}` : `/api/projects/${targetProjectId}/sites`, {
         method: editingSite ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,9 +144,18 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
         const errorBody = (await safeJson(response)) as { message?: string } | null;
         throw new Error(errorBody?.message ?? 'Impossible de sauvegarder le chantier.');
       }
+
+      return ((await response.json()) as { site?: ProjectSiteItem }).site ?? null;
     },
-    onSuccess: () => {
+    onSuccess: (savedSite) => {
       void queryClient.invalidateQueries({ queryKey: ['project-detail', projectId] });
+      if (editingSite?.projectId && editingSite.projectId !== projectId) {
+        void queryClient.invalidateQueries({ queryKey: ['project-detail', editingSite.projectId] });
+      }
+      if (savedSite?.projectId && savedSite.projectId !== projectId) {
+        void queryClient.invalidateQueries({ queryKey: ['project-detail', savedSite.projectId] });
+      }
+      void queryClient.invalidateQueries({ queryKey: ['projects-list'] });
       setSiteDrawerOpen(false);
       setEditingSite(null);
       pushToast({
@@ -191,6 +203,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
 
   const project = projectQuery.data;
   const canManageRadius = viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
+  const canManageProject = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -263,6 +276,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
             </button>
             <button
               className="rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+              hidden={!canManageProject}
               onClick={() => setSiteImportOpen(true)}
               type="button"
             >
@@ -271,11 +285,13 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
             <Link
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               href={`/web/teams/new?projectId=${encodeURIComponent(projectId)}`}
+              hidden={!canManageProject}
             >
               Créer équipe
             </Link>
             <button
               className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+              hidden={!canManageProject}
               onClick={() => setArchiveOpen(true)}
               type="button"
             >
@@ -351,12 +367,14 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                     <Link
                       className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       href={`/web/teams?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`}
+                      hidden={!canManageProject}
                     >
                       Équipes
                     </Link>
                     <Link
                       className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       href={`/web/teams/new?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`}
+                      hidden={!canManageProject}
                     >
                       Créer équipe
                     </Link>
@@ -491,6 +509,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
 
       <SiteFormDrawer
         canManageRadius={canManageRadius}
+        currentProjectId={projectId}
         initialSite={editingSite}
         onClose={() => {
           setSiteDrawerOpen(false);
@@ -786,6 +805,7 @@ function SiteFormDrawer({
   initialSite,
   options,
   canManageRadius,
+  currentProjectId,
   pending,
   onSubmit,
   onClose,
@@ -794,19 +814,20 @@ function SiteFormDrawer({
   initialSite: ProjectSiteItem | null;
   options: ProjectFormOptionsResponse | null;
   canManageRadius: boolean;
+  currentProjectId: string;
   pending: boolean;
   onSubmit: (values: SiteFormValues) => void;
   onClose: () => void;
 }>) {
-  const [values, setValues] = useState<SiteFormValues>(() => buildInitialSiteFormValues(initialSite));
+  const [values, setValues] = useState<SiteFormValues>(() => buildInitialSiteFormValues(initialSite, currentProjectId));
   const currentManagerIsOutsideGsOptions = Boolean(
     initialSite?.siteManagerId &&
       !(options?.siteManagers ?? []).some((manager) => manager.id === initialSite.siteManagerId),
   );
 
   useEffect(() => {
-    setValues(buildInitialSiteFormValues(initialSite));
-  }, [initialSite]);
+    setValues(buildInitialSiteFormValues(initialSite, currentProjectId));
+  }, [currentProjectId, initialSite]);
 
   useEffect(() => {
     const defaultSiteManagerId = options?.siteManagers.at(0)?.id;
@@ -850,6 +871,21 @@ function SiteFormDrawer({
         </div>
 
         <div className="mt-6 grid gap-4">
+          <Field label="Projet">
+            <select
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+              onChange={(event) => setValues((current) => ({ ...current, projectId: event.target.value }))}
+              value={values.projectId}
+            >
+              <option value="">Choisir un projet</option>
+              {(options?.projects ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           <Field label="Nom du chantier">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
@@ -1057,9 +1093,10 @@ function LoadingCard({ message }: Readonly<{ message: string }>) {
   );
 }
 
-function buildInitialSiteFormValues(site: ProjectSiteItem | null): SiteFormValues {
+function buildInitialSiteFormValues(site: ProjectSiteItem | null, currentProjectId: string): SiteFormValues {
   if (site) {
     return {
+      projectId: site.projectId,
       name: site.name,
       address: site.address,
       siteType: site.siteType,
@@ -1079,6 +1116,7 @@ function buildInitialSiteFormValues(site: ProjectSiteItem | null): SiteFormValue
   }
 
   return {
+    projectId: currentProjectId,
     name: '',
     address: '',
     siteType: 'WORKSITE',
@@ -1099,6 +1137,7 @@ function buildInitialSiteFormValues(site: ProjectSiteItem | null): SiteFormValue
 
 function buildCreateSiteMutationBody(values: SiteFormValues, canManageRadius: boolean): SiteMutationBody {
   return {
+    projectId: values.projectId,
     name: values.name,
     address: values.address,
     siteType: values.siteType,
@@ -1119,6 +1158,7 @@ function buildCreateSiteMutationBody(values: SiteFormValues, canManageRadius: bo
 
 function buildPartialSiteMutationBody(values: SiteFormValues, initialSite: ProjectSiteItem, canManageRadius: boolean): SiteMutationBody {
   const body: SiteMutationBody = {};
+  setStringChange(body, 'projectId', values.projectId, initialSite.projectId);
   setStringChange(body, 'name', values.name, initialSite.name);
   setStringChange(body, 'address', values.address, initialSite.address);
   setStringChange(body, 'siteType', values.siteType, initialSite.siteType);
@@ -1205,7 +1245,8 @@ function canSubmitSiteForm(values: SiteFormValues) {
     (Math.abs(latitude) > 0.01 || Math.abs(longitude) > 0.01);
 
   return Boolean(
-    values.name.trim() &&
+    values.projectId &&
+      values.name.trim() &&
       (!values.requiresClockIn || hasValidGps),
   );
 }

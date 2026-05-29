@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import {
   assertCreateSiteRadiusAllowed,
-  canWriteProjects,
+  canWriteSites,
   getScopedProjectById,
   jsonProjectError,
   parseCreateSiteInput,
@@ -17,7 +17,7 @@ import {
 } from '@/lib/projects';
 
 export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
-  if (!canWriteProjects(user.role)) {
+  if (!canWriteSites(user.role)) {
     return jsonProjectError('FORBIDDEN', 403, 'Acces refuse a la creation de chantier.');
   }
 
