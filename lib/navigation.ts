@@ -73,6 +73,13 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Perimetres GS'],
   },
   {
+    href: '/web/coordinator-scopes',
+    label: 'Coordinateurs projet',
+    icon: 'users',
+    roles: ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    breadcrumb: ['Coordinateurs projet'],
+  },
+  {
     href: '/presences/equipe',
     label: 'Presences equipe',
     icon: 'rh',
@@ -310,6 +317,10 @@ export function getWebBreadcrumbs(pathname: string) {
 
   if (pathname === '/web/supervisor-scopes') {
     return ['Perimetres GS'];
+  }
+
+  if (pathname === '/web/coordinator-scopes') {
+    return ['Coordinateurs projet'];
   }
 
   if (pathname === '/web/teams') {

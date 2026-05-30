@@ -1,7 +1,7 @@
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { getOperationalSiteIds } from '@/lib/dashboard';
+import { getCoordinatorScopedSiteIds } from '@/lib/reports';
 
 type ReminderBody = {
   supervisorId?: string;
@@ -25,7 +25,7 @@ export const POST = withAuth(async ({ user, req }) => {
   }
 
   try {
-    const siteIds = await getOperationalSiteIds(prisma, user.id);
+    const siteIds = await getCoordinatorScopedSiteIds(prisma, user.id);
     const supervisor = await prisma.user.findFirst({
       where: {
         id: supervisorId,

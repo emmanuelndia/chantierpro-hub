@@ -1,7 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { getOperationalSiteIds } from '@/lib/dashboard';
 import { canCreateReports, canReadAllReports, getAccessibleReportById, jsonReportError } from '@/lib/reports';
 import type { ReportDetail } from '@/types/reports';
 
@@ -10,17 +9,10 @@ export const GET = withAuth<{ id: string }>(async ({ params, user, req }) => {
     return jsonReportError('FORBIDDEN', 403, 'Téléchargement du rapport non autorisé.');
   }
 
-  const basePayload = {
+  const report = await getAccessibleReportById(prisma, {
     reportId: params.id,
     user,
-  };
-
-  const report = await getAccessibleReportById(
-    prisma,
-    user.role === 'COORDINATOR'
-      ? { ...basePayload, siteIds: await getOperationalSiteIds(prisma, user.id) }
-      : basePayload,
-  );
+  });
 
   if (!report) {
     return jsonReportError('NOT_FOUND', 404, 'Rapport introuvable.');

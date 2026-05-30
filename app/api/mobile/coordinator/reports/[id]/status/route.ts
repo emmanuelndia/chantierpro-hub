@@ -1,7 +1,7 @@
 import { ReportStatus, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { getOperationalSiteIds } from '@/lib/dashboard';
+import { getCoordinatorScopedSiteIds } from '@/lib/reports';
 
 type UpdateReportStatusBody = {
   status?: ReportStatus;
@@ -27,7 +27,7 @@ export const PATCH = withAuth<{ id: string }>(async ({ user, params, req }) => {
   }
 
   try {
-    const siteIds = await getOperationalSiteIds(prisma, user.id);
+    const siteIds = await getCoordinatorScopedSiteIds(prisma, user.id);
     const currentReport = await prisma.report.findFirst({
       where: {
         id: params.id,

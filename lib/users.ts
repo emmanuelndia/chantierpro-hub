@@ -39,6 +39,23 @@ export const userPublicSelect = {
   mustChangePassword: true,
   lastLoginAt: true,
   createdAt: true,
+  coordinatorProjectManagerScopes: {
+    select: {
+      projectManager: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          username: true,
+        },
+      },
+    },
+    orderBy: {
+      projectManager: {
+        firstName: 'asc',
+      },
+    },
+  },
 } satisfies Prisma.UserSelect;
 
 type SerializableUser = Prisma.UserGetPayload<{
@@ -118,6 +135,12 @@ export function serializeUser(user: SerializableUser): UserListItem {
     mustChangePassword: user.mustChangePassword,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
+    projectManagerScopes: user.coordinatorProjectManagerScopes.map((scope) => ({
+      id: scope.projectManager.id,
+      firstName: scope.projectManager.firstName,
+      lastName: scope.projectManager.lastName,
+      username: scope.projectManager.username,
+    })),
   };
 }
 
@@ -394,6 +417,12 @@ export async function deactivateManagedUser(prisma: PrismaClient, userId: string
       },
     });
 
+    await tx.coordinatorProjectManagerScope.deleteMany({
+      where: {
+        OR: [{ coordinatorId: userId }, { projectManagerId: userId }],
+      },
+    });
+
     await tx.planningAssignment.updateMany({
       where: {
         supervisorId: userId,
@@ -542,6 +571,7 @@ function sanitizeOptionalEmail(value: unknown) {
 
   return sanitizeEmail(trimmed) ?? undefined;
 }
+
 
 function sanitizeUsername(value: unknown) {
   if (typeof value !== 'string') {

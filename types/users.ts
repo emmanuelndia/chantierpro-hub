@@ -9,6 +9,13 @@ export type UserAvailability = {
   siteName: string | null;
 };
 
+export type UserProjectManagerScope = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+};
+
 export type UserListItem = {
   id: string;
   username: string;
@@ -22,6 +29,7 @@ export type UserListItem = {
   lastLoginAt: string | null;
   createdAt: string;
   availability?: UserAvailability;
+  projectManagerScopes: UserProjectManagerScope[];
 };
 
 export type UserDetail = UserListItem;

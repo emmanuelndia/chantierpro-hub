@@ -1,7 +1,7 @@
 import { ClockInStatus, ClockInType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { getOperationalSiteIds } from '@/lib/dashboard';
+import { getCoordinatorScopedSiteIds } from '@/lib/reports';
 import type {
   CoordinatorReportsResponse,
   PendingReport,
@@ -22,7 +22,7 @@ export const GET = withAuth(async ({ user, req }) => {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   try {
-    const operationalSiteIds = await getOperationalSiteIds(prisma, user.id);
+    const operationalSiteIds = await getCoordinatorScopedSiteIds(prisma, user.id);
     const siteIds =
       selectedSiteId && operationalSiteIds.includes(selectedSiteId)
         ? [selectedSiteId]

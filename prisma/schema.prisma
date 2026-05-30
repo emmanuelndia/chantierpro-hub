@@ -170,6 +170,9 @@ model User {
   taskProgressUpdates        TaskProgressUpdate[]
   generalSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeGeneralSupervisor")
   managedGeneralSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeProjectManager")
+  coordinatorProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeCoordinator")
+  coordinatedProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeProjectManager")
+  createdCoordinatorProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeCreator")
 }
 
 model Project {
@@ -431,6 +434,22 @@ model PhotoDeletionLog {
   @@index([photoId])
   @@index([deletedById])
   @@index([originalAuthorId])
+}
+
+model CoordinatorProjectManagerScope {
+  id               String   @id @default(cuid())
+  coordinatorId    String
+  projectManagerId String
+  createdById      String
+  createdAt        DateTime @default(now())
+  coordinator      User     @relation("CoordinatorProjectManagerScopeCoordinator", fields: [coordinatorId], references: [id], onDelete: Cascade)
+  projectManager   User     @relation("CoordinatorProjectManagerScopeProjectManager", fields: [projectManagerId], references: [id], onDelete: Cascade)
+  createdBy        User     @relation("CoordinatorProjectManagerScopeCreator", fields: [createdById], references: [id])
+
+  @@unique([coordinatorId, projectManagerId])
+  @@index([coordinatorId])
+  @@index([projectManagerId])
+  @@index([createdById])
 }
 
 model TaskProgressUpdate {

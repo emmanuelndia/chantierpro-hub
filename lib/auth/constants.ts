@@ -58,6 +58,7 @@ export const WEB_ROUTE_ROLE_MAP: Record<string, Role[]> = {
   ],
   '/web/planning': ['GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
   '/web/supervisor-scopes': ['GENERAL_SUPERVISOR', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+  '/web/coordinator-scopes': ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
   '/web/teams': ['GENERAL_SUPERVISOR', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
   '/web/deletion-logs': ['DIRECTION', 'ADMIN'],
   '/web/users/': ['GENERAL_SUPERVISOR', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],

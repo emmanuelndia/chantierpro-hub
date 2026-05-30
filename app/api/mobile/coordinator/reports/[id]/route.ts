@@ -1,7 +1,7 @@
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { getOperationalSiteIds } from '@/lib/dashboard';
+import { getCoordinatorScopedSiteIds } from '@/lib/reports';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import type { ReportDetail } from '@/types/mobile-reports';
 
@@ -11,7 +11,7 @@ export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
   }
 
   try {
-    const siteIds = await getOperationalSiteIds(prisma, user.id);
+    const siteIds = await getCoordinatorScopedSiteIds(prisma, user.id);
 
     if (siteIds.length === 0) {
       return Response.json({ code: 'NOT_FOUND', message: 'Rapport non trouvé' }, { status: 404 });

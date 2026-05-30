@@ -5,12 +5,12 @@ import {
   GeneralSupervisorSiteScopeStatus,
   PhotoTag,
   Prisma,
+  ProjectStatus,
   ReportStatus,
   ReportValidationStatus,
   Role,
   type PrismaClient,
 } from '@prisma/client';
-import { getOperationalSiteIds } from '@/lib/dashboard';
 import { documentAttachmentSelect, serializeDocumentAttachment } from '@/lib/documents';
 import {
   BUSINESS_FIELD_RESOURCE_ROLES,
@@ -26,7 +26,9 @@ import type {
   ReportApiErrorCode,
   ReportDetail,
   ReportItem,
+  WebReportCoveragePeriod,
   WebReportItem,
+  WebReportSiteCoverageItem,
   WebReportsResponse,
   WebReportStatusFilter,
   WebReportValidationFilter,
@@ -136,6 +138,7 @@ type WebReportQuery = {
   status: WebReportStatusFilter;
   validationStatus: WebReportValidationFilter;
   q: string | null;
+  coveragePeriod: WebReportCoveragePeriod;
 };
 
 type WebExportFormat = 'csv' | 'xlsx' | 'pdf' | 'txt';
@@ -184,6 +187,7 @@ export function parseWebReportQuery(searchParams: URLSearchParams): WebReportQue
     status,
     validationStatus,
     q: sanitizeString(searchParams.get('q')),
+    coveragePeriod: parseCoveragePeriod(searchParams.get('coveragePeriod')),
   };
 }
 
@@ -343,8 +347,9 @@ export async function getWebReports(
   const siteWhere = await getWebReportSiteWhere(prisma, user);
   const where = buildWebReportWhere(siteWhere, query);
   const optionsWhere = siteWhere;
+  const coverageRange = buildCoverageRange(query.coveragePeriod);
 
-  const [items, totalItems, totalSubmitted, totalValidated, siteRows, projects, sites, resources] =
+  const [items, totalItems, totalSubmitted, totalValidated, siteRows, projects, sites, resources, siteCoverage] =
     await Promise.all([
       prisma.report.findMany({
         where,
@@ -416,6 +421,7 @@ export async function getWebReports(
           role: true,
         },
       }),
+      buildWebReportSiteCoverage(prisma, optionsWhere, coverageRange),
     ]);
 
   return {
@@ -424,6 +430,8 @@ export async function getWebReports(
     pageSize: WEB_REPORT_PAGE_SIZE,
     totalItems,
     totalPages: Math.max(1, Math.ceil(totalItems / WEB_REPORT_PAGE_SIZE)),
+    coveragePeriod: query.coveragePeriod,
+    siteCoverage,
     widgets: {
       total: totalItems,
       submitted: totalSubmitted,
@@ -648,7 +656,6 @@ export async function validateReportForClient(
   payload: {
     reportId: string;
     user: AuthLikeUser;
-    siteIds: string[];
   },
 ) {
   if (!canValidateReportsForClient(payload.user.role)) {
@@ -666,7 +673,7 @@ export async function validateReportForClient(
     },
   });
 
-  if (!report || !payload.siteIds.includes(report.siteId)) {
+  if (!report || !(await canAccessReportSite(prisma, payload.user, report.siteId))) {
     return { code: 'NOT_FOUND' as const, report: null };
   }
 
@@ -767,8 +774,13 @@ export function serializeReportDetail(
 
 async function getWebReportSiteWhere(prisma: PrismaClient, user: AuthLikeUser): Promise<Prisma.SiteWhereInput> {
   if (user.role === Role.COORDINATOR) {
-    const siteIds = await getOperationalSiteIds(prisma, user.id);
-    return { id: { in: siteIds } };
+    const projectManagerIds = await getCoordinatorProjectManagerIds(prisma, user.id);
+    return {
+      project: {
+        projectManagerId: { in: projectManagerIds },
+        status: { not: ProjectStatus.ARCHIVED },
+      },
+    };
   }
 
   if (user.role === Role.GENERAL_SUPERVISOR) {
@@ -803,6 +815,48 @@ async function getWebReportSiteWhere(prisma: PrismaClient, user: AuthLikeUser): 
   }
 
   return {};
+}
+
+export async function getCoordinatorScopedSiteIds(prisma: PrismaClient, coordinatorId: string) {
+  const projectManagerIds = await getCoordinatorProjectManagerIds(prisma, coordinatorId);
+  if (projectManagerIds.length === 0) {
+    return [];
+  }
+
+  const sites = await prisma.site.findMany({
+    where: {
+      project: {
+        projectManagerId: { in: projectManagerIds },
+        status: { not: ProjectStatus.ARCHIVED },
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return sites.map((site) => site.id);
+}
+
+async function getCoordinatorProjectManagerIds(prisma: PrismaClient, coordinatorId: string) {
+  const scopes = await prisma.coordinatorProjectManagerScope.findMany({
+    where: {
+      coordinatorId,
+      coordinator: {
+        isActive: true,
+        role: Role.COORDINATOR,
+      },
+      projectManager: {
+        isActive: true,
+        role: Role.PROJECT_MANAGER,
+      },
+    },
+    select: {
+      projectManagerId: true,
+    },
+  });
+
+  return scopes.map((scope) => scope.projectManagerId);
 }
 
 async function canAccessReportSite(prisma: PrismaClient, user: AuthLikeUser, siteId: string) {
@@ -913,6 +967,92 @@ function parseValidationStatusFilter(value: string | null): WebReportValidationF
   return Object.values(ReportValidationStatus).includes(value as ReportValidationStatus)
     ? (value as ReportValidationStatus)
     : null;
+}
+
+function parseCoveragePeriod(value: string | null): WebReportCoveragePeriod {
+  return value === 'week' ? 'week' : 'today';
+}
+
+function buildCoverageRange(period: WebReportCoveragePeriod) {
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+
+  if (period === 'week') {
+    const day = todayStart.getUTCDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const from = new Date(todayStart);
+    from.setUTCDate(todayStart.getUTCDate() + mondayOffset);
+    const to = new Date(from);
+    to.setUTCDate(from.getUTCDate() + 7);
+    return { from, to };
+  }
+
+  const to = new Date(todayStart);
+  to.setUTCDate(todayStart.getUTCDate() + 1);
+  return { from: todayStart, to };
+}
+
+async function buildWebReportSiteCoverage(
+  prisma: PrismaClient,
+  siteWhere: Prisma.SiteWhereInput,
+  period: { from: Date; to: Date },
+): Promise<WebReportSiteCoverageItem[]> {
+  const sites = await prisma.site.findMany({
+    where: siteWhere,
+    orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      name: true,
+      projectId: true,
+      project: {
+        select: {
+          name: true,
+          projectManager: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      },
+      reports: {
+        where: {
+          submittedAt: {
+            gte: period.from,
+            lt: period.to,
+          },
+        },
+        orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
+        select: {
+          id: true,
+          submittedAt: true,
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return sites.map((site) => {
+    const latestReport = site.reports[0] ?? null;
+    return {
+      projectId: site.projectId,
+      projectName: site.project.name,
+      projectManagerName: `${site.project.projectManager.firstName} ${site.project.projectManager.lastName}`,
+      siteId: site.id,
+      siteName: site.name,
+      reportsCount: site.reports.length,
+      latestReportAt: latestReport?.submittedAt.toISOString() ?? null,
+      latestReportAuthorName: latestReport
+        ? `${latestReport.user.firstName} ${latestReport.user.lastName}`
+        : null,
+      status: site.reports.length > 0 ? 'RECEIVED' : 'MISSING',
+    };
+  });
 }
 
 function dayRange(date: Date) {

@@ -1,14 +1,11 @@
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { getOperationalSiteIds } from '@/lib/dashboard';
 import { jsonReportError, validateReportForClient } from '@/lib/reports';
 
 export const POST = withAuth<{ id: string }>(async ({ params, user }) => {
-  const siteIds = await getOperationalSiteIds(prisma, user.id);
   const result = await validateReportForClient(prisma, {
     reportId: params.id,
     user,
-    siteIds,
   });
 
   if (result.code === 'FORBIDDEN') {

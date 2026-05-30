@@ -80,6 +80,7 @@ export type NearbySiteItem = {
 
 export type WebReportStatusFilter = 'ALL' | ReportStatus;
 export type WebReportValidationFilter = 'ALL' | ReportValidationStatus;
+export type WebReportCoveragePeriod = 'today' | 'week';
 
 export type WebReportOption = {
   id: string;
@@ -115,12 +116,26 @@ export type WebReportItem = {
   attachmentsCount: number;
 };
 
+export type WebReportSiteCoverageItem = {
+  projectId: string;
+  projectName: string;
+  projectManagerName: string;
+  siteId: string;
+  siteName: string;
+  reportsCount: number;
+  latestReportAt: string | null;
+  latestReportAuthorName: string | null;
+  status: 'RECEIVED' | 'MISSING';
+};
+
 export type WebReportsResponse = {
   generatedAt: string;
   page: number;
   pageSize: number;
   totalItems: number;
   totalPages: number;
+  coveragePeriod: WebReportCoveragePeriod;
+  siteCoverage: WebReportSiteCoverageItem[];
   widgets: {
     total: number;
     submitted: number;

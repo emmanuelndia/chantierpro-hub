@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { Prisma, Role } from '@prisma/client';
-import { getOperationalSiteIds } from '@/lib/dashboard';
+import { getCoordinatorScopedSiteIds } from '@/lib/reports';
 import {
   BUSINESS_FIELD_RESOURCE_ROLES,
   getBusinessManagedResourceRoles,
@@ -18,7 +18,7 @@ export const GET = withAuth(async ({ user }) => {
     }
 
     if (user.role === Role.COORDINATOR) {
-      const siteIds = await getOperationalSiteIds(prisma, user.id);
+      const siteIds = await getCoordinatorScopedSiteIds(prisma, user.id);
       where.siteId = { in: siteIds };
     }
 

@@ -1,7 +1,7 @@
 import { ClockInStatus, ClockInType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { getOperationalSiteIds } from '@/lib/dashboard';
+import { getCoordinatorScopedSiteIds } from '@/lib/reports';
 
 export const GET = withAuth(async ({ user }) => {
   if (user.role !== Role.COORDINATOR) {
@@ -14,7 +14,7 @@ export const GET = withAuth(async ({ user }) => {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   try {
-    const siteIds = await getOperationalSiteIds(prisma, user.id);
+    const siteIds = await getCoordinatorScopedSiteIds(prisma, user.id);
 
     if (siteIds.length === 0) {
       return Response.json({

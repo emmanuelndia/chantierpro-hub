@@ -11,6 +11,8 @@ import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
   WebReportItem,
+  WebReportCoveragePeriod,
+  WebReportSiteCoverageItem,
   WebReportsResponse,
   WebReportStatusFilter,
   WebReportValidationFilter,
@@ -50,6 +52,7 @@ export function ReportsWebPage({ viewer }: ReportsWebPageProps) {
   const [resourceId, setResourceId] = useState('');
   const [status, setStatus] = useState<WebReportStatusFilter>('ALL');
   const [validationStatus, setValidationStatus] = useState<WebReportValidationFilter>('ALL');
+  const [coveragePeriod, setCoveragePeriod] = useState<WebReportCoveragePeriod>('today');
   const [q, setQ] = useState('');
 
   const filters = useMemo(
@@ -62,9 +65,10 @@ export function ReportsWebPage({ viewer }: ReportsWebPageProps) {
       resourceId,
       status,
       validationStatus,
+      coveragePeriod,
       q,
     }),
-    [from, page, projectId, q, resourceId, siteId, status, to, validationStatus],
+    [coveragePeriod, from, page, projectId, q, resourceId, siteId, status, to, validationStatus],
   );
 
   const query = useQuery({
@@ -92,6 +96,17 @@ export function ReportsWebPage({ viewer }: ReportsWebPageProps) {
   });
 
   const data = query.data;
+  const visibleCoverage = useMemo(() => {
+    const items = data?.siteCoverage ?? [];
+    const search = q.trim().toLowerCase();
+    return items.filter((item) => {
+      if (projectId && item.projectId !== projectId) return false;
+      if (siteId && item.siteId !== siteId) return false;
+      if (!search) return true;
+      return [item.projectName, item.siteName, item.projectManagerName]
+        .some((value) => value.toLowerCase().includes(search));
+    });
+  }, [data?.siteCoverage, projectId, q, siteId]);
 
   function resetPageAnd(run: () => void) {
     setPage(1);
@@ -136,6 +151,32 @@ export function ReportsWebPage({ viewer }: ReportsWebPageProps) {
             <MetricCard label="Soumis" value={data.widgets.submitted} tone="warning" />
             <MetricCard label="Valides client" value={data.widgets.validated} tone="success" />
             <MetricCard label="Chantiers" value={data.widgets.sites} tone="info" />
+          </section>
+
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+            <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Suivi des rapports attendus</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Visualise les chantiers suivis, meme lorsque les rapports ne sont pas encore envoyes.
+                </p>
+              </div>
+              <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+                {(['today', 'week'] as const).map((period) => (
+                  <button
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                      coveragePeriod === period ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-white'
+                    }`}
+                    key={period}
+                    onClick={() => setCoveragePeriod(period)}
+                    type="button"
+                  >
+                    {period === 'today' ? 'Aujourd hui' : 'Cette semaine'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <ReportsCoverageList items={visibleCoverage} period={coveragePeriod} />
           </section>
 
           <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
@@ -334,6 +375,7 @@ type ReportFilters = {
   resourceId: string;
   status: WebReportStatusFilter;
   validationStatus: WebReportValidationFilter;
+  coveragePeriod: WebReportCoveragePeriod;
   q: string;
 };
 
@@ -342,6 +384,7 @@ function buildSearchParams(filters: ReportFilters) {
     page: String(filters.page),
     status: filters.status,
     validationStatus: filters.validationStatus,
+    coveragePeriod: filters.coveragePeriod,
   });
 
   if (filters.from) searchParams.set('from', filters.from);
@@ -352,6 +395,56 @@ function buildSearchParams(filters: ReportFilters) {
   if (filters.q) searchParams.set('q', filters.q);
 
   return searchParams;
+}
+
+function ReportsCoverageList({
+  items,
+  period,
+}: Readonly<{
+  items: WebReportSiteCoverageItem[];
+  period: WebReportCoveragePeriod;
+}>) {
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        title="Aucun chantier suivi"
+        description="Aucun projet ou chantier ne correspond au perimetre et aux filtres selectionnes."
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-3 xl:grid-cols-2">
+      {items.map((item) => (
+        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4" key={item.siteId}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                {item.projectName} - {item.projectManagerName}
+              </p>
+              <h3 className="mt-2 text-base font-semibold text-slate-950">{item.siteName}</h3>
+              {item.latestReportAt ? (
+                <p className="mt-1 text-sm text-slate-500">
+                  Dernier rapport : {formatDateTime(item.latestReportAt)}
+                  {item.latestReportAuthorName ? ` par ${item.latestReportAuthorName}` : ''}
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-slate-500">
+                  {period === 'today' ? "Aucun rapport aujourd'hui" : 'Aucun rapport cette semaine'}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={item.status === 'RECEIVED' ? 'success' : 'warning'}>
+                {item.status === 'RECEIVED' ? 'Rapport recu' : 'Aucun rapport sur la periode'}
+              </Badge>
+              <Badge tone="neutral">{item.reportsCount} rapport(s)</Badge>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
 }
 
 function ReportsTable({

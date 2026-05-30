@@ -57,10 +57,26 @@ export const PUT = withAuth<{ id: string }>(
       return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant ou cet email existe deja.');
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: params.id },
-      data: input,
-      select: userPublicSelect,
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: params.id },
+        data: input,
+        select: userPublicSelect,
+      });
+
+      if (input.role !== Role.COORDINATOR) {
+        await tx.coordinatorProjectManagerScope.deleteMany({
+          where: { coordinatorId: params.id },
+        });
+      }
+
+      if (input.role !== Role.PROJECT_MANAGER) {
+        await tx.coordinatorProjectManagerScope.deleteMany({
+          where: { projectManagerId: params.id },
+        });
+      }
+
+      return updated;
     });
 
     return NextResponse.json({ user: serializeUserDetail(updatedUser) });

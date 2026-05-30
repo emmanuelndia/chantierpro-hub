@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { getOperationalSiteIds } from '@/lib/dashboard';
-import { canCreateReports, canReadAllReports, jsonReportError } from '@/lib/reports';
+import { canCreateReports, canReadAllReports, getCoordinatorScopedSiteIds, jsonReportError } from '@/lib/reports';
 import { getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
 import { Prisma } from '@prisma/client';
 import { jsPDF } from 'jspdf';
@@ -52,7 +51,7 @@ export const GET = withAuth(async ({ user, req }) => {
 
   // Récupérer les rapports du jour pour le coordinateur
   const siteIds = user.role === 'COORDINATOR' 
-    ? await getOperationalSiteIds(prisma, user.id)
+    ? await getCoordinatorScopedSiteIds(prisma, user.id)
     : undefined;
 
   const reports = await prisma.report.findMany({

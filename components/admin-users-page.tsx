@@ -289,6 +289,11 @@ export function AdminUsersPage() {
                     </td>
                     <td className="px-5 py-4">
                       <Badge tone="neutral">{formatRole(user.role)}</Badge>
+                      {user.role === Role.COORDINATOR ? (
+                        <p className="mt-1 text-xs font-medium text-slate-500">
+                          Suit {user.projectManagerScopes.length} chef(s) projet
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-5 py-4">
                       <Badge tone={user.isActive ? 'success' : 'warning'}>{user.isActive ? 'Actif' : 'Inactif'}</Badge>
