@@ -5,13 +5,19 @@ import type {
   CentralizedPlanningResponse,
 } from '@/types/planning-web';
 import type { TaskProgressUpdateItem } from '@/types/mobile-planning';
+import { BUSINESS_MANAGER_ROLES } from '@/lib/field-roles';
 
 type AuthLikeUser = {
   id: string;
   role: Role;
 };
 
-const CENTRALIZED_PLANNING_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
+const CENTRALIZED_PLANNING_ROLES: readonly Role[] = [
+  ...BUSINESS_MANAGER_ROLES,
+  Role.PROJECT_MANAGER,
+  Role.DIRECTION,
+  Role.ADMIN,
+];
 const MAX_RANGE_DAYS = 31;
 
 export function canAccessCentralizedPlanning(role: Role) {

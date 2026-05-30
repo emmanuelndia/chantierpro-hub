@@ -102,6 +102,11 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     viewer.role === 'FLEET_MANAGER' ||
     viewer.role === 'PROJECT_MANAGER';
   const canAccessCentralized = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
+  const canViewCentralized =
+    viewer.role === 'BE_MANAGER' ||
+    viewer.role === 'NEGOTIATION_MANAGER' ||
+    viewer.role === 'FLEET_MANAGER' ||
+    canAccessCentralized;
 
   const dayQuery = useQuery({
     queryKey: ['web-planning', selectedDate],
@@ -122,7 +127,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const centralizedQuery = useQuery({
     queryKey: ['web-planning-centralized', centralizedFilters],
     queryFn: () => fetchCentralizedPlanning(centralizedFilters),
-    enabled: canAccessCentralized && viewMode === 'centralized',
+    enabled: canViewCentralized && viewMode === 'centralized',
     staleTime: 30_000,
   });
   const assignmentConflictsQuery = useQuery({
@@ -137,7 +142,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         role: '',
         workLocationType: '',
       }),
-    enabled: canAccessCentralized && Boolean(drawerMode && form.date && form.supervisorId),
+    enabled: canViewCentralized && Boolean(drawerMode && form.date && form.supervisorId),
     staleTime: 30_000,
   });
 
@@ -358,7 +363,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
             <SegmentedButton active={viewMode === 'week'} onClick={() => setViewMode('week')}>
               Semaine
             </SegmentedButton>
-            {canAccessCentralized ? (
+            {canViewCentralized ? (
               <SegmentedButton active={viewMode === 'centralized'} onClick={() => setViewMode('centralized')}>
                 Centralisé
               </SegmentedButton>

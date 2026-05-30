@@ -124,12 +124,14 @@ export async function getPlanningDay(
   if (rangeError) return rangeError;
 
   const siteWhere = operationalPlanningSiteWhere(user, parsedDate);
+  const assignmentScopeWhere = planningAssignmentScopeWhere(user);
   const [assignments, sites, scopedSupervisorIds] = await Promise.all([
     prisma.planningAssignment.findMany({
       where: {
         date: parsedDate,
         deletedAt: null,
         site: siteWhere,
+        ...assignmentScopeWhere,
       },
       orderBy: [
         { site: { name: 'asc' } },
@@ -198,6 +200,7 @@ export async function getPlanningDay(
         date: addDays(parsedDate, -1),
         deletedAt: null,
         site: siteWhere,
+        ...assignmentScopeWhere,
       },
     }),
   ]);
@@ -517,12 +520,14 @@ export async function duplicatePlanningAssignments(
 
   const sourceSiteWhere = operationalPlanningSiteWhere(user, sourceDate);
   const targetSiteWhere = operationalPlanningSiteWhere(user, targetDate);
+  const assignmentScopeWhere = planningAssignmentScopeWhere(user);
   const [sourceAssignments, existingTargetAssignments, validTargetSites, validSupervisorIds] = await Promise.all([
     prisma.planningAssignment.findMany({
       where: {
         date: sourceDate,
         deletedAt: null,
         site: sourceSiteWhere,
+        ...assignmentScopeWhere,
       },
       orderBy: [{ site: { name: 'asc' } }, { supervisor: { firstName: 'asc' } }, { id: 'asc' }],
       select: planningAssignmentSelect,
@@ -532,6 +537,7 @@ export async function duplicatePlanningAssignments(
         date: targetDate,
         deletedAt: null,
         site: targetSiteWhere,
+        ...assignmentScopeWhere,
       },
       select: {
         supervisorId: true,
@@ -627,6 +633,18 @@ function getScopedPlanningAssignment(prisma: PrismaClient, user: AuthLikeUser, a
     },
     select: planningAssignmentSelect,
   });
+}
+
+function planningAssignmentScopeWhere(user: AuthLikeUser): Prisma.PlanningAssignmentWhereInput {
+  if (!isBusinessManagerRole(user.role)) {
+    return {};
+  }
+
+  return {
+    supervisor: {
+      role: { in: [...getBusinessManagedResourceRoles(user.role)] },
+    },
+  };
 }
 
 function getAccessibleSupervisorAssignment(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {

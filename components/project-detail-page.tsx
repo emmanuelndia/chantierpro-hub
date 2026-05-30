@@ -71,6 +71,17 @@ type SiteMutationBody = Partial<{
   siteManagerId: string;
 }>;
 
+const SITE_WRITE_ROLES: readonly Role[] = [
+  'PROJECT_MANAGER',
+  'BE_MANAGER',
+  'NEGOTIATION_MANAGER',
+  'FLEET_MANAGER',
+  'DIRECTION',
+  'ADMIN',
+];
+
+const PROJECT_DOCUMENT_ROLES: readonly Role[] = ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'];
+
 export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps) {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
@@ -204,6 +215,8 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
   const project = projectQuery.data;
   const canManageRadius = viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
   const canManageProject = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
+  const canManageSites = SITE_WRITE_ROLES.includes(viewer.role);
+  const canManageProjectDocuments = PROJECT_DOCUMENT_ROLES.includes(viewer.role);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -212,11 +225,11 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
       requestedTab === 'team' ||
       requestedTab === 'presences' ||
       requestedTab === 'photos' ||
-      requestedTab === 'documents'
+      (requestedTab === 'documents' && canManageProjectDocuments)
     ) {
       setActiveTab(requestedTab);
     }
-  }, [searchParams]);
+  }, [canManageProjectDocuments, searchParams]);
 
   const tabs = useMemo(
     () => [
@@ -224,9 +237,9 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
       { id: 'team', label: 'Equipe' },
       { id: 'presences', label: 'Presences' },
       { id: 'photos', label: 'Photos' },
-      { id: 'documents', label: 'Documents' },
+      ...(canManageProjectDocuments ? [{ id: 'documents' as const, label: 'Documents' }] : []),
     ] as const,
-    [],
+    [canManageProjectDocuments],
   );
 
   if (projectQuery.isLoading) {
@@ -276,7 +289,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
             </button>
             <button
               className="rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
-              hidden={!canManageProject}
+              hidden={!canManageSites}
               onClick={() => setSiteImportOpen(true)}
               type="button"
             >
@@ -390,13 +403,15 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                     </button>
                   </div>
                 </div>
+                {canManageProjectDocuments ? (
                 <DocumentAttachmentsPanel
-                  canUpload={viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN'}
+                  canUpload={canManageProjectDocuments}
                   compact
                   context={{ siteId: site.id }}
                   description="Documents rattachés à ce chantier."
                   title="Documents chantier"
                 />
+                ) : null}
               </article>
             ))
           )}
@@ -500,7 +515,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
 
       {activeTab === 'documents' ? (
         <DocumentAttachmentsPanel
-          canUpload={viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN'}
+          canUpload={canManageProjectDocuments}
           context={{ projectId }}
           description="Documents, PV, Excel et livrables rattachés au projet."
           title={`Documents - ${project.name}`}

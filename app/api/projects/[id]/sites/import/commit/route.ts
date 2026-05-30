@@ -1,10 +1,10 @@
 import { withAuth } from '@/lib/auth/with-auth';
-import { canWriteProjects, getScopedProjectById, jsonProjectError } from '@/lib/projects';
+import { canWriteSites, getScopedProjectById, jsonProjectError } from '@/lib/projects';
 import { prisma } from '@/lib/prisma';
 import { commitSiteImport, parseSiteImportRowsPayload } from '@/lib/site-import';
 
 export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
-  if (!canWriteProjects(user.role)) {
+  if (!canWriteSites(user.role)) {
     return jsonProjectError('FORBIDDEN', 403, 'Acces refuse a l import de chantiers.');
   }
 
