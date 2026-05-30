@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/auth/with-auth';
 import { getCoordinatorScopedSiteIds } from '@/lib/reports';
 import type {
   CoordinatorReportsResponse,
+  MobileReportCoveragePeriod,
   PendingReport,
   ReceivedReport,
 } from '@/types/mobile-reports';
@@ -15,6 +16,8 @@ export const GET = withAuth(async ({ user, req }) => {
 
   const { searchParams } = new URL(req.url);
   const selectedSiteId = searchParams.get('siteId');
+  const coveragePeriod: MobileReportCoveragePeriod = searchParams.get('coveragePeriod') === 'week' ? 'week' : 'today';
+  const reportRange = buildReportRange(coveragePeriod);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -39,6 +42,7 @@ export const GET = withAuth(async ({ user, req }) => {
         },
         pendingReports: [],
         receivedReports: [],
+        siteCoverage: [],
         sites: [],
       };
 
@@ -47,11 +51,23 @@ export const GET = withAuth(async ({ user, req }) => {
 
     const [sites, completedRecords, submittedReports] = await Promise.all([
       prisma.site.findMany({
-        where: { id: { in: operationalSiteIds } },
-        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        where: { id: { in: siteIds } },
+        orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
         select: {
           id: true,
           name: true,
+          projectId: true,
+          project: {
+            select: {
+              name: true,
+              projectManager: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
         },
       }),
       prisma.clockInRecord.findMany({
@@ -91,8 +107,8 @@ export const GET = withAuth(async ({ user, req }) => {
         where: {
           siteId: { in: siteIds },
           submittedAt: {
-            gte: today,
-            lt: tomorrow,
+            gte: reportRange.from,
+            lt: reportRange.to,
           },
         },
         orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
@@ -186,6 +202,13 @@ export const GET = withAuth(async ({ user, req }) => {
 
     const totalExpected = completedRecords.length;
     const totalReceived = submittedReports.length;
+    const reportsBySite = new Map<string, typeof submittedReports>();
+
+    for (const report of submittedReports) {
+      const current = reportsBySite.get(report.siteId) ?? [];
+      current.push(report);
+      reportsBySite.set(report.siteId, current);
+    }
 
     const response: CoordinatorReportsResponse = {
       summary: {
@@ -197,7 +220,28 @@ export const GET = withAuth(async ({ user, req }) => {
       },
       pendingReports,
       receivedReports,
-      sites,
+      siteCoverage: sites.map((site) => {
+        const reports = reportsBySite.get(site.id) ?? [];
+        const latestReport = reports[0] ?? null;
+
+        return {
+          projectId: site.projectId,
+          projectName: site.project.name,
+          projectManagerName: `${site.project.projectManager.firstName} ${site.project.projectManager.lastName}`,
+          siteId: site.id,
+          siteName: site.name,
+          reportsCount: reports.length,
+          latestReportAt: latestReport?.submittedAt.toISOString() ?? null,
+          latestReportAuthorName: latestReport
+            ? `${latestReport.user.firstName} ${latestReport.user.lastName}`
+            : null,
+          status: reports.length > 0 ? 'RECEIVED' : 'MISSING',
+        };
+      }),
+      sites: sites.map((site) => ({
+        id: site.id,
+        name: site.name,
+      })),
     };
 
     return Response.json(response);
@@ -209,3 +253,22 @@ export const GET = withAuth(async ({ user, req }) => {
     );
   }
 });
+
+function buildReportRange(period: MobileReportCoveragePeriod) {
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+
+  if (period === 'week') {
+    const day = todayStart.getUTCDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const from = new Date(todayStart);
+    from.setUTCDate(todayStart.getUTCDate() + mondayOffset);
+    const to = new Date(from);
+    to.setUTCDate(from.getUTCDate() + 7);
+    return { from, to };
+  }
+
+  const to = new Date(todayStart);
+  to.setUTCDate(todayStart.getUTCDate() + 1);
+  return { from: todayStart, to };
+}

@@ -4,6 +4,8 @@ export type ReportStatus = 'RECU' | 'EN_REVUE' | 'VALIDE' | 'ENVOYE';
 
 export type ReportFilter = 'all' | 'pending' | 'received' | 'site';
 
+export type MobileReportCoveragePeriod = 'today' | 'week';
+
 export type PendingReport = {
   id: string;
   supervisorId: string;
@@ -74,10 +76,23 @@ export type CoordinatorReportsResponse = {
   summary: ReportsSummary;
   pendingReports: PendingReport[];
   receivedReports: ReceivedReport[];
+  siteCoverage: MobileReportSiteCoverageItem[];
   sites: {
     id: string;
     name: string;
   }[];
+};
+
+export type MobileReportSiteCoverageItem = {
+  projectId: string;
+  projectName: string;
+  projectManagerName: string;
+  siteId: string;
+  siteName: string;
+  reportsCount: number;
+  latestReportAt: string | null;
+  latestReportAuthorName: string | null;
+  status: 'RECEIVED' | 'MISSING';
 };
 
 export type ReportValidationRequest = {
