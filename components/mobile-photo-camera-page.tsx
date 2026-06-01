@@ -79,6 +79,7 @@ export function MobilePhotoCameraPage() {
   const [photoMode, setPhotoMode] = useState<PhotoMode>('site');
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
   const [siteSheetOpen, setSiteSheetOpen] = useState(false);
+  const [photoInfoSheetOpen, setPhotoInfoSheetOpen] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<CapturedPhoto | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -572,7 +573,7 @@ export function MobilePhotoCameraPage() {
 
         <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-slate-950/80 to-transparent p-4 pt-5">
           <button
-            className="w-full rounded-lg bg-white/15 px-4 py-3 text-left backdrop-blur"
+            className="w-full rounded-lg bg-white/15 px-4 py-2.5 text-left backdrop-blur"
             onClick={() => setSiteSheetOpen(true)}
             type="button"
           >
@@ -590,27 +591,14 @@ export function MobilePhotoCameraPage() {
             </p>
           ) : null}
           {confirmationMessage ? (
-            <div className="mt-3 rounded-lg bg-emerald-500/95 px-3 py-3 text-xs font-bold text-white">
+            <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-emerald-500/95 px-3 py-2 text-[11px] font-bold text-white">
               <p>{confirmationMessage}</p>
               {taskPhotoNotice ? (
-                <Link className="mt-2 inline-flex rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-emerald-700" href="/mobile/tasks">
-                  Ouvrir Taches
+                <Link className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-emerald-700" href="/mobile/tasks">
+                  Taches
                 </Link>
               ) : null}
             </div>
-          ) : null}
-          <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-white/10 p-1">
-            <ModeButton active={photoMode === 'site'} label="Photo chantier" onClick={() => setPhotoMode('site')} />
-            <ModeButton active={photoMode === 'task'} label="Photo liée à une tâche" onClick={() => setPhotoMode('task')} />
-          </div>
-          {photoMode === 'task' ? (
-            <TaskSelector
-              assignments={siteAssignments}
-              error={assignmentsQuery.isError}
-              loading={assignmentsQuery.isLoading}
-              onSelect={setSelectedAssignmentId}
-              selectedAssignmentId={selectedAssignmentId}
-            />
           ) : null}
         </div>
 
@@ -629,11 +617,12 @@ export function MobilePhotoCameraPage() {
           </IconButton>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 space-y-3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
-          <PhotoMetadataPanel
+        <div className="absolute inset-x-0 bottom-0 space-y-3 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent p-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+          <PhotoInfoSummaryBar
             description={description}
-            onDescriptionChange={setDescription}
-            onToggleTag={(tag) => setSelectedTags((current) => togglePhotoTag(current, tag))}
+            onOpen={() => setPhotoInfoSheetOpen(true)}
+            photoMode={photoMode}
+            selectedAssignment={selectedAssignment}
             selectedTags={selectedTags}
           />
           <button
@@ -659,6 +648,23 @@ export function MobilePhotoCameraPage() {
             }}
             selectedSiteId={selectedSite?.id ?? ''}
             sites={sites}
+          />
+        ) : null}
+
+        {photoInfoSheetOpen ? (
+          <PhotoInfoBottomSheet
+            assignments={siteAssignments}
+            assignmentsError={assignmentsQuery.isError}
+            assignmentsLoading={assignmentsQuery.isLoading}
+            description={description}
+            onClose={() => setPhotoInfoSheetOpen(false)}
+            onDescriptionChange={setDescription}
+            onModeChange={setPhotoMode}
+            onSelectAssignment={setSelectedAssignmentId}
+            onToggleTag={(tag) => setSelectedTags((current) => togglePhotoTag(current, tag))}
+            photoMode={photoMode}
+            selectedAssignmentId={selectedAssignmentId}
+            selectedTags={selectedTags}
           />
         ) : null}
       </div>
@@ -809,41 +815,128 @@ function ModeButton({ active, label, onClick }: Readonly<{ active: boolean; labe
   );
 }
 
-function PhotoMetadataPanel({
+function PhotoInfoSummaryBar({
   description,
-  onDescriptionChange,
-  onToggleTag,
+  onOpen,
+  photoMode,
+  selectedAssignment,
   selectedTags,
 }: Readonly<{
   description: string;
+  onOpen: () => void;
+  photoMode: PhotoMode;
+  selectedAssignment: SupervisorMyAssignment | null;
+  selectedTags: PhotoTag[];
+}>) {
+  const details = [
+    photoMode === 'task' ? selectedAssignment ? `Tache: ${selectedAssignment.action}` : 'Tache a choisir' : 'Photo chantier',
+    selectedTags.length > 0 ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''}` : null,
+    description.trim() ? 'Commentaire' : null,
+  ].filter(Boolean);
+
+  return (
+    <button
+      className="flex min-h-14 w-full items-center justify-between gap-3 rounded-lg bg-white/15 px-4 py-3 text-left backdrop-blur"
+      onClick={onOpen}
+      type="button"
+    >
+      <div className="min-w-0">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-white/70">Infos photo</p>
+        <p className="mt-1 truncate text-sm font-bold text-white">{details.join(' / ')}</p>
+      </div>
+      <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-950">Modifier</span>
+    </button>
+  );
+}
+
+function PhotoInfoBottomSheet({
+  assignments,
+  assignmentsError,
+  assignmentsLoading,
+  description,
+  onClose,
+  onDescriptionChange,
+  onModeChange,
+  onSelectAssignment,
+  onToggleTag,
+  photoMode,
+  selectedAssignmentId,
+  selectedTags,
+}: Readonly<{
+  assignments: SupervisorMyAssignment[];
+  assignmentsError: boolean;
+  assignmentsLoading: boolean;
+  description: string;
+  onClose: () => void;
   onDescriptionChange: (value: string) => void;
+  onModeChange: (mode: PhotoMode) => void;
+  onSelectAssignment: (assignmentId: string) => void;
   onToggleTag: (tag: PhotoTag) => void;
+  photoMode: PhotoMode;
+  selectedAssignmentId: string;
   selectedTags: PhotoTag[];
 }>) {
   return (
-    <div className="rounded-lg bg-white/15 p-3 backdrop-blur">
-      <textarea
-        className="min-h-16 w-full resize-none rounded-md border border-white/20 bg-slate-950/60 px-3 py-2 text-sm font-semibold text-white outline-none placeholder:text-white/50"
-        onChange={(event) => onDescriptionChange(event.target.value)}
-        placeholder="Commentaire photo"
-        value={description}
-      />
-      <div className="mt-2 flex flex-wrap gap-2">
-        {PHOTO_TAG_OPTIONS.map((tag) => {
-          const selected = selectedTags.includes(tag.value);
-          return (
-            <button
-              className={`rounded-full border px-3 py-1.5 text-[11px] font-black ${
-                selected ? 'border-primary bg-primary text-white' : 'border-white/20 bg-white/10 text-white'
-              }`}
-              key={tag.value}
-              onClick={() => onToggleTag(tag.value)}
-              type="button"
-            >
-              {tag.label}
-            </button>
-          );
-        })}
+    <div className="absolute inset-0 z-40 flex items-end bg-slate-950/60">
+      <div className="max-h-[82%] w-full overflow-y-auto rounded-t-lg bg-slate-950 p-4 text-white shadow-2xl">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-white/50">Photo</p>
+            <h2 className="text-xl font-black">Infos photo</h2>
+          </div>
+          <button className="rounded-lg bg-white px-4 py-2 text-sm font-black text-slate-950" onClick={onClose} type="button">
+            Valider
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 rounded-lg bg-white/10 p-1">
+          <ModeButton active={photoMode === 'site'} label="Photo chantier" onClick={() => onModeChange('site')} />
+          <ModeButton active={photoMode === 'task'} label="Photo liee a une tache" onClick={() => onModeChange('task')} />
+        </div>
+
+        {photoMode === 'task' ? (
+          <TaskSelector
+            assignments={assignments}
+            error={assignmentsError}
+            loading={assignmentsLoading}
+            onSelect={onSelectAssignment}
+            selectedAssignmentId={selectedAssignmentId}
+          />
+        ) : null}
+
+        <div className="mt-4 rounded-lg bg-white/10 p-3">
+          <label className="text-xs font-black uppercase tracking-[0.14em] text-white/60" htmlFor="mobile-photo-description">
+            Commentaire
+          </label>
+          <textarea
+            className="mt-2 min-h-24 w-full resize-none rounded-md border border-white/20 bg-slate-950/70 px-3 py-2 text-sm font-semibold text-white outline-none placeholder:text-white/50"
+            id="mobile-photo-description"
+            onChange={(event) => onDescriptionChange(event.target.value)}
+            placeholder="Commentaire photo"
+            value={description}
+          />
+        </div>
+
+        <div className="mt-4 rounded-lg bg-white/10 p-3">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-white/60">Tags rapides</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {PHOTO_TAG_OPTIONS.map((tag) => {
+              const selected = selectedTags.includes(tag.value);
+              return (
+                <button
+                  className={`rounded-full border px-3 py-2 text-xs font-black ${
+                    selected ? 'border-primary bg-primary text-white' : 'border-white/20 bg-white/10 text-white'
+                  }`}
+                  key={tag.value}
+                  onClick={() => onToggleTag(tag.value)}
+                  type="button"
+                >
+                  {tag.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
