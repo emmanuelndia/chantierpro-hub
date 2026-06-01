@@ -251,7 +251,7 @@ export async function createPlanningAssignment(
       siteId: normalized.siteId,
       deletedAt: null,
     },
-    select: { id: true, action: true, targetProgress: true, workLocationType: true },
+    select: { id: true, action: true, targetProgress: true, targetQuantity: true, targetUnit: true, workLocationType: true },
   });
 
   if (existingTasks.some((task) => isSameTask(task, normalized))) {
@@ -267,6 +267,8 @@ export async function createPlanningAssignment(
         siteId: normalized.siteId,
         action: normalized.action,
         targetProgress: normalized.targetProgress,
+        targetQuantity: normalized.targetQuantity,
+        targetUnit: normalized.targetUnit,
         objectiveText: normalized.objectiveText,
         workLocationType: normalized.workLocationType,
         status: PlanningAssignmentStatus.ASSIGNED,
@@ -315,6 +317,8 @@ export async function updatePlanningAssignment(
 
   const action = normalizeOptionalAction(input.action);
   const targetProgress = normalizeTargetProgress(input.targetProgress);
+  const targetQuantity = normalizeQuantity(input.targetQuantity);
+  const targetUnit = normalizeUnit(input.targetUnit);
   const objectiveText = normalizeOptionalText(input.objectiveText);
   const status = normalizePlanningStatus(input.status);
   const workLocationType = normalizeWorkLocationType(input.workLocationType);
@@ -325,6 +329,10 @@ export async function updatePlanningAssignment(
 
   if (targetProgress instanceof Response) {
     return targetProgress;
+  }
+
+  if (targetQuantity instanceof Response) {
+    return targetQuantity;
   }
 
   if (input.status !== undefined && !status) {
@@ -340,6 +348,8 @@ export async function updatePlanningAssignment(
     data: {
       ...(action ? { action } : {}),
       ...(input.targetProgress !== undefined ? { targetProgress } : {}),
+      ...(input.targetQuantity !== undefined ? { targetQuantity } : {}),
+      ...(input.targetUnit !== undefined ? { targetUnit } : {}),
       ...(input.objectiveText !== undefined ? { objectiveText } : {}),
       ...(status ? { status } : {}),
       ...(workLocationType ? { workLocationType } : {}),
@@ -400,8 +410,13 @@ export async function createTaskProgressUpdate(
     return planningError('NOT_FOUND', 'Assignation introuvable.', 404);
   }
 
-  const progress = normalizeActualProgress(input.progress);
-  if (progress instanceof Response) return progress;
+  const actualQuantity = normalizeQuantity(input.actualQuantity);
+  if (actualQuantity instanceof Response) return actualQuantity;
+
+  const progressInput = normalizeActualProgress(input.progress);
+  if (progressInput instanceof Response) return progressInput;
+
+  const progress = calculateActualProgress(assignment.targetQuantity, actualQuantity, progressInput);
 
   const comment = normalizeOptionalText(input.comment);
   const blocked = Boolean(input.blocked);
@@ -415,6 +430,7 @@ export async function createTaskProgressUpdate(
     data: {
       assignmentId,
       progress,
+      actualQuantity,
       comment,
       blocked,
       completed,
@@ -428,7 +444,7 @@ export async function createTaskProgressUpdate(
       where: { id: assignmentId },
       data: { status: PlanningAssignmentStatus.COMPLETED },
     });
-  } else if (!completed && assignment.status === PlanningAssignmentStatus.ASSIGNED && (progress !== null || blocked || comment)) {
+  } else if (!completed && assignment.status === PlanningAssignmentStatus.ASSIGNED && (progress !== null || actualQuantity !== null || blocked || comment)) {
     await prisma.planningAssignment.update({
       where: { id: assignmentId },
       data: { status: PlanningAssignmentStatus.IN_PROGRESS },
@@ -544,6 +560,8 @@ export async function duplicatePlanningAssignments(
         siteId: true,
         action: true,
         targetProgress: true,
+        targetQuantity: true,
+        targetUnit: true,
         workLocationType: true,
       },
     }),
@@ -564,6 +582,8 @@ export async function duplicatePlanningAssignments(
         assignment.siteId,
         assignment.action,
         assignment.targetProgress,
+        assignment.targetQuantity,
+        assignment.targetUnit,
         assignment.workLocationType,
       ),
     ),
@@ -576,6 +596,8 @@ export async function duplicatePlanningAssignments(
       assignment.siteId,
       assignment.action,
       assignment.targetProgress,
+      assignment.targetQuantity,
+      assignment.targetUnit,
       assignment.workLocationType,
     );
 
@@ -600,6 +622,8 @@ export async function duplicatePlanningAssignments(
           siteId: assignment.siteId,
           action: assignment.action,
           targetProgress: assignment.targetProgress,
+          targetQuantity: assignment.targetQuantity,
+          targetUnit: assignment.targetUnit,
           objectiveText: assignment.objectiveText,
           workLocationType: assignment.workLocationType,
           status: PlanningAssignmentStatus.ASSIGNED,
@@ -671,6 +695,8 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   const siteId = normalizeId(input.siteId);
   const action = normalizeOptionalAction(input.action);
   const targetProgress = normalizeTargetProgress(input.targetProgress);
+  const targetQuantity = normalizeQuantity(input.targetQuantity);
+  const targetUnit = normalizeUnit(input.targetUnit);
   const objectiveText = normalizeOptionalText(input.objectiveText);
   const workLocationType = normalizeWorkLocationType(input.workLocationType) ?? PlanningWorkLocationType.ON_SITE;
 
@@ -679,6 +705,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   }
 
   if (targetProgress instanceof Response) return targetProgress;
+  if (targetQuantity instanceof Response) return targetQuantity;
 
   const [site, supervisorIds] = await Promise.all([
     prisma.site.findFirst({
@@ -705,6 +732,8 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
     siteId,
     action,
     targetProgress,
+    targetQuantity,
+    targetUnit,
     objectiveText,
     workLocationType,
   };
@@ -778,9 +807,11 @@ function buildTaskKey(
   siteId: string,
   action: string,
   targetProgress: number | null,
+  targetQuantity: unknown,
+  targetUnit: string | null,
   workLocationType: PlanningWorkLocationType,
 ) {
-  return `${supervisorId}:${siteId}:${normalizeTaskActionKey(action)}:${targetProgress ?? 'null'}:${workLocationType}`;
+  return `${supervisorId}:${siteId}:${normalizeTaskActionKey(action)}:${targetProgress ?? 'null'}:${decimalToNumber(targetQuantity) ?? 'null'}:${targetUnit ?? 'null'}:${workLocationType}`;
 }
 
 function normalizeTaskActionKey(action: string) {
@@ -788,12 +819,26 @@ function normalizeTaskActionKey(action: string) {
 }
 
 function isSameTask(
-  existing: { action: string; targetProgress: number | null; workLocationType: PlanningWorkLocationType },
-  normalized: { action: string; targetProgress: number | null; workLocationType: PlanningWorkLocationType },
+  existing: {
+    action: string;
+    targetProgress: number | null;
+    targetQuantity?: unknown;
+    targetUnit?: string | null;
+    workLocationType: PlanningWorkLocationType;
+  },
+  normalized: {
+    action: string;
+    targetProgress: number | null;
+    targetQuantity?: unknown;
+    targetUnit?: string | null;
+    workLocationType: PlanningWorkLocationType;
+  },
 ) {
   return (
     normalizeTaskActionKey(existing.action) === normalizeTaskActionKey(normalized.action) &&
     existing.targetProgress === normalized.targetProgress &&
+    decimalToNumber(existing.targetQuantity) === decimalToNumber(normalized.targetQuantity) &&
+    (existing.targetUnit ?? null) === (normalized.targetUnit ?? null) &&
     existing.workLocationType === normalized.workLocationType
   );
 }
@@ -868,6 +913,8 @@ const planningAssignmentSelect = {
   siteId: true,
   action: true,
   targetProgress: true,
+  targetQuantity: true,
+  targetUnit: true,
   objectiveText: true,
   status: true,
   workLocationType: true,
@@ -900,6 +947,7 @@ const planningAssignmentSelect = {
     select: {
       id: true,
       progress: true,
+      actualQuantity: true,
       comment: true,
       blocked: true,
       completed: true,
@@ -918,6 +966,7 @@ const planningAssignmentSelect = {
 const taskProgressUpdateSelect = {
   id: true,
   progress: true,
+  actualQuantity: true,
   comment: true,
   blocked: true,
   completed: true,
@@ -952,6 +1001,8 @@ const supervisorAssignmentSelect = {
   siteId: true,
   action: true,
   targetProgress: true,
+  targetQuantity: true,
+  targetUnit: true,
   objectiveText: true,
   status: true,
   workLocationType: true,
@@ -981,7 +1032,8 @@ const supervisorAssignmentSelect = {
 
 function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns: ClockInRow[]): PlanningAssignment {
   const latestProgressUpdate = assignment.progressUpdates[0] ? serializeTaskProgressUpdate(assignment.progressUpdates[0]) : null;
-  const objective = buildObjectiveState(assignment.targetProgress, latestProgressUpdate);
+  const targetQuantity = decimalToNumber(assignment.targetQuantity);
+  const objective = buildObjectiveState(assignment.targetProgress, targetQuantity, latestProgressUpdate);
 
   return {
     id: assignment.id,
@@ -993,9 +1045,13 @@ function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns
     siteAddress: assignment.site.address,
     action: assignment.action,
     targetProgress: assignment.targetProgress,
+    targetQuantity,
+    targetUnit: assignment.targetUnit,
     objectiveText: assignment.objectiveText,
+    actualQuantity: objective.actualQuantity,
     actualProgress: objective.actualProgress,
     progressDelta: objective.progressDelta,
+    remainingQuantity: objective.remainingQuantity,
     objectiveStatus: objective.objectiveStatus,
     latestProgressUpdate,
     assignedAt: assignment.date.toISOString(),
@@ -1013,7 +1069,8 @@ function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns
 
 function serializeSupervisorAssignment(assignment: SupervisorAssignmentRow) {
   const latestProgressUpdate = assignment.progressUpdates[0] ? serializeTaskProgressUpdate(assignment.progressUpdates[0]) : null;
-  const objective = buildObjectiveState(assignment.targetProgress, latestProgressUpdate);
+  const targetQuantity = decimalToNumber(assignment.targetQuantity);
+  const objective = buildObjectiveState(assignment.targetProgress, targetQuantity, latestProgressUpdate);
 
   return {
     id: assignment.id,
@@ -1023,9 +1080,13 @@ function serializeSupervisorAssignment(assignment: SupervisorAssignmentRow) {
     siteAddress: assignment.site.address,
     action: assignment.action,
     targetProgress: assignment.targetProgress,
+    targetQuantity,
+    targetUnit: assignment.targetUnit,
     objectiveText: assignment.objectiveText,
+    actualQuantity: objective.actualQuantity,
     actualProgress: objective.actualProgress,
     progressDelta: objective.progressDelta,
+    remainingQuantity: objective.remainingQuantity,
     objectiveStatus: objective.objectiveStatus,
     latestProgressUpdate,
     status: assignment.status,
@@ -1043,6 +1104,7 @@ function serializeTaskProgressUpdate(update: Prisma.TaskProgressUpdateGetPayload
   return {
     id: update.id,
     progress: update.progress,
+    actualQuantity: decimalToNumber(update.actualQuantity),
     comment: update.comment,
     blocked: update.blocked,
     completed: update.completed,
@@ -1055,20 +1117,32 @@ function serializeTaskProgressUpdate(update: Prisma.TaskProgressUpdateGetPayload
   };
 }
 
-function buildObjectiveState(targetProgress: number | null, latestProgressUpdate: TaskProgressUpdateItem | null) {
-  const actualProgress = latestProgressUpdate?.progress ?? null;
-  const progressDelta = targetProgress !== null && actualProgress !== null ? actualProgress - targetProgress : null;
+function buildObjectiveState(
+  targetProgress: number | null,
+  targetQuantity: number | null,
+  latestProgressUpdate: TaskProgressUpdateItem | null,
+) {
+  const actualQuantity = latestProgressUpdate?.actualQuantity ?? null;
+  const actualProgress = calculateActualProgress(targetQuantity, actualQuantity, latestProgressUpdate?.progress ?? null);
+  const progressTarget = targetQuantity !== null && targetQuantity > 0 ? 100 : targetProgress;
+  const progressDelta = progressTarget !== null && actualProgress !== null ? actualProgress - progressTarget : null;
+  const remainingQuantity =
+    targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
   const objectiveStatus = latestProgressUpdate?.blocked
     ? 'BLOCKED'
-    : latestProgressUpdate?.completed || (targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
+    : latestProgressUpdate?.completed ||
+        (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null && actualQuantity >= targetQuantity) ||
+        (targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
       ? 'ACHIEVED'
-      : actualProgress !== null || latestProgressUpdate
+      : actualProgress !== null || actualQuantity !== null || latestProgressUpdate
         ? 'PARTIAL'
         : 'NOT_STARTED';
 
   return {
+    actualQuantity,
     actualProgress,
     progressDelta,
+    remainingQuantity,
     objectiveStatus,
   } as const;
 }
@@ -1146,6 +1220,23 @@ function normalizeOptionalText(value: string | null | undefined) {
   return trimmed;
 }
 
+function normalizeUnit(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 24);
+}
+
+function normalizeQuantity(value: unknown): number | null | Response {
+  if (value === undefined || value === null || value === '') return null;
+
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue < 0) {
+    return planningError('INVALID_QUANTITY', 'La quantite doit etre un nombre positif.', 400);
+  }
+
+  return Math.round(numberValue * 100) / 100;
+}
+
 function normalizeTargetProgress(value: number | null | undefined): number | null | Response {
   if (value === undefined || value === null) return null;
 
@@ -1166,6 +1257,33 @@ function normalizeActualProgress(value: number | null | undefined): number | nul
   }
 
   return numberValue;
+}
+
+function decimalToNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  if (!isDecimalLike(value)) return null;
+  const numberValue = value.toNumber();
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function isDecimalLike(value: unknown): value is { toNumber: () => number } {
+  return typeof value === 'object' && value !== null && typeof (value as { toNumber?: unknown }).toNumber === 'function';
+}
+
+function calculateActualProgress(
+  targetQuantityValue: unknown,
+  actualQuantityValue: unknown,
+  fallbackProgress: number | null,
+) {
+  const targetQuantity = decimalToNumber(targetQuantityValue);
+  const actualQuantity = decimalToNumber(actualQuantityValue);
+
+  if (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null) {
+    return Math.min(100, Math.round((actualQuantity / targetQuantity) * 100));
+  }
+
+  return fallbackProgress;
 }
 
 function normalizePlanningStatus(status: PlanningAssignmentStatus | undefined) {

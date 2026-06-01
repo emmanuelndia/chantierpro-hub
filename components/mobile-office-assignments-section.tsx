@@ -70,6 +70,7 @@ export function MobileOfficeAssignmentsSection({
   const queryClient = useQueryClient();
   const [progressTarget, setProgressTarget] = useState<SupervisorMyAssignment | null>(null);
   const [progress, setProgress] = useState('');
+  const [actualQuantity, setActualQuantity] = useState('');
   const [comment, setComment] = useState('');
   const [blocked, setBlocked] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -81,6 +82,7 @@ export function MobileOfficeAssignmentsSection({
           id: createOfflineId(),
           assignmentId: assignment.id,
           ...(input.progress !== undefined ? { progress: input.progress } : {}),
+          ...(input.actualQuantity !== undefined ? { actualQuantity: input.actualQuantity } : {}),
           ...(input.comment !== undefined ? { comment: input.comment } : {}),
           ...(input.blocked !== undefined ? { blocked: input.blocked } : {}),
           ...(input.completed !== undefined ? { completed: input.completed } : {}),
@@ -119,6 +121,7 @@ export function MobileOfficeAssignmentsSection({
   function openProgressModal(assignment: SupervisorMyAssignment) {
     setProgressTarget(assignment);
     setProgress(assignment.actualProgress === null ? '' : String(assignment.actualProgress));
+    setActualQuantity(assignment.actualQuantity === null ? '' : String(assignment.actualQuantity));
     setComment(assignment.latestProgressUpdate?.comment ?? '');
     setBlocked(assignment.latestProgressUpdate?.blocked ?? false);
     setCompleted(assignment.latestProgressUpdate?.completed ?? false);
@@ -128,10 +131,12 @@ export function MobileOfficeAssignmentsSection({
   function submitProgress() {
     if (!progressTarget) return;
     const parsedProgress = progress.trim() === '' ? null : Number(progress);
+    const parsedQuantity = actualQuantity.trim() === '' ? null : Number(actualQuantity);
     progressMutation.mutate({
       assignment: progressTarget,
       input: {
         progress: parsedProgress,
+        actualQuantity: parsedQuantity,
         comment: comment.trim() || null,
         blocked,
         completed,
@@ -174,7 +179,11 @@ export function MobileOfficeAssignmentsSection({
                 Bureau
               </span>
             </div>
-            {assignment.targetProgress !== null ? (
+            {assignment.targetQuantity !== null ? (
+              <p className="mt-2 text-xs font-bold text-indigo-700">
+                Objectif {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
+              </p>
+            ) : assignment.targetProgress !== null ? (
               <p className="mt-2 text-xs font-bold text-indigo-700">Objectif {assignment.targetProgress}%</p>
             ) : null}
             {assignment.objectiveText ? (
@@ -184,6 +193,11 @@ export function MobileOfficeAssignmentsSection({
               <ObjectiveStatusBadge status={assignment.objectiveStatus} />
               {assignment.actualProgress !== null ? (
                 <span className="text-xs font-bold text-slate-600">Reel {assignment.actualProgress}%</span>
+              ) : null}
+              {assignment.targetQuantity !== null && assignment.actualQuantity !== null ? (
+                <span className="text-xs font-bold text-slate-600">
+                  {formatQuantity(assignment.actualQuantity)} / {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
+                </span>
               ) : null}
             </div>
             <button
@@ -202,8 +216,24 @@ export function MobileOfficeAssignmentsSection({
           <section className="w-full rounded-t-2xl bg-white p-4 shadow-xl">
             <h3 className="text-base font-black text-slate-950">Avancement</h3>
             <p className="mt-1 text-sm text-slate-600">{progressTarget.action}</p>
+            {progressTarget.targetQuantity !== null ? (
+              <label className="mt-4 block text-sm font-bold text-slate-700">
+                Realise cumule {progressTarget.targetUnit ? `(${progressTarget.targetUnit})` : ''}
+                <input
+                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm"
+                  min={0}
+                  onChange={(event) => setActualQuantity(event.currentTarget.value)}
+                  step="0.01"
+                  type="number"
+                  value={actualQuantity}
+                />
+                <span className="mt-2 block text-xs font-semibold text-slate-500">
+                  Objectif : {formatQuantity(progressTarget.targetQuantity)} {progressTarget.targetUnit ?? ''}
+                </span>
+              </label>
+            ) : null}
             <label className="mt-4 block text-sm font-bold text-slate-700">
-              Progression realisee %
+              Progression realisee % {progressTarget.targetQuantity !== null ? '(optionnel)' : ''}
               <input
                 className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm"
                 max={100}
@@ -258,4 +288,9 @@ function ObjectiveStatusBadge({ status }: Readonly<{ status: SupervisorMyAssignm
   } satisfies Record<SupervisorMyAssignment['objectiveStatus'], string>;
 
   return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-700">{config[status]}</span>;
+}
+
+function formatQuantity(value: number | null) {
+  if (value === null) return null;
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }

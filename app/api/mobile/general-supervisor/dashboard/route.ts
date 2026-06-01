@@ -40,12 +40,15 @@ export const GET = withAuth(async ({ user }) => {
         supervisorId: true,
         siteId: true,
         targetProgress: true,
+        targetQuantity: true,
+        targetUnit: true,
         objectiveText: true,
         progressUpdates: {
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           take: 1,
           select: {
             progress: true,
+            actualQuantity: true,
             blocked: true,
             completed: true,
           },
@@ -120,14 +123,17 @@ export const GET = withAuth(async ({ user }) => {
     const alerts: PriorityAlert[] = [];
     const todayAssignments: TodayAssignment[] = assignments.map((assignment) => {
       const latestProgressUpdate = assignment.progressUpdates[0] ?? null;
-      const actualProgress = latestProgressUpdate?.progress ?? null;
-      const progressDelta =
-        assignment.targetProgress !== null && actualProgress !== null
-          ? actualProgress - assignment.targetProgress
-          : null;
+      const targetQuantity = decimalToNumber(assignment.targetQuantity);
+      const actualQuantity = decimalToNumber(latestProgressUpdate?.actualQuantity);
+      const actualProgress = calculateActualProgress(targetQuantity, actualQuantity, latestProgressUpdate?.progress ?? null);
+      const progressTarget = targetQuantity !== null && targetQuantity > 0 ? 100 : assignment.targetProgress;
+      const progressDelta = progressTarget !== null && actualProgress !== null ? actualProgress - progressTarget : null;
+      const remainingQuantity =
+        targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
       const objectiveStatus = latestProgressUpdate?.blocked
         ? 'BLOCKED'
         : latestProgressUpdate?.completed ||
+            (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null && actualQuantity >= targetQuantity) ||
             (assignment.targetProgress !== null && actualProgress !== null && actualProgress >= assignment.targetProgress)
           ? 'ACHIEVED'
           : actualProgress !== null || latestProgressUpdate
@@ -235,10 +241,14 @@ export const GET = withAuth(async ({ user }) => {
         siteAddress: assignment.site.address,
         progressPercentage,
         targetProgress: assignment.targetProgress,
+        targetQuantity,
+        targetUnit: assignment.targetUnit,
         objectiveText: assignment.objectiveText,
         objectiveStatus,
+        actualQuantity,
         actualProgress,
         progressDelta,
+        remainingQuantity,
         isClockedIn,
         hasAlert: assignmentAlerts.length > 0,
         ...(assignmentAlerts[0] ? { alertType: assignmentAlerts[0].type } : {}),
@@ -307,3 +317,30 @@ export const GET = withAuth(async ({ user }) => {
     );
   }
 });
+
+function decimalToNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  if (!isDecimalLike(value)) return null;
+  const numberValue = value.toNumber();
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function isDecimalLike(value: unknown): value is { toNumber: () => number } {
+  return typeof value === 'object' && value !== null && typeof (value as { toNumber?: unknown }).toNumber === 'function';
+}
+
+function calculateActualProgress(
+  targetQuantityValue: unknown,
+  actualQuantityValue: unknown,
+  fallbackProgress: number | null,
+) {
+  const targetQuantity = decimalToNumber(targetQuantityValue);
+  const actualQuantity = decimalToNumber(actualQuantityValue);
+
+  if (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null) {
+    return Math.min(100, Math.round((actualQuantity / targetQuantity) * 100));
+  }
+
+  return fallbackProgress;
+}

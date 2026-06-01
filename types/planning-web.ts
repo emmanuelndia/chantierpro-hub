@@ -38,9 +38,13 @@ export type CentralizedPlanningAssignment = {
   resourceRole: Role;
   action: string;
   targetProgress: number | null;
+  targetQuantity: number | null;
+  targetUnit: string | null;
   objectiveText: string | null;
   actualProgress: number | null;
+  actualQuantity: number | null;
   progressDelta: number | null;
+  remainingQuantity: number | null;
   objectiveStatus: PlanningObjectiveStatus;
   latestProgressUpdate: TaskProgressUpdateItem | null;
   status: PlanningAssignmentStatus;

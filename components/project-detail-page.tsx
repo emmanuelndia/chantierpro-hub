@@ -361,7 +361,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                         ? site.geofenceType === 'POLYGON'
                           ? 'Limite précise'
                           : `Pointage par rayon ${site.radiusKm.toFixed(1)} km`
-                        : 'Lieu planifiable sans flux terrain'} - Surface estimee {site.area.toFixed(2)}
+                        : 'Lieu planifiable sans flux terrain'} - Surface estimee {formatEstimatedArea(site.area)}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -960,10 +960,12 @@ function SiteFormDrawer({
           />
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Surface estimee">
+            <Field label="Surface estimee (facultatif)">
               <input
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
                 onChange={(event) => setValues((current) => ({ ...current, area: event.target.value }))}
+                placeholder="Non renseignÃ©e"
+                type="number"
                 value={values.area}
               />
             </Field>
@@ -1161,7 +1163,7 @@ function buildCreateSiteMutationBody(values: SiteFormValues, canManageRadius: bo
     longitude: numberOrZero(values.longitude),
     description: values.description,
     status: values.status,
-    area: Number(values.area),
+    area: optionalNumberOrZero(values.area),
     startDate: values.startDate,
     endDate: values.endDate || null,
     siteManagerId: values.siteManagerId,
@@ -1182,7 +1184,7 @@ function buildPartialSiteMutationBody(values: SiteFormValues, initialSite: Proje
   setNumberChange(body, 'longitude', numberOrZero(values.longitude), initialSite.longitude);
   setStringChange(body, 'description', values.description, initialSite.description);
   setStringChange(body, 'status', values.status, initialSite.status);
-  setNumberChange(body, 'area', Number(values.area), initialSite.area);
+  setNumberChange(body, 'area', optionalNumberOrZero(values.area), initialSite.area);
   setStringChange(body, 'startDate', values.startDate, initialSite.startDate.slice(0, 10));
 
   const nextEndDate = values.endDate || null;
@@ -1243,6 +1245,18 @@ function numberOrZero(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function optionalNumberOrZero(value: string) {
+  if (!value.trim()) {
+    return 0;
+  }
+
+  return numberOrZero(value);
+}
+
+function formatEstimatedArea(value: number) {
+  return value > 0 ? value.toFixed(2) : 'Non renseignÃ©e';
+}
+
 function samePolygon(left: SiteGeofencePolygon | null, right: SiteGeofencePolygon | null) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
@@ -1250,6 +1264,7 @@ function samePolygon(left: SiteGeofencePolygon | null, right: SiteGeofencePolygo
 function canSubmitSiteForm(values: SiteFormValues) {
   const latitude = Number(values.latitude);
   const longitude = Number(values.longitude);
+  const area = Number(values.area);
   const hasValidGps =
     Number.isFinite(latitude) &&
     latitude >= -90 &&
@@ -1260,8 +1275,9 @@ function canSubmitSiteForm(values: SiteFormValues) {
     (Math.abs(latitude) > 0.01 || Math.abs(longitude) > 0.01);
 
   return Boolean(
-    values.projectId &&
+      values.projectId &&
       values.name.trim() &&
+      (!values.area.trim() || (Number.isFinite(area) && area >= 0)) &&
       (!values.requiresClockIn || hasValidGps),
   );
 }

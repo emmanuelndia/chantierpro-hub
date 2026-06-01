@@ -767,6 +767,8 @@ async function getGeneralSupervisorDashboard(
           supervisorId: true,
           action: true,
           targetProgress: true,
+          targetQuantity: true,
+          targetUnit: true,
           objectiveText: true,
           status: true,
           progressUpdates: {
@@ -995,7 +997,8 @@ async function getGeneralSupervisorDashboard(
     })),
     assignmentsToday: assignmentsToday.map((assignment) => {
       const latestProgressUpdate = assignment.progressUpdates[0] ? serializeTaskProgressUpdate(assignment.progressUpdates[0]) : null;
-      const objective = buildObjectiveState(assignment.targetProgress, latestProgressUpdate);
+      const targetQuantity = decimalToNumber(assignment.targetQuantity);
+      const objective = buildObjectiveState(assignment.targetProgress, targetQuantity, latestProgressUpdate);
 
       return {
         id: assignment.id,
@@ -1005,9 +1008,13 @@ async function getGeneralSupervisorDashboard(
         projectName: assignment.site.project.name,
         action: assignment.action,
         targetProgress: assignment.targetProgress,
+        targetQuantity,
+        targetUnit: assignment.targetUnit,
         objectiveText: assignment.objectiveText,
+        actualQuantity: objective.actualQuantity,
         actualProgress: objective.actualProgress,
         progressDelta: objective.progressDelta,
+        remainingQuantity: objective.remainingQuantity,
         objectiveStatus: objective.objectiveStatus,
         latestProgressUpdate,
         status: assignment.status,
@@ -1036,6 +1043,7 @@ async function getGeneralSupervisorDashboard(
 const taskProgressUpdateSelect = {
   id: true,
   progress: true,
+  actualQuantity: true,
   comment: true,
   blocked: true,
   completed: true,
@@ -1051,6 +1059,7 @@ const taskProgressUpdateSelect = {
 
 const objectiveAssignmentSelect = {
   targetProgress: true,
+  targetQuantity: true,
   progressUpdates: {
     orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
     take: 1,
@@ -1061,6 +1070,7 @@ const objectiveAssignmentSelect = {
 function countObjectiveStatuses(
   assignments: {
     targetProgress: number | null;
+    targetQuantity?: unknown;
     progressUpdates: Parameters<typeof serializeTaskProgressUpdate>[0][];
   }[],
 ): ObjectiveStatusCounts {
@@ -1073,7 +1083,7 @@ function countObjectiveStatuses(
 
   for (const assignment of assignments) {
     const latestProgressUpdate = assignment.progressUpdates[0] ? serializeTaskProgressUpdate(assignment.progressUpdates[0]) : null;
-    const objective = buildObjectiveState(assignment.targetProgress, latestProgressUpdate);
+    const objective = buildObjectiveState(assignment.targetProgress, decimalToNumber(assignment.targetQuantity), latestProgressUpdate);
     counts[objective.objectiveStatus] += 1;
   }
 
@@ -1083,6 +1093,7 @@ function countObjectiveStatuses(
 function serializeTaskProgressUpdate(update: {
   id: string;
   progress: number | null;
+  actualQuantity: unknown;
   comment: string | null;
   blocked: boolean;
   completed: boolean;
@@ -1096,6 +1107,7 @@ function serializeTaskProgressUpdate(update: {
   return {
     id: update.id,
     progress: update.progress,
+    actualQuantity: decimalToNumber(update.actualQuantity),
     comment: update.comment,
     blocked: update.blocked,
     completed: update.completed,
@@ -1108,18 +1120,55 @@ function serializeTaskProgressUpdate(update: {
   };
 }
 
-function buildObjectiveState(targetProgress: number | null, latestProgressUpdate: TaskProgressUpdateItem | null) {
-  const actualProgress = latestProgressUpdate?.progress ?? null;
-  const progressDelta = targetProgress !== null && actualProgress !== null ? actualProgress - targetProgress : null;
+function buildObjectiveState(
+  targetProgress: number | null,
+  targetQuantity: number | null,
+  latestProgressUpdate: TaskProgressUpdateItem | null,
+) {
+  const actualQuantity = latestProgressUpdate?.actualQuantity ?? null;
+  const actualProgress = calculateActualProgress(targetQuantity, actualQuantity, latestProgressUpdate?.progress ?? null);
+  const progressTarget = targetQuantity !== null && targetQuantity > 0 ? 100 : targetProgress;
+  const progressDelta = progressTarget !== null && actualProgress !== null ? actualProgress - progressTarget : null;
+  const remainingQuantity =
+    targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
   const objectiveStatus = latestProgressUpdate?.blocked
     ? 'BLOCKED'
-    : latestProgressUpdate?.completed || (targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
+    : latestProgressUpdate?.completed ||
+        (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null && actualQuantity >= targetQuantity) ||
+        (targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
       ? 'ACHIEVED'
-      : actualProgress !== null || latestProgressUpdate
+      : actualProgress !== null || actualQuantity !== null || latestProgressUpdate
         ? 'PARTIAL'
         : 'NOT_STARTED';
 
-  return { actualProgress, progressDelta, objectiveStatus } as const;
+  return { actualQuantity, actualProgress, progressDelta, remainingQuantity, objectiveStatus } as const;
+}
+
+function decimalToNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  if (!isDecimalLike(value)) return null;
+  const numberValue = value.toNumber();
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function isDecimalLike(value: unknown): value is { toNumber: () => number } {
+  return typeof value === 'object' && value !== null && typeof (value as { toNumber?: unknown }).toNumber === 'function';
+}
+
+function calculateActualProgress(
+  targetQuantityValue: unknown,
+  actualQuantityValue: unknown,
+  fallbackProgress: number | null,
+) {
+  const targetQuantity = decimalToNumber(targetQuantityValue);
+  const actualQuantity = decimalToNumber(actualQuantityValue);
+
+  if (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null) {
+    return Math.min(100, Math.round((actualQuantity / targetQuantity) * 100));
+  }
+
+  return fallbackProgress;
 }
 
 function createStat(

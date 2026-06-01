@@ -27,6 +27,8 @@ type PlanningExportRow = {
   role: string;
   type: string;
   action: string;
+  targetQuantity: string;
+  actualQuantity: string;
   progress: string;
 };
 
@@ -118,7 +120,17 @@ async function getPlanningExportRows(
       date: true,
       action: true,
       targetProgress: true,
+      targetQuantity: true,
+      targetUnit: true,
       workLocationType: true,
+      progressUpdates: {
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 1,
+        select: {
+          progress: true,
+          actualQuantity: true,
+        },
+      },
       supervisor: {
         select: {
           firstName: true,
@@ -140,17 +152,28 @@ async function getPlanningExportRows(
     },
   });
 
-  return assignments.map((assignment) => ({
-    date: formatFrenchDate(assignment.date),
-    project: assignment.site.project.name,
-    site: assignment.site.name,
-    address: assignment.site.address,
-    resource: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`,
-    role: roleLabels[assignment.supervisor.role] ?? assignment.supervisor.role,
-    type: workLocationLabels[assignment.workLocationType],
-    action: assignment.action,
-    progress: assignment.targetProgress === null ? '' : String(assignment.targetProgress),
-  }));
+  return assignments.map((assignment) => {
+    const targetQuantity = decimalToNumber(assignment.targetQuantity);
+    const actualQuantity = decimalToNumber(assignment.progressUpdates[0]?.actualQuantity);
+    const actualProgress = calculateActualProgress(targetQuantity, actualQuantity, assignment.progressUpdates[0]?.progress ?? null);
+
+    return {
+      date: formatFrenchDate(assignment.date),
+      project: assignment.site.project.name,
+      site: assignment.site.name,
+      address: assignment.site.address,
+      resource: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`,
+      role: roleLabels[assignment.supervisor.role] ?? assignment.supervisor.role,
+      type: workLocationLabels[assignment.workLocationType],
+      action: assignment.action,
+      targetQuantity: targetQuantity === null ? '' : `${formatQuantity(targetQuantity)} ${assignment.targetUnit ?? ''}`.trim(),
+      actualQuantity:
+        actualQuantity === null || targetQuantity === null
+          ? ''
+          : `${formatQuantity(actualQuantity)} / ${formatQuantity(targetQuantity)} ${assignment.targetUnit ?? ''}`.trim(),
+      progress: actualProgress === null ? (assignment.targetProgress === null ? '' : String(assignment.targetProgress)) : String(actualProgress),
+    };
+  });
 }
 
 async function buildPlanningExportXlsx(rows: PlanningExportRow[], date: string, projectTitle: string) {
@@ -165,10 +188,12 @@ async function buildPlanningExportXlsx(rows: PlanningExportRow[], date: string, 
     { header: 'Poste', key: 'role', width: 26 },
     { header: 'Nom du site / adresse géographique', key: 'siteAddress', width: 44 },
     { header: 'Action du jour', key: 'action', width: 58 },
+    { header: 'Objectif quantitatif', key: 'targetQuantity', width: 20 },
+    { header: 'Realise cumule', key: 'actualQuantity', width: 20 },
     { header: 'Progression en %', key: 'progress', width: 18 },
   ];
 
-  worksheet.mergeCells('A1:F1');
+  worksheet.mergeCells('A1:H1');
   worksheet.getCell('A1').value = `PLANNING ACTIVITÉS JOURNALIÈRES : ${projectTitle}`;
   worksheet.getCell('A1').font = { bold: true, size: 14 };
   worksheet.getCell('A1').alignment = { horizontal: 'center' };
@@ -189,6 +214,8 @@ async function buildPlanningExportXlsx(rows: PlanningExportRow[], date: string, 
       role: row.role,
       siteAddress: formatSiteAddress(row),
       action: row.action,
+      targetQuantity: row.targetQuantity,
+      actualQuantity: row.actualQuantity,
       progress: row.progress,
     });
   }
@@ -230,7 +257,9 @@ function buildPlanningExportPdf(rows: PlanningExportRow[], date: string, project
     { label: 'NOM DE LA RESSOURCE', key: 'resource', width: 50 },
     { label: 'POSTE', key: 'role', width: 38 },
     { label: 'NOM DU SITE / ADRESSE GÉOGRAPHIQUE', key: 'siteAddress', width: 55 },
-    { label: 'ACTION DU JOUR', key: 'action', width: 76 },
+    { label: 'ACTION DU JOUR', key: 'action', width: 58 },
+    { label: 'OBJECTIF', key: 'targetQuantity', width: 24 },
+    { label: 'REALISE CUMULE', key: 'actualQuantity', width: 28 },
     { label: 'PROGRESSION EN %', key: 'progress', width: 28 },
   ];
   const scale = tableWidth / columns.reduce((sum, column) => sum + column.width, 0);
@@ -272,6 +301,8 @@ function buildPlanningExportPdf(rows: PlanningExportRow[], date: string, project
       role: row.role,
       siteAddress: formatSiteAddress(row),
       action: row.action,
+      targetQuantity: row.targetQuantity,
+      actualQuantity: row.actualQuantity,
       progress: row.progress,
     };
     const lineGroups = scaledColumns.map((column) =>
@@ -334,6 +365,37 @@ function normalizeFilter(value: string | null) {
   }
 
   return trimmed;
+}
+
+function decimalToNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  if (!isDecimalLike(value)) return null;
+  const numberValue = value.toNumber();
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function isDecimalLike(value: unknown): value is { toNumber: () => number } {
+  return typeof value === 'object' && value !== null && typeof (value as { toNumber?: unknown }).toNumber === 'function';
+}
+
+function calculateActualProgress(
+  targetQuantityValue: unknown,
+  actualQuantityValue: unknown,
+  fallbackProgress: number | null,
+) {
+  const targetQuantity = decimalToNumber(targetQuantityValue);
+  const actualQuantity = decimalToNumber(actualQuantityValue);
+
+  if (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null) {
+    return Math.min(100, Math.round((actualQuantity / targetQuantity) * 100));
+  }
+
+  return fallbackProgress;
+}
+
+function formatQuantity(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function formatFrenchDate(value: Date) {

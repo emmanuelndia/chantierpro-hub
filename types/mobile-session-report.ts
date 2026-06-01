@@ -19,8 +19,12 @@ export type DayAssignment = {
   id: string;
   action: string;
   targetProgress?: number | undefined;
+  targetQuantity?: number | undefined;
+  targetUnit?: string | undefined;
   objectiveText?: string | undefined;
+  actualQuantity?: number | null | undefined;
   actualProgress?: number | null | undefined;
+  remainingQuantity?: number | null | undefined;
   progressDelta?: number | null | undefined;
   objectiveStatus?: string | undefined;
   latestProgressComment?: string | null | undefined;

@@ -355,6 +355,8 @@ function AssignmentCard({
   const [editData, setEditData] = useState<UpdateAssignmentRequest>({
     action: assignment.action,
     targetProgress: assignment.targetProgress,
+    targetQuantity: assignment.targetQuantity,
+    targetUnit: assignment.targetUnit,
     objectiveText: assignment.objectiveText,
     status: assignment.status,
     workLocationType: assignment.workLocationType,
@@ -380,6 +382,39 @@ function AssignmentCard({
               className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
             />
           </label>
+
+          <div className="grid grid-cols-[1fr_96px] gap-2">
+            <label className="block text-sm font-semibold text-slate-700">
+              Objectif quantitatif
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={editData.targetQuantity ?? ''}
+                onChange={(event) => {
+                  const targetQuantity = event.currentTarget.value;
+                  setEditData((prev) => ({
+                    ...prev,
+                    targetQuantity: targetQuantity === '' ? null : Number(targetQuantity),
+                  }));
+                }}
+                className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                placeholder="12"
+              />
+            </label>
+            <label className="block text-sm font-semibold text-slate-700">
+              Unite
+              <input
+                value={editData.targetUnit ?? ''}
+                onChange={(event) => {
+                  const targetUnit = event.currentTarget.value;
+                  setEditData((prev) => ({ ...prev, targetUnit }));
+                }}
+                className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                placeholder="u"
+              />
+            </label>
+          </div>
 
           <label className="block text-sm font-semibold text-slate-700">
             Progression cible (facultatif)
@@ -502,6 +537,11 @@ function AssignmentCard({
 
       <p className="mt-3 text-sm text-slate-800">{assignment.action}</p>
       {assignment.objectiveText ? <p className="mt-2 text-xs font-semibold text-slate-600">{assignment.objectiveText}</p> : null}
+      {assignment.targetQuantity !== null ? (
+        <p className="mt-2 text-xs font-bold text-sky-700">
+          Objectif {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
+        </p>
+      ) : null}
 
       {assignment.targetProgress !== null ? (
         <div className="mt-3 flex items-center gap-2">
@@ -618,6 +658,11 @@ function AssignmentTaskRow({
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Tâche {index + 1}</p>
           <p className="mt-1 text-sm leading-6 text-slate-800">{assignment.action}</p>
           {assignment.objectiveText ? <p className="mt-1 text-xs font-semibold text-slate-500">{assignment.objectiveText}</p> : null}
+          {assignment.targetQuantity !== null ? (
+            <p className="mt-1 text-xs font-bold text-sky-700">
+              Objectif {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
+            </p>
+          ) : null}
         </div>
         <IconButton label="Modifier" onClick={onEdit}>
           <EditIcon className="h-4 w-4" />
@@ -668,6 +713,14 @@ function ObjectiveStatusPill({ assignment }: Readonly<{ assignment: PlanningAssi
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${config.className}`}>{config.label}</span>
+      {assignment.targetQuantity !== null && assignment.actualQuantity !== null ? (
+        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700">
+          {formatQuantity(assignment.actualQuantity)} / {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
+          {assignment.remainingQuantity !== null && assignment.remainingQuantity > 0
+            ? ` - reste ${formatQuantity(assignment.remainingQuantity)}`
+            : ''}
+        </span>
+      ) : null}
       {assignment.actualProgress !== null ? (
         <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700">
           Réel {assignment.actualProgress}%
@@ -859,6 +912,39 @@ function AssignmentBottomSheet({
             />
           </label>
 
+          <div className="grid grid-cols-[1fr_96px] gap-2">
+            <label className="block text-sm font-semibold text-slate-700">
+              Objectif quantitatif
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.targetQuantity ?? ''}
+                onChange={(event) => {
+                  const targetQuantity = event.currentTarget.value;
+                  setFormData((prev) => ({
+                    ...prev,
+                    targetQuantity: targetQuantity === '' ? null : Number(targetQuantity),
+                  }));
+                }}
+                className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                placeholder="12"
+              />
+            </label>
+            <label className="block text-sm font-semibold text-slate-700">
+              Unite
+              <input
+                value={formData.targetUnit ?? ''}
+                onChange={(event) => {
+                  const targetUnit = event.currentTarget.value;
+                  setFormData((prev) => ({ ...prev, targetUnit }));
+                }}
+                className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                placeholder="u"
+              />
+            </label>
+          </div>
+
           <label className="block text-sm font-semibold text-slate-700">
             Progression cible (facultatif)
             <input
@@ -1024,10 +1110,17 @@ function createEmptyForm(date: string): CreateAssignmentRequest {
     siteId: '',
     action: '',
     targetProgress: null,
+    targetQuantity: null,
+    targetUnit: null,
     objectiveText: null,
     date,
     workLocationType: PlanningWorkLocationType.ON_SITE,
   };
+}
+
+function formatQuantity(value: number | null) {
+  if (value === null) return null;
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function formatDateKey(date: Date) {

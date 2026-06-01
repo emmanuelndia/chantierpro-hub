@@ -23,10 +23,14 @@ export type TodayAssignment = {
   siteAddress: string;
   progressPercentage: number;
   targetProgress: number | null;
+  targetQuantity: number | null;
+  targetUnit: string | null;
   objectiveText: string | null;
   objectiveStatus: PlanningObjectiveStatus;
+  actualQuantity: number | null;
   actualProgress: number | null;
   progressDelta: number | null;
+  remainingQuantity: number | null;
   isClockedIn: boolean;
   hasAlert: boolean;
   alertType?: 'ABSENCE' | 'LONG_SESSION' | 'MISSING_REPORT';

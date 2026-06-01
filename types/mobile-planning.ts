@@ -6,6 +6,7 @@ export type PlanningObjectiveStatus = 'NOT_STARTED' | 'PARTIAL' | 'ACHIEVED' | '
 export type TaskProgressUpdateItem = {
   id: string;
   progress: number | null;
+  actualQuantity: number | null;
   comment: string | null;
   blocked: boolean;
   completed: boolean;
@@ -27,9 +28,13 @@ export type PlanningAssignment = {
   siteAddress: string;
   action: string;
   targetProgress: number | null;
+  targetQuantity: number | null;
+  targetUnit: string | null;
   objectiveText: string | null;
   actualProgress: number | null;
+  actualQuantity: number | null;
   progressDelta: number | null;
+  remainingQuantity: number | null;
   objectiveStatus: PlanningObjectiveStatus;
   latestProgressUpdate: TaskProgressUpdateItem | null;
   assignedAt: string;
@@ -90,6 +95,8 @@ export type CreateAssignmentRequest = {
   siteId: string;
   action: string;
   targetProgress: number | null;
+  targetQuantity: number | null;
+  targetUnit: string | null;
   date: string;
   workLocationType?: PlanningWorkLocationType;
   objectiveText?: string | null;
@@ -98,6 +105,8 @@ export type CreateAssignmentRequest = {
 export type UpdateAssignmentRequest = {
   action?: string;
   targetProgress?: number | null;
+  targetQuantity?: number | null;
+  targetUnit?: string | null;
   status?: PlanningAssignmentStatus;
   workLocationType?: PlanningWorkLocationType;
   objectiveText?: string | null;
@@ -133,9 +142,13 @@ export type SupervisorMyAssignment = {
   siteAddress: string;
   action: string;
   targetProgress: number | null;
+  targetQuantity: number | null;
+  targetUnit: string | null;
   objectiveText: string | null;
   actualProgress: number | null;
+  actualQuantity: number | null;
   progressDelta: number | null;
+  remainingQuantity: number | null;
   objectiveStatus: PlanningObjectiveStatus;
   latestProgressUpdate: TaskProgressUpdateItem | null;
   status: PlanningAssignmentStatus;
@@ -150,6 +163,7 @@ export type SupervisorMyAssignmentsResponse = {
 
 export type CreateTaskProgressUpdateRequest = {
   progress?: number | null;
+  actualQuantity?: number | null;
   comment?: string | null;
   blocked?: boolean;
   completed?: boolean;

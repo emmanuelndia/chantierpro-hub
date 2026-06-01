@@ -259,7 +259,26 @@ export function MobileSessionReportPage({ user: _user }: MobileSessionReportPage
             </div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <MiniInfo label="Cible" value={data.assignment.targetProgress !== undefined ? `${data.assignment.targetProgress}%` : 'Libre'} />
+            <MiniInfo
+              label="Cible"
+              value={
+                data.assignment.targetQuantity !== undefined
+                  ? `${formatQuantity(data.assignment.targetQuantity)} ${data.assignment.targetUnit ?? ''}`.trim()
+                  : data.assignment.targetProgress !== undefined
+                    ? `${data.assignment.targetProgress}%`
+                    : 'Libre'
+              }
+            />
+            {data.assignment.targetQuantity !== undefined ? (
+              <MiniInfo
+                label="Realise cumule"
+                value={
+                  data.assignment.actualQuantity !== null && data.assignment.actualQuantity !== undefined
+                    ? `${formatQuantity(data.assignment.actualQuantity)} / ${formatQuantity(data.assignment.targetQuantity)} ${data.assignment.targetUnit ?? ''}`.trim()
+                    : 'Non renseigne'
+                }
+              />
+            ) : null}
             <MiniInfo
               label="Dernier avancement"
               value={data.assignment.actualProgress !== null && data.assignment.actualProgress !== undefined ? `${data.assignment.actualProgress}%` : 'Non déclaré'}
@@ -515,6 +534,11 @@ function MiniInfo({ label, value }: Readonly<{ label: string; value: string }>) 
       <p className="mt-1 break-words text-sm font-black text-slate-950">{value}</p>
     </div>
   );
+}
+
+function formatQuantity(value: number | null | undefined) {
+  if (value === null || value === undefined) return '';
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function buildReportFormData(data: SubmitReportRequest, file: File) {

@@ -318,12 +318,13 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
               value={values.radiusKm}
             />
           </Field>
-          <Field label="Surface estimee" error={errors.area}>
+          <Field label="Surface estimee (facultatif)" error={errors.area}>
             <input
               className={inputClass}
               inputMode="decimal"
               onChange={(event) => setValues((current) => ({ ...current, area: event.target.value }))}
-              placeholder="1200"
+              placeholder="Non renseignée"
+              type="number"
               value={values.area}
             />
           </Field>
@@ -448,14 +449,16 @@ function validateValues(values: SiteFormValues, radiusRequired: boolean): SiteFo
 
   const latitude = Number(values.latitude);
   const longitude = Number(values.longitude);
-  const area = Number(values.area);
   const radiusKm = Number(values.radiusKm);
 
   if (values.requiresClockIn) {
     if (!Number.isFinite(latitude)) nextErrors.latitude = 'Latitude invalide.';
     if (!Number.isFinite(longitude)) nextErrors.longitude = 'Longitude invalide.';
   }
-  if (!Number.isFinite(area) || area <= 0) nextErrors.area = 'Surface estimee invalide.';
+  if (values.area.trim()) {
+    const area = Number(values.area);
+    if (!Number.isFinite(area) || area < 0) nextErrors.area = 'Surface estimee invalide.';
+  }
 
   if (radiusRequired && (!Number.isFinite(radiusKm) || radiusKm < 0.5 || radiusKm > 10)) {
     nextErrors.radiusKm = 'Rayon entre 0.5 et 10 km.';
@@ -481,7 +484,7 @@ function buildPayload(values: SiteFormValues, includeRadius: boolean) {
     ...(includeRadius ? { radiusKm: Number(values.radiusKm) } : {}),
     geofenceType: values.geofenceType,
     geofencePolygon: values.geofenceType === 'POLYGON' ? values.geofencePolygon : null,
-    area: Number(values.area),
+    area: optionalNumberOrZero(values.area),
     status: values.status,
     startDate: values.startDate,
     endDate: values.endDate || null,
@@ -492,6 +495,14 @@ function buildPayload(values: SiteFormValues, includeRadius: boolean) {
 function numberOrZero(value: string) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function optionalNumberOrZero(value: string) {
+  if (!value.trim()) {
+    return 0;
+  }
+
+  return numberOrZero(value);
 }
 
 function defaultRequiresClockInForSiteType(siteType: SiteType) {

@@ -47,6 +47,8 @@ type AssignmentFormState = {
   date: string;
   action: string;
   targetProgress: string;
+  targetQuantity: string;
+  targetUnit: string;
   objectiveText: string;
   status: PlanningAssignmentStatus;
   workLocationType: PlanningWorkLocationType;
@@ -230,6 +232,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       date: selectedDate,
       action: assignment.action,
       targetProgress: assignment.targetProgress === null ? '' : String(assignment.targetProgress),
+      targetQuantity: assignment.targetQuantity === null ? '' : String(assignment.targetQuantity),
+      targetUnit: assignment.targetUnit ?? '',
       objectiveText: assignment.objectiveText ?? '',
       status: assignment.status,
       workLocationType: assignment.workLocationType,
@@ -244,6 +248,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
 
   function submitForm() {
     const targetProgress = form.targetProgress === '' ? null : Number(form.targetProgress);
+    const targetQuantity = form.targetQuantity === '' ? null : Number(form.targetQuantity);
+    const targetUnit = form.targetUnit.trim() || null;
 
     if (drawerMode === 'create') {
       const payload: PlanningWebCreateRequest = {
@@ -251,6 +257,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         siteId: form.siteId,
         action: form.action,
         targetProgress,
+        targetQuantity,
+        targetUnit,
         objectiveText: form.objectiveText.trim() || null,
         date: form.date,
         workLocationType: form.workLocationType,
@@ -265,6 +273,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         data: {
           action: form.action,
           targetProgress,
+          targetQuantity,
+          targetUnit,
           objectiveText: form.objectiveText.trim() || null,
           status: form.status,
           workLocationType: form.workLocationType,
@@ -939,8 +949,10 @@ function AssignmentDrawer({
       ? [selectedResource, ...filteredResources]
       : filteredResources;
   const progressNumber = form.targetProgress === '' ? null : Number(form.targetProgress);
+  const quantityNumber = form.targetQuantity === '' ? null : Number(form.targetQuantity);
   const progressValid = progressNumber === null || (Number.isInteger(progressNumber) && progressNumber >= 0 && progressNumber <= 100);
-  const canSubmit = Boolean(form.action.trim() && form.date);
+  const quantityValid = quantityNumber === null || (Number.isFinite(quantityNumber) && quantityNumber >= 0);
+  const canSubmit = Boolean(form.action.trim() && form.date) && progressValid && quantityValid;
   const createIdentityValid = mode === 'edit' || Boolean(form.supervisorId && form.siteId);
 
   return (
@@ -967,11 +979,50 @@ function AssignmentDrawer({
               <input
                 className={`${filterClassName} mb-2`}
                 disabled={!canEditIdentity}
-                onChange={(event) => setResourceSearch(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setResourceSearch(value);
+                  const nextResources = filterAssignableResources(resources, value);
+                  const nextResource = nextResources[0];
+                  if (nextResources.length === 1 && nextResource) {
+                    onChange({ ...form, supervisorId: nextResource.id });
+                  }
+                }}
                 placeholder="Rechercher une ressource..."
                 type="search"
                 value={resourceSearch}
               />
+            ) : null}
+            {resources.length > 4 && resourceSearch.trim() ? (
+              <div className="mb-2 max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                {filteredResources.length === 0 ? (
+                  <p className="px-3 py-2 text-xs font-semibold text-slate-500">Aucune ressource trouvée.</p>
+                ) : (
+                  filteredResources.slice(0, 8).map((resource) => (
+                    <button
+                      className={`w-full rounded-xl px-3 py-2 text-left text-xs font-semibold transition ${
+                        form.supervisorId === resource.id
+                          ? 'bg-slate-950 text-white'
+                          : 'bg-white text-slate-700 hover:bg-slate-100'
+                      }`}
+                      disabled={!canEditIdentity}
+                      key={resource.id}
+                      onClick={() => {
+                        onChange({ ...form, supervisorId: resource.id });
+                        setResourceSearch(`${resource.firstName} ${resource.name}`);
+                      }}
+                      type="button"
+                    >
+                      <span className="block">
+                        {resource.firstName} {resource.name}
+                      </span>
+                      <span className={`block ${form.supervisorId === resource.id ? 'text-slate-200' : 'text-slate-500'}`}>
+                        {resource.availabilityLabel}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
             ) : null}
             <select
               className={filterClassName}
@@ -1041,7 +1092,29 @@ function AssignmentDrawer({
               value={form.action}
             />
           </Field>
-          <Field label="Progression cible % (facultatif)">
+          <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+            <Field label="Objectif quantitatif">
+              <input
+                className={filterClassName}
+                min={0}
+                onChange={(event) => onChange({ ...form, targetQuantity: event.target.value })}
+                placeholder="Ex : 12"
+                step="0.01"
+                type="number"
+                value={form.targetQuantity}
+              />
+              {!quantityValid ? <p className="mt-2 text-xs font-semibold text-red-600">La quantite doit etre positive.</p> : null}
+            </Field>
+            <Field label="Unite">
+              <input
+                className={filterClassName}
+                onChange={(event) => onChange({ ...form, targetUnit: event.target.value })}
+                placeholder="u, m, ml..."
+                value={form.targetUnit}
+              />
+            </Field>
+          </div>
+          <Field label="Progression cible % (compatibilite)">
             <input
               className={filterClassName}
               max={100}
@@ -1199,14 +1272,32 @@ function ObjectiveSummary({
 }: Readonly<{
   assignment: Pick<
     PlanningWebAssignment,
-    'actualProgress' | 'progressDelta' | 'objectiveStatus' | 'latestProgressUpdate'
+    | 'targetQuantity'
+    | 'targetUnit'
+    | 'actualQuantity'
+    | 'remainingQuantity'
+    | 'actualProgress'
+    | 'progressDelta'
+    | 'objectiveStatus'
+    | 'latestProgressUpdate'
   >;
 }>) {
   const config = objectiveStatusConfig[assignment.objectiveStatus];
+  const hasQuantityObjective = assignment.targetQuantity !== null;
 
   return (
     <div className="mt-2 space-y-1">
       <Badge tone={config.tone}>{config.label}</Badge>
+      {hasQuantityObjective ? (
+        <p className="text-xs font-semibold text-slate-600">
+          Realise {formatQuantity(assignment.actualQuantity) ?? '0'} / {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
+          {assignment.remainingQuantity !== null
+            ? assignment.remainingQuantity > 0
+              ? ` - reste ${formatQuantity(assignment.remainingQuantity)} ${assignment.targetUnit ?? ''}`
+              : ' - objectif atteint'
+            : ''}
+        </p>
+      ) : null}
       {assignment.actualProgress !== null ? (
         <p className="text-xs font-semibold text-slate-600">
           Réel {assignment.actualProgress}%
@@ -1414,10 +1505,17 @@ function createEmptyForm(date: string): AssignmentFormState {
     date,
     action: '',
     targetProgress: '',
+    targetQuantity: '',
+    targetUnit: '',
     objectiveText: '',
     status: PlanningAssignmentStatus.ASSIGNED,
     workLocationType: PlanningWorkLocationType.ON_SITE,
   };
+}
+
+function formatQuantity(value: number | null) {
+  if (value === null) return null;
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function statusTone(status: PlanningAssignmentStatus) {

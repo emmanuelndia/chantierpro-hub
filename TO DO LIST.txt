@@ -50,6 +50,18 @@ Prévoire les sites d'enlèvement matériel,  les entrepôts, ou les lieux dont 
 
 Mettre des commentaires sur les photos pour dire par Exemple je débute cette tâche ou je fini cette tâche
 
+Ajouter rôle ressource externe comme les superviseur qui font le même role 
+
+Quand on ajoute une progression ça doit avancer à la prochaine assignation
+
+
+plan de suivi des camions 
+
+Recevoir notification quand une ressource a été assigné par exemple surtout le parc auto
+
+BE pouvoir dire action termine
+
+
 
 
 

@@ -345,6 +345,8 @@ model PlanningAssignment {
   siteId         String
   action         String
   targetProgress Int?
+  targetQuantity Decimal?                 @db.Decimal(12, 2)
+  targetUnit     String?
   objectiveText  String?
   status         PlanningAssignmentStatus @default(ASSIGNED)
   workLocationType PlanningWorkLocationType @default(ON_SITE)
@@ -456,6 +458,7 @@ model TaskProgressUpdate {
   id           String             @id @default(cuid())
   assignmentId String
   progress     Int?
+  actualQuantity Decimal?           @db.Decimal(12, 2)
   comment      String?
   blocked      Boolean            @default(false)
   completed    Boolean            @default(false)

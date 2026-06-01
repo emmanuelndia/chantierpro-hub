@@ -536,6 +536,14 @@ function AssignmentCard({ assignment }: Readonly<{ assignment: TodayAssignment }
           </div>
           <p className="mt-1 truncate text-xs text-slate-600">{assignment.siteName}</p>
           {assignment.objectiveText ? <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-500">{assignment.objectiveText}</p> : null}
+          {assignment.targetQuantity !== null ? (
+            <p className="mt-1 text-[10px] font-bold text-slate-500">
+              Objectif {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
+              {assignment.actualQuantity !== null
+                ? ` - realise ${formatQuantity(assignment.actualQuantity)} ${assignment.targetUnit ?? ''}`
+                : ''}
+            </p>
+          ) : null}
           <div className="mt-2 flex items-center gap-2">
             <div className="flex-1">
               <div className="h-1.5 w-full rounded-full bg-slate-200">
@@ -826,6 +834,11 @@ function formatShortDuration(totalSeconds: number) {
   }
 
   return `${minutes}min`;
+}
+
+function formatQuantity(value: number | null) {
+  if (value === null) return null;
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function formatLongDate(value: Date) {

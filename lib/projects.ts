@@ -394,7 +394,7 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
   const status = parseSiteStatus(body.status) ?? SiteStatus.ACTIVE;
   const latitude = sanitizeNumber(body.latitude);
   const longitude = sanitizeNumber(body.longitude);
-  const area = sanitizeNumber(body.area);
+  const area = sanitizeNumber(body.area) ?? 0;
   const radiusKmProvided = body.radiusKm !== undefined && body.radiusKm !== null;
   const radiusKm =
     radiusKmProvided ? sanitizeNumber(body.radiusKm) : 2.0;
@@ -406,7 +406,6 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
     !startDate ||
     !status ||
     (requiresClockIn && !validateSiteGps(latitude, longitude)) ||
-    area === null ||
     radiusKm === null ||
     !geofence
   ) {

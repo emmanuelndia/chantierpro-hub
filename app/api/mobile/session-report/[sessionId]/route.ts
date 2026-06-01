@@ -112,6 +112,8 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
           id: true,
           action: true,
           targetProgress: true,
+          targetQuantity: true,
+          targetUnit: true,
           objectiveText: true,
           siteId: true,
           site: {
@@ -124,6 +126,7 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
             take: 1,
             select: {
               progress: true,
+              actualQuantity: true,
               comment: true,
               blocked: true,
               completed: true,
@@ -141,20 +144,23 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
     const pauseDurationSeconds = 0;
     const effectiveDurationSeconds = durationSeconds - pauseDurationSeconds;
     const latestProgress = assignment?.progressUpdates[0] ?? null;
-    const progressDelta =
-      assignment?.targetProgress !== null && assignment?.targetProgress !== undefined && latestProgress?.progress !== null && latestProgress?.progress !== undefined
-        ? latestProgress.progress - assignment.targetProgress
-        : null;
+    const targetQuantity = decimalToNumber(assignment?.targetQuantity);
+    const actualQuantity = decimalToNumber(latestProgress?.actualQuantity);
+    const actualProgress = calculateActualProgress(targetQuantity, actualQuantity, latestProgress?.progress ?? null);
+    const progressTarget = targetQuantity !== null && targetQuantity > 0 ? 100 : assignment?.targetProgress ?? null;
+    const progressDelta = progressTarget !== null && actualProgress !== null ? actualProgress - progressTarget : null;
+    const remainingQuantity =
+      targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
     const objectiveStatus = latestProgress?.blocked
       ? 'BLOCKED'
       : latestProgress?.completed ||
+          (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null && actualQuantity >= targetQuantity) ||
           (assignment?.targetProgress !== null &&
             assignment?.targetProgress !== undefined &&
-            latestProgress?.progress !== null &&
-            latestProgress?.progress !== undefined &&
-            latestProgress.progress >= assignment.targetProgress)
+            actualProgress !== null &&
+            actualProgress >= assignment.targetProgress)
         ? 'ACHIEVED'
-        : latestProgress
+      : latestProgress
           ? 'PARTIAL'
           : 'NOT_STARTED';
 
@@ -184,7 +190,11 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
               ...(assignment.targetProgress !== null
                 ? { targetProgress: assignment.targetProgress }
                 : {}),
-              actualProgress: latestProgress?.progress ?? null,
+              ...(targetQuantity !== null ? { targetQuantity } : {}),
+              ...(assignment.targetUnit ? { targetUnit: assignment.targetUnit } : {}),
+              actualQuantity,
+              actualProgress,
+              remainingQuantity,
               progressDelta,
               objectiveStatus,
               latestProgressComment: latestProgress?.comment ?? null,
@@ -223,3 +233,30 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
     );
   }
 });
+
+function decimalToNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  if (!isDecimalLike(value)) return null;
+  const numberValue = value.toNumber();
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function isDecimalLike(value: unknown): value is { toNumber: () => number } {
+  return typeof value === 'object' && value !== null && typeof (value as { toNumber?: unknown }).toNumber === 'function';
+}
+
+function calculateActualProgress(
+  targetQuantityValue: unknown,
+  actualQuantityValue: unknown,
+  fallbackProgress: number | null,
+) {
+  const targetQuantity = decimalToNumber(targetQuantityValue);
+  const actualQuantity = decimalToNumber(actualQuantityValue);
+
+  if (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null) {
+    return Math.min(100, Math.round((actualQuantity / targetQuantity) * 100));
+  }
+
+  return fallbackProgress;
+}

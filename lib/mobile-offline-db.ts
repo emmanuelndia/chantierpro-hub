@@ -57,6 +57,7 @@ export type OfflineTaskUpdateItem = {
   assignmentId: string;
   status?: 'COMPLETED';
   progress?: number | null;
+  actualQuantity?: number | null;
   comment?: string | null;
   blocked?: boolean;
   completed?: boolean;
@@ -469,7 +470,11 @@ async function syncTaskUpdates(errors: string[]) {
 
   for (const update of updates.sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal))) {
     const isProgressUpdate =
-      update.progress !== undefined || update.comment !== undefined || update.blocked !== undefined || update.completed !== undefined;
+      update.progress !== undefined ||
+      update.actualQuantity !== undefined ||
+      update.comment !== undefined ||
+      update.blocked !== undefined ||
+      update.completed !== undefined;
     const response = await authFetch(
       isProgressUpdate
         ? `/api/mobile/planning/assignment/${update.assignmentId}/progress`
@@ -481,6 +486,7 @@ async function syncTaskUpdates(errors: string[]) {
         isProgressUpdate
           ? {
               progress: update.progress,
+              actualQuantity: update.actualQuantity,
               comment: update.comment,
               blocked: update.blocked,
               completed: update.completed,

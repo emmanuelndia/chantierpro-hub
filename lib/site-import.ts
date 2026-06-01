@@ -26,7 +26,7 @@ export const SITE_IMPORT_COLUMNS: { key: SiteImportColumnKey; label: string; req
   { key: 'latitude', label: 'latitude', required: true },
   { key: 'longitude', label: 'longitude', required: true },
   { key: 'rayon_km', label: 'rayon_km', required: false },
-  { key: 'surface', label: 'surface_estimee', required: true },
+  { key: 'surface', label: 'surface_estimee', required: false },
   { key: 'date_debut', label: 'date_debut', required: true },
   { key: 'date_fin', label: 'date_fin', required: false },
   { key: 'responsable_gs_email', label: 'responsable_gs_email', required: true },
@@ -242,7 +242,7 @@ async function validateSiteImportRows(
       latitude: row.latitude,
       longitude: row.longitude,
       radiusKm: row.rayon_km || undefined,
-      area: row.surface,
+      area: row.surface || 0,
       startDate: row.date_debut,
       endDate: row.date_fin || null,
       siteManagerId: managerId ?? row.responsable_gs_email,
@@ -321,8 +321,8 @@ function addGenericFieldErrors(row: SiteImportNormalizedRow, errors: SiteImportF
   if (!row.longitude.trim() || Number.isNaN(Number(row.longitude))) {
     errors.push({ field: 'longitude', message: 'Longitude numerique requise.' });
   }
-  if (!row.surface.trim() || Number.isNaN(Number(row.surface))) {
-    errors.push({ field: 'surface', message: 'Surface estimee numerique requise.' });
+  if (row.surface.trim() && Number.isNaN(Number(row.surface))) {
+    errors.push({ field: 'surface', message: 'Surface estimee numerique invalide.' });
   }
   if (!row.date_debut.trim() || Number.isNaN(new Date(row.date_debut).getTime())) {
     errors.push({ field: 'date_debut', message: 'Date de debut requise au format AAAA-MM-JJ.' });

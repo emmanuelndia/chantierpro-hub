@@ -109,9 +109,13 @@ export type GeneralSupervisorAssignmentDashboardItem = {
   projectName: string;
   action: string;
   targetProgress: number | null;
+  targetQuantity: number | null;
+  targetUnit: string | null;
   objectiveText: string | null;
+  actualQuantity: number | null;
   actualProgress: number | null;
   progressDelta: number | null;
+  remainingQuantity: number | null;
   objectiveStatus: PlanningObjectiveStatus;
   latestProgressUpdate: TaskProgressUpdateItem | null;
   status: string;
