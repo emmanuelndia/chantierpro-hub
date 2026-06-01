@@ -612,57 +612,68 @@ function DayPlanningCards({
 
   return (
     <section className="space-y-4">
-      {groups.map((group) => (
-        <article className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-panel" key={group.supervisorId}>
-          <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+      {groups.map((group) => {
+        const terrainCount = group.assignments.filter((assignment) => assignment.workLocationType === 'ON_SITE').length;
+        const officeCount = group.assignments.filter((assignment) => assignment.workLocationType === 'OFFICE').length;
+        const blockedCount = group.assignments.filter((assignment) => assignment.objectiveStatus === 'BLOCKED').length;
+
+        return (
+        <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-panel" key={group.supervisorId}>
+          <div className="flex flex-col gap-4 border-b border-slate-100 bg-slate-50/70 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
               <Link
                 className="text-lg font-semibold text-slate-950 underline-offset-4 hover:text-orange-700 hover:underline"
                 href={`/web/users/${encodeURIComponent(group.supervisorId)}/assignments-history`}
               >
                 {group.supervisorFirstName} {group.supervisorName}
               </Link>
-              <p className="mt-1 text-sm text-slate-500">Ressource terrain</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Ressource terrain · {group.assignments.length} tache(s) · {terrainCount} terrain · {officeCount} bureau
+              </p>
             </div>
-            <Badge tone="info">{group.assignments.length} tâche(s)</Badge>
+            <div className="flex flex-wrap gap-2">
+              <Badge tone="info">{group.assignments.length} tâche(s)</Badge>
+              <Badge tone="neutral">{officeCount} bureau</Badge>
+              {blockedCount > 0 ? <Badge tone="error">{blockedCount} bloquée(s)</Badge> : null}
+            </div>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          <div className="grid gap-3 p-4 xl:grid-cols-2">
             {group.assignments.map((assignment) => {
               const site = sites.find((item) => item.id === assignment.siteId);
               return (
                 <div
-                  className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(8rem,0.8fr)_minmax(12rem,1.1fr)_minmax(12rem,1.2fr)_10rem_9rem_auto] md:items-center"
+                  className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md"
                   key={assignment.id}
                 >
-                  <PlanningTaskField label="Projet">
-                    <p className="font-medium text-slate-800">{site?.project.name ?? '-'}</p>
-                  </PlanningTaskField>
-                  <PlanningTaskField label="Chantier">
-                    <p className="font-semibold text-slate-800">{assignment.siteName}</p>
-                    <p className="text-xs text-slate-500">{assignment.siteAddress}</p>
-                  </PlanningTaskField>
-                  <PlanningTaskField label="Tâche">
-                    <p className="text-slate-700">{assignment.action}</p>
-                    {assignment.objectiveText ? <p className="mt-1 text-xs text-slate-500">Objectif : {assignment.objectiveText}</p> : null}
-                    <p className="mt-1 text-xs text-slate-500">
-                      Créé par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
-                    </p>
-                  </PlanningTaskField>
-                  <PlanningTaskField label="Progression">
-                    <ProgressValue value={assignment.targetProgress} />
-                    <ObjectiveSummary assignment={assignment} />
-                  </PlanningTaskField>
-                  <PlanningTaskField label="Statut">
-                    <div className="space-y-2">
-                      <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{site?.project.name ?? '-'}</p>
+                      <h4 className="mt-1 text-base font-semibold text-slate-950">{assignment.siteName}</h4>
+                      <p className="mt-1 line-clamp-1 text-xs text-slate-500">{assignment.siteAddress}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
                       <Badge tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : 'info'}>
                         {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
                       </Badge>
+                      <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
                     </div>
-                  </PlanningTaskField>
-                  {canMutate ? (
-                    <div className="flex justify-start md:justify-end">
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-3">
+                    <PlanningTaskField label="Tâche">
+                      <p className="text-sm font-medium text-slate-800">{assignment.action}</p>
+                      {assignment.objectiveText ? <p className="mt-1 text-xs text-slate-500">Objectif : {assignment.objectiveText}</p> : null}
+                    </PlanningTaskField>
+                  </div>
+
+                  <ObjectiveProgressCard assignment={assignment} />
+
+                  <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                    <p className="text-xs text-slate-500">
+                      Créé par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
+                    </p>
+                    {canMutate ? (
                       <TableActionsMenu
                         actions={[
                           {
@@ -678,14 +689,15 @@ function DayPlanningCards({
                           },
                         ]}
                       />
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </div>
               );
             })}
           </div>
         </article>
-      ))}
+        );
+      })}
     </section>
   );
 }
@@ -693,7 +705,7 @@ function DayPlanningCards({
 function PlanningTaskField({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
   return (
     <div>
-      <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 md:hidden">{label}</p>
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
       {children}
     </div>
   );
@@ -1258,11 +1270,89 @@ function ProgressValue({ value }: Readonly<{ value: number | null }>) {
   if (value === null) return <span className="text-slate-400">n/a</span>;
 
   return (
-    <div className="w-32">
+    <div className="w-full min-w-32">
       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
         <div className="h-full rounded-full bg-orange-500" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
       </div>
       <p className="mt-1 text-xs font-semibold text-slate-600">{value}%</p>
+    </div>
+  );
+}
+
+function ObjectiveProgressCard({
+  assignment,
+}: Readonly<{
+  assignment: Pick<
+    PlanningWebAssignment,
+    | 'targetProgress'
+    | 'targetQuantity'
+    | 'targetUnit'
+    | 'actualQuantity'
+    | 'remainingQuantity'
+    | 'actualProgress'
+    | 'progressDelta'
+    | 'objectiveStatus'
+    | 'latestProgressUpdate'
+  >;
+}>) {
+  const config = objectiveStatusConfig[assignment.objectiveStatus];
+  const hasQuantityObjective = assignment.targetQuantity !== null;
+  const actualProgress = assignment.actualProgress ?? assignment.targetProgress;
+  const unit = assignment.targetUnit ? ` ${assignment.targetUnit}` : '';
+  const actualLabel = formatQuantity(assignment.actualQuantity) ?? '0';
+  const targetLabel = formatQuantity(assignment.targetQuantity);
+  const remainingLabel =
+    assignment.remainingQuantity === null
+      ? null
+      : assignment.remainingQuantity > 0
+        ? `${formatQuantity(assignment.remainingQuantity)}${unit} restants`
+        : 'Objectif atteint';
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Badge tone={config.tone}>{config.label}</Badge>
+        {actualProgress !== null ? <span className="text-sm font-bold text-slate-900">{actualProgress}%</span> : null}
+      </div>
+
+      <div className="mt-3">
+        <ProgressValue value={actualProgress} />
+      </div>
+
+      {hasQuantityObjective ? (
+        <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
+          <div>
+            <p className="font-semibold uppercase tracking-[0.12em] text-slate-400">Objectif</p>
+            <p className="mt-1 font-semibold text-slate-800">
+              {targetLabel}
+              {unit}
+            </p>
+          </div>
+          <div>
+            <p className="font-semibold uppercase tracking-[0.12em] text-slate-400">Réalisé</p>
+            <p className="mt-1 font-semibold text-slate-800">
+              {actualLabel} / {targetLabel}
+              {unit}
+            </p>
+          </div>
+          <div>
+            <p className="font-semibold uppercase tracking-[0.12em] text-slate-400">Reste</p>
+            <p className="mt-1 font-semibold text-slate-800">{remainingLabel ?? '-'}</p>
+          </div>
+        </div>
+      ) : (
+        <ObjectiveSummary assignment={assignment} />
+      )}
+
+      {assignment.progressDelta !== null ? (
+        <p className="mt-2 text-xs font-semibold text-slate-500">
+          Ecart {assignment.progressDelta >= 0 ? '+' : ''}
+          {assignment.progressDelta}%
+        </p>
+      ) : null}
+      {assignment.latestProgressUpdate?.comment ? (
+        <p className="mt-2 line-clamp-2 text-xs text-slate-500">{assignment.latestProgressUpdate.comment}</p>
+      ) : null}
     </div>
   );
 }

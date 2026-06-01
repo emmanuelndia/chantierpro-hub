@@ -7,8 +7,9 @@ import { haversineDistanceKm } from '@/lib/haversine';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import { MobilePendingReportsAlert } from '@/components/mobile-pending-reports-alert';
 import { MobileOfflineLink } from '@/components/mobile-offline-link';
-import { MobileOfficeAssignmentsSection, useTodayOfficeAssignments } from '@/components/mobile-office-assignments-section';
+import { useTodayOfficeAssignments } from '@/components/mobile-office-assignments-section';
 import type { WebSessionUser } from '@/lib/auth/web-session';
+import type { SupervisorMyAssignment } from '@/types/mobile-planning';
 import type { SessionStatus, TodayClockInView } from '@/types/clock-in';
 import type { TodaySiteItem } from '@/types/projects';
 
@@ -203,12 +204,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
       </section>
       ) : null}
 
-      <MobileOfficeAssignmentsSection
-        assignments={assignments}
-        description="Suivez vos taches chantier et bureau, puis mettez a jour le realise cumule."
-        title="Taches du jour"
-        usingOfflineData={usingOfflineAssignments}
-      />
+      <TasksSummaryCard assignments={assignments} usingOfflineData={usingOfflineAssignments} />
 
       {primarySite ? (
         <section className="space-y-3">
@@ -382,6 +378,61 @@ function PrimaryActionButton({
     >
       {label}
     </MobileOfflineLink>
+  );
+}
+
+function TasksSummaryCard({
+  assignments,
+  usingOfflineData,
+}: Readonly<{
+  assignments: SupervisorMyAssignment[];
+  usingOfflineData: boolean;
+}>) {
+  const terrainCount = assignments.filter((assignment) => assignment.workLocationType === 'ON_SITE').length;
+  const officeCount = assignments.filter((assignment) => assignment.workLocationType === 'OFFICE').length;
+  const blockedCount = assignments.filter((assignment) => assignment.objectiveStatus === 'BLOCKED').length;
+  const pendingCount = assignments.filter((assignment) => assignment.objectiveStatus === 'NOT_STARTED').length;
+
+  if (assignments.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-indigo-700">Taches du jour</h2>
+          <p className="mt-1 text-sm font-semibold text-indigo-900">
+            {assignments.length} tache(s), dont {terrainCount} terrain et {officeCount} bureau.
+          </p>
+        </div>
+        <MobileOfflineLink
+          className="shrink-0 rounded-full bg-indigo-600 px-3 py-2 text-xs font-black text-white"
+          href="/mobile/tasks"
+        >
+          Voir
+        </MobileOfflineLink>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <SummaryTile label="A traiter" value={pendingCount} />
+        <SummaryTile label="Bloquees" value={blockedCount} />
+        <SummaryTile label="Terrain" value={terrainCount} />
+      </div>
+      {usingOfflineData ? (
+        <p className="mt-3 rounded-lg bg-white/80 p-3 text-xs font-semibold text-indigo-900">
+          Donnees hors ligne. Les taches preparees du jour sont affichees.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function SummaryTile({ label, value }: Readonly<{ label: string; value: number }>) {
+  return (
+    <div className="rounded-lg bg-white p-3 text-center">
+      <p className="text-lg font-black text-slate-950">{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+    </div>
   );
 }
 
