@@ -55,6 +55,7 @@ export function useTodayOfficeAssignments() {
     assignmentsQuery.data?.assignments.filter((assignment) => assignment.workLocationType === 'OFFICE') ?? [];
 
   return {
+    assignments: assignmentsQuery.data?.assignments ?? [],
     officeAssignments,
     usingOfflineAssignments,
   };
@@ -63,9 +64,13 @@ export function useTodayOfficeAssignments() {
 export function MobileOfficeAssignmentsSection({
   assignments,
   usingOfflineData,
+  title = 'Taches bureau du jour',
+  description = 'Ces taches ne demandent pas de pointage chantier.',
 }: Readonly<{
   assignments: SupervisorMyAssignment[];
   usingOfflineData: boolean;
+  title?: string;
+  description?: string;
 }>) {
   const queryClient = useQueryClient();
   const [progressTarget, setProgressTarget] = useState<SupervisorMyAssignment | null>(null);
@@ -149,10 +154,10 @@ export function MobileOfficeAssignmentsSection({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-indigo-700">
-            Taches bureau du jour
+            {title}
           </h2>
           <p className="mt-1 text-sm font-semibold text-indigo-900">
-            Ces taches ne demandent pas de pointage chantier.
+            {description}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-bold text-indigo-700">
@@ -176,7 +181,7 @@ export function MobileOfficeAssignmentsSection({
                 <p className="mt-2 text-sm leading-5 text-slate-700">{assignment.action}</p>
               </div>
               <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                Bureau
+                {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
               </span>
             </div>
             {assignment.targetQuantity !== null ? (

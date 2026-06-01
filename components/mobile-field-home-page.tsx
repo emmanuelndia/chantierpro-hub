@@ -33,7 +33,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
   const [usingOfflineSites, setUsingOfflineSites] = useState(false);
   const [usingOfflineClockIn, setUsingOfflineClockIn] = useState(false);
   const geoState = useCurrentPosition();
-  const { officeAssignments, usingOfflineAssignments } = useTodayOfficeAssignments();
+  const { assignments, usingOfflineAssignments } = useTodayOfficeAssignments();
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -139,7 +139,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
   const pauseDurationSeconds = calculateElapsedSeconds(null, now, sessionStatus?.pauseDuration);
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
   const loading = sitesQuery.isLoading || clockInQuery.isLoading;
-  const showSitesSection = loading || sites.length > 0 || officeAssignments.length === 0;
+  const showSitesSection = loading || sites.length > 0 || assignments.length === 0;
 
   return (
     <div className="space-y-5">
@@ -186,7 +186,7 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
 
         {loading ? <SitesLoadingState /> : null}
 
-        {!loading && sites.length === 0 && officeAssignments.length === 0 ? <EmptySitesState /> : null}
+        {!loading && sites.length === 0 && assignments.length === 0 ? <EmptySitesState /> : null}
 
         {!loading && sites.length > 0 ? (
           <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2">
@@ -203,7 +203,12 @@ export function MobileFieldHomePage({ user }: MobileFieldHomePageProps) {
       </section>
       ) : null}
 
-      <MobileOfficeAssignmentsSection assignments={officeAssignments} usingOfflineData={usingOfflineAssignments} />
+      <MobileOfficeAssignmentsSection
+        assignments={assignments}
+        description="Suivez vos taches chantier et bureau, puis mettez a jour le realise cumule."
+        title="Taches du jour"
+        usingOfflineData={usingOfflineAssignments}
+      />
 
       {primarySite ? (
         <section className="space-y-3">
