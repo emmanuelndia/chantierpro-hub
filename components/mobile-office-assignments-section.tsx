@@ -192,7 +192,7 @@ export function MobileOfficeAssignmentsSection({
           const status = objectiveStatusConfig[assignment.objectiveStatus];
           const progressValue = Math.max(0, Math.min(100, assignment.actualProgress ?? 0));
           const unit = assignment.targetUnit ?? '';
-          const hasQuantityObjective = assignment.targetQuantity !== null;
+          const hasQuantityObjective = hasQuantitativeObjective(assignment);
           const remainingLabel =
             hasQuantityObjective && assignment.remainingQuantity !== null
               ? assignment.remainingQuantity <= 0
@@ -212,7 +212,7 @@ export function MobileOfficeAssignmentsSection({
                 {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
               </span>
             </div>
-            {assignment.targetQuantity !== null ? (
+            {assignment.targetQuantity !== null && assignment.targetQuantity > 0 ? (
               <p className="mt-2 text-xs font-bold text-indigo-700">
                 Objectif {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
               </p>

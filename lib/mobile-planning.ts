@@ -343,11 +343,18 @@ export async function updatePlanningAssignment(
     return planningError('INVALID_WORK_LOCATION', 'Type de travail invalide.', 400);
   }
 
+  const effectiveTargetQuantity = input.targetQuantity !== undefined ? targetQuantity : decimalToNumber(existing.targetQuantity);
+  const hasQuantityObjective = effectiveTargetQuantity !== null && effectiveTargetQuantity > 0;
+  const normalizedTargetProgress =
+    hasQuantityObjective ? null : targetProgress;
+
   const assignment = await prisma.planningAssignment.update({
     where: { id: existing.id },
     data: {
       ...(action ? { action } : {}),
-      ...(input.targetProgress !== undefined ? { targetProgress } : {}),
+      ...(input.targetProgress !== undefined || (input.targetQuantity !== undefined && hasQuantityObjective)
+        ? { targetProgress: normalizedTargetProgress }
+        : {}),
       ...(input.targetQuantity !== undefined ? { targetQuantity } : {}),
       ...(input.targetUnit !== undefined ? { targetUnit } : {}),
       ...(input.objectiveText !== undefined ? { objectiveText } : {}),
@@ -633,7 +640,7 @@ export async function duplicatePlanningAssignments(
           supervisorId: assignment.supervisorId,
           siteId: assignment.siteId,
           action: assignment.action,
-          targetProgress: assignment.targetProgress,
+          targetProgress: normalizeProgressForQuantity(assignment.targetProgress, assignment.targetQuantity),
           targetQuantity: assignment.targetQuantity,
           targetUnit: assignment.targetUnit,
           objectiveText: assignment.objectiveText,
@@ -738,12 +745,14 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
     return planningError('SUPERVISOR_NOT_FOUND', 'Ressource terrain introuvable.', 404);
   }
 
+  const normalizedTargetProgress = targetQuantity !== null && targetQuantity > 0 ? null : targetProgress;
+
   return {
     date,
     supervisorId,
     siteId,
     action,
-    targetProgress,
+    targetProgress: normalizedTargetProgress,
     targetQuantity,
     targetUnit,
     objectiveText,
@@ -814,6 +823,11 @@ function getSupervisorAvailabilityLabel(supervisorId: string, assignedSupervisor
   return siteName ? `Assigne sur ${siteName}` : 'Disponible';
 }
 
+function normalizeProgressForQuantity(targetProgress: number | null, targetQuantity: unknown) {
+  const quantity = decimalToNumber(targetQuantity);
+  return quantity !== null && quantity > 0 ? null : targetProgress;
+}
+
 function buildTaskKey(
   supervisorId: string,
   siteId: string,
@@ -823,7 +837,9 @@ function buildTaskKey(
   targetUnit: string | null,
   workLocationType: PlanningWorkLocationType,
 ) {
-  return `${supervisorId}:${siteId}:${normalizeTaskActionKey(action)}:${targetProgress ?? 'null'}:${decimalToNumber(targetQuantity) ?? 'null'}:${targetUnit ?? 'null'}:${workLocationType}`;
+  const normalizedTargetQuantity = decimalToNumber(targetQuantity);
+  const normalizedTargetProgress = normalizeProgressForQuantity(targetProgress, targetQuantity);
+  return `${supervisorId}:${siteId}:${normalizeTaskActionKey(action)}:${normalizedTargetProgress ?? 'null'}:${normalizedTargetQuantity ?? 'null'}:${targetUnit ?? 'null'}:${workLocationType}`;
 }
 
 function normalizeTaskActionKey(action: string) {
@@ -848,7 +864,8 @@ function isSameTask(
 ) {
   return (
     normalizeTaskActionKey(existing.action) === normalizeTaskActionKey(normalized.action) &&
-    existing.targetProgress === normalized.targetProgress &&
+    normalizeProgressForQuantity(existing.targetProgress, existing.targetQuantity) ===
+      normalizeProgressForQuantity(normalized.targetProgress, normalized.targetQuantity) &&
     decimalToNumber(existing.targetQuantity) === decimalToNumber(normalized.targetQuantity) &&
     (existing.targetUnit ?? null) === (normalized.targetUnit ?? null) &&
     existing.workLocationType === normalized.workLocationType
@@ -1137,14 +1154,15 @@ function buildObjectiveState(
   const actualQuantity = latestProgressUpdate?.actualQuantity ?? null;
   const actualProgress = calculateActualProgress(targetQuantity, actualQuantity, latestProgressUpdate?.progress ?? null);
   const progressTarget = targetQuantity !== null && targetQuantity > 0 ? 100 : targetProgress;
+  const hasQuantityObjective = targetQuantity !== null && targetQuantity > 0;
   const progressDelta = progressTarget !== null && actualProgress !== null ? actualProgress - progressTarget : null;
   const remainingQuantity =
-    targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
+    hasQuantityObjective && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
   const objectiveStatus = latestProgressUpdate?.blocked
     ? 'BLOCKED'
-    : latestProgressUpdate?.completed ||
-        (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null && actualQuantity >= targetQuantity) ||
-        (targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
+    : (!hasQuantityObjective && latestProgressUpdate?.completed) ||
+        (hasQuantityObjective && actualQuantity !== null && actualQuantity >= targetQuantity) ||
+        (!hasQuantityObjective && targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
       ? 'ACHIEVED'
       : actualProgress !== null || actualQuantity !== null || latestProgressUpdate
         ? 'PARTIAL'

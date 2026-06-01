@@ -242,14 +242,15 @@ function buildObjectiveState(
   const actualQuantity = latestProgressUpdate?.actualQuantity ?? null;
   const actualProgress = calculateActualProgress(targetQuantity, actualQuantity, latestProgressUpdate?.progress ?? null);
   const progressTarget = targetQuantity !== null && targetQuantity > 0 ? 100 : targetProgress;
+  const hasQuantityObjective = targetQuantity !== null && targetQuantity > 0;
   const progressDelta = progressTarget !== null && actualProgress !== null ? actualProgress - progressTarget : null;
   const remainingQuantity =
-    targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
+    hasQuantityObjective && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
   const objectiveStatus = latestProgressUpdate?.blocked
     ? 'BLOCKED'
-    : latestProgressUpdate?.completed ||
-        (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null && actualQuantity >= targetQuantity) ||
-        (targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
+    : (!hasQuantityObjective && latestProgressUpdate?.completed) ||
+        (hasQuantityObjective && actualQuantity !== null && actualQuantity >= targetQuantity) ||
+        (!hasQuantityObjective && targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
       ? 'ACHIEVED'
       : actualProgress !== null || actualQuantity !== null || latestProgressUpdate
         ? 'PARTIAL'

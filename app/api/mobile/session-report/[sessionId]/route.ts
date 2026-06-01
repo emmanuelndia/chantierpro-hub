@@ -148,14 +148,16 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
     const actualQuantity = decimalToNumber(latestProgress?.actualQuantity);
     const actualProgress = calculateActualProgress(targetQuantity, actualQuantity, latestProgress?.progress ?? null);
     const progressTarget = targetQuantity !== null && targetQuantity > 0 ? 100 : assignment?.targetProgress ?? null;
+    const hasQuantityObjective = targetQuantity !== null && targetQuantity > 0;
     const progressDelta = progressTarget !== null && actualProgress !== null ? actualProgress - progressTarget : null;
     const remainingQuantity =
-      targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
+      hasQuantityObjective && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
     const objectiveStatus = latestProgress?.blocked
       ? 'BLOCKED'
-      : latestProgress?.completed ||
-          (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null && actualQuantity >= targetQuantity) ||
-          (assignment?.targetProgress !== null &&
+      : (!hasQuantityObjective && latestProgress?.completed) ||
+          (hasQuantityObjective && actualQuantity !== null && actualQuantity >= targetQuantity) ||
+          (!hasQuantityObjective &&
+            assignment?.targetProgress !== null &&
             assignment?.targetProgress !== undefined &&
             actualProgress !== null &&
             actualProgress >= assignment.targetProgress)
@@ -187,7 +189,7 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
               id: assignment.id,
               action: assignment.action,
               ...(assignment.objectiveText ? { objectiveText: assignment.objectiveText } : {}),
-              ...(assignment.targetProgress !== null
+              ...(!hasQuantityObjective && assignment.targetProgress !== null
                 ? { targetProgress: assignment.targetProgress }
                 : {}),
               ...(targetQuantity !== null ? { targetQuantity } : {}),

@@ -561,7 +561,7 @@ function AssignmentCard({ assignment }: Readonly<{ assignment: TodayAssignment }
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${objective.className}`}>
               {objective.label}
             </span>
-            {assignment.targetProgress !== null ? (
+            {(assignment.targetQuantity === null || assignment.targetQuantity <= 0) && assignment.targetProgress !== null ? (
               <span className="text-[10px] font-bold text-slate-500">Cible {assignment.targetProgress}%</span>
             ) : null}
             {assignment.progressDelta !== null ? (

@@ -172,7 +172,14 @@ async function getPlanningExportRows(
         actualQuantity === null || targetQuantity === null
           ? ''
           : `${formatQuantity(actualQuantity)} / ${formatQuantity(targetQuantity)} ${assignment.targetUnit ?? ''}`.trim(),
-      progress: actualProgress === null ? (assignment.targetProgress === null ? '' : String(assignment.targetProgress)) : String(actualProgress),
+      progress:
+        actualProgress === null
+          ? targetQuantity !== null && targetQuantity > 0
+            ? ''
+            : assignment.targetProgress === null
+              ? ''
+              : String(assignment.targetProgress)
+          : String(actualProgress),
     };
   });
 }

@@ -249,6 +249,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   function submitForm() {
     const targetProgress = form.targetProgress === '' ? null : Number(form.targetProgress);
     const targetQuantity = form.targetQuantity === '' ? null : Number(form.targetQuantity);
+    const normalizedTargetProgress = targetQuantity !== null && targetQuantity > 0 ? null : targetProgress;
     const targetUnit = form.targetUnit.trim() || null;
 
     if (drawerMode === 'create') {
@@ -256,7 +257,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         supervisorId: form.supervisorId,
         siteId: form.siteId,
         action: form.action,
-        targetProgress,
+        targetProgress: normalizedTargetProgress,
         targetQuantity,
         targetUnit,
         objectiveText: form.objectiveText.trim() || null,
@@ -272,7 +273,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         id: form.id,
         data: {
           action: form.action,
-          targetProgress,
+          targetProgress: normalizedTargetProgress,
           targetQuantity,
           targetUnit,
           objectiveText: form.objectiveText.trim() || null,
@@ -663,7 +664,7 @@ function DayPlanningCards({
                   <div className="rounded-2xl bg-slate-50 p-3">
                     <PlanningTaskField label="Tâche">
                       <p className="text-sm font-medium text-slate-800">{assignment.action}</p>
-                      {assignment.objectiveText ? <p className="mt-1 text-xs text-slate-500">Objectif : {assignment.objectiveText}</p> : null}
+                      {assignment.objectiveText ? <p className="mt-1 text-xs text-slate-500">Consigne : {assignment.objectiveText}</p> : null}
                     </PlanningTaskField>
                   </div>
 
@@ -833,7 +834,7 @@ function CentralizedPlanningTable({
                 </td>
                 <td className="min-w-64 px-5 py-4 text-slate-700">
                   <p>{item.action}</p>
-                  {item.objectiveText ? <p className="mt-1 text-xs text-slate-500">Objectif : {item.objectiveText}</p> : null}
+                  {item.objectiveText ? <p className="mt-1 text-xs text-slate-500">Consigne : {item.objectiveText}</p> : null}
                 </td>
                 <td className="px-5 py-4">
                   <Badge tone={item.workLocationType === 'OFFICE' ? 'neutral' : 'info'}>
@@ -841,7 +842,7 @@ function CentralizedPlanningTable({
                   </Badge>
                 </td>
                 <td className="px-5 py-4">
-                  <ProgressValue value={item.targetProgress} />
+                  {item.targetQuantity !== null && item.targetQuantity > 0 ? null : <ProgressValue value={item.targetProgress} />}
                   <ObjectiveSummary assignment={item} />
                 </td>
                 <td className="px-5 py-4">
@@ -962,6 +963,7 @@ function AssignmentDrawer({
       : filteredResources;
   const progressNumber = form.targetProgress === '' ? null : Number(form.targetProgress);
   const quantityNumber = form.targetQuantity === '' ? null : Number(form.targetQuantity);
+  const hasQuantityObjective = quantityNumber !== null && quantityNumber > 0;
   const progressValid = progressNumber === null || (Number.isInteger(progressNumber) && progressNumber >= 0 && progressNumber <= 100);
   const quantityValid = quantityNumber === null || (Number.isFinite(quantityNumber) && quantityNumber >= 0);
   const canSubmit = Boolean(form.action.trim() && form.date) && progressValid && quantityValid;
@@ -1109,7 +1111,15 @@ function AssignmentDrawer({
               <input
                 className={filterClassName}
                 min={0}
-                onChange={(event) => onChange({ ...form, targetQuantity: event.target.value })}
+                onChange={(event) => {
+                  const targetQuantity = event.target.value;
+                  const nextQuantity = targetQuantity === '' ? null : Number(targetQuantity);
+                  onChange({
+                    ...form,
+                    targetQuantity,
+                    targetProgress: nextQuantity !== null && nextQuantity > 0 ? '' : form.targetProgress,
+                  });
+                }}
                 placeholder="Ex : 12"
                 step="0.01"
                 type="number"
@@ -1126,27 +1136,36 @@ function AssignmentDrawer({
               />
             </Field>
           </div>
-          <Field label="Progression cible % (compatibilite)">
-            <input
-              className={filterClassName}
-              max={100}
-              min={0}
-              onChange={(event) => onChange({ ...form, targetProgress: event.target.value })}
-              type="number"
-              value={form.targetProgress}
-            />
-            <p className="mt-2 text-xs font-semibold text-slate-500">
-              Laissez vide si aucune progression cible n&apos;est définie.
-            </p>
-            {!progressValid ? <p className="mt-2 text-xs font-semibold text-red-600">La progression doit etre entre 0 et 100.</p> : null}
-          </Field>
-          <Field label="Objectif qualitatif (facultatif)">
+          {hasQuantityObjective ? (
+            <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3 text-xs font-semibold text-sky-800">
+              La progression sera calculee depuis la quantite realisee. La progression cible % est ignoree pour cette tache.
+            </div>
+          ) : (
+            <Field label="Progression cible % (si pas de quantite)">
+              <input
+                className={filterClassName}
+                max={100}
+                min={0}
+                onChange={(event) => onChange({ ...form, targetProgress: event.target.value })}
+                type="number"
+                value={form.targetProgress}
+              />
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                Uniquement pour les taches sans objectif quantitatif.
+              </p>
+              {!progressValid ? <p className="mt-2 text-xs font-semibold text-red-600">La progression doit etre entre 0 et 100.</p> : null}
+            </Field>
+          )}
+          <Field label="Consigne / objectif texte (facultatif)">
             <textarea
               className={`${filterClassName} min-h-24`}
               onChange={(event) => onChange({ ...form, objectiveText: event.target.value })}
               placeholder="Ex : finaliser les reprises, preparer le PV, suivre les validations..."
               value={form.objectiveText}
             />
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Precision libre pour expliquer le travail attendu. Ce champ ne calcule pas la progression.
+            </p>
           </Field>
           <Field label="Type de tâche">
             <select
@@ -1296,7 +1315,7 @@ function ObjectiveProgressCard({
   >;
 }>) {
   const config = objectiveStatusConfig[assignment.objectiveStatus];
-  const hasQuantityObjective = assignment.targetQuantity !== null;
+  const hasQuantityObjective = assignment.targetQuantity !== null && assignment.targetQuantity > 0;
   const actualProgress = assignment.actualProgress ?? assignment.targetProgress;
   const unit = assignment.targetUnit ? ` ${assignment.targetUnit}` : '';
   const actualLabel = formatQuantity(assignment.actualQuantity) ?? '0';
@@ -1373,7 +1392,7 @@ function ObjectiveSummary({
   >;
 }>) {
   const config = objectiveStatusConfig[assignment.objectiveStatus];
-  const hasQuantityObjective = assignment.targetQuantity !== null;
+  const hasQuantityObjective = assignment.targetQuantity !== null && assignment.targetQuantity > 0;
 
   return (
     <div className="mt-2 space-y-1">

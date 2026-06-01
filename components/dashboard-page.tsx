@@ -384,7 +384,9 @@ function GeneralSupervisorAssignmentsPanel({
               {assignment.objectiveText ? <p className="mt-2 text-xs font-semibold text-slate-500">{assignment.objectiveText}</p> : null}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Badge tone={objectiveStatusTone(assignment.objectiveStatus)}>{objectiveStatusLabel(assignment.objectiveStatus)}</Badge>
-                {assignment.targetProgress !== null ? <Badge tone="info">Cible {assignment.targetProgress}%</Badge> : null}
+                {(assignment.targetQuantity === null || assignment.targetQuantity <= 0) && assignment.targetProgress !== null ? (
+                  <Badge tone="info">Cible {assignment.targetProgress}%</Badge>
+                ) : null}
                 {assignment.actualProgress !== null ? <Badge tone="neutral">Reel {assignment.actualProgress}%</Badge> : null}
                 {assignment.progressDelta !== null ? (
                   <Badge tone={assignment.progressDelta >= 0 ? 'success' : 'warning'}>

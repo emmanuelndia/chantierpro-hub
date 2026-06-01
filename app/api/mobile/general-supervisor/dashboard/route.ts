@@ -127,14 +127,15 @@ export const GET = withAuth(async ({ user }) => {
       const actualQuantity = decimalToNumber(latestProgressUpdate?.actualQuantity);
       const actualProgress = calculateActualProgress(targetQuantity, actualQuantity, latestProgressUpdate?.progress ?? null);
       const progressTarget = targetQuantity !== null && targetQuantity > 0 ? 100 : assignment.targetProgress;
+      const hasQuantityObjective = targetQuantity !== null && targetQuantity > 0;
       const progressDelta = progressTarget !== null && actualProgress !== null ? actualProgress - progressTarget : null;
       const remainingQuantity =
-        targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
+        hasQuantityObjective && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
       const objectiveStatus = latestProgressUpdate?.blocked
         ? 'BLOCKED'
-        : latestProgressUpdate?.completed ||
-            (targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null && actualQuantity >= targetQuantity) ||
-            (assignment.targetProgress !== null && actualProgress !== null && actualProgress >= assignment.targetProgress)
+        : (!hasQuantityObjective && latestProgressUpdate?.completed) ||
+            (hasQuantityObjective && actualQuantity !== null && actualQuantity >= targetQuantity) ||
+            (!hasQuantityObjective && assignment.targetProgress !== null && actualProgress !== null && actualProgress >= assignment.targetProgress)
           ? 'ACHIEVED'
           : actualProgress !== null || latestProgressUpdate
             ? 'PARTIAL'
@@ -166,7 +167,7 @@ export const GET = withAuth(async ({ user }) => {
       } else if (isClockedIn && latestRecord) {
         const elapsed = now.getTime() - latestRecord.timestampLocal.getTime();
         progressPercentage = Math.min(90, Math.max(5, Math.floor(elapsed / (9 * 60 * 60 * 10))));
-      } else if (assignment.targetProgress !== null) {
+      } else if (!hasQuantityObjective && assignment.targetProgress !== null) {
         progressPercentage = assignment.targetProgress;
       }
 

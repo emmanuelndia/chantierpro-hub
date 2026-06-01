@@ -364,6 +364,7 @@ function AssignmentCard({
   const initials = getInitials(assignment.supervisorFirstName, assignment.supervisorName);
   const clockStatus = clockInStatusConfig[assignment.clockInStatus];
   const planningStatus = planningStatusConfig[assignment.status];
+  const hasQuantityObjective = editData.targetQuantity !== null && editData.targetQuantity !== undefined && editData.targetQuantity > 0;
 
   if (isEditing) {
     return (
@@ -393,9 +394,11 @@ function AssignmentCard({
                 value={editData.targetQuantity ?? ''}
                 onChange={(event) => {
                   const targetQuantity = event.currentTarget.value;
+                  const nextQuantity = targetQuantity === '' ? null : Number(targetQuantity);
                   setEditData((prev) => ({
                     ...prev,
-                    targetQuantity: targetQuantity === '' ? null : Number(targetQuantity),
+                    targetQuantity: nextQuantity,
+                    targetProgress: nextQuantity !== null && nextQuantity > 0 ? null : (prev.targetProgress ?? null),
                   }));
                 }}
                 className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
@@ -416,30 +419,36 @@ function AssignmentCard({
             </label>
           </div>
 
-          <label className="block text-sm font-semibold text-slate-700">
-            Progression cible (facultatif)
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={editData.targetProgress ?? ''}
-              onChange={(event) => {
-                const targetProgress = event.currentTarget.value;
-                setEditData((prev) => ({
-                  ...prev,
-                  targetProgress: targetProgress === '' ? null : Number(targetProgress),
-                }));
-              }}
-              className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-              placeholder="0-100"
-            />
-            <span className="mt-2 block text-xs font-semibold text-slate-500">
-              Laissez vide si aucune progression cible n&apos;est définie.
-            </span>
-          </label>
+          {hasQuantityObjective ? (
+            <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-xs font-semibold text-sky-800">
+              La progression sera calculee depuis la quantite realisee.
+            </div>
+          ) : (
+            <label className="block text-sm font-semibold text-slate-700">
+              Progression cible (si pas de quantite)
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={editData.targetProgress ?? ''}
+                onChange={(event) => {
+                  const targetProgress = event.currentTarget.value;
+                  setEditData((prev) => ({
+                    ...prev,
+                    targetProgress: targetProgress === '' ? null : Number(targetProgress),
+                  }));
+                }}
+                className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                placeholder="0-100"
+              />
+              <span className="mt-2 block text-xs font-semibold text-slate-500">
+                Uniquement pour les taches sans objectif quantitatif.
+              </span>
+            </label>
+          )}
 
           <label className="block text-sm font-semibold text-slate-700">
-            Objectif qualitatif (facultatif)
+            Consigne / objectif texte (facultatif)
             <textarea
               value={editData.objectiveText ?? ''}
               onChange={(event) => {
@@ -448,8 +457,11 @@ function AssignmentCard({
               }}
               rows={2}
               className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-              placeholder="Ex : finaliser les reprises, préparer le PV..."
+              placeholder="Ex : finaliser les reprises, preparer le PV..."
             />
+            <span className="mt-2 block text-xs font-semibold text-slate-500">
+              Precision libre, sans calcul de progression.
+            </span>
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
@@ -537,13 +549,13 @@ function AssignmentCard({
 
       <p className="mt-3 text-sm text-slate-800">{assignment.action}</p>
       {assignment.objectiveText ? <p className="mt-2 text-xs font-semibold text-slate-600">{assignment.objectiveText}</p> : null}
-      {assignment.targetQuantity !== null ? (
+      {assignment.targetQuantity !== null && assignment.targetQuantity > 0 ? (
         <p className="mt-2 text-xs font-bold text-sky-700">
           Objectif {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
         </p>
       ) : null}
 
-      {assignment.targetProgress !== null ? (
+      {(assignment.targetQuantity === null || assignment.targetQuantity <= 0) && assignment.targetProgress !== null ? (
         <div className="mt-3 flex items-center gap-2">
           <div className="h-2 flex-1 rounded-full bg-slate-100">
             <div className="h-2 rounded-full bg-sky-600" style={{ width: `${assignment.targetProgress}%` }} />
@@ -658,7 +670,7 @@ function AssignmentTaskRow({
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Tâche {index + 1}</p>
           <p className="mt-1 text-sm leading-6 text-slate-800">{assignment.action}</p>
           {assignment.objectiveText ? <p className="mt-1 text-xs font-semibold text-slate-500">{assignment.objectiveText}</p> : null}
-          {assignment.targetQuantity !== null ? (
+          {assignment.targetQuantity !== null && assignment.targetQuantity > 0 ? (
             <p className="mt-1 text-xs font-bold text-sky-700">
               Objectif {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
             </p>
@@ -669,7 +681,7 @@ function AssignmentTaskRow({
         </IconButton>
       </div>
 
-      {assignment.targetProgress !== null ? (
+      {(assignment.targetQuantity === null || assignment.targetQuantity <= 0) && assignment.targetProgress !== null ? (
         <div className="mt-3 flex items-center gap-2">
           <div className="h-2 flex-1 rounded-full bg-white">
             <div className="h-2 rounded-full bg-sky-600" style={{ width: `${assignment.targetProgress}%` }} />
@@ -780,6 +792,7 @@ function AssignmentBottomSheet({
   const hasAvailableSites = availableSites.length > 0;
   const hasAvailableSupervisors = availableSupervisors.length > 0;
   const canSubmit = Boolean(formData.supervisorId && formData.siteId && formData.action.trim() && hasAvailableSites && hasAvailableSupervisors);
+  const hasQuantityObjective = formData.targetQuantity !== null && formData.targetQuantity !== undefined && formData.targetQuantity > 0;
   const normalizedResourceSearch = resourceSearch.trim().toLowerCase();
   const normalizedSiteSearch = siteSearch.trim().toLowerCase();
   const filteredSupervisors = normalizedResourceSearch
@@ -922,9 +935,11 @@ function AssignmentBottomSheet({
                 value={formData.targetQuantity ?? ''}
                 onChange={(event) => {
                   const targetQuantity = event.currentTarget.value;
+                  const nextQuantity = targetQuantity === '' ? null : Number(targetQuantity);
                   setFormData((prev) => ({
                     ...prev,
-                    targetQuantity: targetQuantity === '' ? null : Number(targetQuantity),
+                    targetQuantity: nextQuantity,
+                    targetProgress: nextQuantity !== null && nextQuantity > 0 ? null : (prev.targetProgress ?? null),
                   }));
                 }}
                 className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
@@ -945,27 +960,33 @@ function AssignmentBottomSheet({
             </label>
           </div>
 
-          <label className="block text-sm font-semibold text-slate-700">
-            Progression cible (facultatif)
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={formData.targetProgress ?? ''}
-              onChange={(event) => {
-                const targetProgress = event.currentTarget.value;
-                setFormData((prev) => ({
-                  ...prev,
-                  targetProgress: targetProgress === '' ? null : Number(targetProgress),
-                }));
-              }}
-              className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-              placeholder="0-100"
-            />
-            <span className="mt-2 block text-xs font-semibold text-slate-500">
-              Laissez vide si aucune progression cible n&apos;est définie.
-            </span>
-          </label>
+          {hasQuantityObjective ? (
+            <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-xs font-semibold text-sky-800">
+              La progression sera calculee depuis la quantite realisee.
+            </div>
+          ) : (
+            <label className="block text-sm font-semibold text-slate-700">
+              Progression cible (si pas de quantite)
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={formData.targetProgress ?? ''}
+                onChange={(event) => {
+                  const targetProgress = event.currentTarget.value;
+                  setFormData((prev) => ({
+                    ...prev,
+                    targetProgress: targetProgress === '' ? null : Number(targetProgress),
+                  }));
+                }}
+                className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                placeholder="0-100"
+              />
+              <span className="mt-2 block text-xs font-semibold text-slate-500">
+                Uniquement pour les taches sans objectif quantitatif.
+              </span>
+            </label>
+          )}
 
           <label className="block text-sm font-semibold text-slate-700">
             Type de tâche
@@ -989,7 +1010,7 @@ function AssignmentBottomSheet({
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
-            Objectif qualitatif (facultatif)
+            Consigne / objectif texte (facultatif)
             <textarea
               value={formData.objectiveText ?? ''}
               onChange={(event) => {
@@ -998,8 +1019,11 @@ function AssignmentBottomSheet({
               }}
               rows={2}
               className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-              placeholder="Ex : finaliser les reprises, préparer le PV..."
+              placeholder="Ex : finaliser les reprises, preparer le PV..."
             />
+            <span className="mt-2 block text-xs font-semibold text-slate-500">
+              Precision libre, sans calcul de progression.
+            </span>
           </label>
         </div>
 
