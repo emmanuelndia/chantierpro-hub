@@ -54,7 +54,7 @@ export const PATCH = withAuth<{ id: string }>(async ({ params, req, user }) => {
     (await validateMobileAssignableUserForSite(prisma, user, existingTeam.siteId, teamLeadId));
 
   if (!leaderIsValid) {
-    return jsonTeamError('INVALID_TEAM_LEAD', 400, "Le chef d'équipe sélectionné doit être actif, disponible et dans votre périmètre.");
+    return jsonTeamError('INVALID_TEAM_LEAD', 400, "Le chef d'équipe sélectionné doit être une ressource externe active.");
   }
 
   const team = await prisma.$transaction(async (tx) => {

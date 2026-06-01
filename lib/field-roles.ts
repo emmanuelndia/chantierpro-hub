@@ -3,6 +3,7 @@ import { Role } from '@prisma/client';
 export const CLASSIC_FIELD_USER_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
   Role.RESOURCE,
+  Role.EXTERNAL_RESOURCE,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
 ];
@@ -17,6 +18,8 @@ export const FIELD_USER_ROLES: readonly Role[] = [
   ...NEGOTIATION_FIELD_USER_ROLES,
   ...FLEET_FIELD_USER_ROLES,
 ];
+
+export const EXTERNAL_TEAM_RESOURCE_ROLES: readonly Role[] = [Role.EXTERNAL_RESOURCE];
 
 type BusinessManagerRole = Extract<Role, 'BE_MANAGER' | 'NEGOTIATION_MANAGER' | 'FLEET_MANAGER'>;
 

@@ -38,7 +38,7 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonTeamError(
       'INVALID_TEAM_LEAD',
       400,
-      "Le chef d'equipe selectionne doit etre un technicien actif.",
+      "Le chef d'equipe selectionne doit etre une ressource externe active.",
     );
   }
 

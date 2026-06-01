@@ -44,6 +44,7 @@ const roleLabels: Partial<Record<Role, string>> = {
   GENERAL_SUPERVISOR: 'Superviseur général',
   SUPERVISOR: 'Superviseur terrain',
   RESOURCE: 'Ressource',
+  EXTERNAL_RESOURCE: 'Ressource externe',
   COORDINATOR: 'Coordinatrice',
   BE_MANAGER: "Responsable Bureau d'étude",
   BE_RESOURCE: "Ressource Bureau d'étude",

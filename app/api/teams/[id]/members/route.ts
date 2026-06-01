@@ -39,7 +39,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonTeamError(
       'INVALID_MEMBER',
       400,
-      'Le membre selectionne doit etre un technicien actif.',
+      'Le membre selectionne doit etre une ressource externe active.',
     );
   }
 

@@ -3,6 +3,7 @@ import type { Role } from '@prisma/client';
 const ROLE_LABELS: Record<Role, string> = {
   SUPERVISOR: 'Superviseur',
   RESOURCE: 'Ressource',
+  EXTERNAL_RESOURCE: 'Ressource externe',
   COORDINATOR: 'Coordinateur',
   GENERAL_SUPERVISOR: 'Superviseur général',
   BE_MANAGER: "Responsable Bureau d'étude",

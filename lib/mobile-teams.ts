@@ -11,7 +11,7 @@ import {
   teamAccessWhere,
   teamPublicSelect,
 } from '@/lib/teams';
-import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import { EXTERNAL_TEAM_RESOURCE_ROLES } from '@/lib/field-roles';
 import type {
   MobileTeamDetailResponse,
   MobileTeamFormOptionsResponse,
@@ -399,7 +399,7 @@ function mobileAssignableUserWhere(_user: AuthLikeUser): Prisma.UserWhereInput {
   return {
     isActive: true,
     role: {
-      in: [...FIELD_USER_ROLES],
+      in: [...EXTERNAL_TEAM_RESOURCE_ROLES],
     },
   };
 }

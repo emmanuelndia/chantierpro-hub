@@ -8,6 +8,7 @@ import type { MobilePhotoSiteOption } from '@/types/mobile-photo';
 const mobilePhotoSiteRoles: readonly Role[] = [
   Role.SUPERVISOR,
   Role.RESOURCE,
+  Role.EXTERNAL_RESOURCE,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
   Role.BE_RESOURCE,

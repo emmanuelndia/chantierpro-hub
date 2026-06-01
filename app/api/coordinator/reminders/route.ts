@@ -43,7 +43,7 @@ export const POST = withAuth(async ({ req, user }) => {
       status: ClockInStatus.VALID,
       report: null,
       user: {
-        role: { in: [Role.SUPERVISOR, Role.RESOURCE] },
+        role: { in: [Role.SUPERVISOR, Role.RESOURCE, Role.EXTERNAL_RESOURCE] },
         isActive: true,
       },
     },

@@ -17,6 +17,7 @@ const ROLE_OPTIONS = Object.values(Role);
 const HISTORY_RESOURCE_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
   Role.RESOURCE,
+  Role.EXTERNAL_RESOURCE,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
   Role.BE_RESOURCE,

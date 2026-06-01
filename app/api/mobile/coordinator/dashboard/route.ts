@@ -34,7 +34,7 @@ export const GET = withAuth(async ({ user }) => {
         clockInDate: today,
         status: ClockInStatus.VALID,
         type: ClockInType.DEPARTURE,
-        user: { role: { in: [Role.SUPERVISOR, Role.RESOURCE] } },
+        user: { role: { in: [Role.SUPERVISOR, Role.RESOURCE, Role.EXTERNAL_RESOURCE] } },
       },
       orderBy: [{ timestampLocal: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
       select: {
@@ -67,7 +67,7 @@ export const GET = withAuth(async ({ user }) => {
         siteId: { in: siteIds },
         clockInDate: today,
         status: ClockInStatus.VALID,
-        user: { role: { in: [Role.SUPERVISOR, Role.RESOURCE] } },
+        user: { role: { in: [Role.SUPERVISOR, Role.RESOURCE, Role.EXTERNAL_RESOURCE] } },
       },
       distinct: ['userId'],
       select: { userId: true },

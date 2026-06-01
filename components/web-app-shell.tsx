@@ -27,6 +27,7 @@ type WebNotification = Readonly<{
 const roleTone: Record<Role, 'success' | 'warning' | 'error' | 'neutral' | 'info'> = {
   SUPERVISOR: 'success',
   RESOURCE: 'success',
+  EXTERNAL_RESOURCE: 'success',
   COORDINATOR: 'info',
   GENERAL_SUPERVISOR: 'warning',
   BE_MANAGER: 'warning',

@@ -37,6 +37,7 @@ const roleLabels: Record<Role, string> = {
   HR: 'Ressources humaines',
   SUPERVISOR: 'Superviseur',
   RESOURCE: 'Ressource',
+  EXTERNAL_RESOURCE: 'Ressource externe',
   COORDINATOR: 'Coordinateur',
   GENERAL_SUPERVISOR: 'Superviseur général',
   BE_MANAGER: "Responsable Bureau d'étude",

@@ -13,7 +13,12 @@ export const GET = withAuth(async ({ user }) => {
   try {
     const where: Prisma.ReportWhereInput = {};
     
-    if (user.role === Role.SUPERVISOR || user.role === Role.RESOURCE || BUSINESS_FIELD_RESOURCE_ROLES.includes(user.role)) {
+    if (
+      user.role === Role.SUPERVISOR ||
+      user.role === Role.RESOURCE ||
+      user.role === Role.EXTERNAL_RESOURCE ||
+      BUSINESS_FIELD_RESOURCE_ROLES.includes(user.role)
+    ) {
       where.userId = user.id;
     }
 

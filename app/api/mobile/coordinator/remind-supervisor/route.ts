@@ -29,7 +29,7 @@ export const POST = withAuth(async ({ user, req }) => {
     const supervisor = await prisma.user.findFirst({
       where: {
         id: supervisorId,
-        role: { in: [Role.SUPERVISOR, Role.RESOURCE] },
+        role: { in: [Role.SUPERVISOR, Role.RESOURCE, Role.EXTERNAL_RESOURCE] },
         isActive: true,
         OR: [
           {

@@ -76,7 +76,7 @@ export const GET = withAuth(async ({ user, req }) => {
           clockInDate: today,
           status: ClockInStatus.VALID,
           type: ClockInType.DEPARTURE,
-          user: { role: { in: [Role.SUPERVISOR, Role.RESOURCE] } },
+          user: { role: { in: [Role.SUPERVISOR, Role.RESOURCE, Role.EXTERNAL_RESOURCE] } },
         },
         orderBy: [{ timestampLocal: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
         select: {

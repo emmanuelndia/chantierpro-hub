@@ -35,7 +35,14 @@ const DASHBOARD_ROLES: readonly DashboardSupportedRole[] = [
   ...BUSINESS_MANAGER_ROLES,
 ] as const;
 
-const FIELD_ROLES: readonly Role[] = [Role.SUPERVISOR, Role.RESOURCE, Role.COORDINATOR, Role.GENERAL_SUPERVISOR, ...BUSINESS_FIELD_RESOURCE_ROLES];
+const FIELD_ROLES: readonly Role[] = [
+  Role.SUPERVISOR,
+  Role.RESOURCE,
+  Role.EXTERNAL_RESOURCE,
+  Role.COORDINATOR,
+  Role.GENERAL_SUPERVISOR,
+  ...BUSINESS_FIELD_RESOURCE_ROLES,
+];
 
 type AuthLikeUser = {
   id: string;
@@ -490,7 +497,7 @@ async function getCoordinatorDashboard(prisma: PrismaClient, userId: string): Pr
       prisma.pushToken.findMany({
         where: {
           user: {
-            role: { in: [Role.SUPERVISOR, Role.RESOURCE] },
+            role: { in: [Role.SUPERVISOR, Role.RESOURCE, Role.EXTERNAL_RESOURCE] },
             isActive: true,
           },
         },
@@ -1350,7 +1357,7 @@ async function getScopedSupervisors(prisma: PrismaClient, siteIds: string[]) {
 
   return prisma.user.findMany({
     where: {
-      role: { in: [Role.SUPERVISOR, Role.RESOURCE] },
+      role: { in: [Role.SUPERVISOR, Role.RESOURCE, Role.EXTERNAL_RESOURCE] },
       isActive: true,
       OR: [
         {
