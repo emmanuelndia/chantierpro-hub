@@ -20,6 +20,13 @@ type RhSitePresencesLivePageProps = Readonly<{
   };
 }>;
 
+type LiveResourceListItem = RhSitePresenceLiveResource & {
+  siteId: string;
+  siteName: string;
+  siteAddress: string;
+  projectName: string;
+};
+
 const inputClassName =
   'w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white';
 
@@ -63,7 +70,22 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   });
 
   const data = liveQuery.data;
-  const filteredSites = data?.sites ?? [];
+  const filteredSites = useMemo(() => data?.sites ?? [], [data?.sites]);
+  const resources = useMemo(
+    () =>
+      filteredSites
+        .flatMap((site) =>
+          site.resources.map((resource) => ({
+            ...resource,
+            siteId: site.siteId,
+            siteName: site.siteName,
+            siteAddress: site.siteAddress,
+            projectName: site.projectName,
+          })),
+        )
+        .sort(compareLivePresenceResource),
+    [filteredSites],
+  );
 
   if (liveQuery.isLoading && !data) {
     return <LoadingState />;
@@ -108,11 +130,10 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <LiveKpi label="Sites actifs" value={data?.summary.activeSites ?? 0} />
-        <LiveKpi label="Attendues" value={data?.summary.expectedResources ?? 0} />
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 [&>*:nth-child(3)]:hidden">
+        <LiveKpi label="Présentes maintenant" tone="success" value={data?.summary.presentResources ?? 0} />
+        <LiveKpi label="Attendues terrain" value={data?.summary.expectedResources ?? 0} />
         <LiveKpi label="Présentes" tone="success" value={data?.summary.presentResources ?? 0} />
-        <LiveKpi label="En pause" tone="warning" value={data?.summary.pausedResources ?? 0} />
         <LiveKpi label="Non pointées" tone="warning" value={data?.summary.notClockedResources ?? 0} />
         <LiveKpi label="Anomalies" tone={(data?.summary.anomalies ?? 0) > 0 ? 'danger' : 'neutral'} value={data?.summary.anomalies ?? 0} />
       </section>
@@ -197,7 +218,37 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Liste de présence</p>
+            <h2 className="mt-2 text-xl font-semibold text-slate-950">Ressources terrain aujourd&apos;hui</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {resources.length} ressource(s) affichée(s), mise à jour {data ? formatTime(data.generatedAt) : '--:--'}.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <SiteCounter label="Présents" tone="success" value={data?.summary.presentResources ?? 0} />
+            <SiteCounter label="Pause" tone="warning" value={data?.summary.pausedResources ?? 0} />
+            <SiteCounter label="Sorties" value={filteredSites.reduce((sum, site) => sum + site.leftCount, 0)} />
+          </div>
+        </div>
+
+        {resources.length === 0 ? (
+          <EmptyState
+            description="Aucune ressource ne correspond aux filtres actifs."
+            title="Aucune présence chantier"
+          />
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {resources.map((resource) => (
+              <ResourcePresenceItem key={`${resource.siteId}:${resource.userId}`} resource={resource} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="hidden">
         {filteredSites.length === 0 ? (
           <EmptyState
             description="Aucun chantier ne correspond aux filtres actifs."
@@ -296,6 +347,60 @@ function ResourceRow({ resource }: Readonly<{ resource: RhSitePresenceLiveResour
   );
 }
 
+function ResourcePresenceItem({ resource }: Readonly<{ resource: LiveResourceListItem }>) {
+  const flags = [
+    resource.isRemoteCheckout ? 'Sortie à distance' : null,
+    resource.isAutoClosed ? 'Auto-clôturée' : null,
+    resource.isRegularized ? 'Régularisée' : null,
+  ].filter(Boolean);
+
+  return (
+    <article className="py-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_auto_minmax(150px,0.5fr)_auto] lg:items-center">
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-slate-950">{resource.name}</p>
+          <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
+            {formatRoleLabel(resource.role as Role)}
+            {resource.email ? ` · ${resource.email}` : ''}
+          </p>
+        </div>
+        <Badge tone={liveStatusTone(resource.status)}>{liveStatusLabel(resource.status)}</Badge>
+        <div className="text-sm font-semibold text-slate-700">
+          <p>Entrée : {resource.arrivalAt ? formatTime(resource.arrivalAt) : '-'}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Dernier : {resource.lastClockInAt ? `${formatTime(resource.lastClockInAt)} ${clockInTypeLabel(resource.lastClockInType)}` : '-'}
+          </p>
+        </div>
+        <Link
+          className="w-fit rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-orange-100 hover:text-orange-700"
+          href={`/web/sites/${encodeURIComponent(resource.siteId)}/presences`}
+        >
+          Détail
+        </Link>
+      </div>
+
+      <details className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <summary className="cursor-pointer font-bold text-slate-700">Projet, chantier et tâche</summary>
+        <div className="mt-3 grid gap-2 lg:grid-cols-2">
+          <p><span className="font-semibold text-slate-950">Projet :</span> {resource.projectName}</p>
+          <p><span className="font-semibold text-slate-950">Chantier :</span> {resource.siteName}</p>
+          <p><span className="font-semibold text-slate-950">Adresse :</span> {resource.siteAddress}</p>
+          <p>
+            <span className="font-semibold text-slate-950">Distance :</span>{' '}
+            {resource.distanceKm === null ? '-' : `${resource.distanceKm.toFixed(2)} km`}
+          </p>
+          <p className="lg:col-span-2">
+            <span className="font-semibold text-slate-950">Tâche :</span> {resource.taskAction ?? 'Aucune tâche terrain'}
+          </p>
+          {flags.length > 0 ? (
+            <p className="lg:col-span-2"><span className="font-semibold text-slate-950">Flags :</span> {flags.join(', ')}</p>
+          ) : null}
+        </div>
+      </details>
+    </article>
+  );
+}
+
 function LiveKpi({
   label,
   value,
@@ -379,6 +484,23 @@ function liveStatusTone(status: RhSitePresenceLiveStatus) {
   if (status === 'PAUSED') return 'warning';
   if (status === 'ANOMALY') return 'error';
   return 'neutral';
+}
+
+function compareLivePresenceResource(left: LiveResourceListItem, right: LiveResourceListItem) {
+  const statusDiff = liveStatusSortRank(left.status) - liveStatusSortRank(right.status);
+  if (statusDiff !== 0) return statusDiff;
+  return left.name.localeCompare(right.name);
+}
+
+function liveStatusSortRank(status: RhSitePresenceLiveStatus) {
+  const ranks: Record<RhSitePresenceLiveStatus, number> = {
+    PRESENT: 0,
+    PAUSED: 1,
+    ANOMALY: 2,
+    EXPECTED_NOT_CLOCKED: 3,
+    LEFT: 4,
+  };
+  return ranks[status];
 }
 
 function clockInTypeLabel(type: string | null) {
