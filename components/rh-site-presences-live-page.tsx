@@ -229,6 +229,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
           <div className="flex flex-wrap gap-2">
             <SiteCounter label="Presents" tone="success" value={data?.summary.presentResources ?? 0} />
             <SiteCounter label="Pause" tone="warning" value={data?.summary.pausedResources ?? 0} />
+            <SiteCounter label="Absents" tone="warning" value={data?.summary.notClockedResources ?? 0} />
             <SiteCounter label="Sorties" value={leftCount} />
           </div>
         </div>
