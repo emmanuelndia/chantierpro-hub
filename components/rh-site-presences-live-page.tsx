@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
@@ -86,6 +85,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
         .sort(compareLivePresenceResource),
     [filteredSites],
   );
+  const leftCount = filteredSites.reduce((sum, site) => sum + site.leftCount, 0);
 
   if (liveQuery.isLoading && !data) {
     return <LoadingState />;
@@ -94,7 +94,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   if (liveQuery.isError) {
     return (
       <EmptyState
-        description="Les présences chantier live ne peuvent pas être chargées pour le moment."
+        description="Les presences chantier live ne peuvent pas etre chargees pour le moment."
         title="Suivi live indisponible"
       />
     );
@@ -106,13 +106,13 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">
-              Présences chantiers
+              Presences chantiers
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-              Suivi live tous projets
+              Liste de presence terrain
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Vue instantanée des ressources attendues, présentes, sorties, en pause ou en anomalie sur les chantiers.
+              Ressources attendues ou deja pointees aujourd&apos;hui. Les ressources non assignees et sans pointage ne sont pas affichees.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -130,18 +130,17 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 [&>*:nth-child(3)]:hidden">
-        <LiveKpi label="Présentes maintenant" tone="success" value={data?.summary.presentResources ?? 0} />
-        <LiveKpi label="Attendues terrain" value={data?.summary.expectedResources ?? 0} />
-        <LiveKpi label="Présentes" tone="success" value={data?.summary.presentResources ?? 0} />
-        <LiveKpi label="Non pointées" tone="warning" value={data?.summary.notClockedResources ?? 0} />
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <LiveKpi label="Presentes" tone="success" value={data?.summary.presentResources ?? 0} />
+        <LiveKpi label="Attendues" value={data?.summary.expectedResources ?? 0} />
+        <LiveKpi label="Absentes" tone="warning" value={data?.summary.notClockedResources ?? 0} />
         <LiveKpi label="Anomalies" tone={(data?.summary.anomalies ?? 0) > 0 ? 'danger' : 'neutral'} value={data?.summary.anomalies ?? 0} />
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
         <div className="mb-5 flex flex-col gap-1">
           <h2 className="text-lg font-semibold text-slate-950">Filtres live</h2>
-          <p className="text-sm text-slate-500">Affinez par projet, chantier, ressource, rôle ou statut.</p>
+          <p className="text-sm text-slate-500">Affinez la liste sans ouvrir les details projets ou chantiers.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field label="Projet">
@@ -174,9 +173,9 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
               ))}
             </select>
           </Field>
-          <Field label="Rôle">
+          <Field label="Role">
             <select className={inputClassName} onChange={(event) => setRole(event.target.value)} value={role}>
-              <option value="">Tous les rôles</option>
+              <option value="">Tous les roles</option>
               {(data?.options.roles ?? []).map((roleOption) => (
                 <option key={roleOption} value={roleOption}>
                   {formatRoleLabel(roleOption as Role)}
@@ -198,7 +197,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
             <input
               className={inputClassName}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Projet, chantier, ressource, tâche..."
+              placeholder="Projet, chantier, ressource, tache..."
               type="search"
               value={search}
             />
@@ -221,23 +220,23 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Liste de présence</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Liste de presence</p>
             <h2 className="mt-2 text-xl font-semibold text-slate-950">Ressources terrain aujourd&apos;hui</h2>
             <p className="mt-1 text-sm text-slate-500">
-              {resources.length} ressource(s) affichée(s), mise à jour {data ? formatTime(data.generatedAt) : '--:--'}.
+              {resources.length} ressource(s) affichee(s), mise a jour {data ? formatTime(data.generatedAt) : '--:--'}.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <SiteCounter label="Présents" tone="success" value={data?.summary.presentResources ?? 0} />
+            <SiteCounter label="Presents" tone="success" value={data?.summary.presentResources ?? 0} />
             <SiteCounter label="Pause" tone="warning" value={data?.summary.pausedResources ?? 0} />
-            <SiteCounter label="Sorties" value={filteredSites.reduce((sum, site) => sum + site.leftCount, 0)} />
+            <SiteCounter label="Sorties" value={leftCount} />
           </div>
         </div>
 
         {resources.length === 0 ? (
           <EmptyState
             description="Aucune ressource ne correspond aux filtres actifs."
-            title="Aucune présence chantier"
+            title="Aucune presence chantier"
           />
         ) : (
           <div className="divide-y divide-slate-100">
@@ -247,140 +246,47 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
           </div>
         )}
       </section>
-
-      <section className="hidden">
-        {filteredSites.length === 0 ? (
-          <EmptyState
-            description="Aucun chantier ne correspond aux filtres actifs."
-            title="Aucune présence chantier"
-          />
-        ) : (
-          filteredSites.map((site) => (
-            <article className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-panel" key={site.siteId}>
-              <div className="border-b border-slate-100 p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">{site.projectName}</p>
-                    <h2 className="mt-2 text-xl font-semibold text-slate-950">{site.siteName}</h2>
-                    <p className="mt-1 text-sm text-slate-500">{site.siteAddress}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <SiteCounter label="Présents" tone="success" value={site.presentCount} />
-                    <SiteCounter label="Attendues" value={site.expectedCount} />
-                    <SiteCounter label="Non pointées" tone="warning" value={site.notClockedCount} />
-                    {site.anomalyCount > 0 ? <SiteCounter label="Anomalies" tone="danger" value={site.anomalyCount} /> : null}
-                  </div>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <span className="text-xs font-semibold text-slate-500">
-                    Dernière activité : {site.lastActivityAt ? formatDateTime(site.lastActivityAt) : "Aucune aujourd'hui"}
-                  </span>
-                  <Link
-                    className="text-xs font-bold text-orange-700 underline-offset-4 hover:underline"
-                    href={`/web/sites/${encodeURIComponent(site.siteId)}/presences`}
-                  >
-                    Ouvrir le détail chantier
-                  </Link>
-                </div>
-              </div>
-
-              {site.resources.length === 0 ? (
-                <div className="p-5 text-sm font-semibold text-slate-500">Aucune ressource attendue ou pointée aujourd&apos;hui.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500">
-                      <tr>
-                        <th className="px-5 py-3 font-semibold">Ressource</th>
-                        <th className="px-5 py-3 font-semibold">Statut</th>
-                        <th className="px-5 py-3 font-semibold">Tâche</th>
-                        <th className="px-5 py-3 font-semibold">Entrée</th>
-                        <th className="px-5 py-3 font-semibold">Dernier pointage</th>
-                        <th className="px-5 py-3 font-semibold">Distance</th>
-                        <th className="px-5 py-3 font-semibold">Flags</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {site.resources.map((resource) => (
-                        <ResourceRow key={`${site.siteId}:${resource.userId}`} resource={resource} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </article>
-          ))
-        )}
-      </section>
     </div>
   );
 }
 
-function ResourceRow({ resource }: Readonly<{ resource: RhSitePresenceLiveResource }>) {
-  return (
-    <tr className="align-top hover:bg-slate-50">
-      <td className="px-5 py-4">
-        <p className="font-semibold text-slate-950">{resource.name}</p>
-        <p className="mt-1 text-xs text-slate-500">{resource.email}</p>
-        <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
-          {formatRoleLabel(resource.role as Role)}
-        </p>
-      </td>
-      <td className="px-5 py-4">
-        <Badge tone={liveStatusTone(resource.status)}>{liveStatusLabel(resource.status)}</Badge>
-      </td>
-      <td className="max-w-xs px-5 py-4 text-slate-600">{resource.taskAction ?? 'Aucune tâche terrain'}</td>
-      <td className="px-5 py-4 text-slate-600">{resource.arrivalAt ? formatTime(resource.arrivalAt) : '-'}</td>
-      <td className="px-5 py-4 text-slate-600">
-        {resource.lastClockInAt ? `${formatTime(resource.lastClockInAt)} (${clockInTypeLabel(resource.lastClockInType)})` : '-'}
-      </td>
-      <td className="px-5 py-4 text-slate-600">{resource.distanceKm === null ? '-' : `${resource.distanceKm.toFixed(2)} km`}</td>
-      <td className="px-5 py-4">
-        <div className="flex flex-wrap gap-1.5">
-          {resource.isRemoteCheckout ? <SmallFlag label="Sortie distance" tone="warning" /> : null}
-          {resource.isAutoClosed ? <SmallFlag label="Auto" tone="danger" /> : null}
-          {resource.isRegularized ? <SmallFlag label="Régularisé" tone="info" /> : null}
-          {!resource.isRemoteCheckout && !resource.isAutoClosed && !resource.isRegularized ? <span className="text-slate-400">-</span> : null}
-        </div>
-      </td>
-    </tr>
-  );
-}
-
 function ResourcePresenceItem({ resource }: Readonly<{ resource: LiveResourceListItem }>) {
+  const isUnplannedClockIn = !resource.taskAction && resource.status !== 'EXPECTED_NOT_CLOCKED';
   const flags = [
-    resource.isRemoteCheckout ? 'Sortie à distance' : null,
-    resource.isAutoClosed ? 'Auto-clôturée' : null,
-    resource.isRegularized ? 'Régularisée' : null,
+    isUnplannedClockIn ? 'Non prevu' : null,
+    resource.isRemoteCheckout ? 'Sortie a distance' : null,
+    resource.isAutoClosed ? 'Auto-cloturee' : null,
+    resource.isRegularized ? 'Regularisee' : null,
   ].filter(Boolean);
 
   return (
     <article className="py-4">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_auto_minmax(150px,0.5fr)_auto] lg:items-center">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_auto_minmax(160px,0.6fr)] lg:items-center">
         <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-slate-950">{resource.name}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-base font-semibold text-slate-950">{resource.name}</p>
+            {isUnplannedClockIn ? (
+              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700">
+                Non prevu
+              </span>
+            ) : null}
+          </div>
           <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
             {formatRoleLabel(resource.role as Role)}
-            {resource.email ? ` · ${resource.email}` : ''}
+            {resource.email ? ` - ${resource.email}` : ''}
           </p>
         </div>
         <Badge tone={liveStatusTone(resource.status)}>{liveStatusLabel(resource.status)}</Badge>
         <div className="text-sm font-semibold text-slate-700">
-          <p>Entrée : {resource.arrivalAt ? formatTime(resource.arrivalAt) : '-'}</p>
+          <p>Entree : {resource.arrivalAt ? formatTime(resource.arrivalAt) : '-'}</p>
           <p className="mt-1 text-xs text-slate-500">
             Dernier : {resource.lastClockInAt ? `${formatTime(resource.lastClockInAt)} ${clockInTypeLabel(resource.lastClockInType)}` : '-'}
           </p>
         </div>
-        <Link
-          className="w-fit rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-orange-100 hover:text-orange-700"
-          href={`/web/sites/${encodeURIComponent(resource.siteId)}/presences`}
-        >
-          Détail
-        </Link>
       </div>
 
       <details className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        <summary className="cursor-pointer font-bold text-slate-700">Projet, chantier et tâche</summary>
+        <summary className="cursor-pointer font-bold text-slate-700">Projet, chantier et tache</summary>
         <div className="mt-3 grid gap-2 lg:grid-cols-2">
           <p><span className="font-semibold text-slate-950">Projet :</span> {resource.projectName}</p>
           <p><span className="font-semibold text-slate-950">Chantier :</span> {resource.siteName}</p>
@@ -390,10 +296,10 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: LiveResourceLis
             {resource.distanceKm === null ? '-' : `${resource.distanceKm.toFixed(2)} km`}
           </p>
           <p className="lg:col-span-2">
-            <span className="font-semibold text-slate-950">Tâche :</span> {resource.taskAction ?? 'Aucune tâche terrain'}
+            <span className="font-semibold text-slate-950">Tache :</span> {resource.taskAction ?? 'Aucune tache terrain planifiee'}
           </p>
           {flags.length > 0 ? (
-            <p className="lg:col-span-2"><span className="font-semibold text-slate-950">Flags :</span> {flags.join(', ')}</p>
+            <p className="lg:col-span-2"><span className="font-semibold text-slate-950">Indicateurs :</span> {flags.join(', ')}</p>
           ) : null}
         </div>
       </details>
@@ -457,22 +363,12 @@ function SiteCounter({
   );
 }
 
-function SmallFlag({ label, tone }: Readonly<{ label: string; tone: 'info' | 'warning' | 'danger' }>) {
-  const className = {
-    info: 'bg-blue-100 text-blue-700',
-    warning: 'bg-orange-100 text-orange-700',
-    danger: 'bg-red-100 text-red-700',
-  }[tone];
-
-  return <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${className}`}>{label}</span>;
-}
-
 function liveStatusLabel(status: RhSitePresenceLiveStatus) {
   const labels: Record<RhSitePresenceLiveStatus, string> = {
-    PRESENT: 'Présent',
+    PRESENT: 'Present',
     PAUSED: 'En pause',
-    EXPECTED_NOT_CLOCKED: 'Non pointé',
-    LEFT: 'Sortie enregistrée',
+    EXPECTED_NOT_CLOCKED: 'Absent',
+    LEFT: 'Sorti',
     ANOMALY: 'Anomalie',
   };
 
@@ -481,7 +377,7 @@ function liveStatusLabel(status: RhSitePresenceLiveStatus) {
 
 function liveStatusTone(status: RhSitePresenceLiveStatus) {
   if (status === 'PRESENT') return 'success';
-  if (status === 'PAUSED') return 'warning';
+  if (status === 'PAUSED' || status === 'EXPECTED_NOT_CLOCKED') return 'warning';
   if (status === 'ANOMALY') return 'error';
   return 'neutral';
 }
@@ -504,7 +400,7 @@ function liveStatusSortRank(status: RhSitePresenceLiveStatus) {
 }
 
 function clockInTypeLabel(type: string | null) {
-  if (type === 'ARRIVAL') return 'Entrée';
+  if (type === 'ARRIVAL') return 'Entree';
   if (type === 'DEPARTURE') return 'Sortie';
   if (type === 'PAUSE_START') return 'Pause';
   if (type === 'PAUSE_END') return 'Reprise';
@@ -518,19 +414,12 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('fr-FR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(value));
-}
-
 function LoadingState() {
   return (
     <div className="space-y-6">
       <section className="h-40 animate-pulse rounded-[2rem] border border-slate-200 bg-white shadow-panel" />
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, index) => (
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
           <div key={index} className="h-32 animate-pulse rounded-[2rem] border border-slate-200 bg-white shadow-panel" />
         ))}
       </section>
