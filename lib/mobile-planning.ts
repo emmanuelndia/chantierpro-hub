@@ -416,14 +416,21 @@ export async function createTaskProgressUpdate(
   const progressInput = normalizeActualProgress(input.progress);
   if (progressInput instanceof Response) return progressInput;
 
-  const progress = calculateActualProgress(assignment.targetQuantity, actualQuantity, progressInput);
+  const targetQuantity = decimalToNumber(assignment.targetQuantity);
+  const hasQuantityTarget = targetQuantity !== null && targetQuantity > 0;
+  const progress = calculateActualProgress(assignment.targetQuantity, actualQuantity, hasQuantityTarget ? null : progressInput);
 
   const comment = normalizeOptionalText(input.comment);
   const blocked = Boolean(input.blocked);
-  const completed = Boolean(input.completed);
+  const requestedCompleted = Boolean(input.completed);
+  const completed = hasQuantityTarget ? !blocked && actualQuantity !== null && actualQuantity >= targetQuantity : requestedCompleted;
 
   if (blocked && !comment) {
     return planningError('BLOCKAGE_COMMENT_REQUIRED', 'Un commentaire est requis pour signaler un blocage.', 400);
+  }
+
+  if (!hasQuantityTarget && blocked && requestedCompleted) {
+    return planningError('BLOCKED_TASK_CANNOT_BE_COMPLETED', 'Une tache bloquee ne peut pas etre marquee terminee.', 400);
   }
 
   const update = await prisma.taskProgressUpdate.create({
@@ -443,6 +450,11 @@ export async function createTaskProgressUpdate(
     await prisma.planningAssignment.update({
       where: { id: assignmentId },
       data: { status: PlanningAssignmentStatus.COMPLETED },
+    });
+  } else if (!completed && assignment.status === PlanningAssignmentStatus.COMPLETED) {
+    await prisma.planningAssignment.update({
+      where: { id: assignmentId },
+      data: { status: PlanningAssignmentStatus.IN_PROGRESS },
     });
   } else if (!completed && assignment.status === PlanningAssignmentStatus.ASSIGNED && (progress !== null || actualQuantity !== null || blocked || comment)) {
     await prisma.planningAssignment.update({
