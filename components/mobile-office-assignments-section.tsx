@@ -172,8 +172,20 @@ export function MobileOfficeAssignmentsSection({
       ) : null}
 
       <div className="mt-4 space-y-3">
-        {assignments.map((assignment) => (
-          <article key={assignment.id} className="rounded-lg bg-white p-3 shadow-sm">
+        {assignments.map((assignment) => {
+          const status = objectiveStatusConfig[assignment.objectiveStatus];
+          const progressValue = Math.max(0, Math.min(100, assignment.actualProgress ?? 0));
+          const unit = assignment.targetUnit ?? '';
+          const hasQuantityObjective = assignment.targetQuantity !== null;
+          const remainingLabel =
+            hasQuantityObjective && assignment.remainingQuantity !== null
+              ? assignment.remainingQuantity <= 0
+                ? 'Objectif atteint'
+                : `Reste ${formatQuantity(assignment.remainingQuantity)} ${unit}`.trim()
+              : null;
+
+          return (
+          <article key={assignment.id} className={`rounded-lg border p-3 shadow-sm ${status.cardClassName}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-black text-slate-950">{assignment.siteName}</p>
@@ -205,15 +217,37 @@ export function MobileOfficeAssignmentsSection({
                 </span>
               ) : null}
             </div>
+            <div className="mt-3 rounded-lg bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-3 text-xs font-black">
+                <span className={status.textClassName}>{status.label}</span>
+                <span className="text-slate-600">{progressValue}%</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className={`h-full rounded-full transition-all ${status.barClassName}`} style={{ width: `${progressValue}%` }} />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-slate-600">
+                {hasQuantityObjective ? (
+                  <span>
+                    Realise {formatQuantity(assignment.actualQuantity ?? 0)} / {formatQuantity(assignment.targetQuantity)} {unit}
+                  </span>
+                ) : assignment.actualProgress !== null ? (
+                  <span>Progression {assignment.actualProgress}%</span>
+                ) : (
+                  <span>Aucun avancement declare</span>
+                )}
+                {remainingLabel ? <span className={status.textClassName}>{remainingLabel}</span> : null}
+              </div>
+            </div>
             <button
-              className="mt-3 w-full rounded-lg bg-indigo-600 px-3 py-2 text-xs font-black text-white"
+              className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-black text-white ${status.buttonClassName}`}
               onClick={() => openProgressModal(assignment)}
               type="button"
             >
               Mettre a jour l&apos;avancement
             </button>
           </article>
-        ))}
+          );
+        })}
       </div>
       {message ? <p className="mt-3 rounded-lg bg-white p-3 text-xs font-bold text-indigo-800">{message}</p> : null}
       {progressTarget ? (
@@ -285,15 +319,55 @@ export function MobileOfficeAssignmentsSection({
 }
 
 function ObjectiveStatusBadge({ status }: Readonly<{ status: SupervisorMyAssignment['objectiveStatus'] }>) {
-  const config = {
-    NOT_STARTED: 'Non demarre',
-    PARTIAL: 'Partiel',
-    ACHIEVED: 'Atteint',
-    BLOCKED: 'Bloque',
-  } satisfies Record<SupervisorMyAssignment['objectiveStatus'], string>;
+  const config = objectiveStatusConfig[status];
 
-  return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-700">{config[status]}</span>;
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-black ${config.badgeClassName}`}>{config.label}</span>;
 }
+
+const objectiveStatusConfig = {
+  NOT_STARTED: {
+    label: 'Non demarre',
+    badgeClassName: 'bg-slate-100 text-slate-700',
+    barClassName: 'bg-slate-400',
+    buttonClassName: 'bg-indigo-600',
+    cardClassName: 'border-slate-100 bg-white',
+    textClassName: 'text-slate-700',
+  },
+  PARTIAL: {
+    label: 'Partiel',
+    badgeClassName: 'bg-amber-100 text-amber-800',
+    barClassName: 'bg-amber-500',
+    buttonClassName: 'bg-amber-600',
+    cardClassName: 'border-amber-100 bg-amber-50/40',
+    textClassName: 'text-amber-800',
+  },
+  ACHIEVED: {
+    label: 'Atteint',
+    badgeClassName: 'bg-emerald-100 text-emerald-800',
+    barClassName: 'bg-emerald-500',
+    buttonClassName: 'bg-emerald-600',
+    cardClassName: 'border-emerald-100 bg-emerald-50/60',
+    textClassName: 'text-emerald-800',
+  },
+  BLOCKED: {
+    label: 'Bloque',
+    badgeClassName: 'bg-rose-100 text-rose-800',
+    barClassName: 'bg-rose-500',
+    buttonClassName: 'bg-rose-600',
+    cardClassName: 'border-rose-100 bg-rose-50/60',
+    textClassName: 'text-rose-800',
+  },
+} satisfies Record<
+  SupervisorMyAssignment['objectiveStatus'],
+  {
+    label: string;
+    badgeClassName: string;
+    barClassName: string;
+    buttonClassName: string;
+    cardClassName: string;
+    textClassName: string;
+  }
+>;
 
 function formatQuantity(value: number | null) {
   if (value === null) return null;
