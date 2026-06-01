@@ -816,7 +816,6 @@ function CentralizedPlanningTable({
               <th className="px-5 py-3">Progression</th>
               <th className="px-5 py-3">Statut</th>
               <th className="px-5 py-3">Créateur</th>
-              <th className="px-5 py-3">Droit</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -842,18 +841,14 @@ function CentralizedPlanningTable({
                   </Badge>
                 </td>
                 <td className="px-5 py-4">
-                  {item.targetQuantity !== null && item.targetQuantity > 0 ? null : <ProgressValue value={item.targetProgress} />}
-                  <ObjectiveSummary assignment={item} />
+                  <CentralizedProgressSummary assignment={item} />
                 </td>
                 <td className="px-5 py-4">
-                  <Badge tone={statusTone(item.status)}>{planningStatusLabel[item.status]}</Badge>
+                  <CentralizedStatusBadge item={item} />
                 </td>
                 <td className="px-5 py-4">
                   <p className="font-medium text-slate-800">{item.createdBy.name}</p>
                   <p className="mt-1 text-xs text-slate-500">{formatRoleLabel(item.createdBy.role)}</p>
-                </td>
-                <td className="px-5 py-4">
-                  <Badge tone={item.canEdit ? 'success' : 'neutral'}>{item.canEdit ? 'Dans votre périmètre' : 'Lecture seule'}</Badge>
                 </td>
               </tr>
             ))}
@@ -1296,6 +1291,52 @@ function ProgressValue({ value }: Readonly<{ value: number | null }>) {
       <p className="mt-1 text-xs font-semibold text-slate-600">{value}%</p>
     </div>
   );
+}
+
+function CentralizedProgressSummary({ assignment }: Readonly<{ assignment: CentralizedPlanningAssignment }>) {
+  const hasQuantityObjective = assignment.targetQuantity !== null && assignment.targetQuantity > 0;
+  const progressValue = Math.max(0, Math.min(100, assignment.actualProgress ?? 0));
+  const unit = assignment.targetUnit ? ` ${assignment.targetUnit}` : '';
+  const hasDeclaredProgress = assignment.actualProgress !== null || assignment.actualQuantity !== null;
+
+  return (
+    <div className="min-w-40 space-y-2">
+      <div className="flex items-center gap-3">
+        <div className="h-2 min-w-28 flex-1 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full rounded-full bg-orange-500" style={{ width: `${progressValue}%` }} />
+        </div>
+        <span className="w-10 text-xs font-bold text-slate-700">{progressValue}%</span>
+      </div>
+
+      {hasQuantityObjective ? (
+        <p className="text-xs font-semibold text-slate-600">
+          {formatQuantity(assignment.actualQuantity) ?? '0'} / {formatQuantity(assignment.targetQuantity)}
+          {unit}
+          {assignment.remainingQuantity !== null && assignment.remainingQuantity > 0
+            ? ` - reste ${formatQuantity(assignment.remainingQuantity)}${unit}`
+            : assignment.actualQuantity !== null
+              ? ' - objectif atteint'
+              : ''}
+        </p>
+      ) : assignment.targetProgress !== null ? (
+        <p className="text-xs font-semibold text-slate-500">Cible {assignment.targetProgress}%</p>
+      ) : null}
+
+      {!hasDeclaredProgress ? <p className="text-xs font-semibold text-slate-400">Aucun avancement declare</p> : null}
+      {assignment.latestProgressUpdate?.comment ? (
+        <p className="line-clamp-2 text-xs text-slate-500">{assignment.latestProgressUpdate.comment}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function CentralizedStatusBadge({ item }: Readonly<{ item: CentralizedPlanningAssignment }>) {
+  if (item.objectiveStatus === 'BLOCKED' || item.objectiveStatus === 'ACHIEVED') {
+    const config = objectiveStatusConfig[item.objectiveStatus];
+    return <Badge tone={config.tone}>{config.label}</Badge>;
+  }
+
+  return <Badge tone={statusTone(item.status)}>{planningStatusLabel[item.status]}</Badge>;
 }
 
 function ObjectiveProgressCard({
