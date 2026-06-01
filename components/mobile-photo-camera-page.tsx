@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { PhotoTag, PlanningAssignmentStatus } from '@prisma/client';
+import { PhotoTag } from '@prisma/client';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch, getAccessToken } from '@/lib/auth/client-session';
 import {
@@ -14,8 +15,6 @@ import {
   type PendingMobilePhoto,
 } from '@/lib/mobile-photo-offline';
 import {
-  createOfflineId,
-  enqueueOfflineTaskUpdate,
   getMobileOfflineCache,
   setMobileOfflineCache,
 } from '@/lib/mobile-offline-db';
@@ -84,8 +83,8 @@ export function MobilePhotoCameraPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
+  const [taskPhotoNotice, setTaskPhotoNotice] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
-  const [completingAssignment, setCompletingAssignment] = useState(false);
   const [usingOfflinePhotoData, setUsingOfflinePhotoData] = useState(false);
   const [description, setDescription] = useState('');
   const [selectedTags, setSelectedTags] = useState<PhotoTag[]>([]);
@@ -185,11 +184,15 @@ export function MobilePhotoCameraPage() {
   }, [photoMode, selectedAssignmentId, siteAssignments]);
 
   useEffect(() => {
+    if (capturedPhoto) {
+      return;
+    }
+
     void startCamera();
     return stopCamera;
-    // Camera restart is intentionally tied to facing mode changes only.
+    // Camera restart is intentionally tied to facing mode and confirmation changes only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [facingMode]);
+  }, [facingMode, capturedPhoto]);
 
   useEffect(() => {
     requestGps();
@@ -240,6 +243,7 @@ export function MobilePhotoCameraPage() {
   async function startCamera() {
     setCameraState('loading');
     setCameraMessage('');
+    stopCamera();
 
     // Vérifier le support avec fallbacks pour anciens navigateurs
     let getUserMedia: ((constraints: MediaStreamConstraints) => Promise<MediaStream>) | null = null;
@@ -331,6 +335,9 @@ export function MobilePhotoCameraPage() {
   function stopCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
   }
 
   function requestGps() {
@@ -420,6 +427,7 @@ export function MobilePhotoCameraPage() {
 
       // Vibration pour confirmer la capture (si supporté)
       navigator.vibrate?.(60);
+      stopCamera();
 
       setCapturedPhoto({
         blob,
@@ -433,6 +441,7 @@ export function MobilePhotoCameraPage() {
         tags: selectedTags,
       });
       setConfirmationMessage(null);
+      setTaskPhotoNotice(false);
       setUploadProgress(0);
     } catch (error) {
       setCameraMessage('Erreur lors de la capture photo.');
@@ -463,11 +472,14 @@ export function MobilePhotoCameraPage() {
     }
 
     const pendingPhoto = toPendingPhoto(capturedPhoto);
+    const isTaskPhoto = Boolean(capturedPhoto.planningAssignment);
 
     if (!navigator.onLine) {
       await enqueuePendingMobilePhoto(pendingPhoto);
       await refreshPendingCount();
       setConfirmationMessage('Photo en attente de synchronisation.');
+      setTaskPhotoNotice(isTaskPhoto);
+      setCapturedPhoto(null);
       return;
     }
 
@@ -476,18 +488,19 @@ export function MobilePhotoCameraPage() {
 
     try {
       await uploadPhotoWithProgress(pendingPhoto, setUploadProgress);
-      if (capturedPhoto.planningAssignment) {
-        setConfirmationMessage('Photo envoyée. Vous pouvez marquer la tâche terminée.');
-      } else {
-        setConfirmationMessage('Photo envoyée.');
-        setCapturedPhoto(null);
-      }
+      setConfirmationMessage(
+        isTaskPhoto ? "Photo envoyee. Mets a jour l'avancement depuis l'ecran Taches si necessaire." : 'Photo envoyee.',
+      );
+      setTaskPhotoNotice(isTaskPhoto);
+      setCapturedPhoto(null);
       await refreshPendingCount();
     } catch (error) {
       if (isNetworkPhotoUploadError(error)) {
         await enqueuePendingMobilePhoto(pendingPhoto);
         await refreshPendingCount();
         setConfirmationMessage('Photo stockee hors ligne, synchronisation au retour reseau.');
+        setTaskPhotoNotice(isTaskPhoto);
+        setCapturedPhoto(null);
       } else {
         setConfirmationMessage(getPhotoUploadErrorMessage(error));
       }
@@ -500,48 +513,6 @@ export function MobilePhotoCameraPage() {
     setPendingCount(await countPendingMobilePhotos());
   }
 
-  async function completeCapturedAssignment() {
-    const assignmentId = capturedPhoto?.planningAssignment?.id;
-    if (!assignmentId) {
-      return;
-    }
-
-    setCompletingAssignment(true);
-    try {
-      if (!navigator.onLine) {
-        await enqueueOfflineTaskUpdate({
-          id: createOfflineId(),
-          assignmentId,
-          status: 'COMPLETED',
-          timestampLocal: new Date().toISOString(),
-        });
-        setConfirmationMessage('Photo en attente et tache a terminer a la synchronisation.');
-        setCapturedPhoto(null);
-        setSelectedAssignmentId('');
-        return;
-      }
-
-      const response = await authFetch(`/api/mobile/planning/assignment/${assignmentId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: PlanningAssignmentStatus.COMPLETED }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Mise à jour refusée.');
-      }
-
-      setConfirmationMessage('Photo envoyée et tâche terminée.');
-      setCapturedPhoto(null);
-      setSelectedAssignmentId('');
-      void assignmentsQuery.refetch();
-    } catch {
-      setConfirmationMessage("Photo envoyée, mais la tâche n'a pas pu être marquée terminée.");
-    } finally {
-      setCompletingAssignment(false);
-    }
-  }
-
   if (capturedPhoto) {
     return (
       <PhotoConfirmation
@@ -549,18 +520,15 @@ export function MobilePhotoCameraPage() {
         onRetry={() => {
           setCapturedPhoto(null);
           setConfirmationMessage(null);
+          setTaskPhotoNotice(false);
         }}
         onSend={() => {
           void sendPhoto();
-        }}
-        onCompleteTask={() => {
-          void completeCapturedAssignment();
         }}
         photo={capturedPhoto}
         pendingCount={pendingCount}
         progress={uploadProgress}
         uploading={uploading}
-        completingTask={completingAssignment}
       />
     );
   }
@@ -620,6 +588,16 @@ export function MobilePhotoCameraPage() {
             <p className="mt-3 rounded-lg bg-amber-500/90 px-3 py-2 text-xs font-bold">
               Donnees hors ligne. Les photos seront synchronisees au retour reseau.
             </p>
+          ) : null}
+          {confirmationMessage ? (
+            <div className="mt-3 rounded-lg bg-emerald-500/95 px-3 py-3 text-xs font-bold text-white">
+              <p>{confirmationMessage}</p>
+              {taskPhotoNotice ? (
+                <Link className="mt-2 inline-flex rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-emerald-700" href="/mobile/tasks">
+                  Ouvrir Taches
+                </Link>
+              ) : null}
+            </div>
           ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-white/10 p-1">
             <ModeButton active={photoMode === 'site'} label="Photo chantier" onClick={() => setPhotoMode('site')} />
@@ -689,9 +667,7 @@ export function MobilePhotoCameraPage() {
 }
 
 function PhotoConfirmation({
-  completingTask,
   confirmationMessage,
-  onCompleteTask,
   onRetry,
   onSend,
   pendingCount,
@@ -699,9 +675,7 @@ function PhotoConfirmation({
   progress,
   uploading,
 }: Readonly<{
-  completingTask: boolean;
   confirmationMessage: string | null;
-  onCompleteTask: () => void;
   onRetry: () => void;
   onSend: () => void;
   pendingCount: number;
@@ -709,8 +683,6 @@ function PhotoConfirmation({
   progress: number;
   uploading: boolean;
 }>) {
-  const canCompleteTask = Boolean(photo.planningAssignment && confirmationMessage?.startsWith('Photo envoyée'));
-
   return (
     <div className="-mx-4 -my-4 min-h-[calc(100dvh-10rem)] bg-slate-950 text-white">
       <div className="relative min-h-[calc(100dvh-10rem)]">
@@ -749,16 +721,6 @@ function PhotoConfirmation({
             >
               {uploading ? `Envoi ${progress}%` : 'Envoyer'}
             </button>
-            {canCompleteTask ? (
-              <button
-                className="flex min-h-14 w-full items-center justify-center rounded-lg bg-emerald-500 px-5 text-sm font-black text-white disabled:opacity-50"
-                disabled={completingTask}
-                onClick={onCompleteTask}
-                type="button"
-              >
-                {completingTask ? 'Mise à jour...' : 'Marquer la tâche terminée'}
-              </button>
-            ) : null}
             <div className="h-1 overflow-hidden rounded-full bg-white/20">
               <div className="h-full bg-white transition-all" style={{ width: `${progress}%` }} />
             </div>

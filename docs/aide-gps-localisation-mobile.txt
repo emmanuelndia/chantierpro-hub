@@ -1,0 +1,62 @@
+Aide GPS / localisation mobile ChantierPro
+
+Probleme observe
+Un utilisateur terrain peut voir le message :
+"GPS indisponible. Permission refusee. Allez dans Parametres > Site web > Localisation et autorisez ChantierPro."
+
+Ce probleme arrive souvent quand la localisation a ete refusee une premiere fois dans Chrome, dans l'application installee, ou dans le navigateur integre de WhatsApp.
+
+Etapes a verifier sur le telephone
+
+1. Activer la localisation du telephone
+Aller dans :
+Parametres Android > Localisation
+Puis activer la localisation.
+
+2. Autoriser la localisation pour Chrome
+Aller dans :
+Parametres > Applications > Chrome > Autorisations > Localisation
+Puis choisir :
+Autoriser pendant l'utilisation.
+
+3. Autoriser la localisation pour ChantierPro installe
+Si ChantierPro est installe comme application :
+faire un appui long sur l'icone ChantierPro > Infos sur l'application > Autorisations > Localisation
+Puis choisir :
+Autoriser pendant l'utilisation.
+
+4. Autoriser la localisation pour le site ChantierPro
+Si l'utilisateur ouvre ChantierPro dans Chrome :
+ouvrir le site ChantierPro > appuyer sur l'icone cadenas ou informations pres de l'adresse > Autorisations > Localisation
+Puis choisir :
+Autoriser.
+
+5. Eviter le navigateur integre de WhatsApp
+Si le lien ChantierPro a ete ouvert depuis WhatsApp, il peut s'ouvrir dans un navigateur integre.
+Ce navigateur gere parfois mal le GPS.
+
+Il faut plutot :
+copier le lien ChantierPro > ouvrir Chrome > coller le lien > se connecter.
+
+Si l'utilisateur veut installer l'application, il vaut mieux l'installer depuis Chrome.
+
+6. Fermer puis rouvrir ChantierPro
+Apres avoir autorise la localisation :
+fermer completement ChantierPro ou Chrome, puis rouvrir.
+
+Point important
+Le bouton "Reessayer" dans ChantierPro ne peut pas toujours redemander la permission si Android ou Chrome l'a deja bloquee.
+Dans ce cas, il faut obligatoirement passer par les parametres du telephone ou les parametres du site.
+
+Message court a envoyer a un superviseur
+
+Bonjour,
+si ChantierPro affiche "GPS indisponible", active la localisation du telephone puis verifie :
+Parametres > Applications > Chrome ou ChantierPro > Autorisations > Localisation > Autoriser pendant l'utilisation.
+
+Si tu as ouvert le lien depuis WhatsApp, copie le lien et ouvre-le directement dans Chrome.
+Ensuite ferme et rouvre ChantierPro, puis appuie sur "Reessayer".
+
+Amelioration possible dans l'application
+Afficher un message plus clair quand la permission GPS est refusee, avec les etapes Android/Chrome/PWA.
+Preciser que "Reessayer" ne fonctionnera pas tant que la localisation reste bloquee dans les parametres.
