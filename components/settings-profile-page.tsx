@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Eye, EyeOff } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
 import { useToast } from '@/components/toast-provider';
@@ -238,39 +239,30 @@ export function SettingsProfilePage() {
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
         <h2 className="text-xl font-semibold text-slate-950">Changer le mot de passe</h2>
         <div className="mt-5 grid gap-4 lg:grid-cols-3">
-          <Field label="Ancien mot de passe">
-            <input
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-              onChange={(event) => {
+          <PasswordField
+            label="Ancien mot de passe"
+            onChange={(value) => {
                 setPasswordError(null);
-                setPasswordValues((current) => ({ ...current, currentPassword: event.target.value }));
+              setPasswordValues((current) => ({ ...current, currentPassword: value }));
               }}
-              type="password"
-              value={passwordValues.currentPassword}
-            />
-          </Field>
-          <Field label="Nouveau mot de passe">
-            <input
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-              onChange={(event) => {
+            value={passwordValues.currentPassword}
+          />
+          <PasswordField
+            label="Nouveau mot de passe"
+            onChange={(value) => {
                 setPasswordError(null);
-                setPasswordValues((current) => ({ ...current, newPassword: event.target.value }));
+              setPasswordValues((current) => ({ ...current, newPassword: value }));
               }}
-              type="password"
-              value={passwordValues.newPassword}
-            />
-          </Field>
-          <Field label="Confirmation">
-            <input
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-              onChange={(event) => {
+            value={passwordValues.newPassword}
+          />
+          <PasswordField
+            label="Confirmation"
+            onChange={(value) => {
                 setPasswordError(null);
-                setPasswordValues((current) => ({ ...current, confirmation: event.target.value }));
+              setPasswordValues((current) => ({ ...current, confirmation: value }));
               }}
-              type="password"
-              value={passwordValues.confirmation}
-            />
-          </Field>
+            value={passwordValues.confirmation}
+          />
         </div>
         {passwordValues.confirmation && passwordValues.newPassword !== passwordValues.confirmation ? (
           <p className="mt-3 text-sm font-medium text-red-600">La confirmation ne correspond pas au nouveau mot de passe.</p>
@@ -297,6 +289,40 @@ function Field({ label, children }: Readonly<{ label: string; children: ReactNod
       <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</span>
       {children}
     </label>
+  );
+}
+
+function PasswordField({
+  label,
+  onChange,
+  value,
+}: Readonly<{
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}>) {
+  const [visible, setVisible] = useState(false);
+  const Icon = visible ? EyeOff : Eye;
+
+  return (
+    <Field label={label}>
+      <div className="relative">
+        <input
+          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+          onChange={(event) => onChange(event.target.value)}
+          type={visible ? 'text' : 'password'}
+          value={value}
+        />
+        <button
+          aria-label={visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
+          onClick={() => setVisible((current) => !current)}
+          type="button"
+        >
+          <Icon className="h-4 w-4" />
+        </button>
+      </div>
+    </Field>
   );
 }
 

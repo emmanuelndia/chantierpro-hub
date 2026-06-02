@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode 
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
+import { Eye, EyeOff } from 'lucide-react';
 import { clearAccessToken, authFetch } from '@/lib/auth/client-session';
 import { removeMobileOfflineCache } from '@/lib/mobile-offline-db';
 import {
@@ -438,15 +439,28 @@ function PasswordField({
   onChange: (value: string) => void;
   value: string;
 }>) {
+  const [visible, setVisible] = useState(false);
+  const Icon = visible ? EyeOff : Eye;
+
   return (
     <label className="block">
       <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
-      <input
-        className="mt-2 min-h-14 w-full rounded-lg border border-slate-200 bg-white px-4 text-base font-semibold text-slate-950 outline-none focus:border-primary"
-        onChange={(event) => onChange(event.target.value)}
-        type="password"
-        value={value}
-      />
+      <div className="relative mt-2">
+        <input
+          className="min-h-14 w-full rounded-lg border border-slate-200 bg-white px-4 pr-14 text-base font-semibold text-slate-950 outline-none focus:border-primary"
+          onChange={(event) => onChange(event.target.value)}
+          type={visible ? 'text' : 'password'}
+          value={value}
+        />
+        <button
+          aria-label={visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+          className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-slate-500"
+          onClick={() => setVisible((current) => !current)}
+          type="button"
+        >
+          <Icon className="h-5 w-5" />
+        </button>
+      </div>
     </label>
   );
 }
