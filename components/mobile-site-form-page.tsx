@@ -62,6 +62,7 @@ const initialValues: SiteFormValues = {
   siteManagerId: '',
 };
 
+const INTERVENTION_ZONE_RADIUS_KM = '10';
 const inputClass =
   'min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-primary';
 
@@ -104,7 +105,8 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
 
   const options = mode === 'edit' ? editQuery.data?.options : optionsQuery.data;
   const site = editQuery.data?.site ?? null;
-  const canEditRadius = user.role === 'DIRECTION' || user.role === 'ADMIN';
+  const canManageClassicRadius = user.role === 'DIRECTION' || user.role === 'ADMIN';
+  const canEditRadius = canManageClassicRadius || values.siteType === 'INTERVENTION_ZONE';
   const currentManagerIsOutsideGsOptions = Boolean(
     site?.siteManagerId && !(options?.siteManagers ?? []).some((manager) => manager.id === site.siteManagerId),
   );
@@ -254,17 +256,30 @@ export function MobileSiteFormPage({ mode, user, siteId }: MobileSiteFormPagePro
                 ...current,
                 siteType,
                 requiresClockIn: defaultRequiresClockInForSiteType(siteType),
+                ...(siteType === 'INTERVENTION_ZONE'
+                  ? {
+                      radiusKm: INTERVENTION_ZONE_RADIUS_KM,
+                      geofenceType: 'RADIUS',
+                      geofencePolygon: null,
+                    }
+                  : {}),
               }));
             }}
             value={values.siteType}
           >
             <option value="WORKSITE">Chantier</option>
+            <option value="INTERVENTION_ZONE">Zone d&apos;intervention</option>
             <option value="WAREHOUSE">Entrepôt</option>
             <option value="MATERIAL_PICKUP">Point d&apos;enlèvement matériel</option>
             <option value="OFFICE">Bureau</option>
             <option value="CLIENT_SITE">Site client</option>
             <option value="OTHER">Autre lieu</option>
           </select>
+          {values.siteType === 'INTERVENTION_ZONE' ? (
+            <p className="mt-2 text-xs font-bold text-primary">
+              Choisissez le centre de la ville ou du quartier et un rayon de pointage.
+            </p>
+          ) : null}
         </Field>
 
         <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800">

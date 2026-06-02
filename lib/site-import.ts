@@ -29,7 +29,7 @@ export const SITE_IMPORT_COLUMNS: { key: SiteImportColumnKey; label: string; req
   { key: 'surface', label: 'surface_estimee', required: false },
   { key: 'date_debut', label: 'date_debut', required: true },
   { key: 'date_fin', label: 'date_fin', required: false },
-  { key: 'responsable_gs_email', label: 'responsable_gs_email', required: true },
+  { key: 'responsable_gs_email', label: 'responsable_gs_identifiant', required: true },
   { key: 'statut', label: 'statut', required: false },
   { key: 'description', label: 'description', required: false },
 ];
@@ -71,7 +71,7 @@ export async function buildSiteImportTemplate() {
     surface: '100',
     date_debut: '2026-05-26',
     date_fin: '',
-    responsable_gs_email: 'superviseur@example.com',
+    responsable_gs_email: 'superviseur.general',
     statut: 'ACTIVE',
     description: '',
   });
@@ -197,15 +197,17 @@ async function validateSiteImportRows(
     }),
     prisma.user.findMany({
       where: { role: 'GENERAL_SUPERVISOR', isActive: true },
-      select: { id: true, email: true },
+      select: { id: true, email: true, username: true },
     }),
   ]);
 
-  const siteManagerByEmail = new Map(
-    siteManagers
-      .filter((manager) => Boolean(manager.email))
-      .map((manager) => [manager.email!.trim().toLowerCase(), manager.id]),
-  );
+  const siteManagerByIdentifier = new Map<string, string>();
+  for (const manager of siteManagers) {
+    siteManagerByIdentifier.set(manager.username.trim().toLowerCase(), manager.id);
+    if (manager.email) {
+      siteManagerByIdentifier.set(manager.email.trim().toLowerCase(), manager.id);
+    }
+  }
   const existingNames = new Set(existingSites.map((site) => normalizeName(site.name)));
   const seenNames = new Map<string, number>();
 
@@ -229,11 +231,12 @@ async function validateSiteImportRows(
       seenNames.set(normalizedName, row.rowNumber);
     }
 
-    const managerId = siteManagerByEmail.get(row.responsable_gs_email.trim().toLowerCase());
-    if (!row.responsable_gs_email.trim()) {
-      errors.push({ field: 'responsable_gs_email', message: 'Email responsable GS requis.' });
+    const managerIdentifier = row.responsable_gs_email.trim().toLowerCase();
+    const managerId = siteManagerByIdentifier.get(managerIdentifier);
+    if (!managerIdentifier) {
+      errors.push({ field: 'responsable_gs_email', message: 'Identifiant ou email responsable GS requis.' });
     } else if (!managerId) {
-      errors.push({ field: 'responsable_gs_email', message: 'Responsable GS actif introuvable.' });
+      errors.push({ field: 'responsable_gs_email', message: 'Responsable GS actif introuvable avec cet identifiant ou email.' });
     }
 
     const rawInput = {
@@ -465,6 +468,13 @@ function normalizeHeader(value: string) {
     .replace(/\s+/g, '_');
   if (normalized === 'surface_estimee') {
     return 'surface';
+  }
+  if (
+    normalized === 'responsable_gs_identifiant' ||
+    normalized === 'responsable_gs_username' ||
+    normalized === 'responsable_gs'
+  ) {
+    return 'responsable_gs_email';
   }
   return normalized as SiteImportColumnKey;
 }

@@ -14,7 +14,7 @@ import { SiteLocationPicker } from '@/components/site-location-picker';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
-  ProjectDetail,
+  ProjectDetail, 
   ProjectFormOptionsResponse,
   ProjectPresenceSummary,
   ProjectSiteItem,
@@ -81,6 +81,7 @@ const SITE_WRITE_ROLES: readonly Role[] = [
 ];
 
 const PROJECT_DOCUMENT_ROLES: readonly Role[] = ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'];
+const INTERVENTION_ZONE_RADIUS_KM = 10;
 
 export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps) {
   const queryClient = useQueryClient();
@@ -839,6 +840,7 @@ function SiteFormDrawer({
     initialSite?.siteManagerId &&
       !(options?.siteManagers ?? []).some((manager) => manager.id === initialSite.siteManagerId),
   );
+  const canEditRadius = canManageRadius || values.siteType === 'INTERVENTION_ZONE';
 
   useEffect(() => {
     setValues(buildInitialSiteFormValues(initialSite, currentProjectId));
@@ -919,17 +921,30 @@ function SiteFormDrawer({
                     ...current,
                     siteType,
                     requiresClockIn: defaultRequiresClockInForSiteType(siteType),
+                    ...(siteType === 'INTERVENTION_ZONE'
+                      ? {
+                          radiusKm: INTERVENTION_ZONE_RADIUS_KM,
+                          geofenceType: 'RADIUS',
+                          geofencePolygon: null,
+                        }
+                      : {}),
                   }));
                 }}
                 value={values.siteType}
               >
                 <option value="WORKSITE">Chantier</option>
+                <option value="INTERVENTION_ZONE">Zone d&apos;intervention</option>
                 <option value="WAREHOUSE">Entrepôt</option>
                 <option value="MATERIAL_PICKUP">Point d&apos;enlèvement matériel</option>
                 <option value="OFFICE">Bureau</option>
                 <option value="CLIENT_SITE">Site client</option>
                 <option value="OTHER">Autre lieu</option>
               </select>
+              {values.siteType === 'INTERVENTION_ZONE' ? (
+                <p className="mt-2 text-xs font-semibold text-orange-600">
+                  Pour les missions sans adresse client fixe, choisissez le centre de la ville ou du quartier et un rayon de pointage.
+                </p>
+              ) : null}
             </Field>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
@@ -1037,7 +1052,7 @@ function SiteFormDrawer({
               <div className="space-y-2">
                 <input
                   className="w-full accent-orange-600"
-                  disabled={!canManageRadius}
+                  disabled={!canEditRadius}
                   max={10}
                   min={0.5}
                   onChange={(event) =>
@@ -1052,9 +1067,14 @@ function SiteFormDrawer({
                   <span className="font-semibold text-slate-900">{values.radiusKm.toFixed(1)} km</span>
                   <span>10 km</span>
                 </div>
-                {!canManageRadius ? (
+                {!canEditRadius ? (
                   <p className="text-xs text-orange-600">
-                    Seuls DIRECTION et ADMIN peuvent modifier le rayon.
+                    Seuls DIRECTION et ADMIN peuvent modifier le rayon d&apos;un chantier classique.
+                  </p>
+                ) : null}
+                {values.siteType === 'INTERVENTION_ZONE' ? (
+                  <p className="text-xs text-emerald-700">
+                    Zone d&apos;intervention : rayon ajustable pour couvrir la ville ou le quartier.
                   </p>
                 ) : null}
               </div>
@@ -1153,6 +1173,8 @@ function buildInitialSiteFormValues(site: ProjectSiteItem | null, currentProject
 }
 
 function buildCreateSiteMutationBody(values: SiteFormValues, canManageRadius: boolean): SiteMutationBody {
+  const includeRadius = canManageRadius || values.siteType === 'INTERVENTION_ZONE';
+
   return {
     projectId: values.projectId,
     name: values.name,
@@ -1169,11 +1191,12 @@ function buildCreateSiteMutationBody(values: SiteFormValues, canManageRadius: bo
     siteManagerId: values.siteManagerId,
     geofenceType: values.geofenceType,
     geofencePolygon: values.geofenceType === 'POLYGON' ? values.geofencePolygon : null,
-    ...(canManageRadius ? { radiusKm: values.radiusKm } : {}),
+    ...(includeRadius ? { radiusKm: values.radiusKm } : {}),
   };
 }
 
 function buildPartialSiteMutationBody(values: SiteFormValues, initialSite: ProjectSiteItem, canManageRadius: boolean): SiteMutationBody {
+  const includeRadius = canManageRadius || values.siteType === 'INTERVENTION_ZONE';
   const body: SiteMutationBody = {};
   setStringChange(body, 'projectId', values.projectId, initialSite.projectId);
   setStringChange(body, 'name', values.name, initialSite.name);
@@ -1200,7 +1223,7 @@ function buildPartialSiteMutationBody(values: SiteFormValues, initialSite: Proje
     body.geofencePolygon = values.geofenceType === 'POLYGON' ? values.geofencePolygon : null;
   }
 
-  if (canManageRadius) {
+  if (includeRadius) {
     setNumberChange(body, 'radiusKm', values.radiusKm, initialSite.radiusKm);
   }
 
@@ -1290,6 +1313,8 @@ function siteTypeLabel(siteType: SiteType) {
   switch (siteType) {
     case 'WORKSITE':
       return 'Chantier';
+    case 'INTERVENTION_ZONE':
+      return "Zone d'intervention";
     case 'WAREHOUSE':
       return 'Entrepôt';
     case 'MATERIAL_PICKUP':

@@ -35,7 +35,7 @@ export const PATCH = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonProjectError('BAD_REQUEST', 400, 'Le payload chantier est invalide.');
   }
 
-  const geofencingError = assertUpdateSiteRadiusAllowed(user, existingSite.radiusKm.toNumber(), input);
+  const geofencingError = assertUpdateSiteRadiusAllowed(user, existingSite.radiusKm.toNumber(), existingSite.siteType, input);
 
   if (geofencingError) {
     return geofencingError;

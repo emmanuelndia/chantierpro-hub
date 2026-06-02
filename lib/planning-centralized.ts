@@ -137,6 +137,7 @@ export async function getCentralizedPlanning(
           id: true,
           name: true,
           address: true,
+          siteType: true,
           project: {
             select: {
               id: true,
@@ -174,6 +175,7 @@ export async function getCentralizedPlanning(
         siteId: assignment.site.id,
         siteName: assignment.site.name,
         siteAddress: assignment.site.address,
+        siteType: assignment.site.siteType,
         resourceId: assignment.supervisor.id,
         resourceName: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`.trim(),
         resourceRole: assignment.supervisor.role,

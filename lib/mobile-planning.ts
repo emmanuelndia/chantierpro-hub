@@ -960,6 +960,7 @@ const planningAssignmentSelect = {
       id: true,
       name: true,
       address: true,
+      siteType: true,
     },
   },
   createdBy: {
@@ -1039,6 +1040,7 @@ const supervisorAssignmentSelect = {
     select: {
       name: true,
       address: true,
+      siteType: true,
     },
   },
   photos: {
@@ -1072,6 +1074,7 @@ function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns
     siteId: assignment.siteId,
     siteName: assignment.site.name,
     siteAddress: assignment.site.address,
+    siteType: assignment.site.siteType,
     action: assignment.action,
     targetProgress: assignment.targetProgress,
     targetQuantity,
@@ -1107,6 +1110,7 @@ function serializeSupervisorAssignment(assignment: SupervisorAssignmentRow) {
     siteId: assignment.siteId,
     siteName: assignment.site.name,
     siteAddress: assignment.site.address,
+    siteType: assignment.site.siteType,
     action: assignment.action,
     targetProgress: assignment.targetProgress,
     targetQuantity,

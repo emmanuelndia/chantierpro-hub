@@ -47,6 +47,7 @@ type SelectableSite = {
   longitude: number | null;
   radiusKm: number;
   distanceKm: number | null;
+  siteType: TodaySiteItem['siteType'] | null;
 };
 
 type Submission = {
@@ -796,11 +797,18 @@ function GpsPanel({
       <h3 className="mt-4 text-lg font-black text-slate-950">
         {selectedSite ? selectedSite.name : 'Position recuperee'}
       </h3>
+      {selectedSite?.siteType === 'INTERVENTION_ZONE' ? (
+        <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+          Zone d&apos;intervention
+        </p>
+      ) : null}
       <p className={`mt-2 text-sm font-bold ${inRadius ? 'text-emerald-700' : 'text-red-700'}`}>
         {selectedSite && distance !== null
           ? outsideRadius
             ? `${distance.toFixed(2)} km - rayon : ${selectedSite.radiusKm} km`
-            : `${distance.toFixed(2)} km du chantier`
+            : selectedSite.siteType === 'INTERVENTION_ZONE'
+              ? `${distance.toFixed(2)} km de la zone`
+              : `${distance.toFixed(2)} km du chantier`
           : 'Choisissez un chantier pour verifier le rayon'}
       </p>
     </section>
@@ -848,6 +856,11 @@ function ManualSiteList({
                   <div className="min-w-0">
                     <p className="truncate text-base font-black text-slate-950">{site.name}</p>
                     <p className="mt-1 truncate text-sm text-slate-500">{site.address}</p>
+                    {site.siteType === 'INTERVENTION_ZONE' ? (
+                      <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">
+                        Zone d&apos;intervention
+                      </p>
+                    ) : null}
                     <p className="mt-2 text-xs font-bold text-emerald-700">Assigne aujourd&apos;hui</p>
                   </div>
                   <span className="shrink-0 text-sm font-bold text-primary">
@@ -1043,6 +1056,7 @@ function fromTodaySite(site: TodaySiteItem, geoState: GeoState): SelectableSite 
     longitude: site.longitude,
     radiusKm: site.radiusKm,
     distanceKm,
+    siteType: site.siteType,
   };
 }
 
@@ -1055,6 +1069,7 @@ function fromNearbySite(site: NearbySiteItem): SelectableSite {
     longitude: null,
     radiusKm: site.radiusKm,
     distanceKm: site.distance,
+    siteType: null,
   };
 }
 

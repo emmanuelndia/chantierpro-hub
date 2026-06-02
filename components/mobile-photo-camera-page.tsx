@@ -978,7 +978,7 @@ function TaskSelector({
         <option value="">Choisir la tâche</option>
         {assignments.map((assignment) => (
           <option key={assignment.id} value={assignment.id}>
-            {assignment.action}
+            {assignment.siteType === 'INTERVENTION_ZONE' ? 'Zone - ' : ''}{assignment.siteName} - {assignment.action}
           </option>
         ))}
       </select>

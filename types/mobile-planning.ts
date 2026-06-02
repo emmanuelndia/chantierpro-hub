@@ -26,6 +26,7 @@ export type PlanningAssignment = {
   siteId: string;
   siteName: string;
   siteAddress: string;
+  siteType: SiteType;
   action: string;
   targetProgress: number | null;
   targetQuantity: number | null;
@@ -140,6 +141,7 @@ export type SupervisorMyAssignment = {
   siteId: string;
   siteName: string;
   siteAddress: string;
+  siteType: SiteType;
   action: string;
   targetProgress: number | null;
   targetQuantity: number | null;

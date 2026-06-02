@@ -54,6 +54,7 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
   const geofencingError = assertUpdateSiteRadiusAllowed(
     user,
     existingSite.radiusKm.toNumber(),
+    existingSite.siteType,
     input,
   );
 

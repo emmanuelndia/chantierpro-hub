@@ -395,7 +395,7 @@ export function parseCreateSiteInput(body: unknown): CreateSiteInput | null {
   const area = sanitizeNumber(body.area) ?? 0;
   const radiusKmProvided = body.radiusKm !== undefined && body.radiusKm !== null;
   const radiusKm =
-    radiusKmProvided ? sanitizeNumber(body.radiusKm) : 2.0;
+    radiusKmProvided ? sanitizeNumber(body.radiusKm) : siteType === SiteType.INTERVENTION_ZONE ? 10.0 : 2.0;
   const geofence = parseSiteGeofenceInput(body);
 
   if (
@@ -557,11 +557,11 @@ export function validateSiteGps(latitude: number | null, longitude: number | nul
 }
 
 export function assertCreateSiteRadiusAllowed(user: AuthLikeUser, input: CreateSiteInput) {
-  if (input.radiusKmProvided && !canManageGeofencing(user.role)) {
+  if (input.radiusKmProvided && !canManageGeofencing(user.role) && input.siteType !== SiteType.INTERVENTION_ZONE) {
     return jsonProjectError(
       'GEOFENCING_FORBIDDEN',
       403,
-      'Seuls DIRECTION et ADMIN peuvent modifier le rayon du chantier.',
+      "Seuls DIRECTION et ADMIN peuvent modifier le rayon d'un chantier classique.",
     );
   }
 
@@ -571,15 +571,21 @@ export function assertCreateSiteRadiusAllowed(user: AuthLikeUser, input: CreateS
 export function assertUpdateSiteRadiusAllowed(
   user: AuthLikeUser,
   existingRadiusKm: number,
+  existingSiteType: SiteType,
   input: UpdateSiteInput,
 ) {
   const nextRadiusKm = input.radiusKmProvided && input.radiusKm !== undefined ? input.radiusKm : existingRadiusKm;
+  const nextSiteType = input.siteType ?? existingSiteType;
 
-  if (!canManageGeofencing(user.role) && Math.abs(nextRadiusKm - existingRadiusKm) > Number.EPSILON) {
+  if (
+    !canManageGeofencing(user.role) &&
+    nextSiteType !== SiteType.INTERVENTION_ZONE &&
+    Math.abs(nextRadiusKm - existingRadiusKm) > Number.EPSILON
+  ) {
     return jsonProjectError(
       'GEOFENCING_FORBIDDEN',
       403,
-      'Seuls DIRECTION et ADMIN peuvent modifier le rayon du chantier.',
+      "Seuls DIRECTION et ADMIN peuvent modifier le rayon d'un chantier classique.",
     );
   }
 

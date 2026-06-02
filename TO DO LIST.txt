@@ -61,11 +61,13 @@ Recevoir notification quand une ressource a été assigné par exemple surtout l
 
 BE pouvoir dire action termine
 
+Revoir une partie de la logique pointage : 
+
+Dans certains sites n'ont pas de positions fixes, avant dans ce cas là, la ressource faisait un pointage du genre global c'est à dire au lieu de pointer dans un site qui est dans un quartier il pointe dès qu'il se trouve dans la ville et ainsi il peut aller de quartier en quartier en fonction des positions des clients donc le chef de projet n'a pas les positions des sites aux départ et peut pas pas faire une assignation précise et la ressource n'a pas un chantier fixe pour dire je suis sur le chantier
+du genre une ressource A doit aller dans un quartier à Yopougon et c'est le client le jour j qui lui dit où il est donc au lieu de pointer dans ce quartier il pointe dès qu'il arrive à Yopougon et ainsi il peut aller de quartier en quartier selon les positions des clients
 
 
-
-
-
+Erreur sur le model excel
 
 
 

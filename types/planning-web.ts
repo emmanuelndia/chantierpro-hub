@@ -9,7 +9,7 @@ import type {
   TaskProgressUpdateItem,
   UpdateAssignmentRequest,
 } from '@/types/mobile-planning';
-import type { PlanningAssignmentStatus, PlanningWorkLocationType, Role } from '@prisma/client';
+import type { PlanningAssignmentStatus, PlanningWorkLocationType, Role, SiteType } from '@prisma/client';
 
 export type PlanningWebAssignment = PlanningAssignment;
 export type PlanningWebDayResponse = PlanningDayResponse;
@@ -33,6 +33,7 @@ export type CentralizedPlanningAssignment = {
   siteId: string;
   siteName: string;
   siteAddress: string;
+  siteType: SiteType;
   resourceId: string;
   resourceName: string;
   resourceRole: Role;

@@ -45,6 +45,7 @@ enum SiteGeofenceType {
 
 enum SiteType {
   WORKSITE
+  INTERVENTION_ZONE
   WAREHOUSE
   MATERIAL_PICKUP
   OFFICE

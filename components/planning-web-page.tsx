@@ -702,6 +702,7 @@ function DayPlanningCards({
                       <Badge tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : 'info'}>
                         {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
                       </Badge>
+                      {site?.siteType === 'INTERVENTION_ZONE' ? <Badge tone="success">Zone d&apos;intervention</Badge> : null}
                       <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
                     </div>
                   </div>
@@ -871,6 +872,11 @@ function CentralizedPlanningTable({
                 <td className="px-5 py-4">
                   <p className="font-semibold text-slate-900">{item.siteName}</p>
                   <p className="mt-1 text-xs text-slate-500">{item.siteAddress}</p>
+                  {item.siteType === 'INTERVENTION_ZONE' ? (
+                    <div className="mt-2">
+                      <Badge tone="success">Zone d&apos;intervention</Badge>
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-5 py-4">
                   <p className="font-semibold text-slate-900">{item.resourceName}</p>

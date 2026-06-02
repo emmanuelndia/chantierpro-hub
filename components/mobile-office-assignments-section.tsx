@@ -212,6 +212,11 @@ export function MobileOfficeAssignmentsSection({
                 {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
               </span>
             </div>
+            {assignment.siteType === 'INTERVENTION_ZONE' ? (
+              <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">
+                Zone d&apos;intervention
+              </p>
+            ) : null}
             {assignment.targetQuantity !== null && assignment.targetQuantity > 0 ? (
               <p className="mt-2 text-xs font-bold text-indigo-700">
                 Objectif {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
