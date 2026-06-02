@@ -20,6 +20,7 @@ type AuthLikeUser = {
 type MobileProjectsFilters = {
   q?: string | null;
   status?: MobileProjectStatusFilter | null;
+  includeInactive?: boolean;
 };
 
 type ProjectRow = {
@@ -116,7 +117,7 @@ export async function getMobileProjects(
   const andClauses = status ? [{ status }] : [];
   const projects = await prisma.project.findMany({
     where: {
-      ...projectAccessWhere(user),
+      ...projectAccessWhere(user, { includeInactive: Boolean(filters.includeInactive) }),
       ...(filters.q?.trim()
         ? {
             OR: [

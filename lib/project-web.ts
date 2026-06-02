@@ -30,6 +30,7 @@ type ProjectListQuery = {
   status: ProjectStatus | null;
   periodFrom: string | null;
   periodTo: string | null;
+  includeInactive: boolean;
 };
 
 type SitePresencesQuery = {
@@ -91,6 +92,7 @@ export function parseProjectListQuery(searchParams: URLSearchParams): ProjectLis
   const status = parseProjectStatus(searchParams.get('status'));
   const periodFrom = sanitizeDateOnly(searchParams.get('periodFrom'));
   const periodTo = sanitizeDateOnly(searchParams.get('periodTo'));
+  const includeInactive = searchParams.get('includeInactive') === '1';
 
   if (searchParams.get('page') !== null && page < 1) {
     return null;
@@ -110,6 +112,7 @@ export function parseProjectListQuery(searchParams: URLSearchParams): ProjectLis
     status,
     periodFrom,
     periodTo,
+    includeInactive,
   };
 }
 
@@ -125,7 +128,7 @@ export async function listProjectsPage(
   ];
 
   const where: Prisma.ProjectWhereInput = {
-    ...projectAccessWhere(user),
+    ...projectAccessWhere(user, { includeInactive: query.includeInactive }),
     ...(query.search
       ? {
           OR: [
@@ -247,10 +250,14 @@ export async function listProjectFormOptions(
   const [projects, projectManagers, siteManagers] = await Promise.all([
     prisma.project.findMany({
       where: {
-        ...projectAccessWhere(user),
-        status: {
-          notIn: [ProjectStatus.ARCHIVED, ProjectStatus.COMPLETED],
-        },
+        AND: [
+          projectAccessWhere(user),
+          {
+            status: {
+              notIn: [ProjectStatus.ARCHIVED, ProjectStatus.COMPLETED],
+            },
+          },
+        ],
       },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
       select: {

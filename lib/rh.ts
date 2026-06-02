@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { ClockInStatus, ClockInType, Prisma, Role, type PrismaClient } from '@prisma/client';
 import { createSignedStorageUrl, uploadPrivateStorageObject } from '@/lib/storage';
+import { projectAccessWhere } from '@/lib/projects';
 import type {
   RhApiErrorCode,
   RhOptionsResponse,
@@ -987,14 +988,11 @@ export async function getRhExportDownloadArtifact(
   };
 }
 
-export async function getRhOptions(prisma: PrismaClient): Promise<RhOptionsResponse> {
+export async function getRhOptions(prisma: PrismaClient, user: AuthLikeUser): Promise<RhOptionsResponse> {
+  const projectWhere = projectAccessWhere(user);
   const [projects, sites, resources] = await Promise.all([
     prisma.project.findMany({
-      where: {
-        status: {
-          not: 'ARCHIVED',
-        },
-      },
+      where: projectWhere,
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
@@ -1003,11 +1001,7 @@ export async function getRhOptions(prisma: PrismaClient): Promise<RhOptionsRespo
     }),
     prisma.site.findMany({
       where: {
-        project: {
-          status: {
-            not: 'ARCHIVED',
-          },
-        },
+        project: projectWhere,
       },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
       select: {

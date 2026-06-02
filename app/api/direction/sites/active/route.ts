@@ -7,6 +7,6 @@ export const GET = withAuth(async ({ user }) => {
     return jsonDirectionError('FORBIDDEN', 403, 'Acces refuse a la carte Direction.');
   }
 
-  const response = await getDirectionActiveSites(prisma);
+  const response = await getDirectionActiveSites(prisma, user.role);
   return Response.json(response);
 });

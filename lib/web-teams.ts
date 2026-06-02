@@ -24,6 +24,7 @@ import {
   upsertActiveTeamMember,
   validateActiveTechnician,
 } from '@/lib/teams';
+import { projectAccessWhere } from '@/lib/projects';
 import type {
   WebTeamDetailResponse,
   WebTeamFormOptionsResponse,
@@ -60,14 +61,13 @@ export function canAccessWebTeams(role: Role) {
 export function webSiteWhereForTeams(user: AuthLikeUser): Prisma.SiteWhereInput {
   if (user.role === Role.PROJECT_MANAGER) {
     return {
-      project: {
-        projectManagerId: user.id,
-      },
+      project: projectAccessWhere(user),
     };
   }
 
   if (user.role === Role.GENERAL_SUPERVISOR) {
     return {
+      project: projectAccessWhere(user),
       status: SiteStatus.ACTIVE,
       generalSupervisorScopes: {
         some: {
@@ -78,7 +78,9 @@ export function webSiteWhereForTeams(user: AuthLikeUser): Prisma.SiteWhereInput 
     };
   }
 
-  return {};
+  return {
+    project: projectAccessWhere(user),
+  };
 }
 
 export function webTeamWhere(user: AuthLikeUser): Prisma.TeamWhereInput {

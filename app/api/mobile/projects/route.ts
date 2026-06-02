@@ -30,6 +30,7 @@ export const GET = withAuth(async ({ req, user }) => {
     await getMobileProjects(prisma, user, {
       q: searchParams.get('q'),
       status,
+      includeInactive: searchParams.get('includeInactive') === '1',
     }),
   );
 });

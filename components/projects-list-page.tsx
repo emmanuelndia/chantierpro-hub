@@ -43,6 +43,7 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('ALL');
+  const [includeInactive, setIncludeInactive] = useState(false);
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -50,7 +51,7 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
   const [projectToArchive, setProjectToArchive] = useState<ProjectDetail | null>(null);
 
   const canCreateProject = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
-  const canViewArchivedProjects = viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
+  const canViewInactiveProjects = viewer.role === 'ADMIN';
   const pageTitle = scope === 'all' ? 'Tous les projets' : 'Mes projets';
   const pageDescription =
     scope === 'all'
@@ -58,7 +59,7 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
       : 'Retrouve rapidement les projets qui te sont rattaches et ouvre chaque detail chantier.';
 
   const projectsQuery = useQuery({
-    queryKey: ['projects-list', scope, page, search, status, periodFrom, periodTo],
+    queryKey: ['projects-list', scope, page, search, status, periodFrom, periodTo, includeInactive],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
       searchParams.set('page', String(page));
@@ -67,6 +68,9 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
       }
       if (status !== 'ALL') {
         searchParams.set('status', status);
+      }
+      if (canViewInactiveProjects && includeInactive) {
+        searchParams.set('includeInactive', '1');
       }
       if (periodFrom) {
         searchParams.set('periodFrom', periodFrom);
@@ -235,11 +239,11 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
               }}
               value={status}
             >
-              <option value="ALL">Tous les statuts</option>
+              <option value="ALL">{includeInactive ? 'Tous les statuts' : 'Actifs uniquement'}</option>
               <option value="IN_PROGRESS">En cours</option>
-              <option value="COMPLETED">Termine</option>
-              <option value="ON_HOLD">En pause</option>
-              {canViewArchivedProjects ? <option value="ARCHIVED">Archive</option> : null}
+              {canViewInactiveProjects && includeInactive ? <option value="COMPLETED">Termine</option> : null}
+              {canViewInactiveProjects && includeInactive ? <option value="ON_HOLD">En pause</option> : null}
+              {canViewInactiveProjects && includeInactive ? <option value="ARCHIVED">Archive</option> : null}
             </select>
           </label>
           <label className="space-y-2">
@@ -267,6 +271,31 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
             />
           </label>
         </div>
+        {canViewInactiveProjects ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+            <p className="text-sm font-semibold text-slate-600">
+              {includeInactive
+                ? 'Les projets termines, en pause et archives sont visibles.'
+                : 'Les projets inactifs et tests restent masques par defaut.'}
+            </p>
+            <button
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
+              onClick={() => {
+                setIncludeInactive((current) => {
+                  const next = !current;
+                  if (!next && status !== 'ALL' && status !== 'IN_PROGRESS') {
+                    setStatus('ALL');
+                  }
+                  return next;
+                });
+                setPage(1);
+              }}
+              type="button"
+            >
+              {includeInactive ? 'Masquer inactifs' : 'Afficher tous'}
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-panel">

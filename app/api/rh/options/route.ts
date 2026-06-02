@@ -7,5 +7,5 @@ export const GET = withAuth(async ({ user }) => {
     return jsonRhError('FORBIDDEN', 403, "Acces refuse aux options du module RH.");
   }
 
-  return Response.json(await getRhOptions(prisma));
+  return Response.json(await getRhOptions(prisma, user));
 });

@@ -18,6 +18,6 @@ export const GET = withAuth(async ({ req, user }) => {
     return jsonDirectionError('BAD_REQUEST', 400, 'Les filtres de consolidation Direction sont invalides.');
   }
 
-  const response = await getDirectionProjectsConsolidated(prisma, query);
+  const response = await getDirectionProjectsConsolidated(prisma, query, user.role);
   return Response.json(response);
 });

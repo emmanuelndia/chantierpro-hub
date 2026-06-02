@@ -20,7 +20,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/web/my-projects',
     label: 'Mes projets',
     icon: 'my-projects',
-    roles: ['PROJECT_MANAGER', 'ADMIN'],
+    roles: ['PROJECT_MANAGER'],
     breadcrumb: ['Mes projets'],
   },
   {
@@ -83,7 +83,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/presences/equipe',
     label: 'Presences equipe',
     icon: 'rh',
-    roles: ['COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    roles: ['COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'ADMIN'],
     breadcrumb: ['Presences', 'Equipe'],
   },
   {

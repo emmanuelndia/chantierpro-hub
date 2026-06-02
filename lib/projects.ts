@@ -170,16 +170,14 @@ export function canManageGeofencing(role: Role) {
 }
 
 export function canViewArchivedProjects(role: Role) {
-  return role === Role.DIRECTION || role === Role.ADMIN;
+  return role === Role.ADMIN;
 }
 
-export function projectAccessWhere(user: AuthLikeUser): Prisma.ProjectWhereInput {
-  const visibilityWhere = canViewArchivedProjects(user.role)
+export function projectAccessWhere(user: AuthLikeUser, options: { includeInactive?: boolean } = {}): Prisma.ProjectWhereInput {
+  const visibilityWhere = canViewArchivedProjects(user.role) && options.includeInactive
     ? {}
     : {
-        status: {
-          not: ProjectStatus.ARCHIVED,
-        },
+        status: ProjectStatus.IN_PROGRESS,
       };
 
   if (user.role === Role.PROJECT_MANAGER) {

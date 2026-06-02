@@ -18,6 +18,6 @@ export const GET = withAuth(async ({ req, user }) => {
     return jsonDirectionError('BAD_REQUEST', 400, 'Les parametres month et year sont invalides.');
   }
 
-  const response = await getDirectionKpis(prisma, query);
+  const response = await getDirectionKpis(prisma, query, user.role);
   return Response.json(response);
 });

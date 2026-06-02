@@ -121,6 +121,10 @@ export function canAccessDirection(role: Role) {
   return DIRECTION_ALLOWED_ROLES.includes(role);
 }
 
+function directionProjectVisibilityWhere(role: Role): Prisma.ProjectWhereInput {
+  return role === Role.ADMIN ? {} : { status: ProjectStatus.IN_PROGRESS };
+}
+
 export function parseDirectionPeriodQuery(searchParams: URLSearchParams): DirectionPeriodQuery | null {
   const currentDate = new Date();
   const rawMonth = searchParams.get('month');
@@ -160,26 +164,28 @@ export function parseDirectionConsolidatedQuery(
 export async function getDirectionKpis(
   prisma: PrismaClient,
   query: DirectionPeriodQuery,
+  role: Role,
 ): Promise<DirectionKpisResponse> {
   const currentRange = monthRange(query.year, query.month);
   const previous = previousMonth(query.year, query.month);
   const previousRange = monthRange(previous.year, previous.month);
+  const visibilityWhere = directionProjectVisibilityWhere(role);
 
   const [inProgress, completed, onHold, currentSessions, previousSessions, currentPhotos, previousPhotos] =
     await Promise.all([
       prisma.project.count({
         where: {
-          status: ProjectStatus.IN_PROGRESS,
+          AND: [visibilityWhere, { status: ProjectStatus.IN_PROGRESS }],
         },
       }),
       prisma.project.count({
         where: {
-          status: ProjectStatus.COMPLETED,
+          AND: [visibilityWhere, { status: ProjectStatus.COMPLETED }],
         },
       }),
       prisma.project.count({
         where: {
-          status: ProjectStatus.ON_HOLD,
+          AND: [visibilityWhere, { status: ProjectStatus.ON_HOLD }],
         },
       }),
       countCompleteSessionsInRange(prisma, currentRange.from, currentRange.to, null),
@@ -228,11 +234,15 @@ export async function getDirectionKpis(
 export async function getDirectionProjectsConsolidated(
   prisma: PrismaClient,
   query: DirectionConsolidatedQuery,
+  role: Role,
 ): Promise<DirectionConsolidatedProjectsResponse> {
   const range = monthRange(query.year, query.month);
   const projects = await prisma.project.findMany({
     where: {
-      ...(query.status ? { status: query.status } : {}),
+      AND: [
+        directionProjectVisibilityWhere(role),
+        ...(query.status ? [{ status: query.status } satisfies Prisma.ProjectWhereInput] : []),
+      ],
       ...(query.projectManager ? { projectManagerId: query.projectManager } : {}),
     },
     select: {
@@ -366,10 +376,12 @@ export async function getDirectionProjectsConsolidated(
 
 export async function getDirectionActiveSites(
   prisma: PrismaClient,
+  role: Role,
 ): Promise<DirectionActiveSitesResponse> {
   const sites = await prisma.site.findMany({
     where: {
       status: SiteStatus.ACTIVE,
+      project: directionProjectVisibilityWhere(role),
     },
     select: activeSiteSelect,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

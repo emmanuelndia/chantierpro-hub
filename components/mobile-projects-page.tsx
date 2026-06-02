@@ -29,13 +29,14 @@ const baseStatusFilters: { value: MobileProjectStatusFilter; label: string }[] =
 export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<MobileProjectStatusFilter>('ALL');
-  const canViewArchivedProjects = user.role === 'DIRECTION' || user.role === 'ADMIN';
+  const [includeInactive, setIncludeInactive] = useState(false);
+  const canViewInactiveProjects = user.role === 'ADMIN';
   const statusFilters = useMemo(
     () =>
-      canViewArchivedProjects
+      canViewInactiveProjects
         ? baseStatusFilters
-        : baseStatusFilters.filter((filter) => filter.value !== ProjectStatus.ARCHIVED),
-    [canViewArchivedProjects],
+        : baseStatusFilters.filter((filter) => filter.value === 'ALL' || filter.value === ProjectStatus.IN_PROGRESS),
+    [canViewInactiveProjects],
   );
 
   const requestPath = useMemo(() => {
@@ -48,10 +49,13 @@ export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
     if (status !== 'ALL') {
       params.set('status', status);
     }
+    if (canViewInactiveProjects && includeInactive) {
+      params.set('includeInactive', '1');
+    }
 
     const queryString = params.toString();
     return queryString ? `/api/mobile/projects?${queryString}` : '/api/mobile/projects';
-  }, [query, status]);
+  }, [canViewInactiveProjects, includeInactive, query, status]);
 
   const projectsQuery = useQuery({
     queryKey: ['mobile-projects', requestPath],
@@ -113,6 +117,24 @@ export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
             </button>
           ))}
         </div>
+
+        {canViewInactiveProjects ? (
+          <button
+            className="min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-700"
+            onClick={() => {
+              setIncludeInactive((current) => {
+                const next = !current;
+                if (!next && status !== 'ALL' && status !== ProjectStatus.IN_PROGRESS) {
+                  setStatus('ALL');
+                }
+                return next;
+              });
+            }}
+            type="button"
+          >
+            {includeInactive ? 'Masquer inactifs' : 'Afficher tous'}
+          </button>
+        ) : null}
       </section>
 
       {projectsQuery.isLoading ? <ProjectsLoadingState /> : null}

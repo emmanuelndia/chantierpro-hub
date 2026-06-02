@@ -322,12 +322,12 @@ async function getDirectionDashboard(prisma: PrismaClient): Promise<DashboardRes
   const now = new Date();
   const period = currentMonthPeriod(now);
   const [kpis, consolidated, alerts] = await Promise.all([
-    getDirectionKpis(prisma, period),
+    getDirectionKpis(prisma, period, Role.DIRECTION),
     getDirectionProjectsConsolidated(prisma, {
       ...period,
       status: null,
       projectManager: null,
-    }),
+    }, Role.DIRECTION),
     getDirectionAlerts(prisma),
   ]);
 
