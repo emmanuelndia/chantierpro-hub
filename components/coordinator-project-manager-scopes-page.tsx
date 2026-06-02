@@ -32,7 +32,7 @@ const inputClassName =
 export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProjectManagerScopesPageProps) {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
-  const canSelectProjectManager = viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
+  const canSelectProjectManager = viewer.role === 'ADMIN';
   const [form, setForm] = useState<FormState>({ coordinatorId: '', projectManagerId: '' });
   const [deleteTarget, setDeleteTarget] = useState<CoordinatorProjectManagerScopeItem | null>(null);
 

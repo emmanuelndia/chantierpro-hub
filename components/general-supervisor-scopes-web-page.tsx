@@ -53,7 +53,7 @@ const secondaryButtonClassName =
 export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScopesWebPageProps) {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
-  const canMutate = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
+  const canMutate = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'ADMIN';
   const [filters, setFilters] = useState<ScopeFilters>({
     projectId: '',
     siteId: '',

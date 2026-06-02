@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { PlanningAssignmentStatus, PlanningWorkLocationType, type Role } from '@prisma/client';
 import { useMutation, useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { Download, Pencil, Trash2 } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableActionsMenu } from '@/components/table-actions-menu';
@@ -82,8 +82,9 @@ const objectiveStatusConfig = {
 export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
+  const isCentralizedOnlyPlanning = viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
   const [selectedDate, setSelectedDate] = useState(todayKey);
-  const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => (isCentralizedOnlyPlanning ? 'centralized' : 'day'));
   const [filters, setFilters] = useState<PlanningWebFilters>({ projectId: '', siteId: '', resourceId: '' });
   const [centralizedFilters, setCentralizedFilters] = useState<CentralizedPlanningFilters>({
     from: todayKey,
@@ -113,6 +114,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const dayQuery = useQuery({
     queryKey: ['web-planning', selectedDate],
     queryFn: () => fetchPlanningDay(selectedDate),
+    enabled: !isCentralizedOnlyPlanning,
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
@@ -122,7 +124,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     queries: weekDates.map((date) => ({
       queryKey: ['web-planning', date],
       queryFn: () => fetchPlanningDay(date),
-      enabled: viewMode === 'week',
+      enabled: !isCentralizedOnlyPlanning && viewMode === 'week',
       staleTime: 30_000,
     })),
   });
@@ -144,9 +146,15 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         role: '',
         workLocationType: '',
       }),
-    enabled: canViewCentralized && Boolean(drawerMode && form.date && form.supervisorId),
+    enabled: canMutate && canViewCentralized && Boolean(drawerMode && form.date && form.supervisorId),
     staleTime: 30_000,
   });
+
+  useEffect(() => {
+    if (isCentralizedOnlyPlanning && viewMode !== 'centralized') {
+      setViewMode('centralized');
+    }
+  }, [isCentralizedOnlyPlanning, viewMode]);
 
   const createMutation = useMutation({
     mutationFn: createAssignment,
@@ -297,22 +305,58 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Planning terrain</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">
+              {isCentralizedOnlyPlanning ? 'Planning centralise' : 'Planning terrain'}
+            </p>
+            {isCentralizedOnlyPlanning ? (
+              <>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Planning centralise</h1>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+                  Consulte toutes les affectations en lecture seule pour suivre les disponibilites.
+                </p>
+              </>
+            ) : null}
+            {!isCentralizedOnlyPlanning ? (
+              <>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Tâches journalières</h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
               Planifie les ressources terrain par chantier, avec consultation jour ou semaine.
             </p>
+              </>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {isCentralizedOnlyPlanning ? <Badge tone="info">Vue centralisee</Badge> : null}
+            {!isCentralizedOnlyPlanning ? (
+              <>
             <Badge tone={dayQuery.isFetching ? 'warning' : 'info'}>
               {dayQuery.isFetching ? 'Actualisation...' : formatLongDate(selectedDateObject)}
             </Badge>
+              </>
+            ) : null}
             {!canMutate ? <Badge tone="neutral">Lecture seule</Badge> : null}
           </div>
         </div>
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+        {isCentralizedOnlyPlanning ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">Lecture globale</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-950">Planning centralise uniquement</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Les affectations sont consultables, sans creation ni modification depuis ce role.
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <SegmentedButton active={viewMode === 'centralized'} onClick={() => setViewMode('centralized')}>
+                Centralise
+              </SegmentedButton>
+            </div>
+          </div>
+        ) : null}
+        {!isCentralizedOnlyPlanning ? (
         <div className="grid gap-4 xl:grid-cols-[auto_1fr_auto] xl:items-end">
           <div className="flex flex-wrap gap-2">
             <button className={buttonClassName} onClick={() => navigateDate(-1)} type="button">
@@ -381,6 +425,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
             ) : null}
           </div>
         </div>
+        ) : null}
       </section>
 
       {viewMode === 'centralized' ? (

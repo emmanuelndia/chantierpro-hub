@@ -10,7 +10,7 @@ type AuthLikeUser = {
   role: Role;
 };
 
-const MANAGEMENT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
+const MANAGEMENT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.ADMIN];
 
 const scopeSelect = {
   id: true,

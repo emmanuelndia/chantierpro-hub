@@ -11,10 +11,9 @@ type AuthLikeUser = {
   role: Role;
 };
 
-const SCOPE_MANAGEMENT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
+const SCOPE_MANAGEMENT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.ADMIN];
 const SCOPE_WEB_READ_ROLES: readonly Role[] = [
   Role.PROJECT_MANAGER,
-  Role.DIRECTION,
   Role.ADMIN,
   Role.GENERAL_SUPERVISOR,
 ];

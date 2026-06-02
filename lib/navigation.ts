@@ -69,14 +69,14 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/web/supervisor-scopes',
     label: 'Perimetres',
     icon: 'users',
-    roles: ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    roles: ['PROJECT_MANAGER', 'ADMIN'],
     breadcrumb: ['Perimetres GS'],
   },
   {
     href: '/web/coordinator-scopes',
     label: 'Coordinateurs projet',
     icon: 'users',
-    roles: ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    roles: ['PROJECT_MANAGER', 'ADMIN'],
     breadcrumb: ['Coordinateurs projet'],
   },
   {
@@ -238,7 +238,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/supervisor-scopes',
     label: 'Perimetres',
     icon: 'teams',
-    roles: ['PROJECT_MANAGER', 'DIRECTION'],
+    roles: ['PROJECT_MANAGER'],
   },
   {
     href: '/mobile/history',
