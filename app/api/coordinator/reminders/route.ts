@@ -81,7 +81,7 @@ export const POST = withAuth(async ({ req, user }) => {
       clockInRecordId: record.id,
       supervisorId: record.userId,
       supervisorName: `${record.user.firstName} ${record.user.lastName}`,
-      siteName: record.site.name,
+      siteName: record.site?.name ?? 'Mission libre',
       pushTokenCount: record.user.pushTokens.length,
       status: record.user.pushTokens.length > 0 ? 'queued' : 'no_push_token',
     },

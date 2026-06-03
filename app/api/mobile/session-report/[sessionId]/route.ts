@@ -24,6 +24,7 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
         id: true,
         userId: true,
         siteId: true,
+        freeMissionId: true,
         clockInDate: true,
         timestampLocal: true,
         site: {
@@ -31,6 +32,18 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
             id: true,
             name: true,
             address: true,
+          },
+        },
+        freeMission: {
+          select: {
+            id: true,
+            action: true,
+            objectiveText: true,
+            project: {
+              select: {
+                name: true,
+              },
+            },
           },
         },
       },
@@ -46,7 +59,9 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
     const arrivalRecord = await prisma.clockInRecord.findFirst({
       where: {
         userId: user.id,
-        siteId: departureRecord.siteId,
+        ...(departureRecord.freeMissionId
+          ? { freeMissionId: departureRecord.freeMissionId }
+          : { siteId: departureRecord.siteId }),
         clockInDate: departureRecord.clockInDate,
         status: ClockInStatus.VALID,
         type: ClockInType.ARRIVAL,
@@ -68,7 +83,9 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
     const [sessionPhotos, existingReport, assignment] = await Promise.all([
       prisma.photo.findMany({
         where: {
-          siteId: departureRecord.siteId,
+          ...(departureRecord.freeMissionId
+            ? { freeMissionId: departureRecord.freeMissionId }
+            : { siteId: departureRecord.siteId }),
           uploadedById: user.id,
           isDeleted: false,
           timestampLocal: {
@@ -100,7 +117,8 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
           id: true,
         },
       }),
-      prisma.planningAssignment.findFirst({
+      departureRecord.siteId
+        ? prisma.planningAssignment.findFirst({
         where: {
           date: departureRecord.clockInDate,
           siteId: departureRecord.siteId,
@@ -133,7 +151,8 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
             },
           },
         },
-      }),
+          })
+        : Promise.resolve(null),
     ]);
 
     const arrivalAt = arrivalRecord?.timestampLocal ?? departureRecord.timestampLocal;
@@ -169,9 +188,11 @@ export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
     const sessionData: SessionReportData = {
       session: {
         id: departureRecord.id,
-        siteId: departureRecord.site.id,
-        siteName: departureRecord.site.name,
-        siteAddress: departureRecord.site.address,
+        contextType: departureRecord.freeMissionId ? 'FREE_MISSION' : 'SITE',
+        siteId: departureRecord.siteId,
+        freeMissionId: departureRecord.freeMissionId,
+        siteName: departureRecord.site?.name ?? departureRecord.freeMission?.action ?? 'Mission libre',
+        siteAddress: departureRecord.site?.address ?? departureRecord.freeMission?.project.name ?? '',
         date:
           departureRecord.clockInDate.toISOString().split('T')[0] ??
           departureRecord.clockInDate.toISOString(),

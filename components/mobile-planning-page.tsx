@@ -1119,6 +1119,7 @@ const planningStatusConfig: Record<PlanningAssignmentStatus, { label: string; cl
 const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
   ON_SITE: 'Présence chantier requise',
   OFFICE: 'Tâche bureau / coordination',
+  FREE_MISSION: 'Mission libre',
 };
 
 const objectiveStatusConfig: Record<PlanningAssignment['objectiveStatus'], { label: string; className: string }> = {

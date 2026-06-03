@@ -280,10 +280,10 @@ const managementReportSelect = {
 function serializeReportItem(report: ReportRow): MobileManagementReportItem {
   return {
     id: report.id,
-    projectId: report.site.project.id,
-    projectName: report.site.project.name,
+    projectId: report.site?.project.id ?? '',
+    projectName: report.site?.project.name ?? 'Projet',
     siteId: report.siteId,
-    siteName: report.site.name,
+    siteName: report.site?.name ?? 'Mission libre',
     authorId: report.userId,
     authorName: `${report.user.firstName} ${report.user.lastName}`,
     authorRole: report.user.role,

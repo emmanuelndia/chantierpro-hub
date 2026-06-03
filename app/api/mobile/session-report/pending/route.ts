@@ -34,6 +34,11 @@ export const GET = withAuth(async ({ user }) => {
             name: true,
           },
         },
+        freeMission: {
+          select: {
+            action: true,
+          },
+        },
       },
     }),
   ]);
@@ -43,7 +48,7 @@ export const GET = withAuth(async ({ user }) => {
     items: records.map((record) => ({
       departureRecordId: record.id,
       siteId: record.siteId,
-      siteName: record.site.name,
+      siteName: record.site?.name ?? record.freeMission?.action ?? 'Mission libre',
       date: record.clockInDate.toISOString().slice(0, 10),
       endedAt: record.timestampLocal.toISOString(),
     })),

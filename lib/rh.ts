@@ -102,7 +102,7 @@ type BuiltSession = {
   lastName: string;
   email: string | null;
   role: Role;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   projectId: string;
   date: string;
@@ -388,6 +388,9 @@ export async function getSitePresencesLive(
 
   const recordsBySiteUser = new Map<string, typeof records>();
   for (const record of records) {
+    if (!record.siteId) {
+      continue;
+    }
     const key = liveResourceKey(record.siteId, record.userId);
     recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), record]);
   }
@@ -555,7 +558,7 @@ export async function getRhPresenceDetailForUser(
   });
 
   const sortedSessions = sessions
-    .sort((left, right) => left.startedAt.localeCompare(right.startedAt) || left.siteId.localeCompare(right.siteId))
+    .sort((left, right) => left.startedAt.localeCompare(right.startedAt) || (left.siteId ?? '').localeCompare(right.siteId ?? ''))
     .map(serializeRhPresenceSession);
 
   return {
@@ -1187,8 +1190,8 @@ function buildCompleteSession(
     email: arrival.user.email,
     role: arrival.user.role,
     siteId: arrival.siteId,
-    siteName: arrival.site.name,
-    projectId: arrival.site.projectId,
+    siteName: arrival.site?.name ?? 'Mission libre',
+    projectId: arrival.site?.projectId ?? '',
     date: arrival.timestampLocal.toISOString().slice(0, 10),
     arrivalTime: arrival.timestampLocal.toISOString().slice(11, 19),
     departureTime: departure.timestampLocal.toISOString().slice(11, 19),
@@ -1220,8 +1223,8 @@ function buildIncompleteSession(
     email: arrival.user.email,
     role: arrival.user.role,
     siteId: arrival.siteId,
-    siteName: arrival.site.name,
-    projectId: arrival.site.projectId,
+    siteName: arrival.site?.name ?? 'Mission libre',
+    projectId: arrival.site?.projectId ?? '',
     date: arrival.timestampLocal.toISOString().slice(0, 10),
     arrivalTime: arrival.timestampLocal.toISOString().slice(11, 19),
     departureTime: null,
@@ -1252,7 +1255,9 @@ function buildPresenceSummary(sessions: BuiltSession[]): RhPresenceSummaryItem {
   for (const session of orderedSessions) {
     totalPauseDuration += session.pauseDurationHours;
     lastSite = session.siteName;
-    siteIds.add(session.siteId);
+    if (session.siteId) {
+      siteIds.add(session.siteId);
+    }
 
     if (session.incomplete) {
       incompleteSessions += 1;
@@ -1497,7 +1502,7 @@ function compareBuiltSession(left: BuiltSession, right: BuiltSession) {
     left.lastName.localeCompare(right.lastName) ||
     left.firstName.localeCompare(right.firstName) ||
     left.startedAt.localeCompare(right.startedAt) ||
-    left.siteId.localeCompare(right.siteId)
+    (left.siteId ?? '').localeCompare(right.siteId ?? '')
   );
 }
 

@@ -54,6 +54,14 @@ type AssignmentFormState = {
   workLocationType: PlanningWorkLocationType;
 };
 
+type FreeMissionWebRequest = {
+  projectId: string;
+  assigneeId: string;
+  date: string;
+  action: string;
+  objectiveText: string | null;
+};
+
 const todayKey = formatDateKey(new Date());
 const filterClassName =
   'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-500';
@@ -70,6 +78,7 @@ const planningStatusLabel: Record<PlanningAssignmentStatus, string> = {
 const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
   ON_SITE: 'Présence chantier requise',
   OFFICE: 'Tâche bureau / coordination',
+  FREE_MISSION: 'Mission libre',
 };
 
 const objectiveStatusConfig = {
@@ -176,6 +185,17 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     onError: (error) => pushMutationError(error, 'Modification impossible'),
   });
 
+  const freeMissionMutation = useMutation({
+    mutationFn: ({ id, data }: { id?: string; data: FreeMissionWebRequest }) =>
+      id ? updateFreeMission(id, data) : createFreeMission(data),
+    onSuccess: async () => {
+      pushToast({ type: 'success', title: 'Mission libre enregistree' });
+      closeDrawer();
+      await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+    },
+    onError: (error) => pushMutationError(error, 'Mission libre impossible'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: deleteAssignment,
     onSuccess: async () => {
@@ -197,7 +217,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const centralizedItems = useMemo(() => centralizedQuery.data?.items ?? [], [centralizedQuery.data?.items]);
   const centralizedOptions = useMemo(() => getCentralizedOptions(centralizedItems), [centralizedItems]);
   const selectedDateObject = parseDateKey(selectedDate);
-  const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || freeMissionMutation.isPending;
   const assignmentConflicts =
     assignmentConflictsQuery.data?.items.filter((item) => item.id !== form.id && item.siteId !== form.siteId) ?? [];
 
@@ -235,8 +255,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     setForm({
       id: assignment.id,
       supervisorId: assignment.supervisorId,
-      projectId: sites.find((site) => site.id === assignment.siteId)?.project.id ?? '',
-      siteId: assignment.siteId,
+      projectId: assignment.projectId ?? sites.find((site) => site.id === assignment.siteId)?.project.id ?? '',
+      siteId: assignment.siteId ?? '',
       date: selectedDate,
       action: assignment.action,
       targetProgress: assignment.targetProgress === null ? '' : String(assignment.targetProgress),
@@ -259,6 +279,18 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     const targetQuantity = form.targetQuantity === '' ? null : Number(form.targetQuantity);
     const normalizedTargetProgress = targetQuantity !== null && targetQuantity > 0 ? null : targetProgress;
     const targetUnit = form.targetUnit.trim() || null;
+
+    if (form.workLocationType === PlanningWorkLocationType.FREE_MISSION) {
+      const data = {
+        projectId: form.projectId,
+        assigneeId: form.supervisorId,
+        date: form.date,
+        action: form.action,
+        objectiveText: form.objectiveText.trim() || null,
+      };
+      freeMissionMutation.mutate(drawerMode === 'edit' && form.id ? { id: form.id, data } : { data });
+      return;
+    }
 
     if (drawerMode === 'create') {
       const payload: PlanningWebCreateRequest = {
@@ -699,9 +731,14 @@ function DayPlanningCards({
                       <p className="mt-1 line-clamp-1 text-xs text-slate-500">{assignment.siteAddress}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                      <Badge tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : 'info'}>
-                        {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                      <Badge tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : assignment.workLocationType === 'FREE_MISSION' ? 'warning' : 'info'}>
+                        {assignment.workLocationType === 'OFFICE'
+                          ? 'Bureau'
+                          : assignment.workLocationType === 'FREE_MISSION'
+                            ? 'Mission libre'
+                            : 'Terrain'}
                       </Badge>
+                      {assignment.siteType === 'FREE_MISSION' ? <Badge tone="warning">Sans chantier fixe</Badge> : null}
                       {site?.siteType === 'INTERVENTION_ZONE' ? <Badge tone="success">Zone d&apos;intervention</Badge> : null}
                       <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
                     </div>
@@ -1010,10 +1047,11 @@ function AssignmentDrawer({
   const progressNumber = form.targetProgress === '' ? null : Number(form.targetProgress);
   const quantityNumber = form.targetQuantity === '' ? null : Number(form.targetQuantity);
   const hasQuantityObjective = quantityNumber !== null && quantityNumber > 0;
+  const isFreeMission = form.workLocationType === PlanningWorkLocationType.FREE_MISSION;
   const progressValid = progressNumber === null || (Number.isInteger(progressNumber) && progressNumber >= 0 && progressNumber <= 100);
   const quantityValid = quantityNumber === null || (Number.isFinite(quantityNumber) && quantityNumber >= 0);
   const canSubmit = Boolean(form.action.trim() && form.date) && progressValid && quantityValid;
-  const createIdentityValid = mode === 'edit' || Boolean(form.supervisorId && form.siteId);
+  const createIdentityValid = mode === 'edit' || Boolean(form.supervisorId && (isFreeMission ? form.projectId : form.siteId));
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/50">
@@ -1130,21 +1168,27 @@ function AssignmentDrawer({
               ))}
             </select>
           </Field>
-          <Field label="Chantier">
-            <select
-              className={filterClassName}
-              disabled={!canEditIdentity}
-              onChange={(event) => onChange({ ...form, siteId: event.target.value })}
-              value={form.siteId}
-            >
-              <option value="">Selectionner</option>
-              {filteredSites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.name} - {site.project.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {!isFreeMission ? (
+            <Field label="Chantier">
+              <select
+                className={filterClassName}
+                disabled={!canEditIdentity}
+                onChange={(event) => onChange({ ...form, siteId: event.target.value })}
+                value={form.siteId}
+              >
+                <option value="">Selectionner</option>
+                {filteredSites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name} - {site.project.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : (
+            <div className="rounded-2xl border border-orange-100 bg-orange-50 p-3 text-xs font-semibold text-orange-800">
+              Mission sans chantier fixe : la ressource pointera avec sa position GPS reelle.
+            </div>
+          )}
           <Field label="Tâche à réaliser">
             <textarea
               className={`${filterClassName} min-h-32`}
@@ -1152,6 +1196,7 @@ function AssignmentDrawer({
               value={form.action}
             />
           </Field>
+          {!isFreeMission ? (
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
             <Field label="Objectif quantitatif">
               <input
@@ -1182,11 +1227,12 @@ function AssignmentDrawer({
               />
             </Field>
           </div>
-          {hasQuantityObjective ? (
+          ) : null}
+          {!isFreeMission && hasQuantityObjective ? (
             <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3 text-xs font-semibold text-sky-800">
               La progression sera calculee depuis la quantite realisee. La progression cible % est ignoree pour cette tache.
             </div>
-          ) : (
+          ) : !isFreeMission ? (
             <Field label="Progression cible % (si pas de quantite)">
               <input
                 className={filterClassName}
@@ -1201,7 +1247,7 @@ function AssignmentDrawer({
               </p>
               {!progressValid ? <p className="mt-2 text-xs font-semibold text-red-600">La progression doit etre entre 0 et 100.</p> : null}
             </Field>
-          )}
+          ) : null}
           <Field label="Consigne / objectif texte (facultatif)">
             <textarea
               className={`${filterClassName} min-h-24`}
@@ -1571,8 +1617,39 @@ async function updateAssignment(id: string, data: PlanningWebUpdateRequest) {
   return (await response.json()) as PlanningWebMutationResponse;
 }
 
+async function createFreeMission(data: FreeMissionWebRequest) {
+  const response = await authFetch('/api/free-missions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Impossible de creer la mission libre.'));
+  }
+  return (await response.json()) as unknown;
+}
+
+async function updateFreeMission(id: string, data: FreeMissionWebRequest) {
+  const response = await authFetch(`/api/free-missions/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Impossible de modifier la mission libre.'));
+  }
+  return (await response.json()) as unknown;
+}
+
 async function deleteAssignment(id: string) {
   const response = await authFetch(`/api/planning/assignments/${id}`, { method: 'DELETE' });
+  if (response.status === 404) {
+    const freeMissionResponse = await authFetch(`/api/free-missions/${id}`, { method: 'DELETE' });
+    if (!freeMissionResponse.ok) {
+      throw new Error(await getApiErrorMessage(freeMissionResponse, 'Impossible de supprimer la mission libre.'));
+    }
+    return;
+  }
   if (!response.ok) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de supprimer la tâche.'));
   }
@@ -1626,8 +1703,9 @@ function extractFileName(contentDisposition: string | null) {
 function filterAssignments(assignments: PlanningWebAssignment[], sites: AvailableSite[], filters: PlanningWebFilters) {
   return assignments.filter((assignment) => {
     const site = sites.find((item) => item.id === assignment.siteId);
+    const projectId = assignment.projectId ?? site?.project.id;
     return (
-      (!filters.projectId || site?.project.id === filters.projectId) &&
+      (!filters.projectId || projectId === filters.projectId) &&
       (!filters.siteId || assignment.siteId === filters.siteId) &&
       (!filters.resourceId || assignment.supervisorId === filters.resourceId)
     );

@@ -309,8 +309,8 @@ async function findIncompleteSessionAlerts(
       id: `incomplete:${record.userId}:${record.siteId}`,
       type: 'INCOMPLETE_SESSION_12H' as const,
       siteId: record.siteId,
-      siteName: record.site.name,
-      projectName: record.site.project.name,
+      siteName: record.site?.name ?? 'Mission libre',
+      projectName: record.site?.project.name ?? 'Projet',
       title: 'Session incomplete',
       description: `${record.user.firstName} ${record.user.lastName} pointe depuis ${formatHours(record.timestampLocal, now)}.`,
       occurredAt: record.timestampLocal.toISOString(),
@@ -370,18 +370,18 @@ function getPresentUserIds(records: { userId: string; type: ClockInType }[]) {
 
 function serializePhotoItem(photo: {
   id: string;
-  siteId: string;
+  siteId: string | null;
   filename: string;
   storageKey: string;
   timestampLocal: Date;
   site: {
     name: string;
-  };
+  } | null;
 }): MobileManagementPhotoItem {
   return {
     id: photo.id,
     siteId: photo.siteId,
-    siteName: photo.site.name,
+    siteName: photo.site?.name ?? 'Mission libre',
     filename: photo.filename,
     createdAt: photo.timestampLocal.toISOString(),
     url: createInternalPhotoUrl(photo.id),

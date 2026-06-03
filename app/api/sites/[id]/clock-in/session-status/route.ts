@@ -29,6 +29,6 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
   }
 
   const openSession = await getOpenSessionForUser(prisma, user.id);
-  const activePause = openSession ? await getActivePause(prisma, openSession.siteId, user.id) : null;
+  const activePause = openSession?.siteId ? await getActivePause(prisma, openSession.siteId, user.id) : null;
   return Response.json(serializeSessionStatus(openSession, activePause));
 });

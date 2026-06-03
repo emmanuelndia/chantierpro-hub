@@ -16,7 +16,7 @@ export type GeneralSupervisorReportSupervisorOption = {
 
 export type GeneralSupervisorReportItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   authorId: string;
   authorName: string;
@@ -28,7 +28,7 @@ export type GeneralSupervisorReportItem = {
 
 export type GeneralSupervisorMissingReportItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   supervisorId: string;
   supervisorName: string;

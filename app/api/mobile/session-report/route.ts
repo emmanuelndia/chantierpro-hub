@@ -35,6 +35,7 @@ export const POST = withAuth(async ({ user, req }) => {
       select: {
         id: true,
         siteId: true,
+        freeMissionId: true,
         site: {
           select: {
             name: true,
@@ -66,7 +67,14 @@ export const POST = withAuth(async ({ user, req }) => {
       );
     }
 
-    if (body.assignmentId) {
+    if (body.assignmentId && !clockInRecord.siteId) {
+      return Response.json(
+        { code: 'ASSIGNMENT_NOT_ALLOWED', message: 'Une mission libre ne peut pas etre liee a une tache chantier.' },
+        { status: 400 },
+      );
+    }
+
+    if (body.assignmentId && clockInRecord.siteId) {
       const assignment = await prisma.planningAssignment.findFirst({
         where: {
           id: body.assignmentId,
@@ -94,7 +102,9 @@ export const POST = withAuth(async ({ user, req }) => {
       const photosCount = await prisma.photo.count({
         where: {
           id: { in: photoIds },
-          siteId: clockInRecord.siteId,
+          ...(clockInRecord.freeMissionId
+            ? { freeMissionId: clockInRecord.freeMissionId }
+            : { siteId: clockInRecord.siteId }),
           uploadedById: user.id,
           isDeleted: false,
           ...(body.assignmentId ? { OR: [{ planningAssignmentId: body.assignmentId }, { planningAssignmentId: null }] } : {}),
@@ -117,6 +127,7 @@ export const POST = withAuth(async ({ user, req }) => {
         status: ReportStatus.RECU,
         userId: user.id,
         siteId: clockInRecord.siteId,
+        freeMissionId: clockInRecord.freeMissionId,
         clockInRecordId: clockInRecord.id,
       },
       select: {

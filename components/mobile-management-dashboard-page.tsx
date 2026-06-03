@@ -204,28 +204,36 @@ function MetricTile({ label, value }: Readonly<{ label: string; value: string }>
 }
 
 function AlertRow({ alert }: Readonly<{ alert: MobileManagementAlertItem }>) {
+  const content = (
+    <div className="flex items-start gap-3">
+      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700">
+        <AlertIcon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-3">
+          <p className="truncate text-sm font-black text-slate-950">{alert.title}</p>
+          <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+            {formatEventTime(alert.occurredAt)}
+          </span>
+        </div>
+        <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+          {alert.siteName} - {alert.projectName}
+        </p>
+        <p className="mt-1 text-sm leading-5 text-slate-600">{alert.description}</p>
+      </div>
+    </div>
+  );
+
+  if (!alert.siteId) {
+    return <div className="block rounded-lg border border-red-200 bg-white p-3 shadow-panel">{content}</div>;
+  }
+
   return (
     <Link
       className="block rounded-lg border border-red-200 bg-white p-3 shadow-panel transition active:scale-[0.99]"
       href={`/mobile/sites/${encodeURIComponent(alert.siteId)}`}
     >
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700">
-          <AlertIcon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <p className="truncate text-sm font-black text-slate-950">{alert.title}</p>
-            <span className="shrink-0 text-[11px] font-semibold text-slate-400">
-              {formatEventTime(alert.occurredAt)}
-            </span>
-          </div>
-          <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-            {alert.siteName} - {alert.projectName}
-          </p>
-          <p className="mt-1 text-sm leading-5 text-slate-600">{alert.description}</p>
-        </div>
-      </div>
+      {content}
     </Link>
   );
 }

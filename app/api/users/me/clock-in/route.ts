@@ -26,13 +26,13 @@ export const GET = withAuth(async ({ user }) => {
       .map((record) => ({
         id: record.id,
         siteId: record.siteId,
+        freeMissionId: record.freeMissionId,
         userId: record.userId,
         type: record.type,
         status: record.status,
         timestampLocal: record.timestampLocal,
-        site: {
-          name: record.site.name,
-        },
+        site: record.site ? { name: record.site.name } : null,
+        freeMission: record.freeMission ? { action: record.freeMission.action } : null,
       })),
   );
 

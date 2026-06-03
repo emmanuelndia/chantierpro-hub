@@ -2,8 +2,13 @@ import type { ClockInStatus, ClockInType, Role } from '@prisma/client';
 
 export type ClockInRecordItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
+  freeMissionId: string | null;
+  freeMissionAction: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  contextType: 'SITE' | 'FREE_MISSION';
   userId: string;
   type: ClockInType;
   clockInDate: string;
@@ -22,8 +27,10 @@ export type ClockInRecordItem = {
 };
 
 export type ActiveClockInSession = {
-  siteId: string;
+  siteId: string | null;
   siteName: string;
+  freeMissionId: string | null;
+  contextType: 'SITE' | 'FREE_MISSION';
   arrivalAt: string;
   durationSeconds: number;
 };
@@ -44,6 +51,7 @@ export type SessionStatus = {
   pauseDuration: number;
   openSessionSiteId?: string | null;
   openSessionSiteName?: string | null;
+  openSessionFreeMissionId?: string | null;
 };
 
 export type AttendancePersonItem = {

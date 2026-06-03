@@ -72,6 +72,7 @@ const PHOTO_PAGE_SIZE = 20;
 export const photoSelect = {
   id: true,
   siteId: true,
+  freeMissionId: true,
   uploadedById: true,
   planningAssignmentId: true,
   category: true,
@@ -102,6 +103,18 @@ export const photoSelect = {
       status: true,
     },
   },
+  freeMission: {
+    select: {
+      action: true,
+      project: {
+        select: {
+          id: true,
+          name: true,
+          projectManagerId: true,
+        },
+      },
+    },
+  },
 } satisfies Prisma.PhotoSelect;
 
 export const photoDeletionLogSelect = {
@@ -115,6 +128,7 @@ export const photoDeletionLogSelect = {
     select: {
       id: true,
       siteId: true,
+      freeMissionId: true,
       filename: true,
       category: true,
     },
@@ -249,6 +263,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
   const formData = await request.formData();
   const file = formData.get('file');
   const siteId = sanitizeString(formData.get('siteId'));
+  const freeMissionId = sanitizeString(formData.get('freeMissionId'));
   const planningAssignmentId = sanitizeString(formData.get('planningAssignmentId'));
   const category = parsePhotoCategory(formData.get('category'));
   const tags = parsePhotoTags(formData.get('tags'));
@@ -265,7 +280,8 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
 
   if (
     !(file instanceof File) ||
-    !siteId ||
+    (!siteId && !freeMissionId) ||
+    (siteId && freeMissionId) ||
     !category ||
     !tags ||
     description === null ||
@@ -288,6 +304,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
     file,
     input: {
       siteId,
+      freeMissionId,
       planningAssignmentId,
       category,
       tags,
@@ -526,6 +543,82 @@ export async function createPhoto(
   },
 ) {
   const timestampLocal = new Date(payload.input.timestampLocal);
+  if (payload.input.freeMissionId) {
+    if (!FIELD_USER_ROLES.includes(payload.user.role)) {
+      return { code: 'FORBIDDEN' as const, photo: null };
+    }
+
+    const freeMission = await prisma.freeMission.findFirst({
+      where: {
+        id: payload.input.freeMissionId,
+        assigneeId: payload.user.id,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        date: true,
+      },
+    });
+
+    if (!freeMission || formatDateKey(freeMission.date) !== formatDateKey(timestampLocal)) {
+      return { code: 'FORBIDDEN' as const, photo: null };
+    }
+
+    const prepared = await preparePhotoUpload(payload.file);
+    const storageKey = generatePhotoStorageKey({
+      siteId: `free-mission-${freeMission.id}`,
+      userId: payload.user.id,
+      filename: prepared.filename,
+      timestamp: timestampLocal,
+    });
+
+    let stored: Awaited<ReturnType<typeof uploadPrivatePhotoObject>>;
+    try {
+      stored = await uploadPrivatePhotoObject({
+        storageKey,
+        body: prepared.buffer,
+        contentType: prepared.contentType,
+      });
+    } catch (error) {
+      console.error('Private free mission photo upload failed:', {
+        providerError: error instanceof Error ? error.message : String(error),
+        storageKeyPrefix: storageKey.split('/').slice(0, 2).join('/'),
+      });
+      return { code: 'UPLOAD_FAILED' as const, photo: null };
+    }
+
+    const created = await prisma.photo.create({
+      data: {
+        siteId: null,
+        freeMissionId: freeMission.id,
+        uploadedById: payload.user.id,
+        planningAssignmentId: null,
+        category: payload.input.category,
+        tags: payload.input.tags,
+        description: payload.input.description,
+        filename: prepared.filename,
+        storageKey,
+        url: stored.url,
+        fileSize: prepared.fileSize,
+        format: prepared.format,
+        latitude: payload.input.latitude === null ? null : new Prisma.Decimal(payload.input.latitude),
+        longitude: payload.input.longitude === null ? null : new Prisma.Decimal(payload.input.longitude),
+        timestampLocal,
+        takenAt: timestampLocal,
+      },
+      select: photoSelect,
+    });
+
+    return {
+      code: null,
+      photo: serializePhoto(created),
+    };
+  }
+
+  if (!payload.input.siteId) {
+    return { code: 'FORBIDDEN' as const, photo: null };
+  }
+
   const site = await getAccessibleSiteForPhoto(prisma, payload.input.siteId, payload.user, {
     date: timestampLocal,
   });
@@ -644,6 +737,19 @@ export async function getAccessiblePhotoById(
           },
         },
       },
+      freeMissionId: true,
+      freeMission: {
+        select: {
+          action: true,
+          project: {
+            select: {
+              id: true,
+              name: true,
+              projectManagerId: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -656,7 +762,8 @@ export async function getAccessiblePhotoById(
   }
 
   if (payload.user.role === Role.PROJECT_MANAGER) {
-    return photo.site.project.projectManagerId === payload.user.id ? serializePhoto(photo) : null;
+    const projectManagerId = photo.site?.project.projectManagerId ?? photo.freeMission?.project.projectManagerId;
+    return projectManagerId === payload.user.id ? serializePhoto(photo) : null;
   }
 
   if (canReadAllSitePhotos(payload.user.role)) {
@@ -665,6 +772,9 @@ export async function getAccessiblePhotoById(
       payload.user.role === Role.GENERAL_SUPERVISOR ||
       isBusinessManagerRole(payload.user.role)
     ) {
+      if (!photo.siteId) {
+        return photo.uploadedById === payload.user.id || photo.freeMissionId ? serializePhoto(photo) : null;
+      }
       const site = await getAccessibleSiteForPhoto(prisma, photo.siteId, payload.user);
       return site ? serializePhoto(photo) : null;
     }
@@ -873,7 +983,7 @@ export async function listProjectPhotos(
   ]);
 
   return {
-    items: photos.map((photo) => serializePhotoWithSiteName(photo, photo.site.name, { includeUrl: false })),
+    items: photos.map((photo) => serializePhotoWithSiteName(photo, photo.site?.name ?? 'Mission libre', { includeUrl: false })),
     page: payload.page,
     pageSize: PHOTO_PAGE_SIZE,
     totalItems,
@@ -903,9 +1013,19 @@ export async function softDeletePhoto(
     select: {
       id: true,
       siteId: true,
+      freeMissionId: true,
       uploadedById: true,
       isDeleted: true,
       site: {
+        select: {
+          project: {
+            select: {
+              projectManagerId: true,
+            },
+          },
+        },
+      },
+      freeMission: {
         select: {
           project: {
             select: {
@@ -921,7 +1041,7 @@ export async function softDeletePhoto(
     return { code: 'NOT_FOUND' as const, photo: null };
   }
 
-  if (payload.user.role === Role.PROJECT_MANAGER && photo.site.project.projectManagerId !== payload.user.id) {
+  if (payload.user.role === Role.PROJECT_MANAGER && photo.site?.project.projectManagerId !== payload.user.id) {
     return { code: 'FORBIDDEN' as const, photo: null };
   }
 
@@ -1086,7 +1206,7 @@ export async function buildAdminDeletionLogsCsv(
     ...logs.map((log) =>
       [
         buildAdminPhotoLabel(log),
-        log.photo.site.name,
+        log.photo.site?.name ?? 'Mission libre',
         `${log.deletedBy.firstName} ${log.deletedBy.lastName}`,
         log.deletedBy.role,
         log.deletedAt.toISOString(),
@@ -1114,6 +1234,7 @@ export function serializePhoto(
   return {
     id: photo.id,
     siteId: photo.siteId,
+    freeMissionId: photo.freeMissionId,
     siteName: null,
     uploadedById: photo.uploadedById,
     planningAssignmentId: photo.planningAssignmentId,
@@ -1143,7 +1264,7 @@ export function serializePhoto(
 }
 
 function serializePhotoWithSiteName(
-  photo: SerializablePhoto & { site: { name: string } },
+  photo: SerializablePhoto & { site?: { name: string } | null },
   siteName: string,
   options: { includeUrl?: boolean } = {},
 ) {
@@ -1191,8 +1312,8 @@ export function serializeAdminDeletionLog(log: SerializableAdminPhotoDeletionLog
     photoFilename: log.photo.filename,
     photoTakenAt: log.photo.takenAt.toISOString(),
     site: {
-      id: log.photo.site.id,
-      name: log.photo.site.name,
+      id: log.photo.site?.id ?? '',
+      name: log.photo.site?.name ?? 'Mission libre',
     },
     deletedBy: {
       id: log.deletedBy.id,
@@ -1242,11 +1363,21 @@ export async function getAccessiblePhotoStorageById(
     select: {
       id: true,
       siteId: true,
+      freeMissionId: true,
       uploadedById: true,
       storageKey: true,
       url: true,
       isDeleted: true,
       site: {
+        select: {
+          project: {
+            select: {
+              projectManagerId: true,
+            },
+          },
+        },
+      },
+      freeMission: {
         select: {
           project: {
             select: {
@@ -1267,7 +1398,8 @@ export async function getAccessiblePhotoStorageById(
   }
 
   if (payload.user.role === Role.PROJECT_MANAGER) {
-    return photo.site.project.projectManagerId === payload.user.id ? photo : null;
+    const projectManagerId = photo.site?.project.projectManagerId ?? photo.freeMission?.project.projectManagerId;
+    return projectManagerId === payload.user.id ? photo : null;
   }
 
   if (canReadAllSitePhotos(payload.user.role)) {
@@ -1276,6 +1408,9 @@ export async function getAccessiblePhotoStorageById(
       payload.user.role === Role.GENERAL_SUPERVISOR ||
       isBusinessManagerRole(payload.user.role)
     ) {
+      if (!photo.siteId) {
+        return photo.freeMissionId || photo.uploadedById === payload.user.id ? photo : null;
+      }
       const site = await getAccessibleSiteForPhoto(prisma, photo.siteId, payload.user);
       return site ? photo : null;
     }

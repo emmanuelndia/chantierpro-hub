@@ -449,7 +449,7 @@ export async function getProjectPhotos(
   const items: ProjectPhotoItem[] = photos.map((photo) => ({
       id: photo.id,
       siteId: photo.siteId,
-      siteName: photo.site.name,
+      siteName: photo.site?.name ?? 'Mission libre',
       uploadedByName: `${photo.uploadedBy.firstName} ${photo.uploadedBy.lastName}`,
       category: photo.category,
       description: photo.description,

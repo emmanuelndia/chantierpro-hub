@@ -51,7 +51,7 @@ type AuthLikeUser = {
 
 type RecentReportRow = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   authorName: string;
   submittedAt: string;
@@ -60,7 +60,7 @@ type RecentReportRow = {
 
 type RecentPhotoRow = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   filename: string;
   createdAt: string;
@@ -607,7 +607,7 @@ async function getCoordinatorDashboard(prisma: PrismaClient, userId: string): Pr
           id: `incomplete:${latestSessionRecord.userId}:${latestSessionRecord.siteId}`,
           level: 'warning',
           title: `${latestSessionRecord.user.firstName} ${latestSessionRecord.user.lastName}`,
-          description: `Session ouverte depuis ${Math.floor(hoursOpen)} h sur ${latestSessionRecord.site.name}.`,
+          description: `Session ouverte depuis ${Math.floor(hoursOpen)} h sur ${latestSessionRecord.site?.name ?? 'Mission libre'}.`,
           badge: '> 12h',
         });
       }
@@ -633,7 +633,7 @@ async function getCoordinatorDashboard(prisma: PrismaClient, userId: string): Pr
   const supervisorsWithoutReport = missingReportSessions.map((record) => ({
     id: record.id,
     siteId: record.siteId,
-    siteName: record.site.name,
+    siteName: record.site?.name ?? 'Mission libre',
     supervisorId: record.userId,
     supervisorName: `${record.user.firstName} ${record.user.lastName}`,
     endedAt: record.timestampLocal.toISOString(),
@@ -693,7 +693,7 @@ async function getCoordinatorDashboard(prisma: PrismaClient, userId: string): Pr
     pendingValidationReports: pendingReports.map((report) => ({
       id: report.id,
       siteId: report.siteId,
-      siteName: report.site.name,
+      siteName: report.site?.name ?? 'Mission libre',
       supervisorId: report.user.id,
       supervisorName: `${report.user.firstName} ${report.user.lastName}`,
       submittedAt: report.submittedAt.toISOString(),
@@ -918,14 +918,15 @@ async function getGeneralSupervisorDashboard(
     ]);
 
   const assignmentsBySite = countBy(assignmentsToday.map((assignment) => assignment.site.id));
-  const reportsBySite = countBy(reportsToday.map((report) => report.siteId));
+  const reportsBySite = countBy(reportsToday.map((report) => report.siteId).filter((siteId): siteId is string => Boolean(siteId)));
   const activeTeamsBySite = countBy(activeTeamRows.map((team) => team.siteId));
   const validatedReportsBySite = countBy(
     reportsToday
       .filter((report) => report.validationStatus === ReportValidationStatus.VALIDATED_FOR_CLIENT)
-      .map((report) => report.siteId),
+      .map((report) => report.siteId)
+      .filter((siteId): siteId is string => Boolean(siteId)),
   );
-  const presentSiteIds = new Set(presentSiteRecords.map((record) => record.siteId));
+  const presentSiteIds = new Set(presentSiteRecords.map((record) => record.siteId).filter((siteId): siteId is string => Boolean(siteId)));
   const reportBySiteAndUser = new Set(reportsToday.map((report) => `${report.siteId}:${report.userId}`));
   const objectiveCounts = countObjectiveStatuses(assignmentsToday);
   const relevantSiteAlerts = directionAlerts.sitesWithoutPresence.filter((item) => siteScope.includes(item.siteId));
@@ -1210,18 +1211,18 @@ function createStat(
 
 function serializeDashboardPhoto(photo: {
   id: string;
-  siteId: string;
+  siteId: string | null;
   filename: string;
   storageKey: string;
   timestampLocal: Date;
   site: {
     name: string;
-  };
+  } | null;
 }): RecentPhotoRow {
   return {
     id: photo.id,
     siteId: photo.siteId,
-    siteName: photo.site.name,
+    siteName: photo.site?.name ?? 'Mission libre',
     filename: photo.filename,
     createdAt: photo.timestampLocal.toISOString(),
     url: createInternalPhotoUrl(photo.id),
@@ -1232,10 +1233,10 @@ function serializeDashboardReport(report: {
   id: string;
   content: string;
   submittedAt: Date;
-  siteId: string;
+  siteId: string | null;
   site: {
     name: string;
-  };
+  } | null;
   user: {
     firstName: string;
     lastName: string;
@@ -1244,7 +1245,7 @@ function serializeDashboardReport(report: {
   return {
     id: report.id,
     siteId: report.siteId,
-    siteName: report.site.name,
+    siteName: report.site?.name ?? 'Mission libre',
     authorName: `${report.user.firstName} ${report.user.lastName}`,
     submittedAt: report.submittedAt.toISOString(),
     excerpt: report.content.length > 120 ? `${report.content.slice(0, 117)}...` : report.content,
@@ -1345,7 +1346,7 @@ async function findOpenFieldSession(prisma: PrismaClient, userId: string, siteId
 
   return {
     siteId: latestSessionRecord.siteId,
-    siteName: latestSessionRecord.site.name,
+    siteName: latestSessionRecord.site?.name ?? 'Mission libre',
     arrivalAt: latestSessionRecord.timestampLocal.toISOString(),
     durationSeconds: Math.max(0, Math.floor((now.getTime() - latestSessionRecord.timestampLocal.getTime()) / 1000)),
   };

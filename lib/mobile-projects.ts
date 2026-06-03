@@ -477,12 +477,12 @@ function serializeDetailTeams(project: ProjectDetailRow): MobileProjectDetailTea
 
 function serializeDetailPhoto(photo: {
   id: string;
-  siteId: string;
+  siteId: string | null;
   filename: string;
   timestampLocal: Date;
   site: {
     name: string;
-  };
+  } | null;
   uploadedBy: {
     firstName: string;
     lastName: string;
@@ -491,7 +491,7 @@ function serializeDetailPhoto(photo: {
   return {
     id: photo.id,
     siteId: photo.siteId,
-    siteName: photo.site.name,
+    siteName: photo.site?.name ?? 'Mission libre',
     filename: photo.filename,
     url: createInternalPhotoUrl(photo.id),
     uploadedByName: `${photo.uploadedBy.firstName} ${photo.uploadedBy.lastName}`,
@@ -501,13 +501,13 @@ function serializeDetailPhoto(photo: {
 
 function serializeDetailReport(report: {
   id: string;
-  siteId: string;
+  siteId: string | null;
   content: string;
   submittedAt: Date;
   validationStatus: MobileProjectDetailReport['validationStatus'];
   site: {
     name: string;
-  };
+  } | null;
   user: {
     firstName: string;
     lastName: string;
@@ -516,7 +516,7 @@ function serializeDetailReport(report: {
   return {
     id: report.id,
     siteId: report.siteId,
-    siteName: report.site.name,
+    siteName: report.site?.name ?? 'Mission libre',
     authorName: `${report.user.firstName} ${report.user.lastName}`,
     submittedAt: report.submittedAt.toISOString(),
     validationStatus: report.validationStatus,

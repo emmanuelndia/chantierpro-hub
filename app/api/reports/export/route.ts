@@ -20,6 +20,11 @@ const exportReportInclude = {
       address: true,
     },
   },
+  freeMission: {
+    select: {
+      action: true,
+    },
+  },
   clockInRecord: {
     select: {
       clockInDate: true,
@@ -107,7 +112,7 @@ function generateTextExport(reports: ExportReport[], date: Date) {
 RAPPORT ${index + 1}/${reports.length} — ChantierPro
 ===================================
 Superviseur : ${report.user.firstName} ${report.user.lastName}
-Site : ${report.site.name}
+Contexte : ${report.site?.name ?? report.freeMission?.action ?? 'Mission libre'}
 Date : ${new Date(report.submittedAt).toLocaleDateString('fr-FR')}
 Session : ${startTime} → ${endTime} (${duration} min)
 Progression : ${report.progression ?? 0}%
@@ -174,7 +179,7 @@ function generatePDFExport(reports: ExportReport[], date: Date) {
     pdf.text(`Superviseur : ${report.user.firstName} ${report.user.lastName}`, margin, y);
     y += 6;
 
-    pdf.text(`Site : ${report.site.name}`, margin, y);
+    pdf.text(`Contexte : ${report.site?.name ?? report.freeMission?.action ?? 'Mission libre'}`, margin, y);
     y += 6;
 
     const startTime = new Date(report.clockInRecord.timestampLocal).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });

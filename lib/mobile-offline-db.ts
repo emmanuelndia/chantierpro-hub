@@ -68,7 +68,8 @@ export type PendingMobilePhoto = {
   id: string;
   blob: Blob;
   filename: string;
-  siteId: string;
+  siteId?: string | null;
+  freeMissionId?: string | null;
   planningAssignmentId?: string | null;
   description?: string;
   tags?: PhotoTag[];
@@ -249,7 +250,12 @@ export async function syncMobileOfflineQueue({ mode }: { mode: 'auto' | 'manual'
 export function buildPhotoFormData(photo: PendingMobilePhoto) {
   const formData = new FormData();
   formData.set('file', new File([photo.blob], photo.filename, { type: photo.blob.type || 'image/jpeg' }));
-  formData.set('siteId', photo.siteId);
+  if (photo.siteId) {
+    formData.set('siteId', photo.siteId);
+  }
+  if (photo.freeMissionId) {
+    formData.set('freeMissionId', photo.freeMissionId);
+  }
   formData.set('category', 'PROGRESS');
   formData.set('description', photo.description ?? '');
   formData.set('tags', JSON.stringify(photo.tags ?? []));

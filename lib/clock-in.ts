@@ -30,6 +30,7 @@ export const FIELD_ROLES: readonly Role[] = FIELD_USER_ROLES;
 export const clockInRecordSelect = {
   id: true,
   siteId: true,
+  freeMissionId: true,
   userId: true,
   type: true,
   clockInDate: true,
@@ -50,11 +51,23 @@ export const clockInRecordSelect = {
       name: true,
     },
   },
+  freeMission: {
+    select: {
+      action: true,
+      projectId: true,
+      project: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
 } satisfies Prisma.ClockInRecordSelect;
 
 const openSessionSelect = {
   id: true,
   siteId: true,
+  freeMissionId: true,
   userId: true,
   type: true,
   status: true,
@@ -62,6 +75,11 @@ const openSessionSelect = {
   site: {
     select: {
       name: true,
+    },
+  },
+  freeMission: {
+    select: {
+      action: true,
     },
   },
 } satisfies Prisma.ClockInRecordSelect;
@@ -79,7 +97,8 @@ type OpenSessionRecord = Prisma.ClockInRecordGetPayload<{
 
 type PauseRecord = {
   id: string;
-  siteId: string;
+  siteId: string | null;
+  freeMissionId?: string | null;
   userId: string;
   type: ClockInType;
   status: ClockInStatus;
@@ -376,10 +395,16 @@ export function findActivePauseFromRecords(records: PauseRecord[]) {
 }
 
 export function serializeClockInRecord(record: SerializableClockInRecord): ClockInRecordItem {
+  const contextType = record.freeMissionId ? 'FREE_MISSION' : 'SITE';
   return {
     id: record.id,
     siteId: record.siteId,
-    siteName: record.site.name,
+    siteName: record.site?.name ?? record.freeMission?.action ?? 'Mission libre',
+    freeMissionId: record.freeMissionId,
+    freeMissionAction: record.freeMission?.action ?? null,
+    projectId: record.freeMission?.projectId ?? null,
+    projectName: record.freeMission?.project.name ?? null,
+    contextType,
     userId: record.userId,
     type: record.type,
     clockInDate: record.clockInDate.toISOString().slice(0, 10),
@@ -427,6 +452,7 @@ export function serializeSessionStatus(
       pauseDuration: 0,
       openSessionSiteId: null,
       openSessionSiteName: null,
+      openSessionFreeMissionId: null,
     };
   }
 
@@ -437,7 +463,8 @@ export function serializeSessionStatus(
     pauseActive: Boolean(activePause),
     pauseDuration: activePause ? durationSince(activePause.timestampLocal) : 0,
     openSessionSiteId: openSession.siteId,
-    openSessionSiteName: openSession.site.name,
+    openSessionSiteName: openSession.site?.name ?? openSession.freeMission?.action ?? null,
+    openSessionFreeMissionId: openSession.freeMissionId,
   };
 }
 
@@ -448,7 +475,9 @@ export function serializeActiveSession(record: OpenSessionRecord | null): Active
 
   return {
     siteId: record.siteId,
-    siteName: record.site.name,
+    siteName: record.site?.name ?? record.freeMission?.action ?? 'Mission libre',
+    freeMissionId: record.freeMissionId,
+    contextType: record.freeMissionId ? 'FREE_MISSION' : 'SITE',
     arrivalAt: record.timestampLocal.toISOString(),
     durationSeconds: durationSince(record.timestampLocal),
   };
@@ -471,7 +500,8 @@ export function serializeAttendanceToday(payload: {
 export async function createClockInRecord(
   prisma: PrismaClient,
   payload: {
-    siteId: string;
+    siteId?: string | null;
+    freeMissionId?: string | null;
     userId: string;
     input: ClockInInput;
     distanceKm: number;
@@ -485,7 +515,8 @@ export async function createClockInRecord(
 
   const record = await prisma.clockInRecord.create({
     data: {
-      siteId: payload.siteId,
+      siteId: payload.siteId ?? null,
+      freeMissionId: payload.freeMissionId ?? null,
       userId: payload.userId,
       type: payload.input.type,
       clockInDate: toDateOnlyDate(timestampLocal),
@@ -511,7 +542,8 @@ export async function createClockInRecord(
 export async function createBatchClockInRecord(
   prisma: PrismaClient,
   payload: {
-    siteId: string;
+    siteId?: string | null;
+    freeMissionId?: string | null;
     userId: string;
     input: BatchSyncItemInput;
     distanceKm: number;
@@ -525,7 +557,8 @@ export async function createBatchClockInRecord(
 
   return prisma.clockInRecord.create({
     data: {
-      siteId: payload.siteId,
+      siteId: payload.siteId ?? null,
+      freeMissionId: payload.freeMissionId ?? null,
       userId: payload.userId,
       type: payload.input.type,
       clockInDate: toDateOnlyDate(timestampLocal),

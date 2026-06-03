@@ -60,7 +60,7 @@ export type MobileProjectDetailSite = {
 export type MobileProjectDetailTeam = {
   id: string;
   name: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   teamLeadName: string;
   membersCount: number;
@@ -73,7 +73,7 @@ export type MobileProjectDetailTeam = {
 
 export type MobileProjectDetailPhoto = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   filename: string;
   url: string;
@@ -83,7 +83,7 @@ export type MobileProjectDetailPhoto = {
 
 export type MobileProjectDetailReport = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   authorName: string;
   submittedAt: string;

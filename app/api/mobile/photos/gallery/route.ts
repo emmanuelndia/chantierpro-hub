@@ -81,7 +81,7 @@ function serializeMobileGalleryPhoto(photo: MobileGalleryPhoto) {
   return {
     id: photo.id,
     siteId: photo.siteId,
-    siteName: photo.site.name,
+    siteName: photo.site?.name ?? 'Mission libre',
     uploadedById: photo.uploadedById,
     planningAssignmentId: photo.planningAssignmentId,
     assignmentAction: photo.planningAssignment?.action ?? null,

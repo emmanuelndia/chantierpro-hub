@@ -20,7 +20,7 @@ type RhSitePresencesLivePageProps = Readonly<{
 }>;
 
 type LiveResourceListItem = RhSitePresenceLiveResource & {
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   siteAddress: string;
   projectName: string;

@@ -81,14 +81,15 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   if (input.type === 'ARRIVAL' && openSession) {
     if (openSession.siteId !== site.id) {
+      const openContextName = openSession.site?.name ?? openSession.freeMission?.action ?? 'une mission libre';
       return jsonClockInError(
         'SESSION_ALREADY_OPEN',
         409,
-        `Session ouverte sur ${openSession.site.name} depuis ${formatTime(openSession.timestampLocal)}. Pointez votre sortie avant de changer de chantier.`,
+        `Session ouverte sur ${openContextName} depuis ${formatTime(openSession.timestampLocal)}. Pointez votre sortie avant de changer de chantier.`,
         {
           openSession: {
             siteId: openSession.siteId,
-            siteName: openSession.site.name,
+            siteName: openContextName,
             arrivalAt: openSession.timestampLocal.toISOString(),
           },
         },

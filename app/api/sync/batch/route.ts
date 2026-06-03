@@ -344,10 +344,10 @@ async function getOrLoadSessionState(
   }
 
   const openSession = await getOpenSessionForUser(prisma, userId);
-  const activePause = openSession ? await getActivePause(prisma, openSession.siteId, userId) : null;
+  const activePause = openSession?.siteId ? await getActivePause(prisma, openSession.siteId, userId) : null;
   const state = {
     openSiteId: openSession?.siteId ?? null,
-    openSiteName: openSession?.site.name ?? null,
+    openSiteName: openSession?.site?.name ?? openSession?.freeMission?.action ?? null,
     hasOpenSession: Boolean(openSession),
     hasActivePause: Boolean(activePause),
   };

@@ -90,8 +90,8 @@ export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
 
     const reportDetail: ReportDetail = {
       id: report.id,
-      siteId: report.site.id,
-      siteName: report.site.name,
+      siteId: report.siteId,
+      siteName: report.site?.name ?? 'Mission libre',
       date: report.createdAt.toISOString().split('T')[0] ?? report.createdAt.toISOString(),
       progressPercentage: report.progression ?? 0,
       content: report.content,

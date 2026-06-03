@@ -70,6 +70,7 @@ export function MobileCoordinatorReportsPage({ user }: MobileCoordinatorReportsP
   const reportsBySite = useMemo(() => {
     const map = new Map<string, ReceivedReport[]>();
     for (const report of data?.receivedReports ?? []) {
+      if (!report.siteId) continue;
       const current = map.get(report.siteId) ?? [];
       current.push(report);
       map.set(report.siteId, current);

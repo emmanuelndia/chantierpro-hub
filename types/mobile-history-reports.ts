@@ -4,7 +4,7 @@ export type ReportStatus = 'RECU' | 'EN_REVUE' | 'VALIDE' | 'ENVOYE';
 
 export type ReportSummary = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   date: string;
   progressPercentage: number;

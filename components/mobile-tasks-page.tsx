@@ -5,12 +5,13 @@ import { PlanningWorkLocationType } from '@prisma/client';
 import { MobileOfficeAssignmentsSection, useTodayOfficeAssignments } from '@/components/mobile-office-assignments-section';
 import type { SupervisorMyAssignment } from '@/types/mobile-planning';
 
-type TaskFilter = 'ALL' | 'ON_SITE' | 'OFFICE' | 'BLOCKED' | 'COMPLETED';
+type TaskFilter = 'ALL' | 'ON_SITE' | 'OFFICE' | 'FREE_MISSION' | 'BLOCKED' | 'COMPLETED';
 
 const taskFilters: { key: TaskFilter; label: string }[] = [
   { key: 'ALL', label: 'Toutes' },
   { key: 'ON_SITE', label: 'Terrain' },
   { key: 'OFFICE', label: 'Bureau' },
+  { key: 'FREE_MISSION', label: 'Missions libres' },
   { key: 'BLOCKED', label: 'Bloquees' },
   { key: 'COMPLETED', label: 'Terminees' },
 ];
@@ -21,6 +22,7 @@ export function MobileTasksPage() {
   const filteredAssignments = useMemo(() => filterAssignments(assignments, filter), [assignments, filter]);
   const terrainCount = assignments.filter((assignment) => assignment.workLocationType === PlanningWorkLocationType.ON_SITE).length;
   const officeCount = assignments.filter((assignment) => assignment.workLocationType === PlanningWorkLocationType.OFFICE).length;
+  const freeMissionCount = assignments.filter((assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION).length;
   const blockedCount = assignments.filter((assignment) => assignment.objectiveStatus === 'BLOCKED').length;
   const completedCount = assignments.filter((assignment) => assignment.objectiveStatus === 'ACHIEVED').length;
 
@@ -35,7 +37,7 @@ export function MobileTasksPage() {
         <div className="mt-4 grid grid-cols-4 gap-2">
           <TaskKpi label="Total" value={assignments.length} />
           <TaskKpi label="Terrain" value={terrainCount} />
-          <TaskKpi label="Bureau" value={officeCount} />
+          <TaskKpi label="Missions" value={freeMissionCount} />
           <TaskKpi label="Bloquees" value={blockedCount} />
         </div>
       </section>
@@ -96,6 +98,8 @@ function filterAssignments(assignments: SupervisorMyAssignment[], filter: TaskFi
       return assignments.filter((assignment) => assignment.workLocationType === PlanningWorkLocationType.ON_SITE);
     case 'OFFICE':
       return assignments.filter((assignment) => assignment.workLocationType === PlanningWorkLocationType.OFFICE);
+    case 'FREE_MISSION':
+      return assignments.filter((assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION);
     case 'BLOCKED':
       return assignments.filter((assignment) => assignment.objectiveStatus === 'BLOCKED');
     case 'COMPLETED':

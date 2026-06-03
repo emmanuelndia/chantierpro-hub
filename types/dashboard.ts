@@ -48,7 +48,7 @@ export type DashboardAlertItem = {
 
 export type DashboardReportItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   authorName: string;
   submittedAt: string;
@@ -56,7 +56,7 @@ export type DashboardReportItem = {
 };
 
 export type CoordinatorFieldSession = {
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   arrivalAt: string;
   durationSeconds: number;
@@ -71,7 +71,7 @@ export type CoordinatorKpisToday = {
 
 export type CoordinatorPendingReportItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   supervisorId: string;
   supervisorName: string;
@@ -82,7 +82,7 @@ export type CoordinatorPendingReportItem = {
 
 export type CoordinatorSupervisorWithoutReportItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   supervisorId: string;
   supervisorName: string;
@@ -140,7 +140,7 @@ export type GeneralSupervisorReportBySiteItem = {
 
 export type DashboardPhotoItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   filename: string;
   createdAt: string;

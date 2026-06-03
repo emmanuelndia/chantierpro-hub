@@ -14,7 +14,7 @@ export function buildLocalSessionStatus(
   pendingItems: OfflineClockInItem[],
 ): SessionStatus {
   const events = [
-    ...serverItems.filter((item) => item.status === 'VALID').map(toClockInEvent),
+    ...serverItems.filter((item) => item.status === 'VALID' && item.siteId).map(toClockInEvent),
     ...pendingItems.map(toClockInEvent),
   ]
     .sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal));
@@ -84,7 +84,7 @@ export function buildLocalSessionStatus(
 
 function toClockInEvent(item: ClockInRecordItem | OfflineClockInItem): ClockInEvent {
   return {
-    siteId: item.siteId,
+    siteId: item.siteId ?? '',
     siteName: item.siteName,
     type: item.type,
     timestampLocal: item.timestampLocal,

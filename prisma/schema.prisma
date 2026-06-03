@@ -123,6 +123,14 @@ enum PlanningAssignmentStatus {
 enum PlanningWorkLocationType {
   ON_SITE
   OFFICE
+  FREE_MISSION
+}
+
+enum FreeMissionStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 enum GeneralSupervisorSiteScopeStatus {
@@ -170,6 +178,8 @@ model User {
   planningAssignments        PlanningAssignment[] @relation("PlanningAssignmentSupervisor")
   createdPlanningAssignments PlanningAssignment[] @relation("PlanningAssignmentCreator")
   taskProgressUpdates        TaskProgressUpdate[]
+  assignedFreeMissions       FreeMission[]        @relation("FreeMissionAssignee")
+  createdFreeMissions        FreeMission[]        @relation("FreeMissionCreator")
   generalSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeGeneralSupervisor")
   managedGeneralSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeProjectManager")
   coordinatorProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeCoordinator")
@@ -192,6 +202,7 @@ model Project {
   projectManager   User          @relation("ProjectManager", fields: [projectManagerId], references: [id])
   createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
   sites            Site[]
+  freeMissions     FreeMission[]
   documentAttachments DocumentAttachment[]
 
   @@index([projectManagerId])
@@ -272,7 +283,8 @@ model TeamMember {
 
 model ClockInRecord {
   id             String         @id @default(cuid())
-  siteId         String
+  siteId         String?
+  freeMissionId  String?
   userId         String
   type           ClockInType
   clockInDate    DateTime       @db.Date
@@ -288,14 +300,17 @@ model ClockInRecord {
   isAutoClosed     Boolean      @default(false)
   isRegularized    Boolean      @default(false)
   createdAt      DateTime       @default(now())
-  site           Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  site           Site?          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  freeMission    FreeMission?   @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
   user           User           @relation(fields: [userId], references: [id])
   report         Report?
   regularizations ClockInRegularization[]
 
   @@index([siteId])
+  @@index([freeMissionId])
   @@index([userId])
   @@index([userId, siteId, clockInDate])
+  @@index([userId, freeMissionId, clockInDate])
 }
 
 model ClockInRegularization {
@@ -315,8 +330,10 @@ model ClockInRegularization {
 
 model Report {
   id                       String                 @id @default(cuid())
-  siteId                   String
-  site                     Site                   @relation(fields: [siteId], references: [id])
+  siteId                   String?
+  freeMissionId            String?
+  site                     Site?                  @relation(fields: [siteId], references: [id])
+  freeMission              FreeMission?           @relation(fields: [freeMissionId], references: [id])
   userId                   String
   user                     User                   @relation(fields: [userId], references: [id])
   clockInRecordId          String                 @unique
@@ -334,10 +351,37 @@ model Report {
   documentAttachments      DocumentAttachment[]
 
   @@index([siteId])
+  @@index([freeMissionId])
   @@index([userId])
   @@index([status])
   @@index([validationStatus])
   @@index([validatedForClientById])
+}
+
+model FreeMission {
+  id             String            @id @default(cuid())
+  projectId      String
+  assigneeId     String
+  date           DateTime          @db.Date
+  action         String
+  objectiveText  String?
+  status         FreeMissionStatus @default(ASSIGNED)
+  createdById    String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee       User              @relation("FreeMissionAssignee", fields: [assigneeId], references: [id])
+  createdBy      User              @relation("FreeMissionCreator", fields: [createdById], references: [id])
+  clockInRecords ClockInRecord[]
+  photos         Photo[]
+  reports        Report[]
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([date])
+  @@index([createdById])
+  @@index([deletedAt])
 }
 
 model PlanningAssignment {
@@ -392,7 +436,8 @@ model GeneralSupervisorSiteScope {
 
 model Photo {
   id          String             @id @default(cuid())
-  siteId      String
+  siteId      String?
+  freeMissionId String?
   uploadedById String
   planningAssignmentId String?
   category    PhotoCategory
@@ -411,13 +456,15 @@ model Photo {
   deletedAt   DateTime?
   deletedById String?
   createdAt   DateTime           @default(now())
-  site        Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  site        Site?              @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  freeMission FreeMission?       @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
   uploadedBy  User               @relation("PhotoUploader", fields: [uploadedById], references: [id])
   planningAssignment PlanningAssignment? @relation(fields: [planningAssignmentId], references: [id], onDelete: SetNull)
   deletedBy   User?              @relation("PhotoDeleter", fields: [deletedById], references: [id])
   deletionLogs PhotoDeletionLog[]
 
   @@index([siteId])
+  @@index([freeMissionId])
   @@index([uploadedById])
   @@index([planningAssignmentId])
   @@index([deletedById])

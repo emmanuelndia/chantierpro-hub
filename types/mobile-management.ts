@@ -21,7 +21,7 @@ export type MobileManagementSiteItem = {
 export type MobileManagementAlertItem = {
   id: string;
   type: 'NO_PRESENCE_2D' | 'INCOMPLETE_SESSION_12H';
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   projectName: string;
   title: string;
@@ -31,7 +31,7 @@ export type MobileManagementAlertItem = {
 
 export type MobileManagementPhotoItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   filename: string;
   createdAt: string;

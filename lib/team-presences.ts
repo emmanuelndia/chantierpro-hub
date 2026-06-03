@@ -193,8 +193,14 @@ export async function getTeamPresences(
     }),
   ]);
 
-  const recordsBySupervisor = groupRecordsBySupervisor(records);
-  const reportsBySupervisorSite = groupReportsBySupervisorSite(fallbackReports);
+  const siteRecords = records.filter(
+    (record): record is PresenceRecord => Boolean(record.siteId && record.site),
+  );
+  const siteReports = fallbackReports.filter(
+    (report): report is ReportFallback => Boolean(report.siteId),
+  );
+  const recordsBySupervisor = groupRecordsBySupervisor(siteRecords);
+  const reportsBySupervisorSite = groupReportsBySupervisorSite(siteReports);
   const presentNow: TeamPresenceItem[] = [];
   const onPause: TeamPresenceItem[] = [];
   const departedToday: TeamPresenceItem[] = [];

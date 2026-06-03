@@ -2,7 +2,9 @@ import type { PhotoTag } from '@prisma/client';
 
 export type SessionSummary = {
   id: string;
-  siteId: string;
+  contextType?: 'SITE' | 'FREE_MISSION';
+  siteId: string | null;
+  freeMissionId?: string | null;
   siteName: string;
   siteAddress: string;
   date: string;
@@ -72,7 +74,7 @@ export type SessionReportData = {
 
 export type PendingSessionReportItem = {
   departureRecordId: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   date: string;
   endedAt: string;

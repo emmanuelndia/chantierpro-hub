@@ -9,7 +9,7 @@ export type PendingReportItem = {
   supervisorId: string;
   supervisorName: string;
   supervisorFirstName: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   siteAddress: string;
   sessionEndedAt: string;

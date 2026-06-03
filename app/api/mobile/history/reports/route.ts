@@ -61,7 +61,7 @@ export const GET = withAuth(async ({ user, req }) => {
         uploadedById: user.id,
         isDeleted: false,
         siteId: {
-          in: reportsData.map((report) => report.siteId),
+          in: reportsData.map((report) => report.siteId).filter((siteId): siteId is string => Boolean(siteId)),
         },
       },
       _count: {
@@ -72,13 +72,13 @@ export const GET = withAuth(async ({ user, req }) => {
     const formattedReports: ReportSummary[] = reportsData.map((report) => ({
       id: report.id,
       siteId: report.siteId,
-      siteName: report.site.name,
+      siteName: report.site?.name ?? 'Mission libre',
       date: report.createdAt.toISOString().split('T')[0] ?? report.createdAt.toISOString(),
       progressPercentage: report.progression ?? 0,
       content: report.content,
       status: report.status,
       photoCount:
-        photoCounts.find((count) => count.siteId === report.siteId)?._count._all ?? 0,
+        photoCounts.find((count) => count.siteId === report.siteId)?._count?._all ?? 0,
       createdAt: report.createdAt.toISOString(),
       updatedAt: report.submittedAt.toISOString(),
     }));

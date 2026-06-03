@@ -1,7 +1,8 @@
 import type { PhotoCategory, PhotoTag, Role } from '@prisma/client';
 
 export type CreatePhotoInput = {
-  siteId: string;
+  siteId: string | null;
+  freeMissionId: string | null;
   planningAssignmentId: string | null;
   category: PhotoCategory;
   tags: PhotoTag[];
@@ -20,7 +21,8 @@ export type PhotoAuthor = {
 
 export type PhotoItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
+  freeMissionId?: string | null;
   siteName: string | null;
   uploadedById: string;
   planningAssignmentId: string | null;
@@ -69,7 +71,7 @@ export type PhotoDeletionLogItem = {
   deletedAt: string;
   photo: {
     id: string;
-    siteId: string;
+    siteId: string | null;
     filename: string;
     category: PhotoCategory;
   };

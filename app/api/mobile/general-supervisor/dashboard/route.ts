@@ -268,7 +268,7 @@ export const GET = withAuth(async ({ user }) => {
       hasActiveSession && latestGeneralSupervisorRecord
         ? {
             siteId: latestGeneralSupervisorRecord.siteId,
-            siteName: latestGeneralSupervisorRecord.site.name,
+            siteName: latestGeneralSupervisorRecord.site?.name ?? 'Mission libre',
             arrivalAt: latestGeneralSupervisorRecord.timestampLocal.toISOString(),
             durationSeconds: Math.floor(
               (now.getTime() - latestGeneralSupervisorRecord.timestampLocal.getTime()) / 1000,

@@ -50,6 +50,7 @@ type CapturedPhoto = {
   latitude: number | null;
   longitude: number | null;
   site: MobilePhotoSiteOption;
+  freeMissionId?: string | null;
   planningAssignment: SupervisorMyAssignment | null;
   description: string;
   tags: PhotoTag[];
@@ -67,6 +68,7 @@ const PHOTO_TAG_OPTIONS: readonly { value: PhotoTag; label: string }[] = [
 export function MobilePhotoCameraPage() {
   const searchParams = useSearchParams();
   const requestedSiteId = searchParams.get('siteId');
+  const requestedFreeMissionId = searchParams.get('freeMissionId');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraState, setCameraState] = useState<CameraState>('loading');
@@ -76,7 +78,7 @@ export function MobilePhotoCameraPage() {
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [gpsState, setGpsState] = useState<GpsState>({ status: 'loading' });
   const [selectedSiteId, setSelectedSiteId] = useState(requestedSiteId ?? '');
-  const [photoMode, setPhotoMode] = useState<PhotoMode>('site');
+  const [photoMode, setPhotoMode] = useState<PhotoMode>(requestedFreeMissionId ? 'task' : 'site');
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
   const [siteSheetOpen, setSiteSheetOpen] = useState(false);
   const [photoInfoSheetOpen, setPhotoInfoSheetOpen] = useState(false);
@@ -155,10 +157,17 @@ export function MobilePhotoCameraPage() {
       await setMobileOfflineCache(`mobile-planning-my-assignments-${todayKey}`, payload, 24 * 60 * 60 * 1000);
       return payload;
     },
-    enabled: photoMode === 'task',
+    enabled: photoMode === 'task' || Boolean(requestedFreeMissionId),
     staleTime: 30_000,
   });
   const assignments = useMemo(() => assignmentsQuery.data?.assignments ?? [], [assignmentsQuery.data?.assignments]);
+  const selectedFreeMission = useMemo(
+    () =>
+      requestedFreeMissionId
+        ? assignments.find((assignment) => assignment.freeMissionId === requestedFreeMissionId || assignment.id === requestedFreeMissionId) ?? null
+        : null,
+    [assignments, requestedFreeMissionId],
+  );
   const selectedSite = useMemo(
     () => sites.find((site) => site.id === selectedSiteId) ?? sites.find((site) => site.hasOpenSession) ?? sites[0] ?? null,
     [selectedSiteId, sites],
@@ -388,7 +397,7 @@ export function MobilePhotoCameraPage() {
   }
 
   async function capturePhoto() {
-    if (!videoRef.current || !selectedSite) {
+    if (!videoRef.current || (!selectedSite && !selectedFreeMission)) {
       return;
     }
 
@@ -436,7 +445,16 @@ export function MobilePhotoCameraPage() {
         timestampLocal: new Date().toISOString(),
         latitude: gpsState.status === 'ready' ? gpsState.latitude : null,
         longitude: gpsState.status === 'ready' ? gpsState.longitude : null,
-        site: selectedSite,
+        site:
+          selectedSite ??
+          ({
+            id: '',
+            name: selectedFreeMission?.siteName ?? 'Mission libre',
+            address: selectedFreeMission?.projectName ?? '',
+            projectName: selectedFreeMission?.projectName ?? '',
+            hasOpenSession: false,
+          } satisfies MobilePhotoSiteOption),
+        freeMissionId: selectedFreeMission?.freeMissionId ?? null,
         planningAssignment: photoMode === 'task' ? selectedAssignment : null,
         description: description.trim(),
         tags: selectedTags,
@@ -1038,7 +1056,8 @@ function toPendingPhoto(photo: CapturedPhoto): PendingMobilePhoto {
     id: createPendingPhotoId(),
     blob: photo.blob,
     filename: `photo-${photo.timestampLocal.replace(/[:.]/g, '-')}.jpg`,
-    siteId: photo.site.id,
+    siteId: photo.site.id || null,
+    freeMissionId: photo.freeMissionId ?? null,
     planningAssignmentId: photo.planningAssignment?.id ?? null,
     description: photo.description,
     tags: photo.tags,

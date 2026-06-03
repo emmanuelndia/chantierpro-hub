@@ -11,7 +11,7 @@ export type PendingReport = {
   supervisorId: string;
   supervisorName: string;
   supervisorFirstName: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   siteAddress: string;
   sessionEndedAt: string;
@@ -24,7 +24,7 @@ export type ReceivedReport = {
   supervisorId: string;
   supervisorName: string;
   supervisorFirstName: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   submittedAt: string;
   content: string;
@@ -39,7 +39,7 @@ export type ReportDetail = {
   supervisorId: string;
   supervisorName: string;
   supervisorFirstName: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   siteAddress: string;
   sessionStartedAt: string;

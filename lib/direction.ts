@@ -330,6 +330,9 @@ export async function getDirectionProjectsConsolidated(
   }
 
   for (const photoCount of photoCounts) {
+    if (!photoCount.siteId) {
+      continue;
+    }
     const projectId = siteToProjectId.get(photoCount.siteId);
 
     if (!projectId) {
@@ -509,6 +512,9 @@ export async function getDirectionAlerts(prisma: PrismaClient): Promise<Directio
   const lastPresenceByUserAndSiteId = new Map<string, Date>();
 
   for (const record of lastPresenceRecords) {
+    if (!record.siteId) {
+      continue;
+    }
     if (!lastPresenceBySiteId.has(record.siteId)) {
       lastPresenceBySiteId.set(record.siteId, record.timestampLocal);
     }
@@ -532,7 +538,10 @@ export async function getDirectionAlerts(prisma: PrismaClient): Promise<Directio
       lastPresenceAt: lastPresenceBySiteId.get(site.id)?.toISOString() ?? null,
     }));
 
-  const openSessions = buildOpenSessions(allRelevantRecords, incompleteThreshold);
+  const openSessions = buildOpenSessions(
+    allRelevantRecords.filter((record) => record.siteId && record.site) as SessionSourceRecord[],
+    incompleteThreshold,
+  );
 
   const absentResources = activeMemberships
     .map((membership) => {
@@ -595,6 +604,7 @@ async function getCompleteSessionsForRange(
         gte: from,
         lte: to,
       },
+      siteId: { not: null },
       ...(projectIds
         ? {
             site: {
@@ -644,7 +654,7 @@ async function getCompleteSessionsForRange(
     },
   });
 
-  return buildSessions(records).filter((session) => !session.incomplete);
+  return buildSessions(records as SessionSourceRecord[]).filter((session) => !session.incomplete);
 }
 
 function buildSessions(records: SessionSourceRecord[]) {

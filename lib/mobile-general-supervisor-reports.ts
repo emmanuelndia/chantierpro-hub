@@ -364,7 +364,7 @@ function serializeReportItem(report: ReportRow): GeneralSupervisorReportItem {
   return {
     id: report.id,
     siteId: report.siteId,
-    siteName: report.site.name,
+    siteName: report.site?.name ?? 'Mission libre',
     authorId: report.userId,
     authorName: `${report.user.firstName} ${report.user.lastName}`,
     authorRole: report.user.role,
@@ -378,7 +378,7 @@ function serializeMissingReport(departure: DepartureRow): GeneralSupervisorMissi
   return {
     id: departure.id,
     siteId: departure.siteId,
-    siteName: departure.site.name,
+    siteName: departure.site?.name ?? 'Mission libre',
     supervisorId: departure.user.id,
     supervisorName: `${departure.user.firstName} ${departure.user.lastName}`,
     departureAt: departure.timestampLocal.toISOString(),

@@ -134,6 +134,9 @@ function countIncompleteSessions(items: ClockInHistoryItem[]) {
     if (item.status !== 'VALID') {
       continue;
     }
+    if (!item.siteId) {
+      continue;
+    }
 
     const currentOpenCount = openSessionsBySite.get(item.siteId) ?? 0;
 

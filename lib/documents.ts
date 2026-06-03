@@ -468,6 +468,10 @@ async function canAccessReport(prisma: PrismaClient, user: AuthLikeUser, reportI
     return true;
   }
 
+  if (!report.siteId) {
+    return false;
+  }
+
   return canAccessSite(prisma, user, report.siteId);
 }
 

@@ -30,7 +30,7 @@ export type RhPresenceSessionItem = {
   arrivalRecordId: string;
   departureRecordId: string | null;
   date: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   arrivalTime: string;
   departureTime: string | null;
@@ -132,7 +132,7 @@ export type RhSitePresenceLiveResource = {
 };
 
 export type RhSitePresenceLiveSite = {
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   siteAddress: string;
   projectId: string;

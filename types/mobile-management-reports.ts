@@ -18,7 +18,7 @@ export type MobileManagementReportItem = {
   id: string;
   projectId: string;
   projectName: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   authorId: string;
   authorName: string;

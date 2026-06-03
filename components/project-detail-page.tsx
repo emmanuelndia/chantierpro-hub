@@ -14,7 +14,7 @@ import { SiteLocationPicker } from '@/components/site-location-picker';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
-  ProjectDetail, 
+  ProjectDetail,
   ProjectFormOptionsResponse,
   ProjectPresenceSummary,
   ProjectSiteItem,

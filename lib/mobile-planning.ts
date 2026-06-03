@@ -1,6 +1,7 @@
 import {
   ClockInStatus,
   ClockInType,
+  FreeMissionStatus,
   GeneralSupervisorSiteScopeStatus,
   PlanningAssignmentStatus,
   PlanningWorkLocationType,
@@ -31,6 +32,7 @@ import {
   isBusinessManagerRole,
 } from '@/lib/field-roles';
 import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
+import { listFreeMissions, listMyFreeMissions } from '@/lib/free-missions';
 
 type AuthLikeUser = {
   id: string;
@@ -125,7 +127,7 @@ export async function getPlanningDay(
 
   const siteWhere = operationalPlanningSiteWhere(user, parsedDate);
   const assignmentScopeWhere = planningAssignmentScopeWhere(user);
-  const [assignments, sites, scopedSupervisorIds] = await Promise.all([
+  const [assignments, freeMissionResponse, sites, scopedSupervisorIds] = await Promise.all([
     prisma.planningAssignment.findMany({
       where: {
         date: parsedDate,
@@ -141,6 +143,7 @@ export async function getPlanningDay(
       ],
       select: planningAssignmentSelect,
     }),
+    listFreeMissions(prisma, user, formatPlanningDate(parsedDate)),
     prisma.site.findMany({
       where: siteWhere,
       orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
@@ -207,7 +210,10 @@ export async function getPlanningDay(
 
   return {
     date: formatPlanningDate(parsedDate),
-    assignments: assignments.map((assignment) => serializePlanningAssignment(assignment, clockIns)),
+    assignments: [
+      ...assignments.map((assignment) => serializePlanningAssignment(assignment, clockIns)),
+      ...freeMissionResponse.missions.map(serializeFreeMissionAsPlanningAssignment),
+    ],
     clockInStatuses: buildClockInStatuses(assignments, clockIns),
     unassignedSupervisors: supervisors.map((supervisor) => ({
       id: supervisor.id,
@@ -231,7 +237,7 @@ export async function getPlanningDay(
         name: site.project.name,
       },
     })),
-    hasAssignments: assignments.length > 0,
+    hasAssignments: assignments.length + freeMissionResponse.missions.length > 0,
     canDuplicateFromYesterday: assignments.length === 0 && yesterdayCount > 0,
   };
 }
@@ -378,7 +384,8 @@ export async function getSupervisorMyAssignments(
     return planningError('INVALID_DATE', 'Date invalide.', 400);
   }
 
-  const assignments = await prisma.planningAssignment.findMany({
+  const [assignments, freeMissions] = await Promise.all([
+    prisma.planningAssignment.findMany({
     where: {
       date: parsedDate,
       supervisorId: user.id,
@@ -386,11 +393,13 @@ export async function getSupervisorMyAssignments(
     },
     orderBy: [{ site: { name: 'asc' } }, { id: 'asc' }],
     select: supervisorAssignmentSelect,
-  });
+    }),
+    listMyFreeMissions(prisma, user, formatPlanningDate(parsedDate)),
+  ]);
 
   return {
     date: formatPlanningDate(parsedDate),
-    assignments: assignments.map(serializeSupervisorAssignment),
+    assignments: [...assignments.map(serializeSupervisorAssignment), ...freeMissions.map(serializeFreeMissionAsSupervisorAssignment)],
   };
 }
 
@@ -919,6 +928,7 @@ async function loadClockInsForAssignments(
     where: {
       clockInDate: date,
       status: ClockInStatus.VALID,
+      siteId: { not: null },
       OR: assignments.map((assignment) => ({
         siteId: assignment.siteId,
         userId: assignment.supervisorId,
@@ -932,7 +942,7 @@ async function loadClockInsForAssignments(
       timestampLocal: true,
       createdAt: true,
     },
-  });
+  }) as Promise<ClockInRow[]>;
 }
 
 const planningAssignmentSelect = {
@@ -1130,6 +1140,88 @@ function serializeSupervisorAssignment(assignment: SupervisorAssignmentRow) {
       takenAt: photo.takenAt.toISOString(),
       url: createInternalPhotoUrl(photo.id),
     })),
+  };
+}
+
+function serializeFreeMissionAsSupervisorAssignment(mission: Awaited<ReturnType<typeof listMyFreeMissions>>[number]) {
+  return {
+    id: mission.id,
+    kind: 'FREE_MISSION' as const,
+    date: mission.date,
+    siteId: null,
+    freeMissionId: mission.id,
+    projectId: mission.projectId,
+    projectName: mission.projectName,
+    siteName: mission.action,
+    siteAddress: mission.projectName,
+    siteType: 'FREE_MISSION' as const,
+    action: mission.action,
+    targetProgress: null,
+    targetQuantity: null,
+    targetUnit: null,
+    objectiveText: mission.objectiveText,
+    actualQuantity: null,
+    actualProgress: mission.status === FreeMissionStatus.COMPLETED ? 100 : null,
+    progressDelta: null,
+    remainingQuantity: null,
+    objectiveStatus:
+      mission.status === FreeMissionStatus.COMPLETED
+        ? ('ACHIEVED' as const)
+        : mission.status === FreeMissionStatus.IN_PROGRESS
+          ? ('PARTIAL' as const)
+          : ('NOT_STARTED' as const),
+    latestProgressUpdate: null,
+    status:
+      mission.status === FreeMissionStatus.COMPLETED
+        ? PlanningAssignmentStatus.COMPLETED
+        : mission.status === FreeMissionStatus.IN_PROGRESS
+          ? PlanningAssignmentStatus.IN_PROGRESS
+          : PlanningAssignmentStatus.ASSIGNED,
+    workLocationType: PlanningWorkLocationType.FREE_MISSION,
+    photos: [],
+  };
+}
+
+function serializeFreeMissionAsPlanningAssignment(mission: Awaited<ReturnType<typeof listFreeMissions>>['missions'][number]): PlanningAssignment {
+  return {
+    id: mission.id,
+    kind: 'FREE_MISSION',
+    supervisorId: mission.assigneeId,
+    supervisorName: mission.assigneeLastName,
+    supervisorFirstName: mission.assigneeFirstName,
+    siteId: null,
+    freeMissionId: mission.id,
+    projectId: mission.projectId,
+    projectName: mission.projectName,
+    siteName: mission.action,
+    siteAddress: mission.projectName,
+    siteType: 'FREE_MISSION',
+    action: mission.action,
+    targetProgress: null,
+    targetQuantity: null,
+    targetUnit: null,
+    objectiveText: mission.objectiveText,
+    actualQuantity: null,
+    actualProgress: mission.status === FreeMissionStatus.COMPLETED ? 100 : null,
+    progressDelta: null,
+    remainingQuantity: null,
+    objectiveStatus:
+      mission.status === FreeMissionStatus.COMPLETED
+        ? 'ACHIEVED'
+        : mission.status === FreeMissionStatus.IN_PROGRESS
+          ? 'PARTIAL'
+          : 'NOT_STARTED',
+    latestProgressUpdate: null,
+    assignedAt: `${mission.date}T00:00:00.000Z`,
+    status:
+      mission.status === FreeMissionStatus.COMPLETED
+        ? PlanningAssignmentStatus.COMPLETED
+        : mission.status === FreeMissionStatus.IN_PROGRESS
+          ? PlanningAssignmentStatus.IN_PROGRESS
+          : PlanningAssignmentStatus.ASSIGNED,
+    workLocationType: PlanningWorkLocationType.FREE_MISSION,
+    clockInStatus: mission.status === FreeMissionStatus.IN_PROGRESS ? 'CLOCKED_IN' : 'CLOCKED_OUT',
+    createdBy: mission.createdBy,
   };
 }
 

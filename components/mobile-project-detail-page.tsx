@@ -295,12 +295,9 @@ function PhotosTab({
       </div>
       {photos.length > 0 ? (
         <div className="grid grid-cols-2 gap-3">
-          {photos.map((photo) => (
-            <Link
-              className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-panel"
-              href={`/mobile/gallery?siteId=${encodeURIComponent(photo.siteId)}`}
-              key={photo.id}
-            >
+          {photos.map((photo) => {
+            const photoCard = (
+              <>
               <div className="relative aspect-square bg-slate-100">
                 <SignedImage
                   photoId={photo.id}
@@ -316,8 +313,22 @@ function PhotosTab({
                   {photo.uploadedByName} - {formatDate(photo.createdAt)}
                 </p>
               </div>
-            </Link>
-          ))}
+              </>
+            );
+            return photo.siteId ? (
+              <Link
+                className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-panel"
+                href={`/mobile/gallery?siteId=${encodeURIComponent(photo.siteId)}`}
+                key={photo.id}
+              >
+                {photoCard}
+              </Link>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-panel" key={photo.id}>
+                {photoCard}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <EmptyPanel text="Aucune photo récente sur ce projet." />

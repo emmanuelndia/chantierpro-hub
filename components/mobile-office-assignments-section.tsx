@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import {
@@ -189,6 +190,7 @@ export function MobileOfficeAssignmentsSection({
 
       <div className="mt-4 space-y-3">
         {assignments.map((assignment) => {
+          const isFreeMission = assignment.workLocationType === 'FREE_MISSION';
           const status = objectiveStatusConfig[assignment.objectiveStatus];
           const progressValue = Math.max(0, Math.min(100, assignment.actualProgress ?? 0));
           const unit = assignment.targetUnit ?? '';
@@ -209,9 +211,14 @@ export function MobileOfficeAssignmentsSection({
                 <p className="mt-2 text-sm leading-5 text-slate-700">{assignment.action}</p>
               </div>
               <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                {isFreeMission ? 'Mission libre' : assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
               </span>
             </div>
+            {isFreeMission ? (
+              <p className="mt-2 inline-flex rounded-full bg-orange-50 px-2.5 py-1 text-xs font-black text-orange-700">
+                Pointage GPS sans chantier fixe
+              </p>
+            ) : null}
             {assignment.siteType === 'INTERVENTION_ZONE' ? (
               <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">
                 Zone d&apos;intervention
@@ -259,13 +266,30 @@ export function MobileOfficeAssignmentsSection({
                 {remainingLabel ? <span className={status.textClassName}>{remainingLabel}</span> : null}
               </div>
             </div>
-            <button
-              className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-black text-white ${status.buttonClassName}`}
-              onClick={() => openProgressModal(assignment)}
-              type="button"
-            >
-              Mettre a jour l&apos;avancement
-            </button>
+            {isFreeMission ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link
+                  className="rounded-lg bg-slate-950 px-3 py-2 text-center text-xs font-black text-white"
+                  href={`/mobile/clock-in?freeMissionId=${encodeURIComponent(assignment.freeMissionId ?? assignment.id)}`}
+                >
+                  Pointer
+                </Link>
+                <Link
+                  className="rounded-lg bg-indigo-600 px-3 py-2 text-center text-xs font-black text-white"
+                  href={`/mobile/photo?freeMissionId=${encodeURIComponent(assignment.freeMissionId ?? assignment.id)}`}
+                >
+                  Photo
+                </Link>
+              </div>
+            ) : (
+              <button
+                className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-black text-white ${status.buttonClassName}`}
+                onClick={() => openProgressModal(assignment)}
+                type="button"
+              >
+                Mettre a jour l&apos;avancement
+              </button>
+            )}
           </article>
           );
         })}

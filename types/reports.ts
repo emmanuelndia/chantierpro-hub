@@ -8,7 +8,7 @@ export type CreateReportInput = {
 
 export type ReportItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   projectId: string;
   projectName: string;
@@ -100,7 +100,7 @@ export type WebReportItem = {
   id: string;
   projectId: string;
   projectName: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   authorId: string;
   authorName: string;

@@ -165,8 +165,8 @@ export const GET = withAuth(async ({ user, req }) => {
           supervisorName: record.user.lastName,
           supervisorFirstName: record.user.firstName,
           siteId: record.siteId,
-          siteName: record.site.name,
-          siteAddress: record.site.address,
+          siteName: record.site?.name ?? 'Mission libre',
+          siteAddress: record.site?.address ?? '',
           sessionEndedAt: record.timestampLocal.toISOString(),
           reportDueAt: reportDueAt.toISOString(),
           isOverdue: new Date() > reportDueAt,
@@ -185,7 +185,7 @@ export const GET = withAuth(async ({ user, req }) => {
         supervisorName: report.user.lastName,
         supervisorFirstName: report.user.firstName,
         siteId: report.siteId,
-        siteName: report.site.name,
+        siteName: report.site?.name ?? 'Mission libre',
         submittedAt: report.submittedAt.toISOString(),
         content: report.content,
         status: report.status,
@@ -205,6 +205,7 @@ export const GET = withAuth(async ({ user, req }) => {
     const reportsBySite = new Map<string, typeof submittedReports>();
 
     for (const report of submittedReports) {
+      if (!report.siteId) continue;
       const current = reportsBySite.get(report.siteId) ?? [];
       current.push(report);
       reportsBySite.set(report.siteId, current);

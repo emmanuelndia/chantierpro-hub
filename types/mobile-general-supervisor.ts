@@ -56,7 +56,7 @@ export type GeneralSupervisorDashboardResponse = {
   priorityAlerts: PriorityAlert[];
   hasActiveSession: boolean;
   sessionData?: {
-    siteId: string;
+    siteId: string | null;
     siteName: string;
     arrivalAt: string;
     durationSeconds: number;

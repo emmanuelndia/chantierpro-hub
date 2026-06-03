@@ -59,6 +59,7 @@ const WEB_REPORT_MAX_EXPORT_ROWS = 1000;
 export const reportSelect = {
   id: true,
   siteId: true,
+  freeMissionId: true,
   userId: true,
   content: true,
   progression: true,
@@ -114,6 +115,20 @@ export const reportSelect = {
       documentAttachments: {
         where: {
           isDeleted: false,
+        },
+      },
+    },
+  },
+  freeMission: {
+    select: {
+      id: true,
+      action: true,
+      projectId: true,
+      project: {
+        select: {
+          id: true,
+          name: true,
+          projectManagerId: true,
         },
       },
     },
@@ -603,26 +618,26 @@ export async function getAccessibleReportById(
     return null;
   }
 
-  if (payload.siteIds && !payload.siteIds.includes(report.siteId)) {
+  if (payload.siteIds && (!report.siteId || !payload.siteIds.includes(report.siteId))) {
     return null;
   }
 
-  if (canReadAllReports(payload.user.role) && !(await canAccessReportSite(prisma, payload.user, report.siteId))) {
+  if (canReadAllReports(payload.user.role) && report.siteId && !(await canAccessReportSite(prisma, payload.user, report.siteId))) {
     return null;
   }
 
   const submittedDay = dayRange(report.submittedAt);
   const [photos, attachments] = await Promise.all([
     prisma.photo.findMany({
-    where: {
-      siteId: report.siteId,
-      uploadedById: report.userId,
-      isDeleted: false,
-      timestampLocal: {
-        gte: submittedDay.from,
-        lte: submittedDay.to,
+      where: {
+        ...(report.siteId ? { siteId: report.siteId } : { freeMissionId: report.freeMissionId }),
+        uploadedById: report.userId,
+        isDeleted: false,
+        timestampLocal: {
+          gte: submittedDay.from,
+          lte: submittedDay.to,
+        },
       },
-    },
     orderBy: [{ timestampLocal: 'desc' }, { id: 'desc' }],
     take: 8,
     select: {
@@ -674,7 +689,7 @@ export async function validateReportForClient(
     },
   });
 
-  if (!report || !(await canAccessReportSite(prisma, payload.user, report.siteId))) {
+  if (!report || (report.siteId && !(await canAccessReportSite(prisma, payload.user, report.siteId)))) {
     return { code: 'NOT_FOUND' as const, report: null };
   }
 
@@ -701,12 +716,13 @@ export async function validateReportForClient(
 }
 
 export function serializeReport(report: SerializableReport): ReportItem {
+  const project = report.site?.project ?? report.freeMission?.project;
   return {
     id: report.id,
     siteId: report.siteId,
-    siteName: report.site.name,
-    projectId: report.site.project.id,
-    projectName: report.site.project.name,
+    siteName: report.site?.name ?? report.freeMission?.action ?? 'Mission libre',
+    projectId: project?.id ?? '',
+    projectName: project?.name ?? 'Projet',
     userId: report.userId,
     content: report.content,
     hasText: report.content.trim().length > 0,
@@ -913,12 +929,13 @@ function buildWebReportWhere(
 }
 
 function serializeWebReportItem(report: SerializableReport): WebReportItem {
+  const project = report.site?.project ?? report.freeMission?.project;
   return {
     id: report.id,
-    projectId: report.site.project.id,
-    projectName: report.site.project.name,
+    projectId: project?.id ?? '',
+    projectName: project?.name ?? 'Projet',
     siteId: report.siteId,
-    siteName: report.site.name,
+    siteName: report.site?.name ?? report.freeMission?.action ?? 'Mission libre',
     authorId: report.userId,
     authorName: `${report.user.firstName} ${report.user.lastName}`,
     authorRole: report.user.role,

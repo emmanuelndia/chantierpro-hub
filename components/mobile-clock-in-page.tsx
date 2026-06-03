@@ -30,6 +30,7 @@ import { getMobileOfflinePreparationState } from '@/lib/mobile-offline-prepare';
 import type { TodaySiteItem } from '@/types/projects';
 import type { NearbySiteItem } from '@/types/reports';
 import { MobileOfflineLink } from '@/components/mobile-offline-link';
+import { useTodayOfficeAssignments } from '@/components/mobile-office-assignments-section';
 
 type ClockInIntent = 'arrival' | 'departure' | 'pause-start' | 'pause-end';
 type Step = 'clock-in' | 'comment' | 'confirmation';
@@ -55,7 +56,8 @@ type Submission = {
   offline: boolean;
   record: ClockInRecordItem | null;
   type: ClockInType;
-  siteId: string;
+  siteId: string | null;
+  freeMissionId?: string | null;
   siteName: string;
   timestampLocal: string;
   durationSeconds: number | null;
@@ -89,6 +91,7 @@ export function MobileClockInPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const requestedSiteId = searchParams.get('siteId');
+  const requestedFreeMissionId = searchParams.get('freeMissionId');
   const requestedIntent = parseIntent(searchParams.get('intent'));
   const networkState = useMobileNetworkState();
   
@@ -121,6 +124,7 @@ export function MobileClockInPage() {
 
   const [manualMode, setManualMode] = useState(Boolean(requestedSiteId));
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(requestedSiteId);
+  const [selectedFreeMissionId] = useState<string | null>(requestedFreeMissionId);
   const [selectedIntent, setSelectedIntent] = useState<ClockInIntent>(requestedIntent ?? 'arrival');
   const [step, setStep] = useState<Step>('clock-in');
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -251,11 +255,19 @@ export function MobileClockInPage() {
 
       return (await response.json()) as NearbySitesResponse;
     },
-    enabled: geoState.status === 'ready' && !requestedSiteId,
+    enabled: geoState.status === 'ready' && !requestedSiteId && !requestedFreeMissionId,
     staleTime: 30_000,
   });
 
   const todaySites = useMemo(() => todaySitesQuery.data?.items ?? [], [todaySitesQuery.data?.items]);
+  const { assignments: todayAssignments } = useTodayOfficeAssignments();
+  const selectedFreeMission = useMemo(
+    () =>
+      selectedFreeMissionId
+        ? todayAssignments.find((assignment) => assignment.freeMissionId === selectedFreeMissionId || assignment.id === selectedFreeMissionId) ?? null
+        : null,
+    [selectedFreeMissionId, todayAssignments],
+  );
   const activeSession = todayQuery.data?.activeSession ?? null;
   const quickSite = nearbyQuery.data?.sites[0] ?? null;
   const nearbySuggestion =
@@ -280,7 +292,7 @@ export function MobileClockInPage() {
   }, [activeSession?.siteId, selectedSiteId]);
 
   useEffect(() => {
-    if (selectedSiteId || todaySites.length === 0) {
+    if (selectedFreeMission || selectedSiteId || todaySites.length === 0) {
       return;
     }
 
@@ -295,7 +307,7 @@ export function MobileClockInPage() {
     const closestAssignedSite = findClosestTodaySite(todaySites, geoState);
     setSelectedSiteId((closestAssignedSite ?? todaySites[0])?.id ?? null);
     setManualMode(true);
-  }, [geoState, selectedSiteId, todaySites]);
+  }, [geoState, selectedFreeMission, selectedSiteId, todaySites]);
 
   const selectedSite = useMemo(() => {
     const siteFromToday = todaySites.find((site) => site.id === selectedSiteId);
@@ -312,8 +324,16 @@ export function MobileClockInPage() {
   }, [geoState, manualMode, quickSite, selectedSiteId, todaySites]);
 
   const sessionStatusQuery = useQuery({
-    queryKey: ['mobile-session-status', selectedSite?.id],
+    queryKey: ['mobile-session-status', selectedSite?.id, selectedFreeMission?.freeMissionId],
     queryFn: async () => {
+      if (selectedFreeMission?.freeMissionId) {
+        const response = await authFetch(`/api/free-missions/${selectedFreeMission.freeMissionId}/clock-in/session-status`);
+        if (!response.ok) {
+          return null;
+        }
+        return (await response.json()) as SessionStatus;
+      }
+
       if (!selectedSite) {
         return null;
       }
@@ -330,7 +350,7 @@ export function MobileClockInPage() {
         return buildOfflineSessionStatus(selectedSite.id, todayQuery.data?.items ?? [], pendingClockInsQuery.data ?? []);
       }
     },
-    enabled: Boolean(selectedSite),
+    enabled: Boolean(selectedSite ?? selectedFreeMission),
     refetchInterval: 15_000,
     staleTime: 30_000,
   });
@@ -339,11 +359,11 @@ export function MobileClockInPage() {
     ? buildOfflineSessionStatus(selectedSite.id, todayQuery.data?.items ?? [], pendingClockInsQuery.data ?? [])
     : null;
   const sessionStatus =
-    networkState === 'offline' || (pendingClockInsQuery.data?.length ?? 0) > 0
+    !selectedFreeMission && (networkState === 'offline' || (pendingClockInsQuery.data?.length ?? 0) > 0)
       ? localSessionStatus
       : sessionStatusQuery.data;
   const selectedSiteSessionLoaded = sessionStatus !== undefined || sessionStatusQuery.isError;
-  const hasOpenSession = selectedSite ? Boolean(sessionStatus?.sessionOpen) : Boolean(activeSession);
+  const hasOpenSession = selectedSite || selectedFreeMission ? Boolean(sessionStatus?.sessionOpen) : Boolean(activeSession);
   const openSessionDifferentSite =
     Boolean(
       selectedSite &&
@@ -420,10 +440,10 @@ export function MobileClockInPage() {
   });
 
   const canSubmit =
-    Boolean(selectedSite) &&
+    Boolean(selectedSite ?? selectedFreeMission) &&
     geoState.status === 'ready' &&
     !outsideRadius &&
-    (networkState !== 'offline' || offlineReadyToday) &&
+    (selectedFreeMission ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
     !clockInMutation.isPending;
 
   useEffect(() => {
@@ -436,16 +456,17 @@ export function MobileClockInPage() {
   }, [router, step]);
 
   async function submitClockIn(intentOverride?: ClockInIntent): Promise<Submission> {
-    if (!selectedSite || geoState.status !== 'ready') {
-      throw new Error('Position ou chantier indisponible.');
+    if ((!selectedSite && !selectedFreeMission) || geoState.status !== 'ready') {
+      throw new Error('Position ou mission indisponible.');
     }
 
     const actionIntent = intentOverride ?? currentIntent;
     const actionType = intentToType[actionIntent];
     const actionOutsideRadius =
+      Boolean(selectedSite) &&
       actionType === 'ARRIVAL' &&
-      selectedSite.distanceKm !== null &&
-      selectedSite.distanceKm > selectedSite.radiusKm;
+      selectedSite!.distanceKm !== null &&
+      selectedSite!.distanceKm > selectedSite!.radiusKm;
 
     if (actionOutsideRadius) {
       throw new Error('Vous etes hors du rayon autorise.');
@@ -454,7 +475,8 @@ export function MobileClockInPage() {
     const timestampLocal = new Date().toISOString();
     const clientId = createOfflineClockInId();
     const payload = {
-      siteId: selectedSite.id,
+      siteId: selectedSite?.id ?? null,
+      freeMissionId: selectedFreeMission?.freeMissionId ?? null,
       type: actionType,
       latitude: geoState.latitude,
       longitude: geoState.longitude,
@@ -464,11 +486,47 @@ export function MobileClockInPage() {
       gpsSource: geoState.source,
     };
 
+    if (selectedFreeMission) {
+      if (!navigator.onLine) {
+        throw new Error('Le pointage mission libre demande une connexion reseau pour cette version.');
+      }
+
+      const missionId = selectedFreeMission.freeMissionId ?? selectedFreeMission.id;
+      const response = await authFetch(`/api/free-missions/${missionId}/clock-in`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiMessage(response, 'Pointage mission libre refuse.'));
+      }
+
+      const data = (await response.json()) as { record: ClockInRecordItem };
+
+      return {
+        clientId,
+        offline: false,
+        record: data.record,
+        type: actionType,
+        siteId: null,
+        freeMissionId: missionId,
+        siteName: selectedFreeMission.siteName,
+        timestampLocal: data.record.timestampLocal,
+        durationSeconds: actionType === 'DEPARTURE' ? sessionStatus?.duration ?? activeSession?.durationSeconds ?? null : null,
+      };
+    }
+
+    if (!selectedSite) {
+      throw new Error('Chantier indisponible.');
+    }
+
     if (!navigator.onLine) {
       await enqueueOfflineClockIn({
         clientId,
         siteName: selectedSite.name,
         ...payload,
+        siteId: selectedSite.id,
       });
 
       return {
@@ -563,9 +621,20 @@ export function MobileClockInPage() {
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Pointage</p>
         <h2 className="mt-2 text-2xl font-black text-slate-950">{typeLabels[currentType]}</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Validation GPS puis controle serveur du chantier.
+          {selectedFreeMission ? 'Pointage GPS de mission libre, sans controle de rayon.' : 'Validation GPS puis controle serveur du chantier.'}
         </p>
       </section>
+
+      {selectedFreeMission ? (
+        <section className="rounded-lg border border-orange-200 bg-orange-50 p-4 shadow-panel">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Mission libre</p>
+          <h3 className="mt-2 text-lg font-black text-slate-950">{selectedFreeMission.action}</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-600">{selectedFreeMission.projectName}</p>
+          {selectedFreeMission.objectiveText ? (
+            <p className="mt-3 text-sm font-semibold text-orange-900">{selectedFreeMission.objectiveText}</p>
+          ) : null}
+        </section>
+      ) : null}
 
       <GpsPanel
         geoState={geoState}
@@ -592,23 +661,27 @@ export function MobileClockInPage() {
             {geoState.accuracy !== null ? ` - precision ${Math.round(geoState.accuracy)} m` : ''}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Le chantier est choisi manuellement, mais la distance est calculee avec votre position GPS.
+            {selectedFreeMission
+              ? 'La position GPS sera enregistree comme preuve du pointage.'
+              : 'Le chantier est choisi manuellement, mais la distance est calculee avec votre position GPS.'}
           </p>
         </div>
       ) : null}
 
-      <ManualSiteList
-        geoState={geoState}
-        loading={todaySitesQuery.isLoading}
-        onSelect={(siteId) => {
-          setSelectedSiteId(siteId);
-          setManualMode(true);
-        }}
-        selectedSiteId={selectedSite?.id ?? null}
-        sites={todaySites}
-      />
+      {!selectedFreeMission ? (
+        <ManualSiteList
+          geoState={geoState}
+          loading={todaySitesQuery.isLoading}
+          onSelect={(siteId) => {
+            setSelectedSiteId(siteId);
+            setManualMode(true);
+          }}
+          selectedSiteId={selectedSite?.id ?? null}
+          sites={todaySites}
+        />
+      ) : null}
 
-      {geoState.status === 'ready' && todaySites.length === 0 ? (
+      {!selectedFreeMission && geoState.status === 'ready' && todaySites.length === 0 ? (
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
           {nearbyQuery.isLoading ? (
             <p className="text-sm font-semibold text-slate-500">Recherche du chantier le plus proche...</p>
@@ -638,7 +711,7 @@ export function MobileClockInPage() {
         </section>
       ) : null}
 
-      {nearbySuggestion ? (
+      {!selectedFreeMission && nearbySuggestion ? (
         <NearbySuggestionCard
           onSelect={() => {
             setSelectedSiteId(nearbySuggestion.id);
@@ -648,11 +721,11 @@ export function MobileClockInPage() {
         />
       ) : null}
 
-      {selectedSite ? (
+      {selectedSite || selectedFreeMission ? (
         <section className="space-y-3">
           {!selectedSiteSessionLoaded ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center text-sm font-bold text-slate-600">
-              Verification de la session du chantier...
+              Verification de la session...
             </div>
           ) : openSessionDifferentSite ? (
             <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50 p-4">
@@ -715,7 +788,7 @@ export function MobileClockInPage() {
             <ActionButton
               busy={clockInMutation.isPending}
               disabled={!canSubmit}
-              label={todaySites.length === 0 && quickSite && !manualMode ? 'POINTER ICI' : 'POINTER ENTREE'}
+                label={selectedFreeMission ? 'POINTER ENTREE MISSION' : todaySites.length === 0 && quickSite && !manualMode ? 'POINTER ICI' : 'POINTER ENTREE'}
               onClick={() => {
                 setSelectedIntent('arrival');
                 clockInMutation.mutate('arrival');

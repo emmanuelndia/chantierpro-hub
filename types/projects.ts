@@ -121,7 +121,7 @@ export type ProjectTeamSummaryResponse = {
 
 export type ProjectPhotoItem = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   uploadedByName: string;
   category: string;

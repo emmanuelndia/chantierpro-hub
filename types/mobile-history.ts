@@ -25,7 +25,7 @@ export type MobileHistoryRecord = {
 
 export type MobileHistoryPhoto = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   filename: string;
   timestampLocal: string;
   url: string | null;
@@ -40,7 +40,7 @@ export type MobileHistoryReport = {
 export type MobileHistorySession = {
   id: string;
   departureRecordId: string | null;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   startedAt: string;
   endedAt: string | null;

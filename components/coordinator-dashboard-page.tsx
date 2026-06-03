@@ -249,8 +249,8 @@ function FieldSessionBar({
       </div>
       <button
         className="rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={pending}
-        onClick={() => onClockOut(fieldSession.siteId)}
+        disabled={pending || !fieldSession.siteId}
+        onClick={() => fieldSession.siteId && onClockOut(fieldSession.siteId)}
         type="button"
       >
         {pending ? 'Pointage...' : 'Pointer sortie'}

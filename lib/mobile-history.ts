@@ -25,7 +25,7 @@ type HistoryQuery = {
 
 type ClockInRow = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   type: ClockInType;
   status: ClockInStatus;
   distanceToSite: { toNumber(): number };
@@ -33,12 +33,12 @@ type ClockInRow = {
   timestampLocal: Date;
   site: {
     name: string;
-  };
+  } | null;
 };
 
 type PhotoRow = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   filename: string;
   storageKey: string;
   timestampLocal: Date;
@@ -53,7 +53,7 @@ type ReportRow = {
 
 type DraftSession = {
   id: string;
-  siteId: string;
+  siteId: string | null;
   siteName: string;
   records: ClockInRow[];
 };
@@ -191,7 +191,7 @@ function buildSessions(
         {
           id: `incomplete:${record.id}`,
           siteId: record.siteId,
-          siteName: record.site.name,
+          siteName: record.site?.name ?? 'Mission libre',
           records: [record],
         },
         photos,
@@ -202,28 +202,30 @@ function buildSessions(
     }
 
     if (record.type === ClockInType.ARRIVAL) {
-      const existing = openBySite.get(record.siteId);
+      const contextKey = record.siteId ?? `free:${record.id}`;
+      const existing = openBySite.get(contextKey);
       if (existing) {
         sessions.push(finalizeSession(existing, photos, reports, now, 'INCOMPLETE'));
       }
 
-      openBySite.set(record.siteId, {
+      openBySite.set(contextKey, {
         id: record.id,
         siteId: record.siteId,
-        siteName: record.site.name,
+        siteName: record.site?.name ?? 'Mission libre',
         records: [record],
       });
       continue;
     }
 
-    const current = openBySite.get(record.siteId);
+    const contextKey = record.siteId ?? `free:${record.id}`;
+    const current = openBySite.get(contextKey);
 
     if (!current) {
       sessions.push(finalizeSession(
         {
           id: `incomplete:${record.id}`,
           siteId: record.siteId,
-          siteName: record.site.name,
+          siteName: record.site?.name ?? 'Mission libre',
           records: [record],
         },
         photos,
@@ -238,7 +240,7 @@ function buildSessions(
 
     if (record.type === ClockInType.DEPARTURE) {
       sessions.push(finalizeSession(current, photos, reports, now));
-      openBySite.delete(record.siteId);
+      openBySite.delete(contextKey);
     }
   }
 
