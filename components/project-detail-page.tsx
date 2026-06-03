@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -266,7 +266,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
             <div className="flex flex-wrap items-center gap-3">
               <Badge tone={projectStatusTone(project.status)}>{humanizeProjectStatus(project.status)}</Badge>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {project.sitesCount} site(s) • {project.resourcesCount} ressource(s)
+                {project.sitesCount} site(s) â€¢ {project.resourcesCount} ressource(s)
               </p>
             </div>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{project.name}</h1>
@@ -274,7 +274,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
               <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600">{project.description}</p>
             ) : null}
             <p className="mt-4 text-sm text-slate-500">
-              {project.city} • {project.address} • {formatDate(project.startDate)} → {project.endDate ? formatDate(project.endDate) : 'Ouvert'}
+              {project.city} â€¢ {project.address} â€¢ {formatDate(project.startDate)} â†’ {project.endDate ? formatDate(project.endDate) : 'Ouvert'}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -286,7 +286,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
               }}
               type="button"
             >
-              Créer chantier
+              CrÃ©er chantier
             </button>
             <button
               className="rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
@@ -301,7 +301,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
               href={`/web/teams/new?projectId=${encodeURIComponent(projectId)}`}
               hidden={!canManageProject}
             >
-              Créer équipe
+              CrÃ©er Ã©quipe
             </Link>
             <button
               className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
@@ -360,7 +360,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                     <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
                       {site.requiresClockIn
                         ? site.geofenceType === 'POLYGON'
-                          ? 'Limite précise'
+                          ? 'Limite prÃ©cise'
                           : `Pointage par rayon ${site.radiusKm.toFixed(1)} km`
                         : 'Lieu planifiable sans flux terrain'} - Surface estimee {formatEstimatedArea(site.area)}
                     </p>
@@ -376,21 +376,21 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                       className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       href={`/web/sites/${site.id}/presences`}
                     >
-                      Présences
+                      PrÃ©sences
                     </Link>
                     <Link
                       className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       href={`/web/teams?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`}
                       hidden={!canManageProject}
                     >
-                      Équipes
+                      Ã‰quipes
                     </Link>
                     <Link
                       className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       href={`/web/teams/new?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`}
                       hidden={!canManageProject}
                     >
-                      Créer équipe
+                      CrÃ©er Ã©quipe
                     </Link>
                     <button
                       className="rounded-full border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100"
@@ -409,7 +409,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                   canUpload={canManageProjectDocuments}
                   compact
                   context={{ siteId: site.id }}
-                  description="Documents rattachés à ce chantier."
+                  description="Documents rattachÃ©s Ã  ce chantier."
                   title="Documents chantier"
                 />
                 ) : null}
@@ -441,7 +441,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                           {item.firstName} {item.lastName}
                         </Link>
                         <p className="text-sm text-slate-500">
-                          {item.role} • {item.email}
+                          {item.role} â€¢ {item.email}
                         </p>
                       </div>
                       <Badge tone="info">{item.hoursThisMonth.toFixed(2)} h ce mois</Badge>
@@ -476,15 +476,21 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                     <div>
                       <p className="font-semibold text-slate-950">{site.name}</p>
                       <p className="text-sm text-slate-500">
-                        {site.presentCount} ressource(s) sur site • {site.status}
+                        {site.presentCount} ressource(s) {site.contextType === 'FREE_MISSION' ? 'en mission libre' : 'sur site'} - {site.contextLabel}
                       </p>
                     </div>
-                    <Link
-                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                      href={`/web/sites/${site.id}/presences`}
-                    >
-                      Ouvrir le detail
-                    </Link>
+                    {site.contextType === 'SITE' ? (
+                      <Link
+                        className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                        href={`/web/sites/${site.id}/presences`}
+                      >
+                        Ouvrir le detail
+                      </Link>
+                    ) : (
+                      <span className="rounded-full bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">
+                        Pointage GPS mission
+                      </span>
+                    )}
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {site.workers.map((worker) => (
@@ -518,7 +524,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
         <DocumentAttachmentsPanel
           canUpload={canManageProjectDocuments}
           context={{ projectId }}
-          description="Documents, PV, Excel et livrables rattachés au projet."
+          description="Documents, PV, Excel et livrables rattachÃ©s au projet."
           title={`Documents - ${project.name}`}
         />
       ) : null}
@@ -598,7 +604,7 @@ function SiteImportModal({
       setCommitResult(null);
       pushToast({
         type: data.errorRows > 0 ? 'warning' : 'success',
-        title: 'Prévisualisation prête',
+        title: 'PrÃ©visualisation prÃªte',
         message: `${data.validRows} ligne(s) valide(s), ${data.errorRows} ligne(s) en erreur.`,
       });
     },
@@ -641,8 +647,8 @@ function SiteImportModal({
       onImported();
       pushToast({
         type: 'success',
-        title: 'Import terminé',
-        message: `${data.createdCount} chantier(s) créé(s), ${data.skippedCount} ligne(s) ignorée(s).`,
+        title: 'Import terminÃ©',
+        message: `${data.createdCount} chantier(s) crÃ©Ã©(s), ${data.skippedCount} ligne(s) ignorÃ©e(s).`,
       });
     },
     onError: (error) => {
@@ -670,7 +676,7 @@ function SiteImportModal({
             </p>
             <h2 className="mt-3 text-2xl font-semibold text-slate-950">Importer des chantiers en masse</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Téléchargez le modèle, remplissez les lignes puis importez le fichier. Les lignes en erreur restent ignorées.
+              TÃ©lÃ©chargez le modÃ¨le, remplissez les lignes puis importez le fichier. Les lignes en erreur restent ignorÃ©es.
             </p>
           </div>
           <button
@@ -684,15 +690,15 @@ function SiteImportModal({
 
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">1. Modèle</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">1. ModÃ¨le</p>
             <p className="mt-2 text-sm text-slate-600">
-              Le modèle contient toutes les colonnes attendues pour créer les chantiers.
+              Le modÃ¨le contient toutes les colonnes attendues pour crÃ©er les chantiers.
             </p>
             <a
               className="mt-4 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
               href={`/api/projects/${projectId}/sites/import/template`}
             >
-              Télécharger le modèle
+              TÃ©lÃ©charger le modÃ¨le
             </a>
           </article>
 
@@ -714,14 +720,14 @@ function SiteImportModal({
               onClick={() => file && previewMutation.mutate(file)}
               type="button"
             >
-              {previewMutation.isPending ? 'Analyse...' : 'Prévisualiser'}
+              {previewMutation.isPending ? 'Analyse...' : 'PrÃ©visualiser'}
             </button>
           </article>
 
           <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">3. Import</p>
             <p className="mt-2 text-sm text-slate-600">
-              Importez uniquement les lignes valides après vérification.
+              Importez uniquement les lignes valides aprÃ¨s vÃ©rification.
             </p>
             <button
               className="mt-4 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
@@ -745,7 +751,7 @@ function SiteImportModal({
 
             {commitResult ? (
               <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-                {commitResult.createdCount} chantier(s) créé(s). {commitResult.skippedCount} ligne(s) ignorée(s).
+                {commitResult.createdCount} chantier(s) crÃ©Ã©(s). {commitResult.skippedCount} ligne(s) ignorÃ©e(s).
               </div>
             ) : null}
 
@@ -773,7 +779,7 @@ function SiteImportModal({
                         </td>
                         <td className="px-4 py-3">
                           <p className="font-semibold text-slate-950">{row.normalized.nom || '-'}</p>
-                          <p className="text-xs text-slate-500">{row.normalized.adresse_ou_repere || 'Adresse non renseignée'}</p>
+                          <p className="text-xs text-slate-500">{row.normalized.adresse_ou_repere || 'Adresse non renseignÃ©e'}</p>
                         </td>
                         <td className="px-4 py-3 text-slate-600">{row.normalized.responsable_gs_email || '-'}</td>
                         <td className="px-4 py-3 text-slate-600">
@@ -934,8 +940,8 @@ function SiteFormDrawer({
               >
                 <option value="WORKSITE">Chantier</option>
                 <option value="INTERVENTION_ZONE">Zone d&apos;intervention</option>
-                <option value="WAREHOUSE">Entrepôt</option>
-                <option value="MATERIAL_PICKUP">Point d&apos;enlèvement matériel</option>
+                <option value="WAREHOUSE">EntrepÃ´t</option>
+                <option value="MATERIAL_PICKUP">Point d&apos;enlÃ¨vement matÃ©riel</option>
                 <option value="OFFICE">Bureau</option>
                 <option value="CLIENT_SITE">Site client</option>
                 <option value="OTHER">Autre lieu</option>
@@ -957,7 +963,7 @@ function SiteFormDrawer({
                 <span>
                   Pointage GPS requis
                   <span className="mt-1 block text-xs font-normal text-slate-500">
-                    Désactivez pour un bureau ou une tâche logistique qui ne doit pas apparaître dans le pointage.
+                    DÃ©sactivez pour un bureau ou une tÃ¢che logistique qui ne doit pas apparaÃ®tre dans le pointage.
                   </span>
                 </span>
               </label>
@@ -979,7 +985,7 @@ function SiteFormDrawer({
               <input
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
                 onChange={(event) => setValues((current) => ({ ...current, area: event.target.value }))}
-                placeholder="Non renseignÃ©e"
+                placeholder="Non renseignÃƒÂ©e"
                 type="number"
                 value={values.area}
               />
@@ -1277,7 +1283,7 @@ function optionalNumberOrZero(value: string) {
 }
 
 function formatEstimatedArea(value: number) {
-  return value > 0 ? value.toFixed(2) : 'Non renseignÃ©e';
+  return value > 0 ? value.toFixed(2) : 'Non renseignÃƒÂ©e';
 }
 
 function samePolygon(left: SiteGeofencePolygon | null, right: SiteGeofencePolygon | null) {
@@ -1316,9 +1322,9 @@ function siteTypeLabel(siteType: SiteType) {
     case 'INTERVENTION_ZONE':
       return "Zone d'intervention";
     case 'WAREHOUSE':
-      return 'Entrepôt';
+      return 'EntrepÃ´t';
     case 'MATERIAL_PICKUP':
-      return "Point d'enlèvement";
+      return "Point d'enlÃ¨vement";
     case 'OFFICE':
       return 'Bureau';
     case 'CLIENT_SITE':

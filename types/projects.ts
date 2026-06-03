@@ -69,6 +69,8 @@ export type ProjectPresenceSiteItem = {
   id: string;
   name: string;
   status: SiteStatus;
+  contextType: 'SITE' | 'FREE_MISSION';
+  contextLabel: string;
   presentCount: number;
   workers: PresenceWorkerItem[];
 };

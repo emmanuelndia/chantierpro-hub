@@ -669,6 +669,8 @@ export function summarizePresences(payload: {
     id: string;
     name: string;
     status: SiteStatus;
+    contextType?: 'SITE' | 'FREE_MISSION';
+    contextLabel?: string;
     workers: PresenceWorkerItem[];
   }[];
   date: string;
@@ -677,6 +679,8 @@ export function summarizePresences(payload: {
     id: site.id,
     name: site.name,
     status: site.status,
+    contextType: site.contextType ?? 'SITE',
+    contextLabel: site.contextLabel ?? 'Chantier',
     presentCount: site.workers.length,
     workers: site.workers,
   }));

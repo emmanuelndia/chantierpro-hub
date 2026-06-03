@@ -621,18 +621,49 @@ export function MobileClockInPage() {
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Pointage</p>
         <h2 className="mt-2 text-2xl font-black text-slate-950">{typeLabels[currentType]}</h2>
         <p className="mt-1 text-sm text-slate-600">
-          {selectedFreeMission ? 'Pointage GPS de mission libre, sans controle de rayon.' : 'Validation GPS puis controle serveur du chantier.'}
+          Verifie le contexte ci-dessous avant de pointer.
         </p>
       </section>
 
       {selectedFreeMission ? (
-        <section className="rounded-lg border border-orange-200 bg-orange-50 p-4 shadow-panel">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Mission libre</p>
-          <h3 className="mt-2 text-lg font-black text-slate-950">{selectedFreeMission.action}</h3>
-          <p className="mt-1 text-sm font-semibold text-slate-600">{selectedFreeMission.projectName}</p>
+        <section className="space-y-4 rounded-lg border-2 border-orange-300 bg-orange-50 p-4 shadow-panel">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Mode mission libre</p>
+              <h3 className="mt-2 text-lg font-black text-slate-950">{selectedFreeMission.action}</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-600">{selectedFreeMission.projectName}</p>
+            </div>
+            <span className="rounded-full bg-orange-600 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
+              Sans chantier
+            </span>
+          </div>
+          <div className="rounded-lg border border-orange-200 bg-white p-3">
+            <p className="text-sm font-black text-slate-950">Ce pointage sera rattache a la mission libre.</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+              L&apos;application enregistre votre position GPS reelle comme preuve. Elle ne choisit pas automatiquement le chantier le plus proche.
+            </p>
+          </div>
           {selectedFreeMission.objectiveText ? (
-            <p className="mt-3 text-sm font-semibold text-orange-900">{selectedFreeMission.objectiveText}</p>
+            <p className="text-sm font-semibold text-orange-900">{selectedFreeMission.objectiveText}</p>
           ) : null}
+        </section>
+      ) : null}
+
+      {!selectedFreeMission && selectedSite ? (
+        <section className="space-y-3 rounded-lg border-2 border-primary/30 bg-white p-4 shadow-panel">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Mode chantier</p>
+              <h3 className="mt-2 text-lg font-black text-slate-950">{selectedSite.name}</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-600">{selectedSite.address}</p>
+            </div>
+            <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
+              Zone GPS
+            </span>
+          </div>
+          <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">
+            Ce pointage sera rattache a ce chantier. La distance et le rayon autorise sont verifies avec votre position GPS.
+          </p>
         </section>
       ) : null}
 

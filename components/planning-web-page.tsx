@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { PlanningAssignmentStatus, PlanningWorkLocationType, type Role } from '@prisma/client';
@@ -69,23 +69,23 @@ const buttonClassName =
   'rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 
 const planningStatusLabel: Record<PlanningAssignmentStatus, string> = {
-  ASSIGNED: 'Non démarré',
+  ASSIGNED: 'Non dÃ©marrÃ©',
   IN_PROGRESS: 'En cours',
-  COMPLETED: 'Terminé',
-  CANCELLED: 'Annulé',
+  COMPLETED: 'TerminÃ©',
+  CANCELLED: 'AnnulÃ©',
 };
 
 const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
-  ON_SITE: 'Présence chantier requise',
-  OFFICE: 'Tâche bureau / coordination',
+  ON_SITE: 'PrÃ©sence chantier requise',
+  OFFICE: 'TÃ¢che bureau / coordination',
   FREE_MISSION: 'Mission libre',
 };
 
 const objectiveStatusConfig = {
-  NOT_STARTED: { label: 'Non démarré', tone: 'neutral' },
+  NOT_STARTED: { label: 'Non dÃ©marrÃ©', tone: 'neutral' },
   PARTIAL: { label: 'Partiel', tone: 'warning' },
   ACHIEVED: { label: 'Atteint', tone: 'success' },
-  BLOCKED: { label: 'Bloqué', tone: 'error' },
+  BLOCKED: { label: 'BloquÃ©', tone: 'error' },
 } as const;
 
 export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
@@ -168,7 +168,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const createMutation = useMutation({
     mutationFn: createAssignment,
     onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Tâche créée' });
+      pushToast({ type: 'success', title: 'TÃ¢che crÃ©Ã©e' });
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -178,7 +178,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PlanningWebUpdateRequest }) => updateAssignment(id, data),
     onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Tâche modifiée' });
+      pushToast({ type: 'success', title: 'TÃ¢che modifiÃ©e' });
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -199,7 +199,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const deleteMutation = useMutation({
     mutationFn: deleteAssignment,
     onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Tâche supprimée' });
+      pushToast({ type: 'success', title: 'TÃ¢che supprimÃ©e' });
       setDeleteTarget(null);
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -328,7 +328,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     pushToast({
       type: 'error',
       title,
-      message: error instanceof Error ? error.message : 'Opération refusée.',
+      message: error instanceof Error ? error.message : 'OpÃ©ration refusÃ©e.',
     });
   }
 
@@ -350,7 +350,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
             ) : null}
             {!isCentralizedOnlyPlanning ? (
               <>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Tâches journalières</h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">TÃ¢ches journaliÃ¨res</h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
               Planifie les ressources terrain par chantier, avec consultation jour ou semaine.
             </p>
@@ -452,7 +452,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
             </SegmentedButton>
             {canViewCentralized ? (
               <SegmentedButton active={viewMode === 'centralized'} onClick={() => setViewMode('centralized')}>
-                Centralisé
+                CentralisÃ©
               </SegmentedButton>
             ) : null}
           </div>
@@ -523,7 +523,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
                 ))}
               </select>
             </Field>
-            <Field label="Rôle">
+            <Field label="RÃ´le">
               <select
                 className={filterClassName}
                 onChange={(event) => setCentralizedFilter('role', event.target.value)}
@@ -557,10 +557,10 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
 
       {data && viewMode !== 'centralized' ? (
         <section className="grid gap-4 md:grid-cols-4">
-          <MetricCard label="Tâches" value={data.assignments.length} />
+          <MetricCard label="TÃ¢ches" value={data.assignments.length} />
           <MetricCard label="Ressources actives" value={data.unassignedSupervisors.length} />
           <MetricCard label="Chantiers accessibles" value={data.availableSites.length} />
-          <MetricCard label="Affichées" value={filteredAssignments.length} />
+          <MetricCard label="AffichÃ©es" value={filteredAssignments.length} />
         </section>
       ) : null}
 
@@ -568,7 +568,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Actions planning</h2>
-            <p className="mt-1 text-sm text-slate-600">Crée une tâche pour une ressource terrain.</p>
+            <p className="mt-1 text-sm text-slate-600">CrÃ©e une tÃ¢che pour une ressource terrain.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -578,7 +578,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
               type="button"
             >
               <Download className="h-4 w-4" />
-              Récap Excel
+              RÃ©cap Excel
             </button>
             <button
               className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
@@ -587,10 +587,10 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
               type="button"
             >
               <Download className="h-4 w-4" />
-              Récap PDF
+              RÃ©cap PDF
             </button>
             <button className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" disabled={isMutating} onClick={() => openCreate()} type="button">
-              Ajouter une tâche
+              Ajouter une tÃ¢che
             </button>
           </div>
         </section>
@@ -683,7 +683,7 @@ function DayPlanningCards({
   onDelete: (assignment: PlanningWebAssignment) => void;
 }>) {
   if (assignments.length === 0) {
-    return <EmptyState title="Aucune tâche" description="Aucune ligne ne correspond aux filtres sélectionnés." />;
+    return <EmptyState title="Aucune tÃ¢che" description="Aucune ligne ne correspond aux filtres sÃ©lectionnÃ©s." />;
   }
 
   const groups = groupAssignmentsByResource(assignments);
@@ -706,13 +706,13 @@ function DayPlanningCards({
                 {group.supervisorFirstName} {group.supervisorName}
               </Link>
               <p className="mt-1 text-sm text-slate-500">
-                Ressource terrain · {group.assignments.length} tache(s) · {terrainCount} terrain · {officeCount} bureau
+                Ressource terrain Â· {group.assignments.length} tache(s) Â· {terrainCount} terrain Â· {officeCount} bureau
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge tone="info">{group.assignments.length} tâche(s)</Badge>
+              <Badge tone="info">{group.assignments.length} tÃ¢che(s)</Badge>
               <Badge tone="neutral">{officeCount} bureau</Badge>
-              {blockedCount > 0 ? <Badge tone="error">{blockedCount} bloquée(s)</Badge> : null}
+              {blockedCount > 0 ? <Badge tone="error">{blockedCount} bloquÃ©e(s)</Badge> : null}
             </div>
           </div>
 
@@ -745,7 +745,7 @@ function DayPlanningCards({
                   </div>
 
                   <div className="rounded-2xl bg-slate-50 p-3">
-                    <PlanningTaskField label="Tâche">
+                    <PlanningTaskField label="TÃ¢che">
                       <p className="text-sm font-medium text-slate-800">{assignment.action}</p>
                       {assignment.objectiveText ? <p className="mt-1 text-xs text-slate-500">Consigne : {assignment.objectiveText}</p> : null}
                     </PlanningTaskField>
@@ -755,7 +755,7 @@ function DayPlanningCards({
 
                   <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
                     <p className="text-xs text-slate-500">
-                      Créé par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
+                      CrÃ©Ã© par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
                     </p>
                     {canMutate ? (
                       <TableActionsMenu
@@ -839,7 +839,7 @@ function WeekPlanningGrid({
                   </p>
                 </div>
               ))}
-              {!query.isLoading && assignments.length === 0 ? <p className="text-sm text-slate-500">Aucune tâche</p> : null}
+              {!query.isLoading && assignments.length === 0 ? <p className="text-sm text-slate-500">Aucune tÃ¢che</p> : null}
               {assignments.length > 4 ? <p className="text-xs font-semibold text-slate-500">+{assignments.length - 4} autre(s)</p> : null}
             </div>
           </button>
@@ -865,14 +865,14 @@ function CentralizedPlanningTable({
   if (isError) {
     return (
       <EmptyState
-        title="Planning centralisé indisponible"
-        description="La vue centralisée n'a pas pu etre chargée. Vérifie ta session puis réessaie."
+        title="Planning centralisÃ© indisponible"
+        description="La vue centralisÃ©e n'a pas pu etre chargÃ©e. VÃ©rifie ta session puis rÃ©essaie."
       />
     );
   }
 
   if (items.length === 0) {
-    return <EmptyState title="Aucune affectation" description="Aucune ligne ne correspond aux filtres centralisés." />;
+    return <EmptyState title="Aucune affectation" description="Aucune ligne ne correspond aux filtres centralisÃ©s." />;
   }
 
   return (
@@ -880,8 +880,8 @@ function CentralizedPlanningTable({
       <div className="border-b border-slate-100 px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Planning centralisé</h2>
-            <p className="mt-1 text-sm text-slate-600">Lecture globale des affectations pour arbitrer les disponibilités.</p>
+            <h2 className="text-lg font-semibold text-slate-950">Planning centralisÃ©</h2>
+            <p className="mt-1 text-sm text-slate-600">Lecture globale des affectations pour arbitrer les disponibilitÃ©s.</p>
           </div>
           <Badge tone="info">{items.length} ligne(s)</Badge>
         </div>
@@ -894,11 +894,11 @@ function CentralizedPlanningTable({
               <th className="px-5 py-3">Projet</th>
               <th className="px-5 py-3">Chantier</th>
               <th className="px-5 py-3">Ressource</th>
-              <th className="px-5 py-3">Tâche</th>
+              <th className="px-5 py-3">TÃ¢che</th>
               <th className="px-5 py-3">Type</th>
               <th className="px-5 py-3">Progression</th>
               <th className="px-5 py-3">Statut</th>
-              <th className="px-5 py-3">Créateur</th>
+              <th className="px-5 py-3">CrÃ©ateur</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -973,7 +973,7 @@ function ResourcesPanel({
           <input
             className={filterClassName}
             onChange={(event) => setResourceSearch(event.target.value)}
-            placeholder="Rechercher une ressource par nom, email ou disponibilité..."
+            placeholder="Rechercher une ressource par nom, email ou disponibilitÃ©..."
             type="search"
             value={resourceSearch}
           />
@@ -1003,7 +1003,7 @@ function ResourcesPanel({
         ))}
         {filteredResources.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500 md:col-span-2 xl:col-span-3">
-            Aucune ressource ne correspond à cette recherche.
+            Aucune ressource ne correspond Ã  cette recherche.
           </div>
         ) : null}
       </div>
@@ -1058,7 +1058,7 @@ function AssignmentDrawer({
       <aside className="fixed inset-y-0 right-0 flex w-full max-w-xl flex-col bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
         <div className="border-b border-slate-200 p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">
-            {mode === 'create' ? 'Nouvelle tâche' : 'Modifier tâche'}
+            {mode === 'create' ? 'Nouvelle tÃ¢che' : 'Modifier tÃ¢che'}
           </p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-950">Planning terrain</h2>
         </div>
@@ -1071,6 +1071,29 @@ function AssignmentDrawer({
               type="date"
               value={form.date}
             />
+          </Field>
+          <Field label="Type de tÃ¢che">
+            <select
+              className={filterClassName}
+              onChange={(event) => {
+                const workLocationType = event.target.value as PlanningWorkLocationType;
+                onChange({
+                  ...form,
+                  workLocationType,
+                  siteId: workLocationType === PlanningWorkLocationType.FREE_MISSION ? '' : form.siteId,
+                });
+              }}
+              value={form.workLocationType}
+            >
+              {Object.values(PlanningWorkLocationType).map((type) => (
+                <option key={type} value={type}>
+                  {workLocationTypeLabel[type]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Choisis d&apos;abord le type : il determine si la tache demande un chantier, une mission libre ou seulement une action bureau.
+            </p>
           </Field>
           <Field label="Ressource">
             {resources.length > 4 ? (
@@ -1094,7 +1117,7 @@ function AssignmentDrawer({
             {resources.length > 4 && resourceSearch.trim() ? (
               <div className="mb-2 max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
                 {filteredResources.length === 0 ? (
-                  <p className="px-3 py-2 text-xs font-semibold text-slate-500">Aucune ressource trouvée.</p>
+                  <p className="px-3 py-2 text-xs font-semibold text-slate-500">Aucune ressource trouvÃ©e.</p>
                 ) : (
                   filteredResources.slice(0, 8).map((resource) => (
                     <button
@@ -1131,7 +1154,7 @@ function AssignmentDrawer({
               <option value="">Selectionner</option>
               {displayedResources.length === 0 ? (
                 <option value="" disabled>
-                  Aucune ressource ne correspond à la recherche
+                  Aucune ressource ne correspond Ã  la recherche
                 </option>
               ) : null}
               {displayedResources.map((resource) => (
@@ -1189,7 +1212,7 @@ function AssignmentDrawer({
               Mission sans chantier fixe : la ressource pointera avec sa position GPS reelle.
             </div>
           )}
-          <Field label="Tâche à réaliser">
+          <Field label="TÃ¢che Ã  rÃ©aliser">
             <textarea
               className={`${filterClassName} min-h-32`}
               onChange={(event) => onChange({ ...form, action: event.target.value })}
@@ -1259,22 +1282,6 @@ function AssignmentDrawer({
               Precision libre pour expliquer le travail attendu. Ce champ ne calcule pas la progression.
             </p>
           </Field>
-          <Field label="Type de tâche">
-            <select
-              className={filterClassName}
-              onChange={(event) => onChange({ ...form, workLocationType: event.target.value as PlanningWorkLocationType })}
-              value={form.workLocationType}
-            >
-              {Object.values(PlanningWorkLocationType).map((type) => (
-                <option key={type} value={type}>
-                  {workLocationTypeLabel[type]}
-                </option>
-              ))}
-            </select>
-            <p className="mt-2 text-xs font-semibold text-slate-500">
-              Une tâche bureau reste dans le planning, mais ne demande pas de pointage chantier.
-            </p>
-          </Field>
           {mode === 'edit' ? (
             <Field label="Statut">
               <select
@@ -1323,9 +1330,9 @@ function ConfirmDeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
       <section className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-panel">
-        <h2 className="text-xl font-semibold text-slate-950">Supprimer cette tâche ?</h2>
+        <h2 className="text-xl font-semibold text-slate-950">Supprimer cette tÃ¢che ?</h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          La tâche de {assignment.supervisorFirstName} {assignment.supervisorName} sur {assignment.siteName} sera retirée.
+          La tÃ¢che de {assignment.supervisorFirstName} {assignment.supervisorName} sur {assignment.siteName} sera retirÃ©e.
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button className={buttonClassName} onClick={onCancel} type="button">
@@ -1486,7 +1493,7 @@ function ObjectiveProgressCard({
             </p>
           </div>
           <div>
-            <p className="font-semibold uppercase tracking-[0.12em] text-slate-400">Réalisé</p>
+            <p className="font-semibold uppercase tracking-[0.12em] text-slate-400">RÃ©alisÃ©</p>
             <p className="mt-1 font-semibold text-slate-800">
               {actualLabel} / {targetLabel}
               {unit}
@@ -1547,7 +1554,7 @@ function ObjectiveSummary({
       ) : null}
       {assignment.actualProgress !== null ? (
         <p className="text-xs font-semibold text-slate-600">
-          Réel {assignment.actualProgress}%
+          RÃ©el {assignment.actualProgress}%
           {assignment.progressDelta !== null ? ` (${assignment.progressDelta >= 0 ? '+' : ''}${assignment.progressDelta}%)` : ''}
         </p>
       ) : null}
@@ -1587,7 +1594,7 @@ async function fetchCentralizedPlanning(filters: CentralizedPlanningFilters) {
 
   const response = await authFetch(`/api/planning/centralized?${searchParams.toString()}`, { cache: 'no-store' });
   if (!response.ok) {
-    throw new Error(await getApiErrorMessage(response, 'Impossible de charger le planning centralisé.'));
+    throw new Error(await getApiErrorMessage(response, 'Impossible de charger le planning centralisÃ©.'));
   }
 
   return (await response.json()) as CentralizedPlanningResponse;
@@ -1600,7 +1607,7 @@ async function createAssignment(data: PlanningWebCreateRequest) {
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(await getApiErrorMessage(response, 'Impossible de créer la tâche.'));
+    throw new Error(await getApiErrorMessage(response, 'Impossible de crÃ©er la tÃ¢che.'));
   }
   return (await response.json()) as PlanningWebMutationResponse;
 }
@@ -1612,7 +1619,7 @@ async function updateAssignment(id: string, data: PlanningWebUpdateRequest) {
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(await getApiErrorMessage(response, 'Impossible de modifier la tâche.'));
+    throw new Error(await getApiErrorMessage(response, 'Impossible de modifier la tÃ¢che.'));
   }
   return (await response.json()) as PlanningWebMutationResponse;
 }
@@ -1651,7 +1658,7 @@ async function deleteAssignment(id: string) {
     return;
   }
   if (!response.ok) {
-    throw new Error(await getApiErrorMessage(response, 'Impossible de supprimer la tâche.'));
+    throw new Error(await getApiErrorMessage(response, 'Impossible de supprimer la tÃ¢che.'));
   }
 }
 
