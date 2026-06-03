@@ -6,6 +6,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Pencil, UserRoundX } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
 import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
@@ -60,9 +61,6 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
     generalSupervisorId: '',
     status: 'ALL',
   });
-  const [projectSearch, setProjectSearch] = useState('');
-  const [siteSearch, setSiteSearch] = useState('');
-  const [supervisorSearch, setSupervisorSearch] = useState('');
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState<ScopeFormState>(() => createEmptyForm());
   const [deleteTarget, setDeleteTarget] = useState<GeneralSupervisorScopeItem | null>(null);
@@ -108,14 +106,14 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
   const sites = data?.sites ?? emptySites;
   const generalSupervisors = data?.generalSupervisors ?? emptyGeneralSupervisors;
   const projects = useMemo(() => getProjectOptions(sites), [sites]);
-  const filteredProjects = useMemo(() => filterNamedOptions(projects, projectSearch), [projectSearch, projects]);
-  const filteredSites = useMemo(
-    () => filterScopeSites(sites.filter((site) => !filters.projectId || site.project.id === filters.projectId), siteSearch),
-    [filters.projectId, siteSearch, sites],
+  const projectSelectOptions = useMemo(() => toProjectSelectOptions(projects), [projects]);
+  const siteSelectOptions = useMemo(
+    () => toScopeSiteSelectOptions(sites.filter((site) => !filters.projectId || site.project.id === filters.projectId)),
+    [filters.projectId, sites],
   );
-  const filteredGeneralSupervisors = useMemo(
-    () => filterScopeUsers(generalSupervisors, supervisorSearch),
-    [generalSupervisors, supervisorSearch],
+  const generalSupervisorSelectOptions = useMemo(
+    () => toScopeUserSelectOptions(generalSupervisors),
+    [generalSupervisors],
   );
   const filteredScopes = useMemo(() => filterScopes(scopes, filters), [filters, scopes]);
   const activeCount = scopes.filter((scope) => scope.status === GeneralSupervisorSiteScopeStatus.ACTIVE).length;
@@ -217,59 +215,28 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
         <div className="grid gap-4 lg:grid-cols-4">
           <Field label="Projet">
-            <input
-              className={`${inputClassName} mb-2`}
-              onChange={(event) => setProjectSearch(event.target.value)}
-              placeholder="Rechercher un projet..."
-              type="search"
-              value={projectSearch}
+            <SearchableSelect
+              onChange={(value) => setFilter('projectId', value)}
+              options={projectSelectOptions}
+              placeholder="Tous les projets"
+              value={filters.projectId}
             />
-            <select className={inputClassName} onChange={(event) => setFilter('projectId', event.target.value)} value={filters.projectId}>
-              <option value="">Tous</option>
-              {filteredProjects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
           </Field>
           <Field label="Chantier">
-            <input
-              className={`${inputClassName} mb-2`}
-              onChange={(event) => setSiteSearch(event.target.value)}
-              placeholder="Rechercher un chantier..."
-              type="search"
-              value={siteSearch}
+            <SearchableSelect
+              onChange={(value) => setFilter('siteId', value)}
+              options={siteSelectOptions}
+              placeholder="Tous les chantiers"
+              value={filters.siteId}
             />
-            <select className={inputClassName} onChange={(event) => setFilter('siteId', event.target.value)} value={filters.siteId}>
-              <option value="">Tous</option>
-              {filteredSites.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name} - {site.project.name}
-                  </option>
-                ))}
-            </select>
           </Field>
           <Field label="Superviseur general">
-            <input
-              className={`${inputClassName} mb-2`}
-              onChange={(event) => setSupervisorSearch(event.target.value)}
-              placeholder="Rechercher un superviseur..."
-              type="search"
-              value={supervisorSearch}
-            />
-            <select
-              className={inputClassName}
-              onChange={(event) => setFilter('generalSupervisorId', event.target.value)}
+            <SearchableSelect
+              onChange={(value) => setFilter('generalSupervisorId', value)}
+              options={generalSupervisorSelectOptions}
+              placeholder="Tous les superviseurs"
               value={filters.generalSupervisorId}
-            >
-              <option value="">Tous</option>
-              {filteredGeneralSupervisors.map((supervisor) => (
-                <option key={supervisor.id} value={supervisor.id}>
-                  {supervisor.firstName} {supervisor.lastName}
-                </option>
-              ))}
-            </select>
+            />
           </Field>
           <Field label="Statut">
             <select
@@ -452,15 +419,9 @@ function ScopeDrawer({
   onCancel: () => void;
   onSubmit: () => void;
 }>) {
-  const [supervisorSearch, setSupervisorSearch] = useState('');
-  const [projectSearch, setProjectSearch] = useState('');
-  const [siteSearch, setSiteSearch] = useState('');
-  const filteredGeneralSupervisors = filterScopeUsers(generalSupervisors, supervisorSearch);
-  const filteredProjects = filterNamedOptions(projects, projectSearch);
-  const filteredSites = filterScopeSites(
-    sites.filter((site) => !form.projectId || site.project.id === form.projectId),
-    siteSearch,
-  );
+  const generalSupervisorOptions = toScopeUserSelectOptions(generalSupervisors);
+  const projectOptions = toProjectSelectOptions(projects);
+  const siteOptions = toScopeSiteSelectOptions(sites.filter((site) => !form.projectId || site.project.id === form.projectId));
   const canSubmit =
     mode === 'create'
       ? Boolean(form.generalSupervisorId && form.siteId && form.startDate)
@@ -477,73 +438,31 @@ function ScopeDrawer({
         </div>
         <div className="custom-scrollbar flex-1 space-y-5 overflow-y-auto p-6">
           <Field label="Superviseur general">
-            <input
-              className={`${inputClassName} mb-2`}
+            <SearchableSelect
               disabled={mode === 'edit'}
-              onChange={(event) => setSupervisorSearch(event.target.value)}
-              placeholder="Rechercher un superviseur..."
-              type="search"
-              value={supervisorSearch}
-            />
-            <select
-              className={inputClassName}
-              disabled={mode === 'edit'}
-              onChange={(event) => onChange({ ...form, generalSupervisorId: event.target.value })}
+              onChange={(value) => onChange({ ...form, generalSupervisorId: value })}
+              options={generalSupervisorOptions}
+              placeholder="Selectionner un superviseur"
               value={form.generalSupervisorId}
-            >
-              <option value="">Selectionner</option>
-              {filteredGeneralSupervisors.map((supervisor) => (
-                <option key={supervisor.id} value={supervisor.id}>
-                  {supervisor.firstName} {supervisor.lastName}
-                </option>
-              ))}
-            </select>
+            />
           </Field>
           <Field label="Projet">
-            <input
-              className={`${inputClassName} mb-2`}
+            <SearchableSelect
               disabled={mode === 'edit'}
-              onChange={(event) => setProjectSearch(event.target.value)}
-              placeholder="Rechercher un projet..."
-              type="search"
-              value={projectSearch}
-            />
-            <select
-              className={inputClassName}
-              disabled={mode === 'edit'}
-              onChange={(event) => onChange({ ...form, projectId: event.target.value, siteId: '' })}
+              onChange={(value) => onChange({ ...form, projectId: value, siteId: '' })}
+              options={projectOptions}
+              placeholder="Tous les projets"
               value={form.projectId}
-            >
-              <option value="">Tous les projets</option>
-              {filteredProjects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
+            />
           </Field>
           <Field label="Chantier">
-            <input
-              className={`${inputClassName} mb-2`}
+            <SearchableSelect
               disabled={mode === 'edit'}
-              onChange={(event) => setSiteSearch(event.target.value)}
-              placeholder="Rechercher un chantier..."
-              type="search"
-              value={siteSearch}
-            />
-            <select
-              className={inputClassName}
-              disabled={mode === 'edit'}
-              onChange={(event) => onChange({ ...form, siteId: event.target.value })}
+              onChange={(value) => onChange({ ...form, siteId: value })}
+              options={siteOptions}
+              placeholder="Selectionner un chantier"
               value={form.siteId}
-            >
-              <option value="">Selectionner</option>
-              {filteredSites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.name} - {site.project.name}
-                </option>
-              ))}
-            </select>
+            />
           </Field>
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Date debut">
@@ -733,26 +652,28 @@ function getProjectOptions(sites: GeneralSupervisorScopeSiteOption[]) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function filterNamedOptions<T extends { name: string }>(items: T[], search: string) {
-  const normalizedSearch = search.trim().toLowerCase();
-  if (!normalizedSearch) return items;
-  return items.filter((item) => item.name.toLowerCase().includes(normalizedSearch));
+function toProjectSelectOptions(projects: { id: string; name: string }[]): SearchableSelectOption[] {
+  return projects.map((project) => ({
+    value: project.id,
+    label: project.name,
+  }));
 }
 
-function filterScopeSites(sites: GeneralSupervisorScopeSiteOption[], search: string) {
-  const normalizedSearch = search.trim().toLowerCase();
-  if (!normalizedSearch) return sites;
-  return sites.filter((site) =>
-    `${site.name} ${site.address} ${site.project.name}`.toLowerCase().includes(normalizedSearch),
-  );
+function toScopeSiteSelectOptions(sites: GeneralSupervisorScopeSiteOption[]): SearchableSelectOption[] {
+  return sites.map((site) => ({
+    value: site.id,
+    label: site.name,
+    description: site.project.name,
+    keywords: site.address,
+  }));
 }
 
-function filterScopeUsers(users: GeneralSupervisorScopeUserOption[], search: string) {
-  const normalizedSearch = search.trim().toLowerCase();
-  if (!normalizedSearch) return users;
-  return users.filter((user) =>
-    `${user.firstName} ${user.lastName} ${user.email ?? ''}`.toLowerCase().includes(normalizedSearch),
-  );
+function toScopeUserSelectOptions(users: GeneralSupervisorScopeUserOption[]): SearchableSelectOption[] {
+  return users.map((user) => ({
+    value: user.id,
+    label: `${user.firstName} ${user.lastName}`,
+    ...(user.email ? { description: user.email } : {}),
+  }));
 }
 
 function createEmptyForm(): ScopeFormState {

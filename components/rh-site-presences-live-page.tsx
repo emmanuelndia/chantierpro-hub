@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
 import { authFetch } from '@/lib/auth/client-session';
 import { formatRoleLabel } from '@/lib/role-labels';
 import type {
@@ -81,6 +82,18 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 
   const data = liveQuery.data;
   const filteredSites = useMemo(() => data?.sites ?? [], [data?.sites]);
+  const projectOptions = useMemo(
+    () => (data?.options.projects ?? []).map((project) => ({ value: project.id, label: project.label })),
+    [data?.options.projects],
+  );
+  const siteOptions = useMemo(
+    () => (data?.options.sites ?? []).map((site) => ({ value: site.id, label: site.label })),
+    [data?.options.sites],
+  );
+  const resourceOptions = useMemo(
+    () => toPresenceResourceOptions(data?.options.resources ?? []),
+    [data?.options.resources],
+  );
   const resources = useMemo(
     () =>
       filteredSites
@@ -163,34 +176,31 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
             />
           </Field>
           <Field label="Projet">
-            <select className={inputClassName} onChange={(event) => setProjectId(event.target.value)} value={projectId}>
-              <option value="">Tous les projets</option>
-              {(data?.options.projects ?? []).map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.label}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              onChange={(value) => {
+                setProjectId(value);
+                setSiteId('');
+              }}
+              options={projectOptions}
+              placeholder="Tous les projets"
+              value={projectId}
+            />
           </Field>
           <Field label="Chantier">
-            <select className={inputClassName} onChange={(event) => setSiteId(event.target.value)} value={siteId}>
-              <option value="">Tous les chantiers</option>
-              {(data?.options.sites ?? []).map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.label}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              onChange={setSiteId}
+              options={siteOptions}
+              placeholder="Tous les chantiers"
+              value={siteId}
+            />
           </Field>
           <Field label="Ressource">
-            <select className={inputClassName} onChange={(event) => setResourceId(event.target.value)} value={resourceId}>
-              <option value="">Toutes les ressources</option>
-              {(data?.options.resources ?? []).map((resource) => (
-                <option key={resource.id} value={resource.id}>
-                  {resource.label} - {formatRoleLabel(resource.role as Role)}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              onChange={setResourceId}
+              options={resourceOptions}
+              placeholder="Toutes les ressources"
+              value={resourceId}
+            />
           </Field>
           <Field label="Role">
             <select className={inputClassName} onChange={(event) => setRole(event.target.value)} value={role}>
@@ -451,6 +461,16 @@ function liveStatusSortRank(status: RhSitePresenceLiveStatus) {
     LEFT: 4,
   };
   return ranks[status];
+}
+
+function toPresenceResourceOptions(
+  resources: { id: string; label: string; role: string }[],
+): SearchableSelectOption[] {
+  return resources.map((resource) => ({
+    value: resource.id,
+    label: resource.label,
+    description: formatRoleLabel(resource.role as Role),
+  }));
 }
 
 function clockInTypeLabel(type: string | null) {

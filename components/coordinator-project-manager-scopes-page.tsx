@@ -6,6 +6,7 @@ import { Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
 import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
@@ -26,16 +27,11 @@ type FormState = {
   projectManagerId: string;
 };
 
-const inputClassName =
-  'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-500';
-
 export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProjectManagerScopesPageProps) {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const canSelectProjectManager = viewer.role === 'ADMIN';
   const [form, setForm] = useState<FormState>({ coordinatorId: '', projectManagerId: '' });
-  const [projectManagerSearch, setProjectManagerSearch] = useState('');
-  const [coordinatorSearch, setCoordinatorSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<CoordinatorProjectManagerScopeItem | null>(null);
 
   const scopesQuery = useQuery({
@@ -80,8 +76,8 @@ export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProje
 
   const data = scopesQuery.data;
   const projectManagerOptions = useMemo(
-    () => filterCoordinatorUsers(data?.projectManagers ?? [], projectManagerSearch),
-    [data?.projectManagers, projectManagerSearch],
+    () => toUserSelectOptions(data?.projectManagers ?? []),
+    [data?.projectManagers],
   );
   const activeProjectManagerId = canSelectProjectManager ? form.projectManagerId : data?.projectManagers[0]?.id ?? '';
   const coordinatorOptions = useMemo(() => {
@@ -90,11 +86,8 @@ export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProje
         .filter((scope) => scope.projectManagerId === activeProjectManagerId)
         .map((scope) => scope.coordinatorId) ?? [],
     );
-    return filterCoordinatorUsers(
-      data?.coordinators.filter((coordinator) => !existingForProject.has(coordinator.id)) ?? [],
-      coordinatorSearch,
-    );
-  }, [activeProjectManagerId, coordinatorSearch, data?.coordinators, data?.scopes]);
+    return toUserSelectOptions(data?.coordinators.filter((coordinator) => !existingForProject.has(coordinator.id)) ?? []);
+  }, [activeProjectManagerId, data?.coordinators, data?.scopes]);
 
   const canSubmit = Boolean(form.coordinatorId && (!canSelectProjectManager || form.projectManagerId));
 
@@ -133,49 +126,23 @@ export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProje
         <div className={`grid gap-4 ${canSelectProjectManager ? 'lg:grid-cols-[1fr_1fr_auto]' : 'lg:grid-cols-[1fr_auto]'}`}>
           {canSelectProjectManager ? (
             <Field label="Chef projet">
-              <input
-                className={`${inputClassName} mb-2`}
-                onChange={(event) => setProjectManagerSearch(event.target.value)}
-                placeholder="Rechercher un chef projet..."
-                type="search"
-                value={projectManagerSearch}
-              />
-              <select
-                className={inputClassName}
-                onChange={(event) => setForm((current) => ({ ...current, projectManagerId: event.target.value, coordinatorId: '' }))}
+              <SearchableSelect
+                onChange={(value) => setForm((current) => ({ ...current, projectManagerId: value, coordinatorId: '' }))}
+                options={projectManagerOptions}
+                placeholder="Selectionner un chef projet"
                 value={form.projectManagerId}
-              >
-                <option value="">Selectionner</option>
-                {projectManagerOptions.map((projectManager) => (
-                  <option key={projectManager.id} value={projectManager.id}>
-                    {projectManager.firstName} {projectManager.lastName}
-                  </option>
-                ))}
-              </select>
+              />
             </Field>
           ) : null}
           <Field label="Coordinateur">
-            <input
-              className={`${inputClassName} mb-2`}
+            <SearchableSelect
               disabled={canSelectProjectManager && !form.projectManagerId}
-              onChange={(event) => setCoordinatorSearch(event.target.value)}
-              placeholder="Rechercher un coordinateur..."
-              type="search"
-              value={coordinatorSearch}
-            />
-            <select
-              className={inputClassName}
-              disabled={canSelectProjectManager && !form.projectManagerId}
-              onChange={(event) => setForm((current) => ({ ...current, coordinatorId: event.target.value }))}
+              emptyLabel="Aucun coordinateur disponible."
+              onChange={(value) => setForm((current) => ({ ...current, coordinatorId: value }))}
+              options={coordinatorOptions}
+              placeholder="Selectionner un coordinateur"
               value={form.coordinatorId}
-            >
-              <option value="">Selectionner</option>
-              {coordinatorOptions.map((coordinator) => (
-                <option key={coordinator.id} value={coordinator.id}>
-                  {coordinator.firstName} {coordinator.lastName}
-                </option>
-              ))}
-            </select>
+            />
           </Field>
           <div className="flex items-end">
             <button
@@ -377,16 +344,15 @@ async function getApiErrorMessage(response: Response, fallback: string) {
   }
 }
 
-function filterCoordinatorUsers<T extends { id: string; firstName: string; lastName: string; username: string; email: string | null }>(
+function toUserSelectOptions<T extends { id: string; firstName: string; lastName: string; username: string; email: string | null }>(
   users: T[],
-  search: string,
-) {
-  const normalizedSearch = search.trim().toLowerCase();
-  if (!normalizedSearch) return users;
-
-  return users.filter((user) =>
-    `${user.firstName} ${user.lastName} ${user.username} ${user.email ?? ''}`.toLowerCase().includes(normalizedSearch),
-  );
+): SearchableSelectOption[] {
+  return users.map((user) => ({
+    value: user.id,
+    label: `${user.firstName} ${user.lastName}`,
+    description: user.username,
+    keywords: user.email ?? '',
+  }));
 }
 
 function formatDate(value: string) {

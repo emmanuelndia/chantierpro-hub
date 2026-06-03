@@ -3,6 +3,7 @@
 import { PlanningAssignmentStatus, PlanningWorkLocationType } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
 import { authFetch } from '@/lib/auth/client-session';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import type { WebSessionUser } from '@/lib/auth/web-session';
@@ -793,6 +794,8 @@ function AssignmentBottomSheet({
   const hasAvailableSupervisors = availableSupervisors.length > 0;
   const canSubmit = Boolean(formData.supervisorId && formData.siteId && formData.action.trim() && hasAvailableSites && hasAvailableSupervisors);
   const hasQuantityObjective = formData.targetQuantity !== null && formData.targetQuantity !== undefined && formData.targetQuantity > 0;
+  const supervisorOptions = toMobileSupervisorOptions(availableSupervisors);
+  const siteOptions = toMobileSiteOptions(availableSites);
   const normalizedResourceSearch = resourceSearch.trim().toLowerCase();
   const normalizedSiteSearch = siteSearch.trim().toLowerCase();
   const filteredSupervisors = normalizedResourceSearch
@@ -843,6 +846,30 @@ function AssignmentBottomSheet({
         <div className="mt-4 space-y-4">
           <label className="block text-sm font-semibold text-slate-700">
             Ressource terrain
+            <SearchableSelect
+              className="mt-2"
+              emptyLabel="Aucune ressource ne correspond à la recherche."
+              onChange={(supervisorId) => setFormData((prev) => ({ ...prev, supervisorId }))}
+              options={supervisorOptions}
+              placeholder="Sélectionner une ressource"
+              value={formData.supervisorId}
+            />
+          </label>
+
+          <label className="block text-sm font-semibold text-slate-700">
+            Chantier
+            <SearchableSelect
+              className="mt-2"
+              emptyLabel="Aucun chantier ne correspond à la recherche."
+              onChange={(siteId) => setFormData((prev) => ({ ...prev, siteId }))}
+              options={siteOptions}
+              placeholder="Sélectionner un chantier"
+              value={formData.siteId}
+            />
+          </label>
+
+          <label className="hidden text-sm font-semibold text-slate-700">
+            Ressource terrain
             {availableSupervisors.length > 4 ? (
               <input
                 type="search"
@@ -876,7 +903,7 @@ function AssignmentBottomSheet({
             </select>
           </label>
 
-          <label className="block text-sm font-semibold text-slate-700">
+          <label className="hidden text-sm font-semibold text-slate-700">
             Chantier
             {availableSites.length > 1 ? (
               <input
@@ -1141,6 +1168,24 @@ function createEmptyForm(date: string): CreateAssignmentRequest {
     date,
     workLocationType: PlanningWorkLocationType.ON_SITE,
   };
+}
+
+function toMobileSupervisorOptions(supervisors: UnassignedSupervisor[]): SearchableSelectOption[] {
+  return supervisors.map((supervisor) => ({
+    value: supervisor.id,
+    label: `${supervisor.firstName} ${supervisor.name}`,
+    description: supervisor.availabilityLabel,
+    keywords: `${supervisor.email ?? ''} ${supervisor.availabilityLabel}`,
+  }));
+}
+
+function toMobileSiteOptions(sites: AvailableSite[]): SearchableSelectOption[] {
+  return sites.map((site) => ({
+    value: site.id,
+    label: site.name,
+    description: site.project.name,
+    keywords: `${site.address} ${site.project.name}`,
+  }));
 }
 
 function formatQuantity(value: number | null) {
