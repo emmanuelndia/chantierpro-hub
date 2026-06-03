@@ -32,6 +32,7 @@ const inputClassName =
 const liveStatuses: RhSitePresenceLiveStatus[] = ['PRESENT', 'PAUSED', 'EXPECTED_NOT_CLOCKED', 'LEFT', 'ANOMALY'];
 
 export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps) {
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [projectId, setProjectId] = useState('');
   const [siteId, setSiteId] = useState('');
   const [resourceId, setResourceId] = useState('');
@@ -42,6 +43,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 
   const requestPath = useMemo(() => {
     const searchParams = new URLSearchParams();
+    if (selectedDate) searchParams.set('date', selectedDate);
     if (projectId) searchParams.set('projectId', projectId);
     if (siteId) searchParams.set('siteId', siteId);
     if (resourceId) searchParams.set('resourceId', resourceId);
@@ -52,7 +54,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 
     const queryString = searchParams.toString();
     return queryString ? `/api/rh/site-presences-live?${queryString}` : '/api/rh/site-presences-live';
-  }, [anomaliesOnly, projectId, resourceId, role, search, siteId, status]);
+  }, [anomaliesOnly, projectId, resourceId, role, search, selectedDate, siteId, status]);
 
   const liveQuery = useQuery({
     queryKey: ['rh-site-presences-live', requestPath],
@@ -64,7 +66,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 
       return (await response.json()) as RhSitePresenceLiveResponse;
     },
-    refetchInterval: 45_000,
+    refetchInterval: selectedDate === new Date().toISOString().slice(0, 10) ? 45_000 : false,
     staleTime: 20_000,
   });
 
@@ -112,7 +114,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
               Liste de presence terrain
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Ressources attendues ou deja pointees aujourd&apos;hui. Les ressources non assignees et sans pointage ne sont pas affichees.
+              Ressources attendues ou deja pointees sur la date selectionnee. Les ressources non assignees et sans pointage ne sont pas affichees.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -139,10 +141,18 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
         <div className="mb-5 flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-slate-950">Filtres live</h2>
+          <h2 className="text-lg font-semibold text-slate-950">Filtres</h2>
           <p className="text-sm text-slate-500">Affinez la liste sans ouvrir les details projets ou chantiers.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <Field label="Date">
+            <input
+              className={inputClassName}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              type="date"
+              value={selectedDate}
+            />
+          </Field>
           <Field label="Projet">
             <select className={inputClassName} onChange={(event) => setProjectId(event.target.value)} value={projectId}>
               <option value="">Tous les projets</option>

@@ -18,6 +18,12 @@ import type {
 } from '@/types/rh';
 
 const RH_ALLOWED_ROLES: readonly Role[] = [Role.HR, Role.DIRECTION, Role.ADMIN];
+const SITE_PRESENCE_LIVE_ALLOWED_ROLES: readonly Role[] = [
+  Role.HR,
+  Role.DIRECTION,
+  Role.ADMIN,
+  Role.PROJECT_MANAGER,
+];
 const RH_EXPORT_HISTORY_LIMIT = 20;
 const RH_EXPORT_ARTIFACT_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -146,6 +152,7 @@ type ExportQuery = {
 };
 
 type SitePresenceLiveQuery = {
+  date: Date;
   projectId: string | null;
   siteId: string | null;
   resourceId: string | null;
@@ -190,6 +197,10 @@ export function jsonRhError(code: RhApiErrorCode, status: number, message: strin
 
 export function canAccessRh(role: Role) {
   return RH_ALLOWED_ROLES.includes(role);
+}
+
+export function canAccessSitePresencesLive(role: Role) {
+  return SITE_PRESENCE_LIVE_ALLOWED_ROLES.includes(role);
 }
 
 export function parseMonthlyPresenceQuery(searchParams: URLSearchParams): MonthlyPresenceQuery | null {
@@ -255,7 +266,10 @@ export function parseRhExportInput(body: unknown): RhExportInput | null {
 }
 
 export function parseSitePresenceLiveQuery(searchParams: URLSearchParams): SitePresenceLiveQuery {
+  const parsedDate = parseDateOnly(searchParams.get('date'));
+
   return {
+    date: parsedDate ?? toDateOnlyDate(new Date()),
     projectId: sanitizeString(searchParams.get('projectId')),
     siteId: sanitizeString(searchParams.get('siteId')),
     resourceId: sanitizeString(searchParams.get('resourceId')),
@@ -269,18 +283,15 @@ export function parseSitePresenceLiveQuery(searchParams: URLSearchParams): SiteP
 export async function getSitePresencesLive(
   prisma: PrismaClient,
   query: SitePresenceLiveQuery,
+  user: AuthLikeUser,
 ): Promise<RhSitePresenceLiveResponse> {
-  const today = toDateOnlyDate(new Date());
+  const today = query.date;
   const tomorrow = new Date(today);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
   const siteWhere: Prisma.SiteWhereInput = {
     status: 'ACTIVE',
-    project: {
-      status: {
-        not: 'ARCHIVED',
-      },
-    },
+    project: projectAccessWhere(user),
     ...(query.projectId ? { projectId: query.projectId } : {}),
     ...(query.siteId ? { id: query.siteId } : {}),
   };
@@ -367,12 +378,8 @@ export async function getSitePresencesLive(
       where: {
         date: today,
         deletedAt: null,
-        project: {
-          status: {
-            not: 'ARCHIVED',
-          },
-          ...(query.projectId ? { id: query.projectId } : {}),
-        },
+        project: projectAccessWhere(user),
+        ...(query.projectId ? { projectId: query.projectId } : {}),
         ...(query.resourceId ? { assigneeId: query.resourceId } : {}),
         ...(query.role ? { assignee: { role: query.role } } : {}),
       },
@@ -1627,6 +1634,15 @@ function parseRole(value: string | null) {
 function parseLiveStatus(value: string | null): RhSitePresenceLiveStatus | null {
   const statuses: RhSitePresenceLiveStatus[] = ['PRESENT', 'PAUSED', 'EXPECTED_NOT_CLOCKED', 'LEFT', 'ANOMALY'];
   return statuses.includes(value as RhSitePresenceLiveStatus) ? (value as RhSitePresenceLiveStatus) : null;
+}
+
+function parseDateOnly(value: string | null) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function toDateOnlyDate(value: Date) {

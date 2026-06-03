@@ -41,7 +41,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/web/rh/presences-chantiers',
     label: 'Presences chantiers',
     icon: 'rh',
-    roles: ['HR', 'DIRECTION', 'ADMIN'],
+    roles: ['HR', 'DIRECTION', 'ADMIN', 'PROJECT_MANAGER'],
     breadcrumb: ['Presences / RH', 'Presences chantiers'],
   },
   {
@@ -83,7 +83,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/presences/equipe',
     label: 'Presences equipe',
     icon: 'rh',
-    roles: ['COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'ADMIN'],
+    roles: ['COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'ADMIN'],
     breadcrumb: ['Presences', 'Equipe'],
   },
   {
