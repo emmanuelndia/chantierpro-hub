@@ -34,6 +34,8 @@ export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProje
   const { pushToast } = useToast();
   const canSelectProjectManager = viewer.role === 'ADMIN';
   const [form, setForm] = useState<FormState>({ coordinatorId: '', projectManagerId: '' });
+  const [projectManagerSearch, setProjectManagerSearch] = useState('');
+  const [coordinatorSearch, setCoordinatorSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<CoordinatorProjectManagerScopeItem | null>(null);
 
   const scopesQuery = useQuery({
@@ -77,6 +79,10 @@ export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProje
   });
 
   const data = scopesQuery.data;
+  const projectManagerOptions = useMemo(
+    () => filterCoordinatorUsers(data?.projectManagers ?? [], projectManagerSearch),
+    [data?.projectManagers, projectManagerSearch],
+  );
   const activeProjectManagerId = canSelectProjectManager ? form.projectManagerId : data?.projectManagers[0]?.id ?? '';
   const coordinatorOptions = useMemo(() => {
     const existingForProject = new Set(
@@ -84,8 +90,11 @@ export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProje
         .filter((scope) => scope.projectManagerId === activeProjectManagerId)
         .map((scope) => scope.coordinatorId) ?? [],
     );
-    return data?.coordinators.filter((coordinator) => !existingForProject.has(coordinator.id)) ?? [];
-  }, [activeProjectManagerId, data?.coordinators, data?.scopes]);
+    return filterCoordinatorUsers(
+      data?.coordinators.filter((coordinator) => !existingForProject.has(coordinator.id)) ?? [],
+      coordinatorSearch,
+    );
+  }, [activeProjectManagerId, coordinatorSearch, data?.coordinators, data?.scopes]);
 
   const canSubmit = Boolean(form.coordinatorId && (!canSelectProjectManager || form.projectManagerId));
 
@@ -124,13 +133,20 @@ export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProje
         <div className={`grid gap-4 ${canSelectProjectManager ? 'lg:grid-cols-[1fr_1fr_auto]' : 'lg:grid-cols-[1fr_auto]'}`}>
           {canSelectProjectManager ? (
             <Field label="Chef projet">
+              <input
+                className={`${inputClassName} mb-2`}
+                onChange={(event) => setProjectManagerSearch(event.target.value)}
+                placeholder="Rechercher un chef projet..."
+                type="search"
+                value={projectManagerSearch}
+              />
               <select
                 className={inputClassName}
                 onChange={(event) => setForm((current) => ({ ...current, projectManagerId: event.target.value, coordinatorId: '' }))}
                 value={form.projectManagerId}
               >
                 <option value="">Selectionner</option>
-                {data?.projectManagers.map((projectManager) => (
+                {projectManagerOptions.map((projectManager) => (
                   <option key={projectManager.id} value={projectManager.id}>
                     {projectManager.firstName} {projectManager.lastName}
                   </option>
@@ -139,6 +155,14 @@ export function CoordinatorProjectManagerScopesPage({ viewer }: CoordinatorProje
             </Field>
           ) : null}
           <Field label="Coordinateur">
+            <input
+              className={`${inputClassName} mb-2`}
+              disabled={canSelectProjectManager && !form.projectManagerId}
+              onChange={(event) => setCoordinatorSearch(event.target.value)}
+              placeholder="Rechercher un coordinateur..."
+              type="search"
+              value={coordinatorSearch}
+            />
             <select
               className={inputClassName}
               disabled={canSelectProjectManager && !form.projectManagerId}
@@ -351,6 +375,18 @@ async function getApiErrorMessage(response: Response, fallback: string) {
   } catch {
     return fallback;
   }
+}
+
+function filterCoordinatorUsers<T extends { id: string; firstName: string; lastName: string; username: string; email: string | null }>(
+  users: T[],
+  search: string,
+) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) return users;
+
+  return users.filter((user) =>
+    `${user.firstName} ${user.lastName} ${user.username} ${user.email ?? ''}`.toLowerCase().includes(normalizedSearch),
+  );
 }
 
 function formatDate(value: string) {

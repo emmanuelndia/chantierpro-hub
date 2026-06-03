@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
@@ -39,7 +39,16 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [anomaliesOnly, setAnomaliesOnly] = useState(false);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 450);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [search]);
 
   const requestPath = useMemo(() => {
     const searchParams = new URLSearchParams();
@@ -49,12 +58,12 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
     if (resourceId) searchParams.set('resourceId', resourceId);
     if (role) searchParams.set('role', role);
     if (status) searchParams.set('status', status);
-    if (search.trim()) searchParams.set('q', search.trim());
+    if (debouncedSearch) searchParams.set('q', debouncedSearch);
     if (anomaliesOnly) searchParams.set('anomaliesOnly', 'true');
 
     const queryString = searchParams.toString();
     return queryString ? `/api/rh/site-presences-live?${queryString}` : '/api/rh/site-presences-live';
-  }, [anomaliesOnly, projectId, resourceId, role, search, selectedDate, siteId, status]);
+  }, [anomaliesOnly, debouncedSearch, projectId, resourceId, role, selectedDate, siteId, status]);
 
   const liveQuery = useQuery({
     queryKey: ['rh-site-presences-live', requestPath],
@@ -312,9 +321,43 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: LiveResourceLis
           {flags.length > 0 ? (
             <p className="lg:col-span-2"><span className="font-semibold text-slate-950">Indicateurs :</span> {flags.join(', ')}</p>
           ) : null}
+          {resource.arrivalGps || resource.departureGps ? (
+            <div className="flex flex-wrap gap-2 lg:col-span-2">
+              {resource.arrivalGps ? (
+                <GpsPointLink label={`Position entree ${formatTime(resource.arrivalGps.recordedAt)}`} point={resource.arrivalGps} />
+              ) : null}
+              {resource.departureGps ? (
+                <GpsPointLink label={`Position sortie ${formatTime(resource.departureGps.recordedAt)}`} point={resource.departureGps} />
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </details>
     </article>
+  );
+}
+
+function GpsPointLink({
+  label,
+  point,
+}: Readonly<{
+  label: string;
+  point: {
+    latitude: number;
+    longitude: number;
+    accuracy: number | null;
+  };
+}>) {
+  return (
+    <a
+      className="rounded-full bg-slate-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800"
+      href={buildGpsMapUrl(point.latitude, point.longitude)}
+      rel="noreferrer"
+      target="_blank"
+      title={point.accuracy === null ? undefined : `Precision GPS ${Math.round(point.accuracy)} m`}
+    >
+      {label}
+    </a>
   );
 }
 
@@ -423,6 +466,10 @@ function formatTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function buildGpsMapUrl(latitude: number, longitude: number) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`;
 }
 
 function LoadingState() {

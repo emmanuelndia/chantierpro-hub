@@ -95,6 +95,9 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [viewMode, setViewMode] = useState<ViewMode>(() => (isCentralizedOnlyPlanning ? 'centralized' : 'day'));
   const [filters, setFilters] = useState<PlanningWebFilters>({ projectId: '', siteId: '', resourceId: '' });
+  const [projectFilterSearch, setProjectFilterSearch] = useState('');
+  const [siteFilterSearch, setSiteFilterSearch] = useState('');
+  const [resourceFilterSearch, setResourceFilterSearch] = useState('');
   const [centralizedFilters, setCentralizedFilters] = useState<CentralizedPlanningFilters>({
     from: todayKey,
     to: todayKey,
@@ -104,6 +107,9 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     role: '',
     workLocationType: '',
   });
+  const [centralizedProjectSearch, setCentralizedProjectSearch] = useState('');
+  const [centralizedSiteSearch, setCentralizedSiteSearch] = useState('');
+  const [centralizedResourceSearch, setCentralizedResourceSearch] = useState('');
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [form, setForm] = useState<AssignmentFormState>(() => createEmptyForm(selectedDate));
   const [deleteTarget, setDeleteTarget] = useState<PlanningWebAssignment | null>(null);
@@ -212,10 +218,32 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     [data, filters],
   );
   const projects = useMemo(() => getProjectOptions(data?.availableSites ?? []), [data]);
-  const sites = data?.availableSites ?? [];
-  const resources = data?.unassignedSupervisors ?? [];
+  const sites = useMemo(() => data?.availableSites ?? [], [data?.availableSites]);
+  const resources = useMemo(() => data?.unassignedSupervisors ?? [], [data?.unassignedSupervisors]);
   const centralizedItems = useMemo(() => centralizedQuery.data?.items ?? [], [centralizedQuery.data?.items]);
   const centralizedOptions = useMemo(() => getCentralizedOptions(centralizedItems), [centralizedItems]);
+  const dayProjectOptions = useMemo(() => filterNamedOptions(projects, projectFilterSearch), [projectFilterSearch, projects]);
+  const daySiteOptions = useMemo(
+    () => filterPlanningSites(sites.filter((site) => !filters.projectId || site.project.id === filters.projectId), siteFilterSearch),
+    [filters.projectId, siteFilterSearch, sites],
+  );
+  const dayResourceOptions = useMemo(() => filterAssignableResources(resources, resourceFilterSearch), [resourceFilterSearch, resources]);
+  const centralizedProjectOptions = useMemo(
+    () => filterNamedOptions(centralizedOptions.projects, centralizedProjectSearch),
+    [centralizedOptions.projects, centralizedProjectSearch],
+  );
+  const centralizedSiteOptions = useMemo(
+    () =>
+      filterNamedOptions(
+        centralizedOptions.sites.filter((site) => !centralizedFilters.projectId || site.projectId === centralizedFilters.projectId),
+        centralizedSiteSearch,
+      ),
+    [centralizedFilters.projectId, centralizedOptions.sites, centralizedSiteSearch],
+  );
+  const centralizedResourceOptions = useMemo(
+    () => filterNamedOptions(centralizedOptions.resources, centralizedResourceSearch),
+    [centralizedOptions.resources, centralizedResourceSearch],
+  );
   const selectedDateObject = parseDateKey(selectedDate);
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || freeMissionMutation.isPending;
   const assignmentConflicts =
@@ -411,9 +439,16 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
               />
             </Field>
             <Field label="Projet">
+              <input
+                className={`${filterClassName} mb-2`}
+                onChange={(event) => setProjectFilterSearch(event.target.value)}
+                placeholder="Rechercher un projet..."
+                type="search"
+                value={projectFilterSearch}
+              />
               <select className={filterClassName} onChange={(event) => setFilter('projectId', event.target.value)} value={filters.projectId}>
                 <option value="">Tous</option>
-                {projects.map((project) => (
+                {dayProjectOptions.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
                   </option>
@@ -421,21 +456,33 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
               </select>
             </Field>
             <Field label="Chantier">
+              <input
+                className={`${filterClassName} mb-2`}
+                onChange={(event) => setSiteFilterSearch(event.target.value)}
+                placeholder="Rechercher un chantier..."
+                type="search"
+                value={siteFilterSearch}
+              />
               <select className={filterClassName} onChange={(event) => setFilter('siteId', event.target.value)} value={filters.siteId}>
                 <option value="">Tous</option>
-                {sites
-                  .filter((site) => !filters.projectId || site.project.id === filters.projectId)
-                  .map((site) => (
+                {daySiteOptions.map((site) => (
                     <option key={site.id} value={site.id}>
-                      {site.name}
+                      {site.name} - {site.project.name}
                     </option>
                   ))}
               </select>
             </Field>
             <Field label="Ressource">
+              <input
+                className={`${filterClassName} mb-2`}
+                onChange={(event) => setResourceFilterSearch(event.target.value)}
+                placeholder="Rechercher une ressource..."
+                type="search"
+                value={resourceFilterSearch}
+              />
               <select className={filterClassName} onChange={(event) => setFilter('resourceId', event.target.value)} value={filters.resourceId}>
                 <option value="">Toutes</option>
-                {resources.map((resource) => (
+                {dayResourceOptions.map((resource) => (
                   <option key={resource.id} value={resource.id}>
                     {resource.firstName} {resource.name}
                   </option>
@@ -480,13 +527,20 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
               />
             </Field>
             <Field label="Projet">
+              <input
+                className={`${filterClassName} mb-2`}
+                onChange={(event) => setCentralizedProjectSearch(event.target.value)}
+                placeholder="Rechercher un projet..."
+                type="search"
+                value={centralizedProjectSearch}
+              />
               <select
                 className={filterClassName}
                 onChange={(event) => setCentralizedFilter('projectId', event.target.value)}
                 value={centralizedFilters.projectId}
               >
                 <option value="">Tous</option>
-                {centralizedOptions.projects.map((project) => (
+                {centralizedProjectOptions.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
                   </option>
@@ -494,15 +548,20 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
               </select>
             </Field>
             <Field label="Chantier">
+              <input
+                className={`${filterClassName} mb-2`}
+                onChange={(event) => setCentralizedSiteSearch(event.target.value)}
+                placeholder="Rechercher un chantier..."
+                type="search"
+                value={centralizedSiteSearch}
+              />
               <select
                 className={filterClassName}
                 onChange={(event) => setCentralizedFilter('siteId', event.target.value)}
                 value={centralizedFilters.siteId}
               >
                 <option value="">Tous</option>
-                {centralizedOptions.sites
-                  .filter((site) => !centralizedFilters.projectId || site.projectId === centralizedFilters.projectId)
-                  .map((site) => (
+                {centralizedSiteOptions.map((site) => (
                     <option key={site.id} value={site.id}>
                       {site.name}
                     </option>
@@ -510,13 +569,20 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
               </select>
             </Field>
             <Field label="Ressource">
+              <input
+                className={`${filterClassName} mb-2`}
+                onChange={(event) => setCentralizedResourceSearch(event.target.value)}
+                placeholder="Rechercher une ressource..."
+                type="search"
+                value={centralizedResourceSearch}
+              />
               <select
                 className={filterClassName}
                 onChange={(event) => setCentralizedFilter('resourceId', event.target.value)}
                 value={centralizedFilters.resourceId}
               >
                 <option value="">Toutes</option>
-                {centralizedOptions.resources.map((resource) => (
+                {centralizedResourceOptions.map((resource) => (
                   <option key={resource.id} value={resource.id}>
                     {resource.name}
                   </option>
@@ -1037,7 +1103,13 @@ function AssignmentDrawer({
   onSubmit: () => void;
 }>) {
   const [resourceSearch, setResourceSearch] = useState('');
-  const filteredSites = sites.filter((site) => !form.projectId || site.project.id === form.projectId);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [siteSearch, setSiteSearch] = useState('');
+  const filteredProjects = filterNamedOptions(projects, projectSearch);
+  const filteredSites = filterPlanningSites(
+    sites.filter((site) => !form.projectId || site.project.id === form.projectId),
+    siteSearch,
+  );
   const filteredResources = filterAssignableResources(resources, resourceSearch);
   const selectedResource = resources.find((resource) => resource.id === form.supervisorId);
   const displayedResources =
@@ -1177,14 +1249,58 @@ function AssignmentDrawer({
             ) : null}
           </Field>
           <Field label="Projet">
+            <input
+              className={`${filterClassName} mb-2`}
+              disabled={!canEditIdentity}
+              onChange={(event) => {
+                const value = event.target.value;
+                setProjectSearch(value);
+                const nextProjects = filterNamedOptions(projects, value);
+                const nextProject = nextProjects[0];
+                if (nextProjects.length === 1 && nextProject) {
+                  onChange({ ...form, projectId: nextProject.id, siteId: '' });
+                }
+              }}
+              placeholder="Rechercher un projet..."
+              type="search"
+              value={projectSearch}
+            />
+            {projectSearch.trim() ? (
+              <div className="mb-2 max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                {filteredProjects.length === 0 ? (
+                  <p className="px-3 py-2 text-xs font-semibold text-slate-500">Aucun projet trouvé.</p>
+                ) : (
+                  filteredProjects.slice(0, 8).map((project) => (
+                    <button
+                      className={`w-full rounded-xl px-3 py-2 text-left text-xs font-semibold transition ${
+                        form.projectId === project.id ? 'bg-slate-950 text-white' : 'bg-white text-slate-700 hover:bg-slate-100'
+                      }`}
+                      disabled={!canEditIdentity}
+                      key={project.id}
+                      onClick={() => {
+                        onChange({ ...form, projectId: project.id, siteId: '' });
+                        setProjectSearch(project.name);
+                      }}
+                      type="button"
+                    >
+                      {project.name}
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : null}
             <select
               className={filterClassName}
               disabled={!canEditIdentity}
-              onChange={(event) => onChange({ ...form, projectId: event.target.value, siteId: '' })}
+              onChange={(event) => {
+                const nextProjectId = event.target.value;
+                onChange({ ...form, projectId: nextProjectId, siteId: '' });
+                setProjectSearch(projects.find((project) => project.id === nextProjectId)?.name ?? '');
+              }}
               value={form.projectId}
             >
               <option value="">Tous les projets</option>
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
                 </option>
@@ -1193,10 +1309,59 @@ function AssignmentDrawer({
           </Field>
           {!isFreeMission ? (
             <Field label="Chantier">
+              <input
+                className={`${filterClassName} mb-2`}
+                disabled={!canEditIdentity}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSiteSearch(value);
+                  const nextSites = filterPlanningSites(
+                    sites.filter((site) => !form.projectId || site.project.id === form.projectId),
+                    value,
+                  );
+                  const nextSite = nextSites[0];
+                  if (nextSites.length === 1 && nextSite) {
+                    onChange({ ...form, siteId: nextSite.id, projectId: nextSite.project.id });
+                  }
+                }}
+                placeholder="Rechercher un chantier..."
+                type="search"
+                value={siteSearch}
+              />
+              {siteSearch.trim() ? (
+                <div className="mb-2 max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                  {filteredSites.length === 0 ? (
+                    <p className="px-3 py-2 text-xs font-semibold text-slate-500">Aucun chantier trouvé.</p>
+                  ) : (
+                    filteredSites.slice(0, 8).map((site) => (
+                      <button
+                        className={`w-full rounded-xl px-3 py-2 text-left text-xs font-semibold transition ${
+                          form.siteId === site.id ? 'bg-slate-950 text-white' : 'bg-white text-slate-700 hover:bg-slate-100'
+                        }`}
+                        disabled={!canEditIdentity}
+                        key={site.id}
+                        onClick={() => {
+                          onChange({ ...form, siteId: site.id, projectId: site.project.id });
+                          setSiteSearch(`${site.name} - ${site.project.name}`);
+                        }}
+                        type="button"
+                      >
+                        <span className="block">{site.name}</span>
+                        <span className={`block ${form.siteId === site.id ? 'text-slate-200' : 'text-slate-500'}`}>{site.project.name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : null}
               <select
                 className={filterClassName}
                 disabled={!canEditIdentity}
-                onChange={(event) => onChange({ ...form, siteId: event.target.value })}
+                onChange={(event) => {
+                  const nextSiteId = event.target.value;
+                  const nextSite = sites.find((site) => site.id === nextSiteId);
+                  onChange({ ...form, siteId: nextSiteId, projectId: nextSite?.project.id ?? form.projectId });
+                  setSiteSearch(nextSite ? `${nextSite.name} - ${nextSite.project.name}` : '');
+                }}
                 value={form.siteId}
               >
                 <option value="">Selectionner</option>
@@ -1768,6 +1933,26 @@ function getCentralizedOptions(items: CentralizedPlanningAssignment[]) {
     resources: [...resources.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
     roles: [...roles.values()].sort((a, b) => formatRoleLabel(a).localeCompare(formatRoleLabel(b))),
   };
+}
+
+function filterNamedOptions<T extends { name: string }>(items: T[], search: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) {
+    return items;
+  }
+
+  return items.filter((item) => item.name.toLowerCase().includes(normalizedSearch));
+}
+
+function filterPlanningSites(sites: AvailableSite[], search: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) {
+    return sites;
+  }
+
+  return sites.filter((site) =>
+    `${site.name} ${site.address} ${site.project.name}`.toLowerCase().includes(normalizedSearch),
+  );
 }
 
 function filterAssignableResources(resources: UnassignedSupervisor[], search: string) {

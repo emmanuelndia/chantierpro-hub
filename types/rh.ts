@@ -126,9 +126,18 @@ export type RhSitePresenceLiveResource = {
   lastClockInAt: string | null;
   lastClockInType: string | null;
   distanceKm: number | null;
+  arrivalGps: RhPresenceGpsPoint | null;
+  departureGps: RhPresenceGpsPoint | null;
   isRemoteCheckout: boolean;
   isAutoClosed: boolean;
   isRegularized: boolean;
+};
+
+export type RhPresenceGpsPoint = {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  recordedAt: string;
 };
 
 export type RhSitePresenceLiveSite = {

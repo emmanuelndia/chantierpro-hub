@@ -360,6 +360,9 @@ export async function getSitePresencesLive(
         type: true,
         timestampLocal: true,
         distanceToSite: true,
+        latitude: true,
+        longitude: true,
+        accuracy: true,
         isRemoteCheckout: true,
         isAutoClosed: true,
         isRegularized: true,
@@ -422,6 +425,9 @@ export async function getSitePresencesLive(
             type: true,
             timestampLocal: true,
             distanceToSite: true,
+            latitude: true,
+            longitude: true,
+            accuracy: true,
             isRemoteCheckout: true,
             isAutoClosed: true,
             isRegularized: true,
@@ -1666,6 +1672,9 @@ function buildLiveResource(
     type: ClockInType;
     timestampLocal: Date;
     distanceToSite: Prisma.Decimal;
+    latitude: Prisma.Decimal | null;
+    longitude: Prisma.Decimal | null;
+    accuracy: Prisma.Decimal | null;
     isRemoteCheckout: boolean;
     isAutoClosed: boolean;
     isRegularized: boolean;
@@ -1673,6 +1682,7 @@ function buildLiveResource(
 ): RhSitePresenceLiveResource {
   const latest = records.at(-1) ?? null;
   const arrival = [...records].reverse().find((record) => record.type === ClockInType.ARRIVAL) ?? null;
+  const departure = [...records].reverse().find((record) => record.type === ClockInType.DEPARTURE) ?? null;
   const hasRemoteReview = records.some((record, index) => {
     if (!record.isRemoteCheckout || record.type !== ClockInType.DEPARTURE) return false;
     const previousArrival = records
@@ -1695,9 +1705,29 @@ function buildLiveResource(
     lastClockInAt: latest?.timestampLocal.toISOString() ?? null,
     lastClockInType: latest?.type ?? null,
     distanceKm: latest?.distanceToSite.toNumber() ?? null,
+    arrivalGps: serializeGpsPoint(arrival),
+    departureGps: serializeGpsPoint(departure),
     isRemoteCheckout: records.some((record) => record.isRemoteCheckout),
     isAutoClosed: records.some((record) => record.isAutoClosed),
     isRegularized: records.some((record) => record.isRegularized),
+  };
+}
+
+function serializeGpsPoint(record: {
+  latitude: Prisma.Decimal | null;
+  longitude: Prisma.Decimal | null;
+  accuracy: Prisma.Decimal | null;
+  timestampLocal: Date;
+} | null) {
+  if (!record?.latitude || !record.longitude) {
+    return null;
+  }
+
+  return {
+    latitude: record.latitude.toNumber(),
+    longitude: record.longitude.toNumber(),
+    accuracy: record.accuracy?.toNumber() ?? null,
+    recordedAt: record.timestampLocal.toISOString(),
   };
 }
 

@@ -60,6 +60,9 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
     generalSupervisorId: '',
     status: 'ALL',
   });
+  const [projectSearch, setProjectSearch] = useState('');
+  const [siteSearch, setSiteSearch] = useState('');
+  const [supervisorSearch, setSupervisorSearch] = useState('');
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState<ScopeFormState>(() => createEmptyForm());
   const [deleteTarget, setDeleteTarget] = useState<GeneralSupervisorScopeItem | null>(null);
@@ -105,6 +108,15 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
   const sites = data?.sites ?? emptySites;
   const generalSupervisors = data?.generalSupervisors ?? emptyGeneralSupervisors;
   const projects = useMemo(() => getProjectOptions(sites), [sites]);
+  const filteredProjects = useMemo(() => filterNamedOptions(projects, projectSearch), [projectSearch, projects]);
+  const filteredSites = useMemo(
+    () => filterScopeSites(sites.filter((site) => !filters.projectId || site.project.id === filters.projectId), siteSearch),
+    [filters.projectId, siteSearch, sites],
+  );
+  const filteredGeneralSupervisors = useMemo(
+    () => filterScopeUsers(generalSupervisors, supervisorSearch),
+    [generalSupervisors, supervisorSearch],
+  );
   const filteredScopes = useMemo(() => filterScopes(scopes, filters), [filters, scopes]);
   const activeCount = scopes.filter((scope) => scope.status === GeneralSupervisorSiteScopeStatus.ACTIVE).length;
   const inactiveCount = scopes.filter((scope) => scope.status === GeneralSupervisorSiteScopeStatus.INACTIVE).length;
@@ -205,9 +217,16 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
         <div className="grid gap-4 lg:grid-cols-4">
           <Field label="Projet">
+            <input
+              className={`${inputClassName} mb-2`}
+              onChange={(event) => setProjectSearch(event.target.value)}
+              placeholder="Rechercher un projet..."
+              type="search"
+              value={projectSearch}
+            />
             <select className={inputClassName} onChange={(event) => setFilter('projectId', event.target.value)} value={filters.projectId}>
               <option value="">Tous</option>
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
                 </option>
@@ -215,25 +234,37 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
             </select>
           </Field>
           <Field label="Chantier">
+            <input
+              className={`${inputClassName} mb-2`}
+              onChange={(event) => setSiteSearch(event.target.value)}
+              placeholder="Rechercher un chantier..."
+              type="search"
+              value={siteSearch}
+            />
             <select className={inputClassName} onChange={(event) => setFilter('siteId', event.target.value)} value={filters.siteId}>
               <option value="">Tous</option>
-              {sites
-                .filter((site) => !filters.projectId || site.project.id === filters.projectId)
-                .map((site) => (
+              {filteredSites.map((site) => (
                   <option key={site.id} value={site.id}>
-                    {site.name}
+                    {site.name} - {site.project.name}
                   </option>
                 ))}
             </select>
           </Field>
           <Field label="Superviseur general">
+            <input
+              className={`${inputClassName} mb-2`}
+              onChange={(event) => setSupervisorSearch(event.target.value)}
+              placeholder="Rechercher un superviseur..."
+              type="search"
+              value={supervisorSearch}
+            />
             <select
               className={inputClassName}
               onChange={(event) => setFilter('generalSupervisorId', event.target.value)}
               value={filters.generalSupervisorId}
             >
               <option value="">Tous</option>
-              {generalSupervisors.map((supervisor) => (
+              {filteredGeneralSupervisors.map((supervisor) => (
                 <option key={supervisor.id} value={supervisor.id}>
                   {supervisor.firstName} {supervisor.lastName}
                 </option>
@@ -421,7 +452,15 @@ function ScopeDrawer({
   onCancel: () => void;
   onSubmit: () => void;
 }>) {
-  const filteredSites = sites.filter((site) => !form.projectId || site.project.id === form.projectId);
+  const [supervisorSearch, setSupervisorSearch] = useState('');
+  const [projectSearch, setProjectSearch] = useState('');
+  const [siteSearch, setSiteSearch] = useState('');
+  const filteredGeneralSupervisors = filterScopeUsers(generalSupervisors, supervisorSearch);
+  const filteredProjects = filterNamedOptions(projects, projectSearch);
+  const filteredSites = filterScopeSites(
+    sites.filter((site) => !form.projectId || site.project.id === form.projectId),
+    siteSearch,
+  );
   const canSubmit =
     mode === 'create'
       ? Boolean(form.generalSupervisorId && form.siteId && form.startDate)
@@ -438,6 +477,14 @@ function ScopeDrawer({
         </div>
         <div className="custom-scrollbar flex-1 space-y-5 overflow-y-auto p-6">
           <Field label="Superviseur general">
+            <input
+              className={`${inputClassName} mb-2`}
+              disabled={mode === 'edit'}
+              onChange={(event) => setSupervisorSearch(event.target.value)}
+              placeholder="Rechercher un superviseur..."
+              type="search"
+              value={supervisorSearch}
+            />
             <select
               className={inputClassName}
               disabled={mode === 'edit'}
@@ -445,7 +492,7 @@ function ScopeDrawer({
               value={form.generalSupervisorId}
             >
               <option value="">Selectionner</option>
-              {generalSupervisors.map((supervisor) => (
+              {filteredGeneralSupervisors.map((supervisor) => (
                 <option key={supervisor.id} value={supervisor.id}>
                   {supervisor.firstName} {supervisor.lastName}
                 </option>
@@ -453,6 +500,14 @@ function ScopeDrawer({
             </select>
           </Field>
           <Field label="Projet">
+            <input
+              className={`${inputClassName} mb-2`}
+              disabled={mode === 'edit'}
+              onChange={(event) => setProjectSearch(event.target.value)}
+              placeholder="Rechercher un projet..."
+              type="search"
+              value={projectSearch}
+            />
             <select
               className={inputClassName}
               disabled={mode === 'edit'}
@@ -460,7 +515,7 @@ function ScopeDrawer({
               value={form.projectId}
             >
               <option value="">Tous les projets</option>
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
                 </option>
@@ -468,6 +523,14 @@ function ScopeDrawer({
             </select>
           </Field>
           <Field label="Chantier">
+            <input
+              className={`${inputClassName} mb-2`}
+              disabled={mode === 'edit'}
+              onChange={(event) => setSiteSearch(event.target.value)}
+              placeholder="Rechercher un chantier..."
+              type="search"
+              value={siteSearch}
+            />
             <select
               className={inputClassName}
               disabled={mode === 'edit'}
@@ -668,6 +731,28 @@ function getProjectOptions(sites: GeneralSupervisorScopeSiteOption[]) {
   return [...projects.entries()]
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function filterNamedOptions<T extends { name: string }>(items: T[], search: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) return items;
+  return items.filter((item) => item.name.toLowerCase().includes(normalizedSearch));
+}
+
+function filterScopeSites(sites: GeneralSupervisorScopeSiteOption[], search: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) return sites;
+  return sites.filter((site) =>
+    `${site.name} ${site.address} ${site.project.name}`.toLowerCase().includes(normalizedSearch),
+  );
+}
+
+function filterScopeUsers(users: GeneralSupervisorScopeUserOption[], search: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) return users;
+  return users.filter((user) =>
+    `${user.firstName} ${user.lastName} ${user.email ?? ''}`.toLowerCase().includes(normalizedSearch),
+  );
 }
 
 function createEmptyForm(): ScopeFormState {
