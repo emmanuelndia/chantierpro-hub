@@ -285,7 +285,7 @@ export async function getSitePresencesLive(
     ...(query.siteId ? { id: query.siteId } : {}),
   };
 
-  const [sites, assignments, records] = await Promise.all([
+  const [sites, assignments, records, freeMissions] = await Promise.all([
     prisma.site.findMany({
       where: siteWhere,
       orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
@@ -363,6 +363,74 @@ export async function getSitePresencesLive(
         },
       },
     }),
+    prisma.freeMission.findMany({
+      where: {
+        date: today,
+        deletedAt: null,
+        project: {
+          status: {
+            not: 'ARCHIVED',
+          },
+          ...(query.projectId ? { id: query.projectId } : {}),
+        },
+        ...(query.resourceId ? { assigneeId: query.resourceId } : {}),
+        ...(query.role ? { assignee: { role: query.role } } : {}),
+      },
+      orderBy: [{ project: { name: 'asc' } }, { action: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        action: true,
+        projectId: true,
+        project: {
+          select: {
+            name: true,
+          },
+        },
+        assigneeId: true,
+        assignee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+        clockInRecords: {
+          where: {
+            status: ClockInStatus.VALID,
+            timestampLocal: {
+              gte: today,
+              lt: tomorrow,
+            },
+            type: {
+              in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
+            },
+          },
+          orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+          select: {
+            id: true,
+            userId: true,
+            siteId: true,
+            type: true,
+            timestampLocal: true,
+            distanceToSite: true,
+            isRemoteCheckout: true,
+            isAutoClosed: true,
+            isRegularized: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                role: true,
+              },
+            },
+          },
+        },
+      },
+    }),
   ]);
 
   const siteRows = new Map(
@@ -385,8 +453,25 @@ export async function getSitePresencesLive(
       },
     ]),
   );
+  for (const mission of freeMissions) {
+    siteRows.set(mission.id, {
+      siteId: mission.id,
+      siteName: mission.action,
+      siteAddress: 'Mission libre',
+      projectId: mission.projectId,
+      projectName: mission.project.name,
+      expectedCount: 0,
+      presentCount: 0,
+      pausedCount: 0,
+      notClockedCount: 0,
+      leftCount: 0,
+      anomalyCount: 0,
+      lastActivityAt: null as string | null,
+      resources: [] as RhSitePresenceLiveResource[],
+    });
+  }
 
-  const recordsBySiteUser = new Map<string, typeof records>();
+  const recordsBySiteUser = new Map<string, (typeof records)[number][]>();
   for (const record of records) {
     if (!record.siteId) {
       continue;
@@ -394,12 +479,25 @@ export async function getSitePresencesLive(
     const key = liveResourceKey(record.siteId, record.userId);
     recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), record]);
   }
+  for (const mission of freeMissions) {
+    const key = liveResourceKey(mission.id, mission.assigneeId);
+    recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), ...mission.clockInRecords]);
+  }
 
-  const assignmentBySiteUser = new Map<string, (typeof assignments)[number]>();
+  const assignmentBySiteUser = new Map<
+    string,
+    { action: string; supervisorId: string; supervisor: (typeof assignments)[number]['supervisor'] }
+  >();
   for (const assignment of assignments) {
     const key = liveResourceKey(assignment.siteId, assignment.supervisorId);
     const existing = assignmentBySiteUser.get(key);
     assignmentBySiteUser.set(key, existing ? { ...existing, action: `${existing.action} / ${assignment.action}` } : assignment);
+  }
+  for (const mission of freeMissions) {
+    const key = liveResourceKey(mission.id, mission.assigneeId);
+    const existing = assignmentBySiteUser.get(key);
+    const assignment = { action: mission.action, supervisorId: mission.assigneeId, supervisor: mission.assignee };
+    assignmentBySiteUser.set(key, existing ? { ...existing, action: `${existing.action} / ${mission.action}` } : assignment);
   }
 
   const allKeys = new Set([...recordsBySiteUser.keys(), ...assignmentBySiteUser.keys()]);

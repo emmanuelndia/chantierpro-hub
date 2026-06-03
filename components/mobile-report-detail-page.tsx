@@ -127,7 +127,7 @@ export function MobileReportDetailPage({ reportId }: MobileReportDetailPageProps
         <div className="mt-4 grid grid-cols-2 gap-3">
           <MetricTile
             label="Durée session"
-            value={formatDuration(report.sessionDuration)}
+            value={formatDuration(report.sessionDuration ?? 0)}
           />
           <MetricTile
             label="Progression"

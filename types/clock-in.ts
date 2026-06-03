@@ -18,7 +18,7 @@ export type ClockInRecordItem = {
   accuracy: number | null;
   distanceToSite: number;
   status: ClockInStatus;
-  comment: string | null;
+  comment?: string | null;
   timestampLocal: string;
   isRemoteCheckout: boolean;
   isAutoClosed: boolean;

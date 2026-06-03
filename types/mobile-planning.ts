@@ -99,11 +99,11 @@ export type CreateAssignmentRequest = {
   supervisorId: string;
   siteId: string;
   action: string;
-  targetProgress: number | null;
-  targetQuantity: number | null;
-  targetUnit: string | null;
+  targetProgress?: number | null;
+  targetQuantity?: number | null;
+  targetUnit?: string | null;
   date: string;
-  workLocationType?: PlanningWorkLocationType;
+  workLocationType: PlanningWorkLocationType;
   objectiveText?: string | null;
 };
 

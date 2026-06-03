@@ -67,7 +67,7 @@ export function DataTable<T>({
   const visibleRows = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function toggleSort(column: DataTableColumn<T>) {
-    if (!column.sortValue) {
+    if (!column?.sortValue) {
       return;
     }
 

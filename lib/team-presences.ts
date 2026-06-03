@@ -133,6 +133,7 @@ export async function getTeamPresences(
       select: {
         id: true,
         name: true,
+        projectId: true,
       },
     }),
     findScopedSupervisors(prisma, scopedSiteIds, resourceRoles),
@@ -193,9 +194,90 @@ export async function getTeamPresences(
     }),
   ]);
 
+  const freeMissions =
+    query.siteId || sites.length === 0
+      ? []
+      : await prisma.freeMission.findMany({
+          where: {
+            date: query.date,
+            deletedAt: null,
+            projectId: {
+              in: [...new Set(sites.map((site) => site.projectId))],
+            },
+            assignee: {
+              role: { in: [...resourceRoles] },
+              isActive: true,
+            },
+          },
+          orderBy: [{ action: 'asc' }, { id: 'asc' }],
+          select: {
+            id: true,
+            action: true,
+            assignee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            clockInRecords: {
+              where: {
+                status: ClockInStatus.VALID,
+                clockInDate: query.date,
+              },
+              orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+              select: {
+                id: true,
+                userId: true,
+                siteId: true,
+                type: true,
+                timestampLocal: true,
+                comment: true,
+                site: {
+                  select: {
+                    name: true,
+                  },
+                },
+                report: {
+                  select: {
+                    id: true,
+                    submittedAt: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+  const supervisorRows = [...supervisors];
+  const supervisorById = new Map(supervisorRows.map((supervisor) => [supervisor.id, supervisor]));
+  for (const mission of freeMissions) {
+    const missionSite = { id: mission.id, name: `Mission libre - ${mission.action}` };
+    const existing = supervisorById.get(mission.assignee.id);
+    if (existing) {
+      existing.teamMemberships.push({ team: { site: missionSite } });
+      continue;
+    }
+    supervisorRows.push({
+      id: mission.assignee.id,
+      firstName: mission.assignee.firstName,
+      lastName: mission.assignee.lastName,
+      teamMemberships: [{ team: { site: missionSite } }],
+    });
+  }
+
   const siteRecords = records.filter(
     (record): record is PresenceRecord => Boolean(record.siteId && record.site),
   );
+  for (const mission of freeMissions) {
+    for (const record of mission.clockInRecords) {
+      siteRecords.push({
+        ...record,
+        siteId: mission.id,
+        site: { name: `Mission libre - ${mission.action}` },
+      });
+    }
+  }
   const siteReports = fallbackReports.filter(
     (report): report is ReportFallback => Boolean(report.siteId),
   );
@@ -206,7 +288,7 @@ export async function getTeamPresences(
   const departedToday: TeamPresenceItem[] = [];
   const absent: TeamPresenceItem[] = [];
 
-  for (const supervisor of supervisors) {
+  for (const supervisor of supervisorRows) {
     const supervisorRecords = recordsBySupervisor.get(supervisor.id) ?? [];
     const item = buildSupervisorPresenceItem(supervisor, supervisorRecords, reportsBySupervisorSite, now);
 

@@ -39,29 +39,29 @@ export type OfflineReportItem = {
   content: string;
   clockInRecordId?: string;
   clockInClientId?: string;
-  timestampLocal: string;
+  timestampLocal?: string;
 };
 
 export type OfflineSessionReportItem = {
   clientId: string;
-  clockInRecordId: string;
+  clockInRecordId?: string;
   content: string;
   progressPercentage: number;
   blockageNote?: string;
   assignmentId?: string;
-  timestampLocal: string;
+  timestampLocal?: string;
 };
 
 export type OfflineTaskUpdateItem = {
   id: string;
-  assignmentId: string;
+  assignmentId?: string;
   status?: 'COMPLETED';
   progress?: number | null;
   actualQuantity?: number | null;
   comment?: string | null;
   blocked?: boolean;
   completed?: boolean;
-  timestampLocal: string;
+  timestampLocal?: string;
 };
 
 export type PendingMobilePhoto = {
@@ -73,7 +73,7 @@ export type PendingMobilePhoto = {
   planningAssignmentId?: string | null;
   description?: string;
   tags?: PhotoTag[];
-  timestampLocal: string;
+  timestampLocal?: string;
   latitude: number | null;
   longitude: number | null;
 };
@@ -105,7 +105,7 @@ export type MobileOfflinePendingCounts = {
 };
 
 type ClientMapping = {
-  clockInClientId: string;
+  clockInClientId?: string;
   serverRecordId: string;
 };
 
@@ -259,7 +259,7 @@ export function buildPhotoFormData(photo: PendingMobilePhoto) {
   formData.set('category', 'PROGRESS');
   formData.set('description', photo.description ?? '');
   formData.set('tags', JSON.stringify(photo.tags ?? []));
-  formData.set('timestampLocal', photo.timestampLocal);
+  formData.set('timestampLocal', photo.timestampLocal ?? new Date().toISOString());
 
   if (photo.planningAssignmentId) {
     formData.set('planningAssignmentId', photo.planningAssignmentId);
@@ -400,7 +400,7 @@ async function syncReports(errors: string[]) {
 
   const mappingByClientId = new Map(mappings.map((mapping) => [mapping.clockInClientId, mapping.serverRecordId]));
 
-  for (const report of reports.sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal))) {
+  for (const report of reports.sort((left, right) => (left.timestampLocal ?? '').localeCompare(right.timestampLocal ?? ''))) {
     const clockInRecordId =
       report.clockInRecordId ?? (report.clockInClientId ? mappingByClientId.get(report.clockInClientId) : null);
 
@@ -427,7 +427,7 @@ async function syncReports(errors: string[]) {
 async function syncPhotos(errors: string[]) {
   const db = await openDb();
   const photos = (await getAll<PendingMobilePhoto>(db, 'photos'))
-    .sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal))
+    .sort((left, right) => (left.timestampLocal ?? '').localeCompare(right.timestampLocal ?? ''))
     .slice(0, PHOTO_BATCH_SIZE);
   db.close();
 
@@ -452,7 +452,7 @@ async function syncSessionReports(errors: string[]) {
   const reports = await getAll<OfflineSessionReportItem>(db, 'sessionReports');
   db.close();
 
-  for (const report of reports.sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal))) {
+  for (const report of reports.sort((left, right) => (left.timestampLocal ?? '').localeCompare(right.timestampLocal ?? ''))) {
     const response = await authFetch('/api/mobile/session-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -474,7 +474,7 @@ async function syncTaskUpdates(errors: string[]) {
   const updates = await getAll<OfflineTaskUpdateItem>(db, 'taskUpdates');
   db.close();
 
-  for (const update of updates.sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal))) {
+  for (const update of updates.sort((left, right) => (left.timestampLocal ?? '').localeCompare(right.timestampLocal ?? ''))) {
     const isProgressUpdate =
       update.progress !== undefined ||
       update.actualQuantity !== undefined ||

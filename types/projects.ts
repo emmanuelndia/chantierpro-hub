@@ -63,6 +63,16 @@ export type PresenceWorkerItem = {
   firstName: string;
   lastName: string;
   role: Role;
+  gpsPointage: {
+    arrivalAt: string | null;
+    arrivalLatitude: number | null;
+    arrivalLongitude: number | null;
+    arrivalAccuracy: number | null;
+    departureAt: string | null;
+    departureLatitude: number | null;
+    departureLongitude: number | null;
+    departureAccuracy: number | null;
+  };
 };
 
 export type ProjectPresenceSiteItem = {
@@ -278,7 +288,7 @@ export type SiteImportPreviewRow = {
 };
 
 export type SiteImportPreviewResponse = {
-  projectId: string;
+  projectId?: string;
   totalRows: number;
   validRows: number;
   errorRows: number;
@@ -287,7 +297,7 @@ export type SiteImportPreviewResponse = {
 };
 
 export type SiteImportCommitResponse = {
-  projectId: string;
+  projectId?: string;
   createdCount: number;
   skippedCount: number;
   rows: SiteImportPreviewRow[];

@@ -64,7 +64,7 @@ type SerializableUser = Prisma.UserGetPayload<{
 
 export type CreateUserInput = {
   username: string;
-  email: string | null;
+  email?: string | null;
   firstName: string;
   lastName: string;
   role: Role;
@@ -73,7 +73,7 @@ export type CreateUserInput = {
 
 export type UpdateUserInput = {
   username: string;
-  email: string | null;
+  email?: string | null;
   firstName: string;
   lastName: string;
   role: Role;
@@ -486,7 +486,7 @@ export async function createManagedUser(
   const user = await prisma.user.create({
     data: {
       username: input.username,
-      email: input.email,
+      email: input.email ?? null,
       firstName: input.firstName,
       lastName: input.lastName,
       role: input.role,

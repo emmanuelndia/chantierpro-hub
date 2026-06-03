@@ -44,8 +44,8 @@ export type ReportDetail = {
   siteAddress: string;
   sessionStartedAt: string;
   sessionEndedAt: string;
-  sessionDuration: number;
-  progressPercentage: number;
+  sessionDuration?: number;
+  progressPercentage?: number;
   submittedAt: string;
   content: string;
   status: ReportStatus;
@@ -69,7 +69,7 @@ export type ReportsSummary = {
   totalReceived: number;
   pendingCount: number;
   receivedCount: number;
-  progressPercentage: number;
+  progressPercentage?: number;
 };
 
 export type CoordinatorReportsResponse = {

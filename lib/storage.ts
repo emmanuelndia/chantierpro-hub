@@ -261,7 +261,7 @@ async function uploadR2Object(
   payload: {
     storageKey: string;
     body: Buffer;
-    contentType: string;
+    contentType?: string;
   },
 ) {
   const payloadHash = sha256Hex(payload.body);
@@ -270,7 +270,7 @@ async function uploadR2Object(
     method: 'PUT',
     url,
     payloadHash,
-    contentType: payload.contentType,
+    ...(payload.contentType ? { contentType: payload.contentType } : {}),
   });
 
   const response = await fetch(url, {

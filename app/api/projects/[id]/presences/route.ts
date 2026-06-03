@@ -12,6 +12,61 @@ function toDateOnly(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
+type PresenceRecord = {
+  userId: string;
+  type: 'ARRIVAL' | 'DEPARTURE' | 'INTERMEDIATE' | 'PAUSE_START' | 'PAUSE_END';
+  timestampLocal: Date;
+  latitude: { toNumber(): number } | null;
+  longitude: { toNumber(): number } | null;
+  accuracy: { toNumber(): number } | null;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    role: Role;
+  };
+};
+
+function buildPresenceWorkers(records: PresenceRecord[]) {
+  const present = new Map<string, ReturnType<typeof buildPresenceWorker>>();
+
+  for (const record of records) {
+    if (record.type === 'ARRIVAL' || record.type === 'INTERMEDIATE' || record.type === 'PAUSE_START' || record.type === 'PAUSE_END') {
+      present.set(record.userId, buildPresenceWorker(record, records));
+      continue;
+    }
+
+    if (record.type === 'DEPARTURE') {
+      present.delete(record.userId);
+    }
+  }
+
+  return [...present.values()];
+}
+
+function buildPresenceWorker(record: PresenceRecord, records: PresenceRecord[]) {
+  const userRecords = records.filter((item) => item.userId === record.userId);
+  const arrival = userRecords.find((item) => item.type === 'ARRIVAL') ?? null;
+  const departure = [...userRecords].reverse().find((item) => item.type === 'DEPARTURE') ?? null;
+
+  return {
+    userId: record.user.id,
+    firstName: record.user.firstName,
+    lastName: record.user.lastName,
+    role: record.user.role,
+    gpsPointage: {
+      arrivalAt: arrival?.timestampLocal.toISOString() ?? null,
+      arrivalLatitude: arrival?.latitude?.toNumber() ?? null,
+      arrivalLongitude: arrival?.longitude?.toNumber() ?? null,
+      arrivalAccuracy: arrival?.accuracy?.toNumber() ?? null,
+      departureAt: departure?.timestampLocal.toISOString() ?? null,
+      departureLatitude: departure?.latitude?.toNumber() ?? null,
+      departureLongitude: departure?.longitude?.toNumber() ?? null,
+      departureAccuracy: departure?.accuracy?.toNumber() ?? null,
+    },
+  };
+}
+
 export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
   if (!canReadProjects(user.role)) {
     return jsonProjectError('FORBIDDEN', 403, 'Acces refuse aux presences.');
@@ -40,10 +95,14 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
             status: 'VALID',
           },
           orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-          select: {
-            userId: true,
-            type: true,
-            user: {
+        select: {
+          userId: true,
+          type: true,
+          timestampLocal: true,
+          latitude: true,
+          longitude: true,
+          accuracy: true,
+          user: {
               select: {
                 id: true,
                 firstName: true,
@@ -74,6 +133,10 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
           select: {
             userId: true,
             type: true,
+            timestampLocal: true,
+            latitude: true,
+            longitude: true,
+            accuracy: true,
             user: {
               select: {
                 id: true,
@@ -94,59 +157,23 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
     date: today,
     sites: [
       ...sites.map((site) => {
-      const present = new Map<string, { userId: string; firstName: string; lastName: string; role: Role }>();
-
-      for (const record of site.clockInRecords) {
-        if (record.type === 'ARRIVAL' || record.type === 'INTERMEDIATE') {
-          present.set(record.userId, {
-            userId: record.user.id,
-            firstName: record.user.firstName,
-            lastName: record.user.lastName,
-            role: record.user.role,
-          });
-          continue;
-        }
-
-        if (record.type === 'DEPARTURE') {
-          present.delete(record.userId);
-        }
-      }
-
       return {
         id: site.id,
         name: site.name,
         status: site.status,
         contextType: 'SITE' as const,
         contextLabel: 'Chantier',
-        workers: [...present.values()],
+        workers: buildPresenceWorkers(site.clockInRecords),
       };
       }),
       ...freeMissions.map((mission) => {
-        const present = new Map<string, { userId: string; firstName: string; lastName: string; role: Role }>();
-
-        for (const record of mission.clockInRecords) {
-          if (record.type === 'ARRIVAL' || record.type === 'INTERMEDIATE' || record.type === 'PAUSE_START' || record.type === 'PAUSE_END') {
-            present.set(record.userId, {
-              userId: record.user.id,
-              firstName: record.user.firstName,
-              lastName: record.user.lastName,
-              role: record.user.role,
-            });
-            continue;
-          }
-
-          if (record.type === 'DEPARTURE') {
-            present.delete(record.userId);
-          }
-        }
-
         return {
           id: mission.id,
           name: mission.action,
           status: SiteStatus.ACTIVE,
           contextType: 'FREE_MISSION' as const,
           contextLabel: 'Mission libre',
-          workers: [...present.values()],
+          workers: buildPresenceWorkers(mission.clockInRecords),
         };
       }),
     ],

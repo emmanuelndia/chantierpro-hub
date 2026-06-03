@@ -9,7 +9,7 @@ export type CoordinatorScopeUserOption = {
 export type CoordinatorProjectManagerScopeItem = {
   id: string;
   coordinatorId: string;
-  projectManagerId: string;
+  projectManagerId?: string;
   createdById: string;
   createdAt: string;
   coordinator: CoordinatorScopeUserOption;

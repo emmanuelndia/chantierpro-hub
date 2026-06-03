@@ -163,9 +163,9 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
     mutationFn: async (payload: UploadPayload) => {
       const formData = new FormData();
       formData.set('file', payload.file);
-      formData.set('siteId', payload.siteId);
+      formData.set('siteId', payload.siteId ?? '');
       formData.set('category', payload.category);
-      formData.set('description', payload.description);
+      formData.set('description', payload.description ?? '');
       formData.set('tags', JSON.stringify(payload.tags));
       formData.set('timestampLocal', payload.timestampLocal);
       if (payload.latitude !== null) {
@@ -439,7 +439,7 @@ function PhotoTile({
 }: Readonly<{
   photo: PhotoItem;
   onOpen: () => void;
-  onDownload: () => void;
+  onDownload?: () => void;
   onDelete?: () => void;
 }>) {
   return (
@@ -618,7 +618,7 @@ type UploadPayload = {
   siteId: string;
   category: PhotoCategory;
   tags: PhotoTag[];
-  description: string;
+  description?: string;
   timestampLocal: string;
   latitude: number | null;
   longitude: number | null;

@@ -1250,8 +1250,8 @@ async function testProjectValidationAndMutations(context: TestContext) {
       Authorization: `Bearer ${pmLogin.payload.accessToken}`,
     },
     body: {
-      name: 'RÃƒÂ©novation Plateau',
-      description: 'RÃƒÂ©habilitation complÃƒÂ¨te dÃ¢â‚¬â„¢un immeuble administratif.',
+      name: 'Rénovation Plateau',
+      description: "Réhabilitation complete d'un immeuble administratif.",
       address: 'Rue de Lyon',
       city: 'Abidjan',
       startDate: '2026-12-31',
@@ -1269,7 +1269,7 @@ async function testProjectValidationAndMutations(context: TestContext) {
       Authorization: `Bearer ${technicianLogin.payload.accessToken}`,
     },
     body: {
-      name: 'BÃƒÂ¢timent A',
+      name: 'Batiment A',
       address: 'Rue de Lyon, Plateau',
       latitude: 5.36,
       longitude: -4.0083,
