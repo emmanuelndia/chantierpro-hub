@@ -852,7 +852,7 @@ function AssignmentBottomSheet({
               onChange={(supervisorId) => setFormData((prev) => ({ ...prev, supervisorId }))}
               options={supervisorOptions}
               placeholder="Sélectionner une ressource"
-              value={formData.supervisorId}
+              value={formData.supervisorId ?? ''}
             />
           </label>
 

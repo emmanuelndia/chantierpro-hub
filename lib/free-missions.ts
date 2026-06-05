@@ -18,6 +18,7 @@ type AuthLikeUser = {
 export type FreeMissionMutationInput = {
   projectId?: unknown;
   assigneeId?: unknown;
+  assigneeIds?: unknown;
   date?: unknown;
   action?: unknown;
   objectiveText?: unknown;
@@ -97,7 +98,8 @@ export function parseFreeMissionInput(body: unknown) {
   if (!body || typeof body !== 'object') return null;
   const input = body as Record<string, unknown>;
   const projectId = sanitizeString(input.projectId);
-  const assigneeId = sanitizeString(input.assigneeId);
+  const assigneeIds = parseFreeMissionAssigneeIds(body);
+  const assigneeId = sanitizeString(input.assigneeId) ?? assigneeIds[0];
   const date = sanitizeDate(input.date);
   const action = sanitizeString(input.action);
   const objectiveText = sanitizeOptionalString(input.objectiveText);
@@ -111,6 +113,13 @@ export function parseFreeMissionInput(body: unknown) {
     action,
     objectiveText,
   };
+}
+
+function parseFreeMissionAssigneeIds(body: unknown) {
+  if (!body || typeof body !== 'object') return [];
+  const input = body as Record<string, unknown>;
+  const rawIds = Array.isArray(input.assigneeIds) && input.assigneeIds.length > 0 ? input.assigneeIds : [input.assigneeId];
+  return [...new Set(rawIds.map((id) => sanitizeString(id)).filter((id): id is string => Boolean(id)))];
 }
 
 export async function listFreeMissions(prisma: PrismaClient, user: AuthLikeUser, dateLabel: string) {
@@ -154,8 +163,75 @@ export async function createFreeMission(prisma: PrismaClient, user: AuthLikeUser
     return Response.json({ code: 'BAD_REQUEST', message: 'Les donnees de mission libre sont invalides.' }, { status: 400 });
   }
 
+  const assigneeIds = parseFreeMissionAssigneeIds(body);
+  if (assigneeIds.length > 1) {
+    const missions = [];
+    let skippedCount = 0;
+
+    for (const assigneeId of assigneeIds) {
+      const accessError = await validateFreeMissionMutationAccess(prisma, user, input.projectId, assigneeId);
+      if (accessError) return accessError;
+
+      const existing = await prisma.freeMission.findFirst({
+        where: {
+          projectId: input.projectId,
+          assigneeId,
+          date: input.date,
+          action: input.action,
+          deletedAt: null,
+          status: { not: FreeMissionStatus.CANCELLED },
+        },
+        select: { id: true },
+      });
+
+      if (existing) {
+        skippedCount += 1;
+        continue;
+      }
+
+      const mission = await prisma.freeMission.create({
+        data: {
+          projectId: input.projectId,
+          assigneeId,
+          date: input.date,
+          action: input.action,
+          objectiveText: input.objectiveText,
+          createdById: user.id,
+        },
+        select: freeMissionSelect,
+      });
+      missions.push(serializeFreeMission(mission));
+    }
+
+    return Response.json(
+      {
+        mission: missions[0],
+        missions,
+        createdCount: missions.length,
+        skippedCount,
+      },
+      { status: 201 },
+    );
+  }
+
   const accessError = await validateFreeMissionMutationAccess(prisma, user, input.projectId, input.assigneeId);
   if (accessError) return accessError;
+
+  const existing = await prisma.freeMission.findFirst({
+    where: {
+      projectId: input.projectId,
+      assigneeId: input.assigneeId,
+      date: input.date,
+      action: input.action,
+      deletedAt: null,
+      status: { not: FreeMissionStatus.CANCELLED },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return Response.json({ code: 'TASK_DUPLICATE', message: 'Cette mission libre existe deja pour cette ressource.' }, { status: 409 });
+  }
 
   const mission = await prisma.freeMission.create({
     data: {

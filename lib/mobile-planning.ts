@@ -7,6 +7,7 @@ import {
   PlanningWorkLocationType,
   Prisma,
   Role,
+  ProjectStatus,
   SiteStatus,
   type PrismaClient,
 } from '@prisma/client';
@@ -112,6 +113,31 @@ export function operationalPlanningSiteWhere(user: AuthLikeUser, _date?: Date): 
   };
 }
 
+function operationalPlanningProjectWhere(user: AuthLikeUser, date?: Date): Prisma.ProjectWhereInput {
+  const activeProjectWhere = {
+    status: { notIn: [ProjectStatus.ARCHIVED, ProjectStatus.COMPLETED] },
+  } satisfies Prisma.ProjectWhereInput;
+
+  if (user.role === Role.PROJECT_MANAGER) {
+    return {
+      ...activeProjectWhere,
+      projectManagerId: user.id,
+    };
+  }
+
+  if (user.role === Role.GENERAL_SUPERVISOR) {
+    const siteWhere = operationalPlanningSiteWhere(user, date);
+    return {
+      ...activeProjectWhere,
+      sites: {
+        some: siteWhere,
+      },
+    };
+  }
+
+  return activeProjectWhere;
+}
+
 export async function getPlanningDay(
   prisma: PrismaClient,
   user: AuthLikeUser,
@@ -127,7 +153,7 @@ export async function getPlanningDay(
 
   const siteWhere = operationalPlanningSiteWhere(user, parsedDate);
   const assignmentScopeWhere = planningAssignmentScopeWhere(user);
-  const [assignments, freeMissionResponse, sites, scopedSupervisorIds] = await Promise.all([
+  const [assignments, freeMissionResponse, sites, projects, scopedSupervisorIds] = await Promise.all([
     prisma.planningAssignment.findMany({
       where: {
         date: parsedDate,
@@ -148,6 +174,14 @@ export async function getPlanningDay(
       where: siteWhere,
       orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
       select: availableSiteSelect,
+    }),
+    prisma.project.findMany({
+      where: operationalPlanningProjectWhere(user, parsedDate),
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+      },
     }),
     getScopedSupervisorIds(prisma, user, parsedDate),
   ]);
@@ -225,6 +259,10 @@ export async function getPlanningDay(
       availabilityLabel: getSupervisorAvailabilityLabel(supervisor.id, assignedSupervisorIds),
       assignedSiteName: assignedSupervisorIds.get(supervisor.id) ?? null,
     })),
+    availableProjects: projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+    })),
     availableSites: sites.map((site) => ({
       id: site.id,
       name: site.name,
@@ -247,6 +285,51 @@ export async function createPlanningAssignment(
   user: AuthLikeUser,
   input: CreateAssignmentRequest,
 ) {
+  const supervisorIds = normalizeSupervisorIds(input);
+  if (supervisorIds instanceof Response) return supervisorIds;
+
+  if (supervisorIds.length > 1) {
+    const assignments: PlanningAssignment[] = [];
+    let skippedCount = 0;
+
+    for (const supervisorId of supervisorIds) {
+      const result = await createSinglePlanningAssignment(
+        prisma,
+        user,
+        { ...withoutSupervisorIds(input), supervisorId },
+        { skipDuplicates: true },
+      );
+
+      if (result instanceof Response) return result;
+      if ('skipped' in result) {
+        skippedCount += 1;
+        continue;
+      }
+      if (result.assignment) assignments.push(result.assignment);
+    }
+
+    return {
+      assignment: assignments[0],
+      assignments,
+      createdCount: assignments.length,
+      skippedCount,
+    };
+  }
+
+  const supervisorId = supervisorIds[0];
+  if (!supervisorId) {
+    return planningError('INVALID_REQUEST', 'Au moins une ressource terrain est requise.', 400);
+  }
+
+  return createSinglePlanningAssignment(prisma, user, { ...withoutSupervisorIds(input), supervisorId });
+}
+
+async function createSinglePlanningAssignment(
+  prisma: PrismaClient,
+  user: AuthLikeUser,
+  input: CreateAssignmentRequest,
+  options: { skipDuplicates?: boolean } = {},
+) {
   const normalized = await validateAssignmentInput(prisma, user, input);
   if (normalized instanceof Response) return normalized;
 
@@ -261,6 +344,9 @@ export async function createPlanningAssignment(
   });
 
   if (existingTasks.some((task) => isSameTask(task, normalized))) {
+    if (options.skipDuplicates) {
+      return { skipped: true as const };
+    }
     return planningError('TASK_DUPLICATE', 'Cette tache existe deja pour cette ressource sur ce chantier.', 409);
   }
 
@@ -299,6 +385,10 @@ export async function createPlanningAssignment(
           "La base de donnees bloque encore les assignations multi-taches sur un meme chantier. Executez `npx prisma migrate deploy` pour appliquer la migration planning_multiple_tasks_per_site.",
           409,
         );
+      }
+
+      if (options.skipDuplicates) {
+        return { skipped: true as const };
       }
 
       return planningError('TASK_DUPLICATE', 'Cette tache existe deja pour cette ressource sur ce chantier.', 409);
@@ -793,23 +883,43 @@ async function getAssignedSupervisorIdsForDay(
     return new Map<string, string>();
   }
 
-  const assignments = await prisma.planningAssignment.findMany({
-    where: {
-      date,
-      deletedAt: null,
-      supervisorId: {
-        in: supervisorIds,
-      },
-    },
-    select: {
-      supervisorId: true,
-      site: {
-        select: {
-          name: true,
+  const [assignments, freeMissions] = await Promise.all([
+    prisma.planningAssignment.findMany({
+      where: {
+        date,
+        deletedAt: null,
+        supervisorId: {
+          in: supervisorIds,
         },
       },
-    },
-  });
+      select: {
+        supervisorId: true,
+        site: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    }),
+    prisma.freeMission.findMany({
+      where: {
+        date,
+        deletedAt: null,
+        status: { not: FreeMissionStatus.CANCELLED },
+        assigneeId: {
+          in: supervisorIds,
+        },
+      },
+      select: {
+        assigneeId: true,
+        project: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    }),
+  ]);
 
   const sitesBySupervisor = new Map<string, Set<string>>();
 
@@ -817,6 +927,12 @@ async function getAssignedSupervisorIdsForDay(
     const siteNames = sitesBySupervisor.get(assignment.supervisorId) ?? new Set<string>();
     siteNames.add(assignment.site.name);
     sitesBySupervisor.set(assignment.supervisorId, siteNames);
+  }
+
+  for (const mission of freeMissions) {
+    const siteNames = sitesBySupervisor.get(mission.assigneeId) ?? new Set<string>();
+    siteNames.add(`Mission libre - ${mission.project.name}`);
+    sitesBySupervisor.set(mission.assigneeId, siteNames);
   }
 
   return new Map(
@@ -853,6 +969,25 @@ function buildTaskKey(
 
 function normalizeTaskActionKey(action: string) {
   return action.trim().replace(/\s+/g, ' ').toLocaleLowerCase('fr-FR');
+}
+
+function normalizeSupervisorIds(input: CreateAssignmentRequest) {
+  const rawIds = Array.isArray(input.supervisorIds) && input.supervisorIds.length > 0 ? input.supervisorIds : [input.supervisorId];
+  const ids = rawIds
+    .map((id) => normalizeId(id))
+    .filter((id): id is string => Boolean(id));
+  const uniqueIds = [...new Set(ids)];
+
+  if (uniqueIds.length === 0) {
+    return planningError('INVALID_REQUEST', 'Au moins une ressource terrain est requise.', 400);
+  }
+
+  return uniqueIds;
+}
+
+function withoutSupervisorIds(input: CreateAssignmentRequest): Omit<CreateAssignmentRequest, 'supervisorIds'> {
+  const { supervisorIds: _supervisorIds, ...rest } = input;
+  return rest;
 }
 
 function isSameTask(

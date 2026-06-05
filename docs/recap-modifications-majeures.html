@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChantierPro - Recapitulatif des modifications majeures</title>
+    <style>
+      :root {
+        --ink: #0f172a;
+        --muted: #64748b;
+        --soft: #f5f7fb;
+        --line: #e2e8f0;
+        --orange: #f05a0a;
+        --orange-soft: #fff1e8;
+        --blue: #0f4c81;
+        --green: #0f9f6e;
+        --shadow: 0 22px 70px rgba(15, 23, 42, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--soft);
+        color: var(--ink);
+        font-family:
+          Segoe UI,
+          Arial,
+          sans-serif;
+      }
+
+      .page {
+        min-height: 100vh;
+      }
+
+      .hero {
+        background:
+          linear-gradient(135deg, rgba(240, 90, 10, 0.35), transparent 36%),
+          linear-gradient(45deg, rgba(15, 76, 129, 0.4), transparent 45%),
+          #070d1a;
+        color: white;
+        padding: 56px 28px;
+      }
+
+      .wrap {
+        width: min(1180px, 100%);
+        margin: 0 auto;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 32px;
+        align-items: stretch;
+      }
+
+      .eyebrow {
+        margin: 0 0 14px;
+        color: #ffb27d;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 820px;
+        font-size: clamp(38px, 6vw, 70px);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+      }
+
+      .hero p.lead {
+        max-width: 760px;
+        margin: 24px 0 0;
+        color: #dce6f3;
+        font-size: 18px;
+        line-height: 1.8;
+      }
+
+      .hero-card {
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 32px;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 24px;
+        backdrop-filter: blur(14px);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-card h2 {
+        margin: 0;
+        color: white;
+        font-size: 14px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+
+      .figures {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .figure {
+        border-radius: 24px;
+        background: white;
+        color: var(--ink);
+        padding: 20px;
+      }
+
+      .figure strong {
+        display: block;
+        color: var(--orange);
+        font-size: 40px;
+        line-height: 1;
+      }
+
+      .figure span {
+        display: block;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .section {
+        padding: 36px 28px;
+      }
+
+      .intro-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+
+      .intro-card,
+      .change-card {
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: white;
+        box-shadow: 0 16px 50px rgba(15, 23, 42, 0.06);
+      }
+
+      .intro-card {
+        padding: 24px;
+      }
+
+      .intro-card h3 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .intro-card p {
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 650;
+        line-height: 1.8;
+      }
+
+      .section-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: end;
+        margin-bottom: 22px;
+      }
+
+      .section-title h2 {
+        margin: 0;
+        font-size: 34px;
+        letter-spacing: -0.03em;
+      }
+
+      .section-title p {
+        max-width: 520px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+      }
+
+      .change-card {
+        overflow: hidden;
+      }
+
+      .change-head {
+        display: grid;
+        grid-template-columns: 56px 1fr;
+        gap: 16px;
+        padding: 24px;
+        border-bottom: 1px solid #edf2f7;
+      }
+
+      .icon {
+        width: 56px;
+        height: 56px;
+        display: grid;
+        place-items: center;
+        border-radius: 20px;
+        background: var(--orange-soft);
+        color: var(--orange);
+        font-size: 26px;
+      }
+
+      .change-head h3 {
+        margin: 6px 0 0;
+        font-size: 23px;
+        line-height: 1.15;
+      }
+
+      .change-head p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 650;
+        line-height: 1.7;
+      }
+
+      .tag {
+        color: var(--orange);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .change-body {
+        display: grid;
+        grid-template-columns: 1fr 0.9fr;
+        gap: 18px;
+        padding: 24px;
+      }
+
+      ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      li {
+        position: relative;
+        padding-left: 18px;
+        color: #334155;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.75em;
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--orange);
+      }
+
+      .impact {
+        border-radius: 22px;
+        background: var(--ink);
+        color: white;
+        padding: 18px;
+      }
+
+      .impact strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .impact strong {
+        color: #ffb27d;
+      }
+
+      .impact p {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 650;
+        line-height: 1.65;
+      }
+
+      footer {
+        padding: 30px 28px 46px;
+        color: var(--muted);
+        text-align: center;
+        font-size: 13px;
+      }
+
+      @media (max-width: 920px) {
+        .hero-grid,
+        .intro-grid,
+        .cards,
+        .change-body {
+          grid-template-columns: 1fr;
+        }
+
+        .section-title {
+          align-items: start;
+          flex-direction: column;
+        }
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+
+        .hero {
+          background: #070d1a;
+        }
+
+        .change-card,
+        .intro-card {
+          box-shadow: none;
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <div class="wrap hero-grid">
+          <div>
+            <p class="eyebrow">ChantierPro</p>
+            <h1>Recapitulatif des evolutions majeures</h1>
+            <p class="lead">
+              Synthese des fonctionnalites et logiques importantes ajoutees dans l application : terrain,
+              planning, presences, rapports, roles, missions libres et pilotage.
+            </p>
+          </div>
+
+          <aside class="hero-card">
+            <h2>Vue d ensemble</h2>
+            <div class="figures">
+              <div class="figure"><strong>12</strong><span>modules enrichis</span></div>
+              <div class="figure"><strong>2</strong><span>nouveaux roles</span></div>
+              <div class="figure"><strong>3</strong><span>parcours terrain</span></div>
+              <div class="figure"><strong>4</strong><span>suivis operationnels</span></div>
+            </div>
+          </aside>
+        </div>
+      </header>
+
+      <main>
+        <section class="section">
+          <div class="wrap intro-grid">
+            <article class="intro-card">
+              <h3>Terrain</h3>
+              <p>Taches, pointage, photo, rapport et mission libre ont chacun un role plus clair.</p>
+            </article>
+            <article class="intro-card">
+              <h3>Pilotage</h3>
+              <p>Les chefs projets, responsables et coordinateurs ont des perimetres plus adaptes.</p>
+            </article>
+            <article class="intro-card">
+              <h3>Controle</h3>
+              <p>Les presences, statuts et positions GPS deviennent plus faciles a suivre.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="wrap">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Fonctionnalites ajoutees</p>
+                <h2>Les grands changements</h2>
+              </div>
+              <p>Chaque carte resume la logique metier ajoutee et ce que cela change dans l utilisation de ChantierPro.</p>
+            </div>
+
+            <div class="cards">
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">📷</div>
+                  <div>
+                    <span class="tag">Preuves terrain</span>
+                    <h3>Photos chantier enrichies</h3>
+                    <p>Les photos deviennent exploitables avec contexte, tags et lien possible avec une tache.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Commentaire photo visible avant envoi.</li>
+                    <li>Tags rapides : debut tache, fin tache, blocage, preuve travaux, incident.</li>
+                    <li>Lien possible entre photo et tache planning.</li>
+                    <li>Conservation tags/commentaires en offline.</li>
+                    <li>Galerie et rapports enrichis.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>La photo devient une preuve classee et rattachee au travail realise.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">👥</div>
+                  <div>
+                    <span class="tag">Organisation utilisateurs</span>
+                    <h3>Roles Ressource et Ressource externe</h3>
+                    <p>Deux roles structurent mieux les ressources internes et externes.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Ajout du role Ressource avec droits terrain.</li>
+                    <li>Ajout du role Ressource externe.</li>
+                    <li>Les ressources externes composent les equipes chantier.</li>
+                    <li>Les ressources internes restent planifiables.</li>
+                    <li>Roles visibles dans planning, presences, rapports et galerie.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>L entreprise distingue clairement ses ressources internes et les intervenants externes.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">🔑</div>
+                  <div>
+                    <span class="tag">Comptes</span>
+                    <h3>Connexion par identifiant</h3>
+                    <p>Le username devient l identifiant principal et l email devient facultatif.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Connexion possible avec nom d utilisateur.</li>
+                    <li>Email facultatif et informatif.</li>
+                    <li>Creation utilisateur avec username obligatoire.</li>
+                    <li>Compatibilite avec anciens emails.</li>
+                    <li>Utilisateurs desactives masques des listes actives.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>Les comptes terrain peuvent etre crees sans demander l email personnel.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">✅</div>
+                  <div>
+                    <span class="tag">Suivi d avancement</span>
+                    <h3>Planning avec objectif quantitatif</h3>
+                    <p>Le planning suit objectif, unite, realise cumule et progression calculee.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Objectif quantitatif et unite.</li>
+                    <li>La ressource saisit le realise cumule.</li>
+                    <li>Progression automatique depuis realise / objectif.</li>
+                    <li>Progression cible reservee aux taches sans quantite.</li>
+                    <li>Correction des incoherences blocage / termine.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>On suit ce qui devait etre fait et ce qui est vraiment realise.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">📱</div>
+                  <div>
+                    <span class="tag">Terrain mobile</span>
+                    <h3>Ecran mobile Taches</h3>
+                    <p>Les taches terrain et bureau ont un ecran dedie sur mobile.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Nouvel ecran mobile Taches.</li>
+                    <li>Filtres : toutes, terrain, bureau, bloquees, terminees.</li>
+                    <li>Cartes avec objectif, realise, progression, reste et statut.</li>
+                    <li>Mise a jour d avancement centralisee.</li>
+                    <li>Accueil mobile allege.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>La ressource sait ou declarer son avancement sans melanger les usages.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">🛡️</div>
+                  <div>
+                    <span class="tag">RH et suivi terrain</span>
+                    <h3>Presences chantiers live</h3>
+                    <p>Une liste de presence terrain suit les ressources attendues ou deja pointees.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Nouvel ecran Presences chantiers.</li>
+                    <li>Statuts : present, pause, absent, sorti, anomalie.</li>
+                    <li>Absent = assigne terrain mais non pointe.</li>
+                    <li>Non prevu = pointe sans assignation terrain.</li>
+                    <li>Filtre date et exclusion des taches bureau.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>La RH suit une vraie liste de presence terrain, pas un annuaire complet.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">📍</div>
+                  <div>
+                    <span class="tag">Interventions mobiles</span>
+                    <h3>Missions libres sans site fixe</h3>
+                    <p>Les missions sans chantier connu sont rattachees a un projet et pointees au GPS reel.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Mission libre rattachee a un projet.</li>
+                    <li>Pas de chantier fixe et pas de controle de rayon.</li>
+                    <li>GPS d entree et de sortie enregistre.</li>
+                    <li>Photos et rapports lies a la mission libre.</li>
+                    <li>Presences affichees avec contexte mission libre.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>On evite les faux chantiers pour les interventions client variables.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">🗺️</div>
+                  <div>
+                    <span class="tag">Controle GPS</span>
+                    <h3>Positions de pointage</h3>
+                    <p>Les roles habilites peuvent ouvrir les positions GPS capturees au pointage.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Bouton de consultation quand les coordonnees existent.</li>
+                    <li>Position d entree visible.</li>
+                    <li>Position de sortie visible si disponible.</li>
+                    <li>Utile pour missions libres et presences chantier.</li>
+                    <li>Pas de tracking live continu.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>Le controle reste proportionne : on verifie les pointages, pas les deplacements.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">🏗️</div>
+                  <div>
+                    <span class="tag">Gestion projet</span>
+                    <h3>Chantiers, sites et import</h3>
+                    <p>La gestion des chantiers est plus flexible pour les chefs projets et responsables.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Deplacement d un chantier vers un autre projet.</li>
+                    <li>Responsables metier autorises a gerer les chantiers actifs.</li>
+                    <li>Import multi-chantiers ouvert aux roles concernes.</li>
+                    <li>Documents projet/chantier masques pour responsables metier.</li>
+                    <li>Surface estimee facultative.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>Les corrections et creations en masse deviennent plus simples.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">🤝</div>
+                  <div>
+                    <span class="tag">Rapports et portefeuille</span>
+                    <h3>Coordinateurs rattaches aux chefs projets</h3>
+                    <p>Les chefs projets pilotent les coordinateurs qui suivent leurs rapports.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Rattachement coordinateur vers chef projet.</li>
+                    <li>Un coordinateur peut suivre plusieurs chefs projets.</li>
+                    <li>Rapports visibles selon les PM rattaches.</li>
+                    <li>Correction possible admin/direction.</li>
+                    <li>Suivi rapports attendus jour/semaine.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>La visibilite des coordinateurs suit l organisation terrain.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">📝</div>
+                  <div>
+                    <span class="tag">Experience terrain</span>
+                    <h3>Rapports et camera mobile</h3>
+                    <p>La camera et les rapports sont simplifies pour eviter les actions melangees.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Suppression des alertes systeme peu modernes.</li>
+                    <li>Correction du blocage camera apres photo.</li>
+                    <li>La camera ne termine plus les taches.</li>
+                    <li>Infos photo dans un panneau bas.</li>
+                    <li>Avancement et blocage restent dans Taches.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>Chaque ecran a un role clair : preuve, avancement ou compte rendu.</p></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="change-card">
+                <div class="change-head">
+                  <div class="icon">🔎</div>
+                  <div>
+                    <span class="tag">Ergonomie</span>
+                    <h3>Recherche et selections harmonisees</h3>
+                    <p>Les longues listes utilisent un champ de selection recherchable plus clair.</p>
+                  </div>
+                </div>
+                <div class="change-body">
+                  <ul>
+                    <li>Projet, chantier, ressource et coordinateur recherchables.</li>
+                    <li>Suppression du modele champ + resultat + select.</li>
+                    <li>Disponibilite visible dans les resultats ressource.</li>
+                    <li>Utilise dans planning, perimetres et coordinateurs projet.</li>
+                    <li>Recherche presence chantier debouncee.</li>
+                  </ul>
+                  <div>
+                    <div class="impact"><strong>Ce que ca change</strong><p>Les listes restent utilisables meme avec beaucoup de ressources et sites.</p></div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <footer>
+        ChantierPro - Synthese fonctionnelle des modifications majeures.
+      </footer>
+    </div>
+  </body>
+</html>

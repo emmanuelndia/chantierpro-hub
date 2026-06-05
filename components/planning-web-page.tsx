@@ -7,7 +7,7 @@ import { Download, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
-import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
+import { SearchableMultiSelect, SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
 import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
@@ -43,6 +43,7 @@ type PlanningAssignmentGroup = {
 type AssignmentFormState = {
   id?: string;
   supervisorId: string;
+  supervisorIds: string[];
   projectId: string;
   siteId: string;
   date: string;
@@ -58,9 +59,15 @@ type AssignmentFormState = {
 type FreeMissionWebRequest = {
   projectId: string;
   assigneeId: string;
+  assigneeIds?: string[];
   date: string;
   action: string;
   objectiveText: string | null;
+};
+
+type CreateSummaryResponse = {
+  createdCount?: number;
+  skippedCount?: number;
 };
 
 const todayKey = formatDateKey(new Date());
@@ -168,8 +175,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
 
   const createMutation = useMutation({
     mutationFn: createAssignment,
-    onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Tâche créée' });
+    onSuccess: async (result) => {
+      pushToast({ type: 'success', title: formatCreateSuccessTitle(result, 'Tâche créée') });
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -189,8 +196,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const freeMissionMutation = useMutation({
     mutationFn: ({ id, data }: { id?: string; data: FreeMissionWebRequest }) =>
       id ? updateFreeMission(id, data) : createFreeMission(data),
-    onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Mission libre enregistree' });
+    onSuccess: async (result) => {
+      pushToast({ type: 'success', title: formatCreateSuccessTitle(result, 'Mission libre enregistree') });
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -212,7 +219,10 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     () => filterAssignments(data?.assignments ?? [], data?.availableSites ?? [], filters),
     [data, filters],
   );
-  const projects = useMemo(() => getProjectOptions(data?.availableSites ?? []), [data]);
+  const projects = useMemo(
+    () => data?.availableProjects ?? getProjectOptions(data?.availableSites ?? []),
+    [data],
+  );
   const sites = useMemo(() => data?.availableSites ?? [], [data?.availableSites]);
   const resources = useMemo(() => data?.unassignedSupervisors ?? [], [data?.unassignedSupervisors]);
   const centralizedItems = useMemo(() => centralizedQuery.data?.items ?? [], [centralizedQuery.data?.items]);
@@ -277,6 +287,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     setForm({
       id: assignment.id,
       supervisorId: assignment.supervisorId,
+      supervisorIds: [assignment.supervisorId],
       projectId: assignment.projectId ?? sites.find((site) => site.id === assignment.siteId)?.project.id ?? '',
       siteId: assignment.siteId ?? '',
       date: selectedDate,
@@ -306,6 +317,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       const data = {
         projectId: form.projectId,
         assigneeId: form.supervisorId,
+        ...(drawerMode === 'create' ? { assigneeIds: form.supervisorIds } : {}),
         date: form.date,
         action: form.action,
         objectiveText: form.objectiveText.trim() || null,
@@ -317,6 +329,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     if (drawerMode === 'create') {
       const payload: PlanningWebCreateRequest = {
         supervisorId: form.supervisorId,
+        supervisorIds: form.supervisorIds,
         siteId: form.siteId,
         action: form.action,
         targetProgress: normalizedTargetProgress,
@@ -1040,7 +1053,8 @@ function AssignmentDrawer({
   const progressValid = progressNumber === null || (Number.isInteger(progressNumber) && progressNumber >= 0 && progressNumber <= 100);
   const quantityValid = quantityNumber === null || (Number.isFinite(quantityNumber) && quantityNumber >= 0);
   const canSubmit = Boolean(form.action.trim() && form.date) && progressValid && quantityValid;
-  const createIdentityValid = mode === 'edit' || Boolean(form.supervisorId && (isFreeMission ? form.projectId : form.siteId));
+  const selectedResourceCount = mode === 'create' ? form.supervisorIds.length : form.supervisorId ? 1 : 0;
+  const createIdentityValid = mode === 'edit' || Boolean(selectedResourceCount > 0 && (isFreeMission ? form.projectId : form.siteId));
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/50">
@@ -1084,15 +1098,31 @@ function AssignmentDrawer({
               Choisis d&apos;abord le type : il determine si la tache demande un chantier, une mission libre ou seulement une action bureau.
             </p>
           </Field>
-          <Field label="Ressource">
-            <SearchableSelect
-              disabled={!canEditIdentity}
-              emptyLabel="Aucune ressource trouvée."
-              onChange={(value) => onChange({ ...form, supervisorId: value })}
-              options={resourceOptions}
-              placeholder="Rechercher une ressource"
-              value={form.supervisorId}
-            />
+          <Field label={mode === 'create' ? 'Ressources' : 'Ressource'}>
+            {mode === 'create' ? (
+              <SearchableMultiSelect
+                disabled={!canEditIdentity}
+                emptyLabel="Aucune ressource trouvée."
+                onChange={(values) => onChange({ ...form, supervisorIds: values, supervisorId: values[0] ?? '' })}
+                options={resourceOptions}
+                placeholder="Rechercher des ressources"
+                values={form.supervisorIds}
+              />
+            ) : (
+              <SearchableSelect
+                disabled
+                emptyLabel="Aucune ressource trouvée."
+                onChange={(value) => onChange({ ...form, supervisorId: value, supervisorIds: value ? [value] : [] })}
+                options={resourceOptions}
+                placeholder="Ressource"
+                value={form.supervisorId}
+              />
+            )}
+            {mode === 'create' && form.supervisorIds.length > 1 ? (
+              <p className="mt-2 rounded-2xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                {form.supervisorIds.length} tâches identiques seront créées, une par ressource.
+              </p>
+            ) : null}
             {conflicts.length > 0 ? (
               <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                 <p className="font-bold">Cette ressource est deja occupee ailleurs ce jour.</p>
@@ -1556,7 +1586,7 @@ async function createFreeMission(data: FreeMissionWebRequest) {
   if (!response.ok) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de creer la mission libre.'));
   }
-  return (await response.json()) as unknown;
+  return (await response.json()) as CreateSummaryResponse;
 }
 
 async function updateFreeMission(id: string, data: FreeMissionWebRequest) {
@@ -1568,7 +1598,7 @@ async function updateFreeMission(id: string, data: FreeMissionWebRequest) {
   if (!response.ok) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de modifier la mission libre.'));
   }
-  return (await response.json()) as unknown;
+  return (await response.json()) as CreateSummaryResponse;
 }
 
 async function deleteAssignment(id: string) {
@@ -1706,6 +1736,20 @@ function filterAssignableResources(resources: UnassignedSupervisor[], search: st
   );
 }
 
+function formatCreateSuccessTitle(result: CreateSummaryResponse, fallback: string) {
+  const createdCount = result.createdCount;
+  const skippedCount = result.skippedCount ?? 0;
+  if (typeof createdCount !== 'number') {
+    return fallback;
+  }
+
+  if (skippedCount > 0) {
+    return `${createdCount} créée(s), ${skippedCount} déjà existante(s)`;
+  }
+
+  return `${createdCount} créée(s)`;
+}
+
 function toProjectSelectOptions(projects: { id: string; name: string }[]): SearchableSelectOption[] {
   return projects.map((project) => ({
     value: project.id,
@@ -1734,6 +1778,7 @@ function toResourceSelectOptions(resources: UnassignedSupervisor[]): SearchableS
 function createEmptyForm(date: string): AssignmentFormState {
   return {
     supervisorId: '',
+    supervisorIds: [],
     projectId: '',
     siteId: '',
     date,

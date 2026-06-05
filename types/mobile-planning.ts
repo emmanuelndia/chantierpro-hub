@@ -85,18 +85,25 @@ export type AvailableSite = {
   };
 };
 
+export type AvailableProject = {
+  id: string;
+  name: string;
+};
+
 export type PlanningDayResponse = {
   date: string;
   assignments: PlanningAssignment[];
   clockInStatuses: PlanningClockInStatusItem[];
   unassignedSupervisors: UnassignedSupervisor[];
+  availableProjects: AvailableProject[];
   availableSites: AvailableSite[];
   hasAssignments: boolean;
   canDuplicateFromYesterday: boolean;
 };
 
 export type CreateAssignmentRequest = {
-  supervisorId: string;
+  supervisorId?: string;
+  supervisorIds?: string[];
   siteId: string;
   action: string;
   targetProgress?: number | null;
@@ -123,7 +130,10 @@ export type DuplicateAssignmentsRequest = {
 };
 
 export type PlanningAssignmentMutationResponse = {
-  assignment: PlanningAssignment;
+  assignment?: PlanningAssignment;
+  assignments?: PlanningAssignment[];
+  createdCount?: number;
+  skippedCount?: number;
 };
 
 export type DuplicateAssignmentsResponse = {

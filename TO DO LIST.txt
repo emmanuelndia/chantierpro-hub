@@ -69,6 +69,21 @@ du genre une ressource A doit aller dans un quartier à Yopougon et c'est le cli
 
 Erreur sur le model excel
 
+Certain sites peuvent être à des coordonnées proches et dans le excel ça mets des erreurs quand les coordonnées sont proches 
+
+
+
+Ajout de commentaire photo
+Ajout de tags sur les photos (début tâche, fin tâche etc)
+Role RESOURCE et EXTERNAL_RESOURCE ajouté
+Passage de la connexion par email à la connexion par username
+Au niveau du planning : 
+
+Ajout du suivi par objectif quantitatif :
+    - objectif quantité ;
+    - unité ;
+    - réalisé cumulé ;
+    - progression calculée automatiquement.
 
 
 
