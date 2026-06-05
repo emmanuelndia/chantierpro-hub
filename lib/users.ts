@@ -417,6 +417,17 @@ export async function deactivateManagedUser(prisma: PrismaClient, userId: string
       },
     });
 
+    await tx.generalSupervisorProjectScope.updateMany({
+      where: {
+        generalSupervisorId: userId,
+        status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+      },
+      data: {
+        status: GeneralSupervisorSiteScopeStatus.INACTIVE,
+        endDate: today,
+      },
+    });
+
     await tx.coordinatorProjectManagerScope.deleteMany({
       where: {
         OR: [{ coordinatorId: userId }, { projectManagerId: userId }],

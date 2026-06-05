@@ -17,29 +17,54 @@ export type GeneralSupervisorScopeSiteOption = {
   };
 };
 
-export type GeneralSupervisorScopeItem = {
+export type GeneralSupervisorScopeProjectOption = {
+  id: string;
+  name: string;
+};
+
+type GeneralSupervisorScopeBaseItem = {
   id: string;
   generalSupervisorId: string;
   projectManagerId: string;
-  siteId: string;
   startDate: string;
   endDate: string | null;
   status: GeneralSupervisorSiteScopeStatus;
   createdAt: string;
   generalSupervisor: GeneralSupervisorScopeUserOption;
   projectManager: GeneralSupervisorScopeUserOption;
-  site: GeneralSupervisorScopeSiteOption;
 };
+
+export type GeneralSupervisorSiteScopeItem = GeneralSupervisorScopeBaseItem & {
+  scopeType: 'SITES';
+  siteId: string;
+  site: GeneralSupervisorScopeSiteOption;
+  project: GeneralSupervisorScopeProjectOption;
+};
+
+export type GeneralSupervisorProjectScopeItem = GeneralSupervisorScopeBaseItem & {
+  scopeType: 'PROJECT';
+  projectId: string;
+  project: GeneralSupervisorScopeProjectOption;
+  site: null;
+};
+
+export type GeneralSupervisorScopeItem = GeneralSupervisorSiteScopeItem | GeneralSupervisorProjectScopeItem;
 
 export type GeneralSupervisorScopesResponse = {
   scopes: GeneralSupervisorScopeItem[];
+  siteScopes: GeneralSupervisorSiteScopeItem[];
+  projectScopes: GeneralSupervisorProjectScopeItem[];
   generalSupervisors: GeneralSupervisorScopeUserOption[];
+  projects: GeneralSupervisorScopeProjectOption[];
   sites: GeneralSupervisorScopeSiteOption[];
 };
 
 export type CreateGeneralSupervisorScopeRequest = {
   generalSupervisorId: string;
-  siteId: string;
+  scopeType?: 'PROJECT' | 'SITES';
+  projectId?: string;
+  siteId?: string;
+  siteIds?: string[];
   startDate: string;
   endDate?: string | null;
 };

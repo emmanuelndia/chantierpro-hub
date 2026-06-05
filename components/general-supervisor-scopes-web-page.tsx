@@ -6,13 +6,14 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Pencil, UserRoundX } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
-import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
+import { SearchableMultiSelect, SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
 import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
   CreateGeneralSupervisorScopeRequest,
   GeneralSupervisorScopeItem,
+  GeneralSupervisorScopeProjectOption,
   GeneralSupervisorScopesResponse,
   GeneralSupervisorScopeSiteOption,
   GeneralSupervisorScopeUserOption,
@@ -30,13 +31,16 @@ type ScopeFilters = {
   siteId: string;
   generalSupervisorId: string;
   status: 'ALL' | GeneralSupervisorSiteScopeStatus;
+  scopeType: 'ALL' | 'PROJECT' | 'SITES';
 };
 
 type ScopeFormState = {
   id?: string;
+  scopeType: 'PROJECT' | 'SITES';
   generalSupervisorId: string;
   projectId: string;
   siteId: string;
+  siteIds: string[];
   startDate: string;
   endDate: string;
   status: GeneralSupervisorSiteScopeStatus;
@@ -45,6 +49,7 @@ type ScopeFormState = {
 const todayKey = new Date().toISOString().slice(0, 10);
 const emptyScopes: GeneralSupervisorScopeItem[] = [];
 const emptySites: GeneralSupervisorScopeSiteOption[] = [];
+const emptyProjects: GeneralSupervisorScopeProjectOption[] = [];
 const emptyGeneralSupervisors: GeneralSupervisorScopeUserOption[] = [];
 const inputClassName =
   'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-500';
@@ -60,6 +65,7 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
     siteId: '',
     generalSupervisorId: '',
     status: 'ALL',
+    scopeType: 'ALL',
   });
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState<ScopeFormState>(() => createEmptyForm());
@@ -73,8 +79,13 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
 
   const createMutation = useMutation({
     mutationFn: createScope,
-    onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Perimetre cree' });
+    onSuccess: async (result) => {
+      const title =
+        result.createdCount && result.createdCount > 1
+          ? `${result.createdCount} perimetres crees`
+          : 'Perimetre cree';
+      const message = result.skippedCount ? `${result.skippedCount} deja existant(s) ignore(s).` : undefined;
+      pushToast({ type: 'success', title, ...(message ? { message } : {}) });
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-general-supervisor-scopes'] });
     },
@@ -104,8 +115,8 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
   const data = scopesQuery.data;
   const scopes = data?.scopes ?? emptyScopes;
   const sites = data?.sites ?? emptySites;
+  const projects = data?.projects ?? emptyProjects;
   const generalSupervisors = data?.generalSupervisors ?? emptyGeneralSupervisors;
-  const projects = useMemo(() => getProjectOptions(sites), [sites]);
   const projectSelectOptions = useMemo(() => toProjectSelectOptions(projects), [projects]);
   const siteSelectOptions = useMemo(
     () => toScopeSiteSelectOptions(sites.filter((site) => !filters.projectId || site.project.id === filters.projectId)),
@@ -117,8 +128,8 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
   );
   const filteredScopes = useMemo(() => filterScopes(scopes, filters), [filters, scopes]);
   const activeCount = scopes.filter((scope) => scope.status === GeneralSupervisorSiteScopeStatus.ACTIVE).length;
-  const inactiveCount = scopes.filter((scope) => scope.status === GeneralSupervisorSiteScopeStatus.INACTIVE).length;
-  const siteCount = new Set(scopes.map((scope) => scope.siteId)).size;
+  const projectScopeCount = scopes.filter((scope) => scope.scopeType === 'PROJECT').length;
+  const siteScopeCount = scopes.filter((scope) => scope.scopeType === 'SITES').length;
 
   function setFilter(key: keyof ScopeFilters, value: string) {
     setFilters((current) => ({
@@ -136,9 +147,11 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
   function openEdit(scope: GeneralSupervisorScopeItem) {
     setForm({
       id: scope.id,
+      scopeType: scope.scopeType,
       generalSupervisorId: scope.generalSupervisorId,
-      projectId: scope.site.project.id,
-      siteId: scope.siteId,
+      projectId: scope.project.id,
+      siteId: scope.scopeType === 'SITES' ? scope.siteId : '',
+      siteIds: scope.scopeType === 'SITES' ? [scope.siteId] : [],
       startDate: scope.startDate,
       endDate: scope.endDate ?? '',
       status: scope.status,
@@ -155,7 +168,10 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
     if (drawerMode === 'create') {
       const payload: CreateGeneralSupervisorScopeRequest = {
         generalSupervisorId: form.generalSupervisorId,
-        siteId: form.siteId,
+        scopeType: form.scopeType,
+        ...(form.scopeType === 'PROJECT'
+          ? { projectId: form.projectId }
+          : { ...(form.projectId ? { projectId: form.projectId } : {}), siteIds: form.siteIds }),
         startDate: form.startDate,
         endDate: form.endDate || null,
       };
@@ -207,13 +223,13 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
         <section className="grid gap-4 md:grid-cols-4">
           <MetricCard label="Total" value={scopes.length} />
           <MetricCard label="Actifs" value={activeCount} tone="success" />
-          <MetricCard label="Inactifs" value={inactiveCount} tone="neutral" />
-          <MetricCard label="Chantiers" value={siteCount} tone="info" />
+          <MetricCard label="Projets entiers" value={projectScopeCount} tone="info" />
+          <MetricCard label="Sites specifiques" value={siteScopeCount} tone="neutral" />
         </section>
       ) : null}
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-        <div className="grid gap-4 lg:grid-cols-4">
+        <div className="grid gap-4 xl:grid-cols-5">
           <Field label="Projet">
             <SearchableSelect
               onChange={(value) => setFilter('projectId', value)}
@@ -247,6 +263,17 @@ export function GeneralSupervisorScopesWebPage({ viewer }: GeneralSupervisorScop
               <option value="ALL">Tous</option>
               <option value={GeneralSupervisorSiteScopeStatus.ACTIVE}>Actif</option>
               <option value={GeneralSupervisorSiteScopeStatus.INACTIVE}>Inactif</option>
+            </select>
+          </Field>
+          <Field label="Type">
+            <select
+              className={inputClassName}
+              onChange={(event) => setFilter('scopeType', event.target.value)}
+              value={filters.scopeType}
+            >
+              <option value="ALL">Tous</option>
+              <option value="PROJECT">Projet entier</option>
+              <option value="SITES">Sites specifiques</option>
             </select>
           </Field>
         </div>
@@ -328,6 +355,7 @@ function ScopesTable({
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
             <tr>
               <th className="px-4 py-4">Superviseur general</th>
+              <th className="px-4 py-4">Type</th>
               <th className="px-4 py-4">Projet</th>
               <th className="px-4 py-4">Chantier</th>
               <th className="px-4 py-4">Chef de projet</th>
@@ -346,10 +374,24 @@ function ScopesTable({
                   </p>
                   <p className="text-xs text-slate-500">{scope.generalSupervisor.email}</p>
                 </td>
-                <td className="px-4 py-4 text-slate-700">{scope.site.project.name}</td>
                 <td className="px-4 py-4">
-                  <p className="font-semibold text-slate-800">{scope.site.name}</p>
-                  <p className="text-xs text-slate-500">{scope.site.address}</p>
+                  <Badge tone={scope.scopeType === 'PROJECT' ? 'info' : 'neutral'}>
+                    {scope.scopeType === 'PROJECT' ? 'Projet entier' : 'Sites specifiques'}
+                  </Badge>
+                </td>
+                <td className="px-4 py-4 text-slate-700">{scope.project.name}</td>
+                <td className="px-4 py-4">
+                  {scope.scopeType === 'PROJECT' ? (
+                    <>
+                      <p className="font-semibold text-slate-800">Tous les sites actifs</p>
+                      <p className="text-xs text-slate-500">Les nouveaux sites du projet seront inclus automatiquement.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-slate-800">{scope.site.name}</p>
+                      <p className="text-xs text-slate-500">{scope.site.address}</p>
+                    </>
+                  )}
                 </td>
                 <td className="px-4 py-4">
                   <p className="font-semibold text-slate-800">
@@ -424,7 +466,12 @@ function ScopeDrawer({
   const siteOptions = toScopeSiteSelectOptions(sites.filter((site) => !form.projectId || site.project.id === form.projectId));
   const canSubmit =
     mode === 'create'
-      ? Boolean(form.generalSupervisorId && form.siteId && form.startDate)
+      ? Boolean(
+          form.generalSupervisorId &&
+            form.projectId &&
+            form.startDate &&
+            (form.scopeType === 'PROJECT' || form.siteIds.length > 0),
+        )
       : Boolean(form.startDate);
 
   return (
@@ -446,24 +493,59 @@ function ScopeDrawer({
               value={form.generalSupervisorId}
             />
           </Field>
+          <Field label="Type de perimetre">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                  form.scopeType === 'PROJECT'
+                    ? 'border-slate-950 bg-slate-950 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+                disabled={mode === 'edit'}
+                onClick={() => onChange({ ...form, scopeType: 'PROJECT', siteId: '', siteIds: [] })}
+                type="button"
+              >
+                Tout un projet
+              </button>
+              <button
+                className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                  form.scopeType === 'SITES'
+                    ? 'border-slate-950 bg-slate-950 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+                disabled={mode === 'edit'}
+                onClick={() => onChange({ ...form, scopeType: 'SITES', siteId: '', siteIds: [] })}
+                type="button"
+              >
+                Sites specifiques
+              </button>
+            </div>
+          </Field>
           <Field label="Projet">
             <SearchableSelect
               disabled={mode === 'edit'}
-              onChange={(value) => onChange({ ...form, projectId: value, siteId: '' })}
+              onChange={(value) => onChange({ ...form, projectId: value, siteId: '', siteIds: [] })}
               options={projectOptions}
-              placeholder="Tous les projets"
+              placeholder="Selectionner un projet"
               value={form.projectId}
             />
           </Field>
-          <Field label="Chantier">
-            <SearchableSelect
-              disabled={mode === 'edit'}
-              onChange={(value) => onChange({ ...form, siteId: value })}
-              options={siteOptions}
-              placeholder="Selectionner un chantier"
-              value={form.siteId}
-            />
-          </Field>
+          {mode === 'create' && form.scopeType === 'PROJECT' ? (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-semibold leading-6 text-blue-900">
+              Les nouveaux sites actifs de ce projet seront inclus automatiquement dans le perimetre du superviseur general.
+            </div>
+          ) : null}
+          {form.scopeType === 'SITES' ? (
+            <Field label="Chantiers">
+              <SearchableMultiSelect
+                disabled={mode === 'edit'}
+                onChange={(values) => onChange({ ...form, siteIds: values, siteId: values[0] ?? '' })}
+                options={siteOptions}
+                placeholder="Selectionner un ou plusieurs chantiers"
+                values={form.siteIds}
+              />
+            </Field>
+          ) : null}
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Date debut">
               <input
@@ -529,7 +611,8 @@ function ConfirmDeactivateModal({
       <section className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-panel">
         <h2 className="text-xl font-semibold text-slate-950">Desactiver ce perimetre ?</h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          {scope.generalSupervisor.firstName} {scope.generalSupervisor.lastName} ne verra plus {scope.site.name} dans son perimetre actif.
+          {scope.generalSupervisor.firstName} {scope.generalSupervisor.lastName} ne verra plus{' '}
+          {scope.scopeType === 'PROJECT' ? `le projet ${scope.project.name}` : scope.site.name} dans son perimetre actif.
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button className={secondaryButtonClassName} onClick={onCancel} type="button">
@@ -603,7 +686,12 @@ async function createScope(data: CreateGeneralSupervisorScopeRequest) {
   if (!response.ok) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de creer le perimetre.'));
   }
-  return (await response.json()) as { scope: GeneralSupervisorScopeItem };
+  return (await response.json()) as {
+    scope: GeneralSupervisorScopeItem;
+    scopes?: GeneralSupervisorScopeItem[];
+    createdCount?: number;
+    skippedCount?: number;
+  };
 }
 
 async function updateScope(id: string, data: UpdateGeneralSupervisorScopeRequest) {
@@ -637,19 +725,12 @@ async function getApiErrorMessage(response: Response, fallback: string) {
 function filterScopes(scopes: GeneralSupervisorScopeItem[], filters: ScopeFilters) {
   return scopes.filter(
     (scope) =>
-      (!filters.projectId || scope.site.project.id === filters.projectId) &&
-      (!filters.siteId || scope.siteId === filters.siteId) &&
+      (!filters.projectId || scope.project.id === filters.projectId) &&
+      (!filters.siteId || (scope.scopeType === 'SITES' && scope.siteId === filters.siteId)) &&
       (!filters.generalSupervisorId || scope.generalSupervisorId === filters.generalSupervisorId) &&
-      (filters.status === 'ALL' || scope.status === filters.status),
+      (filters.status === 'ALL' || scope.status === filters.status) &&
+      (filters.scopeType === 'ALL' || scope.scopeType === filters.scopeType),
   );
-}
-
-function getProjectOptions(sites: GeneralSupervisorScopeSiteOption[]) {
-  const projects = new Map<string, string>();
-  sites.forEach((site) => projects.set(site.project.id, site.project.name));
-  return [...projects.entries()]
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function toProjectSelectOptions(projects: { id: string; name: string }[]): SearchableSelectOption[] {
@@ -678,9 +759,11 @@ function toScopeUserSelectOptions(users: GeneralSupervisorScopeUserOption[]): Se
 
 function createEmptyForm(): ScopeFormState {
   return {
+    scopeType: 'PROJECT',
     generalSupervisorId: '',
     projectId: '',
     siteId: '',
+    siteIds: [],
     startDate: todayKey,
     endDate: '',
     status: GeneralSupervisorSiteScopeStatus.ACTIVE,

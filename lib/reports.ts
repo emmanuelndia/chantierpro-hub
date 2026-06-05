@@ -802,12 +802,30 @@ async function getWebReportSiteWhere(prisma: PrismaClient, user: AuthLikeUser): 
 
   if (user.role === Role.GENERAL_SUPERVISOR) {
     return {
-      generalSupervisorScopes: {
-        some: {
-          generalSupervisorId: user.id,
-          status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+      OR: [
+        {
+          project: {
+            status: { notIn: [ProjectStatus.ARCHIVED, ProjectStatus.COMPLETED] },
+          },
+          generalSupervisorScopes: {
+            some: {
+              generalSupervisorId: user.id,
+              status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+            },
+          },
         },
-      },
+        {
+          project: {
+            status: { notIn: [ProjectStatus.ARCHIVED, ProjectStatus.COMPLETED] },
+            generalSupervisorProjectScopes: {
+              some: {
+                generalSupervisorId: user.id,
+                status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+              },
+            },
+          },
+        },
+      ],
     };
   }
 

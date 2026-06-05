@@ -69,12 +69,26 @@ export function webSiteWhereForTeams(user: AuthLikeUser): Prisma.SiteWhereInput 
     return {
       project: projectAccessWhere(user),
       status: SiteStatus.ACTIVE,
-      generalSupervisorScopes: {
-        some: {
-          generalSupervisorId: user.id,
-          status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+      OR: [
+        {
+          generalSupervisorScopes: {
+            some: {
+              generalSupervisorId: user.id,
+              status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+            },
+          },
         },
-      },
+        {
+          project: {
+            generalSupervisorProjectScopes: {
+              some: {
+                generalSupervisorId: user.id,
+                status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+              },
+            },
+          },
+        },
+      ],
     };
   }
 

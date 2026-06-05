@@ -21,6 +21,7 @@ export function MobileGeneralSupervisorScopesPage({ user }: MobileGeneralSupervi
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<CreateGeneralSupervisorScopeRequest>({
     generalSupervisorId: '',
+    scopeType: 'SITES',
     siteId: '',
     startDate: todayKey,
     endDate: null,
@@ -55,7 +56,7 @@ export function MobileGeneralSupervisorScopesPage({ user }: MobileGeneralSupervi
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['mobile-general-supervisor-scopes'] });
-      setFormData({ generalSupervisorId: '', siteId: '', startDate: todayKey, endDate: null });
+      setFormData({ generalSupervisorId: '', scopeType: 'SITES', siteId: '', startDate: todayKey, endDate: null });
     },
   });
 
@@ -226,7 +227,9 @@ function ScopeList({
                   {scope.generalSupervisor.firstName} {scope.generalSupervisor.lastName}
                 </p>
                 <p className="mt-1 text-sm font-bold text-slate-500">
-                  {scope.site.project.name} - {scope.site.name}
+                  {scope.scopeType === 'PROJECT'
+                    ? `${scope.project.name} - Tout le projet`
+                    : `${scope.project.name} - ${scope.site.name}`}
                 </p>
               </div>
               <span className={`rounded-full px-2 py-1 text-[11px] font-black ${scope.status === GeneralSupervisorSiteScopeStatus.ACTIVE ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>

@@ -2,7 +2,6 @@ import {
   ClockInStatus,
   ClockInType,
   FreeMissionStatus,
-  GeneralSupervisorSiteScopeStatus,
   PlanningAssignmentStatus,
   PlanningWorkLocationType,
   Prisma,
@@ -86,19 +85,7 @@ export function canAccessSupervisorPlanning(role: Role) {
 
 export function operationalPlanningSiteWhere(user: AuthLikeUser, _date?: Date): Prisma.SiteWhereInput {
   if (user.role === Role.GENERAL_SUPERVISOR) {
-    if (!_date) {
-      return {
-        status: SiteStatus.ACTIVE,
-        generalSupervisorScopes: {
-          some: {
-            generalSupervisorId: user.id,
-            status: GeneralSupervisorSiteScopeStatus.ACTIVE,
-          },
-        },
-      };
-    }
-
-    return generalSupervisorPlanningSiteWhere(user, _date);
+    return generalSupervisorPlanningSiteWhere(user, _date ?? new Date());
   }
 
   return {

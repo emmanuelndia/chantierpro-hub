@@ -390,6 +390,13 @@ async function canAccessProject(prisma: PrismaClient, user: AuthLikeUser, projec
           site: { projectId },
           status: 'ACTIVE',
         },
+      })) > 0 ||
+      (await prisma.generalSupervisorProjectScope.count({
+        where: {
+          generalSupervisorId: user.id,
+          projectId,
+          status: 'ACTIVE',
+        },
       })) > 0
     );
   }
@@ -427,6 +434,17 @@ async function canAccessSite(prisma: PrismaClient, user: AuthLikeUser, siteId: s
     return (
       (await prisma.generalSupervisorSiteScope.count({
         where: { siteId, generalSupervisorId: user.id, status: 'ACTIVE' },
+      })) > 0 ||
+      (await prisma.generalSupervisorProjectScope.count({
+        where: {
+          generalSupervisorId: user.id,
+          status: 'ACTIVE',
+          project: {
+            sites: {
+              some: { id: siteId },
+            },
+          },
+        },
       })) > 0
     );
   }

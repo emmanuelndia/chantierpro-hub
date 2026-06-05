@@ -158,12 +158,26 @@ function buildHistorySiteScope(role: Role, userId: string): Prisma.SiteWhereInpu
 
   if (role === Role.GENERAL_SUPERVISOR) {
     return {
-      generalSupervisorScopes: {
-        some: {
-          generalSupervisorId: userId,
-          status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+      OR: [
+        {
+          generalSupervisorScopes: {
+            some: {
+              generalSupervisorId: userId,
+              status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+            },
+          },
         },
-      },
+        {
+          project: {
+            generalSupervisorProjectScopes: {
+              some: {
+                generalSupervisorId: userId,
+                status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+              },
+            },
+          },
+        },
+      ],
     };
   }
 

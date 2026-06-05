@@ -1,8 +1,17 @@
-import { GeneralSupervisorSiteScopeStatus, Prisma, Role, SiteStatus, type PrismaClient } from '@prisma/client';
+import {
+  GeneralSupervisorSiteScopeStatus,
+  Prisma,
+  ProjectStatus,
+  Role,
+  SiteStatus,
+  type PrismaClient,
+} from '@prisma/client';
 import type {
   CreateGeneralSupervisorScopeRequest,
+  GeneralSupervisorProjectScopeItem,
   GeneralSupervisorScopeItem,
   GeneralSupervisorScopesResponse,
+  GeneralSupervisorSiteScopeItem,
   UpdateGeneralSupervisorScopeRequest,
 } from '@/types/general-supervisor-scopes';
 
@@ -17,8 +26,21 @@ const SCOPE_WEB_READ_ROLES: readonly Role[] = [
   Role.ADMIN,
   Role.GENERAL_SUPERVISOR,
 ];
+const CLOSED_PROJECT_STATUSES: readonly ProjectStatus[] = [ProjectStatus.ARCHIVED, ProjectStatus.COMPLETED];
 
-const scopeSelect = {
+const userOptionSelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+} satisfies Prisma.UserSelect;
+
+const projectOptionSelect = {
+  id: true,
+  name: true,
+} satisfies Prisma.ProjectSelect;
+
+const siteScopeSelect = {
   id: true,
   generalSupervisorId: true,
   projectManagerId: true,
@@ -28,20 +50,10 @@ const scopeSelect = {
   status: true,
   createdAt: true,
   generalSupervisor: {
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-    },
+    select: userOptionSelect,
   },
   projectManager: {
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-    },
+    select: userOptionSelect,
   },
   site: {
     select: {
@@ -49,16 +61,34 @@ const scopeSelect = {
       name: true,
       address: true,
       project: {
-        select: {
-          id: true,
-          name: true,
-        },
+        select: projectOptionSelect,
       },
     },
   },
 } satisfies Prisma.GeneralSupervisorSiteScopeSelect;
 
-type ScopeRow = Prisma.GeneralSupervisorSiteScopeGetPayload<{ select: typeof scopeSelect }>;
+const projectScopeSelect = {
+  id: true,
+  generalSupervisorId: true,
+  projectManagerId: true,
+  projectId: true,
+  startDate: true,
+  endDate: true,
+  status: true,
+  createdAt: true,
+  generalSupervisor: {
+    select: userOptionSelect,
+  },
+  projectManager: {
+    select: userOptionSelect,
+  },
+  project: {
+    select: projectOptionSelect,
+  },
+} satisfies Prisma.GeneralSupervisorProjectScopeSelect;
+
+type SiteScopeRow = Prisma.GeneralSupervisorSiteScopeGetPayload<{ select: typeof siteScopeSelect }>;
+type ProjectScopeRow = Prisma.GeneralSupervisorProjectScopeGetPayload<{ select: typeof projectScopeSelect }>;
 
 export function canManageGeneralSupervisorScopes(role: Role) {
   return SCOPE_MANAGEMENT_ROLES.includes(role);
@@ -68,19 +98,39 @@ export function canReadGeneralSupervisorScopes(role: Role) {
   return SCOPE_WEB_READ_ROLES.includes(role);
 }
 
+export function generalSupervisorActiveScopeWhere(userId: string, date: Date = new Date()) {
+  return {
+    generalSupervisorId: userId,
+    status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+    startDate: {
+      lte: date,
+    },
+    OR: [{ endDate: null }, { endDate: { gte: date } }],
+  };
+}
+
 export function generalSupervisorPlanningSiteWhere(user: AuthLikeUser, date: Date): Prisma.SiteWhereInput {
   return {
     status: SiteStatus.ACTIVE,
-    generalSupervisorScopes: {
-      some: {
-        generalSupervisorId: user.id,
-        status: GeneralSupervisorSiteScopeStatus.ACTIVE,
-        startDate: {
-          lte: date,
-        },
-        OR: [{ endDate: null }, { endDate: { gte: date } }],
+    project: {
+      status: {
+        notIn: [...CLOSED_PROJECT_STATUSES],
       },
     },
+    OR: [
+      {
+        generalSupervisorScopes: {
+          some: generalSupervisorActiveScopeWhere(user.id, date),
+        },
+      },
+      {
+        project: {
+          generalSupervisorProjectScopes: {
+            some: generalSupervisorActiveScopeWhere(user.id, date),
+          },
+        },
+      },
+    ],
   };
 }
 
@@ -93,15 +143,24 @@ export async function getGeneralSupervisorScopes(
   }
 
   const siteWhere = buildReadableSiteWhere(user);
+  const projectWhere = buildReadableProjectWhere(user);
 
-  const [scopes, generalSupervisors, sites] = await Promise.all([
+  const [siteScopes, projectScopes, generalSupervisors, sites, projects] = await Promise.all([
     prisma.generalSupervisorSiteScope.findMany({
       where: {
         site: siteWhere,
         ...(user.role === Role.GENERAL_SUPERVISOR ? { generalSupervisorId: user.id } : {}),
       },
       orderBy: [{ status: 'asc' }, { site: { project: { name: 'asc' } } }, { site: { name: 'asc' } }, { startDate: 'desc' }],
-      select: scopeSelect,
+      select: siteScopeSelect,
+    }),
+    prisma.generalSupervisorProjectScope.findMany({
+      where: {
+        project: projectWhere,
+        ...(user.role === Role.GENERAL_SUPERVISOR ? { generalSupervisorId: user.id } : {}),
+      },
+      orderBy: [{ status: 'asc' }, { project: { name: 'asc' } }, { startDate: 'desc' }],
+      select: projectScopeSelect,
     }),
     prisma.user.findMany({
       where: {
@@ -110,12 +169,7 @@ export async function getGeneralSupervisorScopes(
         ...(user.role === Role.GENERAL_SUPERVISOR ? { id: user.id } : {}),
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }],
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-      },
+      select: userOptionSelect,
     }),
     prisma.site.findMany({
       where: siteWhere,
@@ -125,18 +179,26 @@ export async function getGeneralSupervisorScopes(
         name: true,
         address: true,
         project: {
-          select: {
-            id: true,
-            name: true,
-          },
+          select: projectOptionSelect,
         },
       },
     }),
+    prisma.project.findMany({
+      where: projectWhere,
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      select: projectOptionSelect,
+    }),
   ]);
 
+  const serializedProjectScopes = projectScopes.map(serializeProjectScope);
+  const serializedSiteScopes = siteScopes.map(serializeSiteScope);
+
   return {
-    scopes: scopes.map(serializeScope),
+    scopes: [...serializedProjectScopes, ...serializedSiteScopes],
+    projectScopes: serializedProjectScopes,
+    siteScopes: serializedSiteScopes,
     generalSupervisors,
+    projects,
     sites,
   };
 }
@@ -145,7 +207,7 @@ export async function createGeneralSupervisorScope(
   prisma: PrismaClient,
   user: AuthLikeUser,
   body: unknown,
-): Promise<{ scope: GeneralSupervisorScopeItem } | Response> {
+): Promise<{ scope: GeneralSupervisorScopeItem; scopes?: GeneralSupervisorScopeItem[]; createdCount?: number; skippedCount?: number } | Response> {
   if (!canManageGeneralSupervisorScopes(user.role)) {
     return jsonScopeError('FORBIDDEN', 'Acces refuse a la gestion des perimetres.', 403);
   }
@@ -165,74 +227,24 @@ export async function createGeneralSupervisorScope(
     return jsonScopeError('INVALID_DATE_RANGE', 'La date de fin doit etre posterieure a la date de debut.', 400);
   }
 
-  const [site, generalSupervisor] = await Promise.all([
-    prisma.site.findFirst({
-      where: {
-        id: input.siteId,
-        ...buildManageableSiteWhere(user),
-      },
-      select: {
-        id: true,
-        project: {
-          select: {
-            projectManagerId: true,
-          },
-        },
-      },
-    }),
-    prisma.user.findFirst({
-      where: {
-        id: input.generalSupervisorId,
-        role: Role.GENERAL_SUPERVISOR,
-        isActive: true,
-      },
-      select: { id: true },
-    }),
-  ]);
-
-  if (!site) {
-    return jsonScopeError('SITE_NOT_FOUND', 'Chantier introuvable dans votre perimetre.', 404);
-  }
+  const generalSupervisor = await prisma.user.findFirst({
+    where: {
+      id: input.generalSupervisorId,
+      role: Role.GENERAL_SUPERVISOR,
+      isActive: true,
+    },
+    select: { id: true },
+  });
 
   if (!generalSupervisor) {
     return jsonScopeError('GENERAL_SUPERVISOR_NOT_FOUND', 'Superviseur general invalide.', 404);
   }
 
-  const duplicate = await prisma.generalSupervisorSiteScope.findFirst({
-    where: {
-      generalSupervisorId: input.generalSupervisorId,
-      siteId: input.siteId,
-      startDate,
-      status: GeneralSupervisorSiteScopeStatus.ACTIVE,
-    },
-    select: { id: true },
-  });
-
-  if (duplicate) {
-    return jsonScopeError('SCOPE_CONFLICT', 'Ce site est deja confie a ce superviseur general pour cette date.', 409);
+  if ((input.scopeType ?? 'SITES') === 'PROJECT') {
+    return createProjectScope(prisma, user, input, startDate, endDate);
   }
 
-  try {
-    const scope = await prisma.generalSupervisorSiteScope.create({
-      data: {
-        generalSupervisorId: input.generalSupervisorId,
-        projectManagerId: site.project.projectManagerId,
-        siteId: input.siteId,
-        startDate,
-        endDate,
-        status: GeneralSupervisorSiteScopeStatus.ACTIVE,
-      },
-      select: scopeSelect,
-    });
-
-    return { scope: serializeScope(scope) };
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return jsonScopeError('SCOPE_CONFLICT', 'Ce perimetre existe deja.', 409);
-    }
-
-    throw error;
-  }
+  return createSiteScopes(prisma, user, input, startDate, endDate);
 }
 
 export async function updateGeneralSupervisorScope(
@@ -250,7 +262,7 @@ export async function updateGeneralSupervisorScope(
     return jsonScopeError('BAD_REQUEST', 'Payload perimetre invalide.', 400);
   }
 
-  const existing = await prisma.generalSupervisorSiteScope.findFirst({
+  const existingSiteScope = await prisma.generalSupervisorSiteScope.findFirst({
     where: {
       id: scopeId,
       site: buildManageableSiteWhere(user),
@@ -262,32 +274,45 @@ export async function updateGeneralSupervisorScope(
     },
   });
 
-  if (!existing) {
+  if (existingSiteScope) {
+    const result = updateDateStatus(input, existingSiteScope.startDate, existingSiteScope.endDate);
+    if (result instanceof Response) return result;
+
+    const scope = await prisma.generalSupervisorSiteScope.update({
+      where: { id: existingSiteScope.id },
+      data: result,
+      select: siteScopeSelect,
+    });
+
+    return { scope: serializeSiteScope(scope) };
+  }
+
+  const existingProjectScope = await prisma.generalSupervisorProjectScope.findFirst({
+    where: {
+      id: scopeId,
+      project: buildManageableProjectWhere(user),
+    },
+    select: {
+      id: true,
+      startDate: true,
+      endDate: true,
+    },
+  });
+
+  if (!existingProjectScope) {
     return jsonScopeError('NOT_FOUND', 'Perimetre introuvable.', 404);
   }
 
-  const startDate = input.startDate ? parseDate(input.startDate) : existing.startDate;
-  const endDate = input.endDate === undefined ? existing.endDate : input.endDate ? parseDate(input.endDate) : null;
+  const result = updateDateStatus(input, existingProjectScope.startDate, existingProjectScope.endDate);
+  if (result instanceof Response) return result;
 
-  if (!startDate || (input.endDate && !endDate)) {
-    return jsonScopeError('INVALID_DATE', 'Dates de perimetre invalides.', 400);
-  }
-
-  if (endDate && endDate < startDate) {
-    return jsonScopeError('INVALID_DATE_RANGE', 'La date de fin doit etre posterieure a la date de debut.', 400);
-  }
-
-  const scope = await prisma.generalSupervisorSiteScope.update({
-    where: { id: existing.id },
-    data: {
-      ...(input.startDate !== undefined ? { startDate } : {}),
-      ...(input.endDate !== undefined ? { endDate } : {}),
-      ...(input.status !== undefined ? { status: input.status } : {}),
-    },
-    select: scopeSelect,
+  const scope = await prisma.generalSupervisorProjectScope.update({
+    where: { id: existingProjectScope.id },
+    data: result,
+    select: projectScopeSelect,
   });
 
-  return { scope: serializeScope(scope) };
+  return { scope: serializeProjectScope(scope) };
 }
 
 export async function deactivateGeneralSupervisorScope(prisma: PrismaClient, user: AuthLikeUser, scopeId: string) {
@@ -295,7 +320,7 @@ export async function deactivateGeneralSupervisorScope(prisma: PrismaClient, use
     return jsonScopeError('FORBIDDEN', 'Acces refuse a la gestion des perimetres.', 403);
   }
 
-  const existing = await prisma.generalSupervisorSiteScope.findFirst({
+  const existingSiteScope = await prisma.generalSupervisorSiteScope.findFirst({
     where: {
       id: scopeId,
       site: buildManageableSiteWhere(user),
@@ -303,12 +328,29 @@ export async function deactivateGeneralSupervisorScope(prisma: PrismaClient, use
     select: { id: true },
   });
 
-  if (!existing) {
+  if (existingSiteScope) {
+    await prisma.generalSupervisorSiteScope.update({
+      where: { id: existingSiteScope.id },
+      data: { status: GeneralSupervisorSiteScopeStatus.INACTIVE },
+    });
+
+    return new Response(null, { status: 204 });
+  }
+
+  const existingProjectScope = await prisma.generalSupervisorProjectScope.findFirst({
+    where: {
+      id: scopeId,
+      project: buildManageableProjectWhere(user),
+    },
+    select: { id: true },
+  });
+
+  if (!existingProjectScope) {
     return jsonScopeError('NOT_FOUND', 'Perimetre introuvable.', 404);
   }
 
-  await prisma.generalSupervisorSiteScope.update({
-    where: { id: existing.id },
+  await prisma.generalSupervisorProjectScope.update({
+    where: { id: existingProjectScope.id },
     data: { status: GeneralSupervisorSiteScopeStatus.INACTIVE },
   });
 
@@ -322,46 +364,282 @@ export function jsonScopeError(code: string, message: string, status: number) {
 function buildManageableSiteWhere(user: AuthLikeUser): Prisma.SiteWhereInput {
   return {
     status: SiteStatus.ACTIVE,
-    ...(user.role === Role.PROJECT_MANAGER
-      ? {
-          project: {
-            projectManagerId: user.id,
-          },
-        }
-      : {}),
+    project: buildManageableProjectWhere(user),
   };
+}
+
+function buildManageableProjectWhere(user: AuthLikeUser): Prisma.ProjectWhereInput {
+  return {
+    status: {
+      notIn: [...CLOSED_PROJECT_STATUSES],
+    },
+    ...(user.role === Role.PROJECT_MANAGER ? { projectManagerId: user.id } : {}),
+  };
+}
+
+function buildReadableProjectWhere(user: AuthLikeUser): Prisma.ProjectWhereInput {
+  if (user.role === Role.GENERAL_SUPERVISOR) {
+    return {
+      status: {
+        notIn: [...CLOSED_PROJECT_STATUSES],
+      },
+      OR: [
+        {
+          generalSupervisorProjectScopes: {
+            some: {
+              generalSupervisorId: user.id,
+            },
+          },
+        },
+        {
+          sites: {
+            some: {
+              generalSupervisorScopes: {
+                some: {
+                  generalSupervisorId: user.id,
+                },
+              },
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  return buildManageableProjectWhere(user);
 }
 
 function buildReadableSiteWhere(user: AuthLikeUser): Prisma.SiteWhereInput {
   if (user.role === Role.GENERAL_SUPERVISOR) {
     return {
       status: SiteStatus.ACTIVE,
-      generalSupervisorScopes: {
-        some: {
-          generalSupervisorId: user.id,
+      project: {
+        status: {
+          notIn: [...CLOSED_PROJECT_STATUSES],
         },
       },
+      OR: [
+        {
+          generalSupervisorScopes: {
+            some: {
+              generalSupervisorId: user.id,
+            },
+          },
+        },
+        {
+          project: {
+            generalSupervisorProjectScopes: {
+              some: {
+                generalSupervisorId: user.id,
+              },
+            },
+          },
+        },
+      ],
     };
   }
 
   return buildManageableSiteWhere(user);
 }
 
+async function createProjectScope(
+  prisma: PrismaClient,
+  user: AuthLikeUser,
+  input: CreateGeneralSupervisorScopeRequest,
+  startDate: Date,
+  endDate: Date | null,
+) {
+  if (!input.projectId) {
+    return jsonScopeError('PROJECT_REQUIRED', 'Projet requis pour un perimetre projet entier.', 400);
+  }
+
+  const project = await prisma.project.findFirst({
+    where: {
+      id: input.projectId,
+      ...buildManageableProjectWhere(user),
+    },
+    select: {
+      id: true,
+      projectManagerId: true,
+    },
+  });
+
+  if (!project) {
+    return jsonScopeError('PROJECT_NOT_FOUND', 'Projet introuvable dans votre perimetre actif.', 404);
+  }
+
+  const duplicate = await prisma.generalSupervisorProjectScope.findFirst({
+    where: {
+      generalSupervisorId: input.generalSupervisorId,
+      projectId: input.projectId,
+      startDate,
+      status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+    },
+    select: { id: true },
+  });
+
+  if (duplicate) {
+    return jsonScopeError('SCOPE_CONFLICT', 'Ce projet est deja confie a ce superviseur general pour cette date.', 409);
+  }
+
+  try {
+    const scope = await prisma.generalSupervisorProjectScope.create({
+      data: {
+        generalSupervisorId: input.generalSupervisorId,
+        projectManagerId: project.projectManagerId,
+        projectId: input.projectId,
+        startDate,
+        endDate,
+        status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+      },
+      select: projectScopeSelect,
+    });
+
+    return { scope: serializeProjectScope(scope) };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return jsonScopeError('SCOPE_CONFLICT', 'Ce perimetre existe deja.', 409);
+    }
+
+    throw error;
+  }
+}
+
+async function createSiteScopes(
+  prisma: PrismaClient,
+  user: AuthLikeUser,
+  input: CreateGeneralSupervisorScopeRequest,
+  startDate: Date,
+  endDate: Date | null,
+) {
+  const siteIds = input.siteIds?.length ? input.siteIds : input.siteId ? [input.siteId] : [];
+  if (siteIds.length === 0) {
+    return jsonScopeError('SITES_REQUIRED', 'Selectionnez au moins un chantier.', 400);
+  }
+
+  const uniqueSiteIds = [...new Set(siteIds)];
+  const sites = await prisma.site.findMany({
+    where: {
+      id: {
+        in: uniqueSiteIds,
+      },
+      ...buildManageableSiteWhere(user),
+    },
+    select: {
+      id: true,
+      project: {
+        select: {
+          projectManagerId: true,
+        },
+      },
+    },
+  });
+
+  if (sites.length !== uniqueSiteIds.length) {
+    return jsonScopeError('SITE_NOT_FOUND', 'Un ou plusieurs chantiers sont introuvables dans votre perimetre.', 404);
+  }
+
+  const existingScopes = await prisma.generalSupervisorSiteScope.findMany({
+    where: {
+      generalSupervisorId: input.generalSupervisorId,
+      siteId: {
+        in: uniqueSiteIds,
+      },
+      startDate,
+      status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+    },
+    select: { siteId: true },
+  });
+  const existingSiteIds = new Set(existingScopes.map((scope) => scope.siteId));
+  const sitesToCreate = sites.filter((site) => !existingSiteIds.has(site.id));
+
+  if (sitesToCreate.length === 0) {
+    return jsonScopeError('SCOPE_CONFLICT', 'Ces chantiers sont deja confies a ce superviseur general pour cette date.', 409);
+  }
+
+  const createdRows: SiteScopeRow[] = [];
+  for (const site of sitesToCreate) {
+    const scope = await prisma.generalSupervisorSiteScope.create({
+      data: {
+        generalSupervisorId: input.generalSupervisorId,
+        projectManagerId: site.project.projectManagerId,
+        siteId: site.id,
+        startDate,
+        endDate,
+        status: GeneralSupervisorSiteScopeStatus.ACTIVE,
+      },
+      select: siteScopeSelect,
+    });
+    createdRows.push(scope);
+  }
+
+  const serializedScopes = createdRows.map(serializeSiteScope);
+
+  return {
+    scope: serializedScopes[0]!,
+    scopes: serializedScopes,
+    createdCount: serializedScopes.length,
+    skippedCount: existingSiteIds.size,
+  };
+}
+
+function updateDateStatus(
+  input: UpdateGeneralSupervisorScopeRequest,
+  currentStartDate: Date,
+  currentEndDate: Date | null,
+): Prisma.GeneralSupervisorSiteScopeUpdateInput | Response {
+  const startDate = input.startDate ? parseDate(input.startDate) : currentStartDate;
+  const endDate = input.endDate === undefined ? currentEndDate : input.endDate ? parseDate(input.endDate) : null;
+
+  if (!startDate || (input.endDate && !endDate)) {
+    return jsonScopeError('INVALID_DATE', 'Dates de perimetre invalides.', 400);
+  }
+
+  if (endDate && endDate < startDate) {
+    return jsonScopeError('INVALID_DATE_RANGE', 'La date de fin doit etre posterieure a la date de debut.', 400);
+  }
+
+  return {
+    ...(input.startDate !== undefined ? { startDate } : {}),
+    ...(input.endDate !== undefined ? { endDate } : {}),
+    ...(input.status !== undefined ? { status: input.status } : {}),
+  };
+}
+
 function parseCreateScopeInput(body: unknown): CreateGeneralSupervisorScopeRequest | null {
   if (!isRecord(body)) return null;
 
   const generalSupervisorId = getString(body.generalSupervisorId);
+  const scopeType = getScopeType(body.scopeType);
+  const projectId = getString(body.projectId);
   const siteId = getString(body.siteId);
+  const siteIds = getStringArray(body.siteIds);
   const startDate = getString(body.startDate);
   const endDate = getNullableString(body.endDate);
 
-  if (!generalSupervisorId || !siteId || !startDate) {
+  if (!generalSupervisorId || !startDate) {
     return null;
   }
 
-  return endDate === undefined
-    ? { generalSupervisorId, siteId, startDate }
-    : { generalSupervisorId, siteId, startDate, endDate };
+  const normalizedScopeType = scopeType ?? (projectId && !siteId && siteIds.length === 0 ? 'PROJECT' : 'SITES');
+
+  if (normalizedScopeType === 'PROJECT' && !projectId) {
+    return null;
+  }
+
+  if (normalizedScopeType === 'SITES' && !siteId && siteIds.length === 0) {
+    return null;
+  }
+
+  return {
+    generalSupervisorId,
+    scopeType: normalizedScopeType,
+    ...(projectId ? { projectId } : {}),
+    ...(siteId ? { siteId } : {}),
+    ...(siteIds.length ? { siteIds } : {}),
+    startDate,
+    ...(endDate !== undefined ? { endDate } : {}),
+  };
 }
 
 function parseUpdateScopeInput(body: unknown): UpdateGeneralSupervisorScopeRequest | null {
@@ -389,9 +667,10 @@ function parseUpdateScopeInput(body: unknown): UpdateGeneralSupervisorScopeReque
   return input;
 }
 
-function serializeScope(scope: ScopeRow): GeneralSupervisorScopeItem {
+function serializeSiteScope(scope: SiteScopeRow): GeneralSupervisorSiteScopeItem {
   return {
     id: scope.id,
+    scopeType: 'SITES',
     generalSupervisorId: scope.generalSupervisorId,
     projectManagerId: scope.projectManagerId,
     siteId: scope.siteId,
@@ -402,6 +681,25 @@ function serializeScope(scope: ScopeRow): GeneralSupervisorScopeItem {
     generalSupervisor: scope.generalSupervisor,
     projectManager: scope.projectManager,
     site: scope.site,
+    project: scope.site.project,
+  };
+}
+
+function serializeProjectScope(scope: ProjectScopeRow): GeneralSupervisorProjectScopeItem {
+  return {
+    id: scope.id,
+    scopeType: 'PROJECT',
+    generalSupervisorId: scope.generalSupervisorId,
+    projectManagerId: scope.projectManagerId,
+    projectId: scope.projectId,
+    startDate: formatDate(scope.startDate),
+    endDate: scope.endDate ? formatDate(scope.endDate) : null,
+    status: scope.status,
+    createdAt: scope.createdAt.toISOString(),
+    generalSupervisor: scope.generalSupervisor,
+    projectManager: scope.projectManager,
+    project: scope.project,
+    site: null,
   };
 }
 
@@ -426,10 +724,22 @@ function getString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function getStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => getString(item))
+    .filter((item): item is string => Boolean(item));
+}
+
 function getNullableString(value: unknown) {
   if (value === undefined) return undefined;
   if (value === null || value === '') return null;
   return getString(value);
+}
+
+function getScopeType(value: unknown) {
+  if (value === 'PROJECT' || value === 'SITES') return value;
+  return null;
 }
 
 function isScopeStatus(value: unknown): value is GeneralSupervisorSiteScopeStatus {
