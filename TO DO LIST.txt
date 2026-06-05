@@ -83,7 +83,7 @@ Ajout du suivi par objectif quantitatif :
     - objectif quantité ;
     - unité ;
     - réalisé cumulé ;
-    - progression calculée automatiquement.
+    - progression calculée automatiquement. 
 
 
 
