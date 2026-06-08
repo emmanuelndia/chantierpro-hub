@@ -303,7 +303,7 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: LiveResourceLis
           </div>
           <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
             {formatRoleLabel(resource.role as Role)}
-            {resource.email ? ` - ${resource.email}` : ''}
+            
           </p>
         </div>
         <Badge tone={liveStatusTone(resource.status)}>{liveStatusLabel(resource.status)}</Badge>
