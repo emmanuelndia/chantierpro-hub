@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ClockInType } from '@prisma/client';
+import { PlanningWorkLocationType, type ClockInType } from '@prisma/client';
 import { authFetch } from '@/lib/auth/client-session';
 import { haversineDistanceKm } from '@/lib/haversine';
 import {
@@ -238,6 +238,13 @@ export function MobileClockInPage() {
     staleTime: 0,
   });
 
+  const todaySites = useMemo(() => todaySitesQuery.data?.items ?? [], [todaySitesQuery.data?.items]);
+  const { assignments: todayAssignments } = useTodayOfficeAssignments();
+  const hasFreeMissionToday = todayAssignments.some(
+    (assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId),
+  );
+  const shouldSelectFreeMissionFromTasks = Boolean(!requestedSiteId && !requestedFreeMissionId && hasFreeMissionToday);
+
   const nearbyQuery = useQuery({
     queryKey: ['mobile-sites-nearby', geoState.status === 'ready' ? geoState.latitude : null, geoState.status === 'ready' ? geoState.longitude : null],
     queryFn: async () => {
@@ -255,12 +262,10 @@ export function MobileClockInPage() {
 
       return (await response.json()) as NearbySitesResponse;
     },
-    enabled: geoState.status === 'ready' && !requestedSiteId && !requestedFreeMissionId,
+    enabled: geoState.status === 'ready' && !requestedSiteId && !requestedFreeMissionId && !shouldSelectFreeMissionFromTasks,
     staleTime: 30_000,
   });
 
-  const todaySites = useMemo(() => todaySitesQuery.data?.items ?? [], [todaySitesQuery.data?.items]);
-  const { assignments: todayAssignments } = useTodayOfficeAssignments();
   const selectedFreeMission = useMemo(
     () =>
       selectedFreeMissionId
@@ -292,7 +297,7 @@ export function MobileClockInPage() {
   }, [activeSession?.siteId, selectedSiteId]);
 
   useEffect(() => {
-    if (selectedFreeMission || selectedSiteId || todaySites.length === 0) {
+    if (shouldSelectFreeMissionFromTasks || selectedFreeMission || selectedSiteId || todaySites.length === 0) {
       return;
     }
 
@@ -307,7 +312,7 @@ export function MobileClockInPage() {
     const closestAssignedSite = findClosestTodaySite(todaySites, geoState);
     setSelectedSiteId((closestAssignedSite ?? todaySites[0])?.id ?? null);
     setManualMode(true);
-  }, [geoState, selectedFreeMission, selectedSiteId, todaySites]);
+  }, [geoState, selectedFreeMission, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
 
   const selectedSite = useMemo(() => {
     const siteFromToday = todaySites.find((site) => site.id === selectedSiteId);
@@ -316,12 +321,12 @@ export function MobileClockInPage() {
       return fromTodaySite(siteFromToday, geoState);
     }
 
-    if (todaySites.length === 0 && !manualMode && quickSite) {
+    if (!shouldSelectFreeMissionFromTasks && todaySites.length === 0 && !manualMode && quickSite) {
       return fromNearbySite(quickSite);
     }
 
     return null;
-  }, [geoState, manualMode, quickSite, selectedSiteId, todaySites]);
+  }, [geoState, manualMode, quickSite, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
 
   const sessionStatusQuery = useQuery({
     queryKey: ['mobile-session-status', selectedSite?.id, selectedFreeMission?.freeMissionId],
@@ -649,6 +654,25 @@ export function MobileClockInPage() {
         </section>
       ) : null}
 
+      {shouldSelectFreeMissionFromTasks ? (
+        <section className="space-y-4 rounded-lg border-2 border-orange-300 bg-orange-50 p-4 shadow-panel">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Mission libre a selectionner</p>
+            <h3 className="mt-2 text-lg font-black text-slate-950">Ouvrez Taches pour pointer</h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-orange-900">
+              Vous avez une mission libre aujourd&apos;hui. Pour eviter une erreur de pointage, ouvrez Taches et choisissez la mission a pointer.
+            </p>
+          </div>
+          <button
+            className="min-h-12 w-full rounded-lg bg-slate-950 px-4 text-sm font-black text-white"
+            onClick={() => router.push('/mobile/tasks')}
+            type="button"
+          >
+            Ouvrir Taches
+          </button>
+        </section>
+      ) : null}
+
       {!selectedFreeMission && selectedSite ? (
         <section className="space-y-3 rounded-lg border-2 border-primary/30 bg-white p-4 shadow-panel">
           <div className="flex items-start justify-between gap-3">
@@ -699,7 +723,7 @@ export function MobileClockInPage() {
         </div>
       ) : null}
 
-      {!selectedFreeMission ? (
+      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks ? (
         <ManualSiteList
           geoState={geoState}
           loading={todaySitesQuery.isLoading}
@@ -712,7 +736,7 @@ export function MobileClockInPage() {
         />
       ) : null}
 
-      {!selectedFreeMission && geoState.status === 'ready' && todaySites.length === 0 ? (
+      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks && geoState.status === 'ready' && todaySites.length === 0 ? (
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
           {nearbyQuery.isLoading ? (
             <p className="text-sm font-semibold text-slate-500">Recherche du chantier le plus proche...</p>
@@ -742,7 +766,7 @@ export function MobileClockInPage() {
         </section>
       ) : null}
 
-      {!selectedFreeMission && nearbySuggestion ? (
+      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks && nearbySuggestion ? (
         <NearbySuggestionCard
           onSelect={() => {
             setSelectedSiteId(nearbySuggestion.id);
