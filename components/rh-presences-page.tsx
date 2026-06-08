@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
@@ -198,6 +199,12 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Link
+              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              href="/web/rh/export"
+            >
+              Exporter RH
+            </Link>
             <button
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => {
