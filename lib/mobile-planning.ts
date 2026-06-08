@@ -199,7 +199,7 @@ export async function getPlanningDay(
     });
   }
 
-  const [supervisors, clockIns, yesterdayCount] = await Promise.all([
+  const [supervisors, clockIns, yesterdayCount, yesterdayFreeMissionResponse] = await Promise.all([
     prisma.user.findMany({
       where: {
         id: { in: scopedSupervisorIds },
@@ -227,7 +227,9 @@ export async function getPlanningDay(
         ...assignmentScopeWhere,
       },
     }),
+    listFreeMissions(prisma, user, formatPlanningDate(addDays(parsedDate, -1))),
   ]);
+  const yesterdayTaskCount = yesterdayCount + yesterdayFreeMissionResponse.missions.length;
 
   return {
     date: formatPlanningDate(parsedDate),
@@ -263,7 +265,7 @@ export async function getPlanningDay(
       },
     })),
     hasAssignments: assignments.length + freeMissionResponse.missions.length > 0,
-    canDuplicateFromYesterday: assignments.length === 0 && yesterdayCount > 0,
+    canDuplicateFromYesterday: assignments.length + freeMissionResponse.missions.length === 0 && yesterdayTaskCount > 0,
   };
 }
 
@@ -641,8 +643,17 @@ export async function duplicatePlanningAssignments(
 
   const sourceSiteWhere = operationalPlanningSiteWhere(user, sourceDate);
   const targetSiteWhere = operationalPlanningSiteWhere(user, targetDate);
+  const targetProjectWhere = operationalPlanningProjectWhere(user, targetDate);
   const assignmentScopeWhere = planningAssignmentScopeWhere(user);
-  const [sourceAssignments, existingTargetAssignments, validTargetSites, validSupervisorIds] = await Promise.all([
+  const [
+    sourceAssignments,
+    sourceFreeMissionResponse,
+    existingTargetAssignments,
+    existingTargetFreeMissionResponse,
+    validTargetSites,
+    validTargetProjects,
+    validSupervisorIds,
+  ] = await Promise.all([
     prisma.planningAssignment.findMany({
       where: {
         date: sourceDate,
@@ -653,6 +664,7 @@ export async function duplicatePlanningAssignments(
       orderBy: [{ site: { name: 'asc' } }, { supervisor: { firstName: 'asc' } }, { id: 'asc' }],
       select: planningAssignmentSelect,
     }),
+    listFreeMissions(prisma, user, formatPlanningDate(sourceDate)),
     prisma.planningAssignment.findMany({
       where: {
         date: targetDate,
@@ -670,15 +682,19 @@ export async function duplicatePlanningAssignments(
         workLocationType: true,
       },
     }),
+    listFreeMissions(prisma, user, formatPlanningDate(targetDate)),
     prisma.site.findMany({ where: targetSiteWhere, select: { id: true } }),
+    prisma.project.findMany({ where: targetProjectWhere, select: { id: true } }),
     getScopedSupervisorIds(prisma, user, targetDate),
   ]);
 
-  if (sourceAssignments.length === 0) {
+  const sourceFreeMissions = sourceFreeMissionResponse.missions;
+  if (sourceAssignments.length === 0 && sourceFreeMissions.length === 0) {
     return planningError('NO_ASSIGNMENTS', 'Aucune assignation à dupliquer pour la date source.', 404);
   }
 
   const targetSiteIds = new Set(validTargetSites.map((site) => site.id));
+  const targetProjectIds = new Set(validTargetProjects.map((project) => project.id));
   const targetSupervisorIds = new Set(validSupervisorIds);
   const existingTargetKeys = new Set(
     existingTargetAssignments.map((assignment) =>
@@ -693,7 +709,13 @@ export async function duplicatePlanningAssignments(
       ),
     ),
   );
+  const existingTargetFreeMissionKeys = new Set(
+    existingTargetFreeMissionResponse.missions.map((mission) =>
+      buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action),
+    ),
+  );
   const validAssignments: PlanningAssignmentRow[] = [];
+  const validFreeMissions: typeof sourceFreeMissions = [];
 
   for (const assignment of sourceAssignments) {
     const key = buildTaskKey(
@@ -714,7 +736,18 @@ export async function duplicatePlanningAssignments(
     validAssignments.push(assignment);
   }
 
-  if (validAssignments.length === 0) {
+  for (const mission of sourceFreeMissions) {
+    const key = buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action);
+
+    if (!targetProjectIds.has(mission.projectId) || !targetSupervisorIds.has(mission.assigneeId) || existingTargetFreeMissionKeys.has(key)) {
+      continue;
+    }
+
+    existingTargetFreeMissionKeys.add(key);
+    validFreeMissions.push(mission);
+  }
+
+  if (validAssignments.length === 0 && validFreeMissions.length === 0) {
     return planningError('NO_VALID_ASSIGNMENTS', 'Aucune assignation valide à dupliquer.', 400);
   }
 
@@ -738,11 +771,36 @@ export async function duplicatePlanningAssignments(
       }),
     ),
   );
+  if (validFreeMissions.length > 0) {
+    await prisma.freeMission.createMany({
+      data: validFreeMissions.map((mission) => ({
+        projectId: mission.projectId,
+        assigneeId: mission.assigneeId,
+        date: targetDate,
+        action: mission.action,
+        objectiveText: mission.objectiveText,
+        status: FreeMissionStatus.ASSIGNED,
+        createdById: user.id,
+      })),
+    });
+  }
+
+  const createdFreeMissionKeys = new Set(
+    validFreeMissions.map((mission) => buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action)),
+  );
+  const targetFreeMissionResponse =
+    validFreeMissions.length > 0 ? await listFreeMissions(prisma, user, formatPlanningDate(targetDate)) : { missions: [] };
+  const createdFreeMissionAssignments = targetFreeMissionResponse.missions
+    .filter((mission) => createdFreeMissionKeys.has(buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action)))
+    .map(serializeFreeMissionAsPlanningAssignment);
 
   return {
-    createdCount: created.length,
-    skippedCount: sourceAssignments.length - created.length,
-    assignments: created.map((assignment) => serializePlanningAssignment(assignment, [])),
+    createdCount: created.length + createdFreeMissionAssignments.length,
+    skippedCount: sourceAssignments.length + sourceFreeMissions.length - created.length - createdFreeMissionAssignments.length,
+    assignments: [
+      ...created.map((assignment) => serializePlanningAssignment(assignment, [])),
+      ...createdFreeMissionAssignments,
+    ],
   };
 }
 
@@ -952,6 +1010,10 @@ function buildTaskKey(
   const normalizedTargetQuantity = decimalToNumber(targetQuantity);
   const normalizedTargetProgress = normalizeProgressForQuantity(targetProgress, targetQuantity);
   return `${supervisorId}:${siteId}:${normalizeTaskActionKey(action)}:${normalizedTargetProgress ?? 'null'}:${normalizedTargetQuantity ?? 'null'}:${targetUnit ?? 'null'}:${workLocationType}`;
+}
+
+function buildFreeMissionKey(assigneeId: string, projectId: string, action: string) {
+  return `${assigneeId}:${projectId}:${normalizeTaskActionKey(action)}:${PlanningWorkLocationType.FREE_MISSION}`;
 }
 
 function normalizeTaskActionKey(action: string) {

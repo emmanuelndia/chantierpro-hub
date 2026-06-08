@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { PlanningAssignmentStatus, PlanningWorkLocationType, type Role } from '@prisma/client';
 import { useMutation, useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { Download, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Download, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
@@ -19,6 +19,7 @@ import type {
   PlanningWebAssignment,
   PlanningWebCreateRequest,
   PlanningWebDayResponse,
+  PlanningWebDuplicateResponse,
   PlanningWebFilters,
   PlanningWebMutationResponse,
   PlanningWebUpdateRequest,
@@ -214,6 +215,19 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     onError: (error) => pushMutationError(error, 'Suppression impossible'),
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: duplicatePlanning,
+    onSuccess: async (result) => {
+      pushToast({
+        type: 'success',
+        title: `${result.createdCount} tache(s) dupliquee(s)`,
+        ...(result.skippedCount > 0 ? { message: `${result.skippedCount} deja existante(s) ou hors perimetre ignoree(s).` } : {}),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+    },
+    onError: (error) => pushMutationError(error, 'Duplication impossible'),
+  });
+
   const data = dayQuery.data;
   const filteredAssignments = useMemo(
     () => filterAssignments(data?.assignments ?? [], data?.availableSites ?? [], filters),
@@ -249,7 +263,12 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     [centralizedOptions.resources],
   );
   const selectedDateObject = parseDateKey(selectedDate);
-  const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || freeMissionMutation.isPending;
+  const isMutating =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    freeMissionMutation.isPending ||
+    duplicateMutation.isPending;
   const assignmentConflicts =
     assignmentConflictsQuery.data?.items.filter((item) => item.id !== form.id && item.siteId !== form.siteId) ?? [];
 
@@ -357,6 +376,13 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         },
       });
     }
+  }
+
+  function duplicateSelectedDayToTomorrow() {
+    duplicateMutation.mutate({
+      sourceDate: selectedDate,
+      targetDate: formatDateKey(addDays(selectedDateObject, 1)),
+    });
   }
 
   function pushMutationError(error: unknown, title: string) {
@@ -595,6 +621,15 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
             >
               <Download className="h-4 w-4" />
               Récap PDF
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              disabled={isMutating || (data.assignments.length ?? 0) === 0}
+              onClick={duplicateSelectedDayToTomorrow}
+              type="button"
+            >
+              <Copy className="h-4 w-4" />
+              {duplicateMutation.isPending ? 'Duplication...' : 'Dupliquer vers demain'}
             </button>
             <button className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" disabled={isMutating} onClick={() => openCreate()} type="button">
               Ajouter une tâche
@@ -1599,6 +1634,18 @@ async function updateFreeMission(id: string, data: FreeMissionWebRequest) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de modifier la mission libre.'));
   }
   return (await response.json()) as CreateSummaryResponse;
+}
+
+async function duplicatePlanning(data: { sourceDate: string; targetDate: string }) {
+  const response = await authFetch('/api/planning/duplicate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Impossible de dupliquer le planning.'));
+  }
+  return (await response.json()) as PlanningWebDuplicateResponse;
 }
 
 async function deleteAssignment(id: string) {
