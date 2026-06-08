@@ -102,6 +102,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const { pushToast } = useToast();
   const isCentralizedOnlyPlanning = viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
   const [selectedDate, setSelectedDate] = useState(todayKey);
+  const [duplicateTargetDate, setDuplicateTargetDate] = useState(() => formatDateKey(addDays(parseDateKey(todayKey), 1)));
   const [viewMode, setViewMode] = useState<ViewMode>(() => (isCentralizedOnlyPlanning ? 'centralized' : 'day'));
   const [filters, setFilters] = useState<PlanningWebFilters>({ projectId: '', siteId: '', resourceId: '' });
   const [centralizedFilters, setCentralizedFilters] = useState<CentralizedPlanningFilters>({
@@ -173,6 +174,10 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       setViewMode('centralized');
     }
   }, [isCentralizedOnlyPlanning, viewMode]);
+
+  useEffect(() => {
+    setDuplicateTargetDate(formatDateKey(addDays(parseDateKey(selectedDate), 1)));
+  }, [selectedDate]);
 
   const createMutation = useMutation({
     mutationFn: createAssignment,
@@ -378,10 +383,19 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     }
   }
 
-  function duplicateSelectedDayToTomorrow() {
+  function duplicateSelectedDay() {
+    if (duplicateTargetDate === selectedDate) {
+      pushToast({
+        type: 'error',
+        title: 'Date cible invalide',
+        message: 'Choisis une date différente du jour source.',
+      });
+      return;
+    }
+
     duplicateMutation.mutate({
       sourceDate: selectedDate,
-      targetDate: formatDateKey(addDays(selectedDateObject, 1)),
+      targetDate: duplicateTargetDate,
     });
   }
 
@@ -622,15 +636,26 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
               <Download className="h-4 w-4" />
               Récap PDF
             </button>
-            <button
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-              disabled={isMutating || (data.assignments.length ?? 0) === 0}
-              onClick={duplicateSelectedDayToTomorrow}
-              type="button"
-            >
-              <Copy className="h-4 w-4" />
-              {duplicateMutation.isPending ? 'Duplication...' : 'Dupliquer vers demain'}
-            </button>
+            <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Dupliquer vers
+                <input
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-900 outline-none transition focus:border-orange-500"
+                  onChange={(event) => setDuplicateTargetDate(event.target.value)}
+                  type="date"
+                  value={duplicateTargetDate}
+                />
+              </label>
+              <button
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                disabled={isMutating || (data.assignments.length ?? 0) === 0 || !duplicateTargetDate}
+                onClick={duplicateSelectedDay}
+                type="button"
+              >
+                <Copy className="h-4 w-4" />
+                {duplicateMutation.isPending ? 'Duplication...' : 'Dupliquer'}
+              </button>
+            </div>
             <button className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" disabled={isMutating} onClick={() => openCreate()} type="button">
               Ajouter une tâche
             </button>
