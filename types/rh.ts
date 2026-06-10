@@ -62,6 +62,9 @@ export type RhExportInput = {
   userId: string | null;
   projectId: string | null;
   siteIds: string[];
+  context: 'TERRAIN' | 'OFFICE' | null;
+  lateOnly: boolean;
+  attendanceList: boolean;
 };
 
 export type RhExportHistoryItem = {
@@ -116,6 +119,14 @@ export type RhResourceListItem = {
   email: string | null;
   matricule: string | null;
   role: string;
+  todayPresence: {
+    label: string;
+    context: 'TERRAIN' | 'OFFICE' | null;
+    status: 'PRESENT' | 'PAUSED' | 'LEFT' | 'ABSENT' | 'NONE' | 'ANOMALY';
+    arrivalAt: string | null;
+    departureAt: string | null;
+    isLate: boolean;
+  };
 };
 
 export type RhResourcesResponse = {
@@ -137,6 +148,7 @@ export type RhSitePresenceLiveResource = {
   name: string;
   email: string | null;
   role: string;
+  presenceContext: 'TERRAIN' | 'OFFICE';
   status: RhSitePresenceLiveStatus;
   taskAction: string | null;
   arrivalAt: string | null;
@@ -162,6 +174,7 @@ export type RhSitePresenceLiveSite = {
   siteId: string | null;
   siteName: string;
   siteAddress: string;
+  presenceContext: 'TERRAIN' | 'OFFICE';
   projectId: string;
   projectName: string;
   expectedCount: number;
@@ -184,6 +197,7 @@ export type RhSitePresenceLiveResponse = {
     pausedResources: number;
     notClockedResources: number;
     anomalies: number;
+    lateResources: number;
   };
   options: {
     projects: RhFilterOption[];

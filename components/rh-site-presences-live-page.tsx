@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
 import { authFetch } from '@/lib/auth/client-session';
 import { formatRoleLabel } from '@/lib/role-labels';
+import { useToast } from '@/components/toast-provider';
 import type {
   RhSitePresenceLiveResource,
   RhSitePresenceLiveResponse,
@@ -39,7 +40,9 @@ const inputClassName =
 const liveStatuses: RhSitePresenceLiveStatus[] = ['PRESENT', 'PAUSED', 'EXPECTED_NOT_CLOCKED', 'LEFT', 'ANOMALY'];
 
 export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps) {
+  const { pushToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [context, setContext] = useState('');
   const [projectId, setProjectId] = useState('');
   const [projectManagerId, setProjectManagerId] = useState('');
   const [siteId, setSiteId] = useState('');
@@ -50,6 +53,8 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [anomaliesOnly, setAnomaliesOnly] = useState(false);
+  const [lateOnly, setLateOnly] = useState(false);
+  const canExportPresenceList = viewer.role === 'HR' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -62,6 +67,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   const requestPath = useMemo(() => {
     const searchParams = new URLSearchParams();
     if (selectedDate) searchParams.set('date', selectedDate);
+    if (context) searchParams.set('context', context);
     if (projectId) searchParams.set('projectId', projectId);
     if (projectManagerId) searchParams.set('projectManagerId', projectManagerId);
     if (siteId) searchParams.set('siteId', siteId);
@@ -69,12 +75,13 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
     if (assignedById) searchParams.set('assignedById', assignedById);
     if (role) searchParams.set('role', role);
     if (status) searchParams.set('status', status);
+    if (lateOnly) searchParams.set('lateOnly', 'true');
     if (debouncedSearch) searchParams.set('q', debouncedSearch);
     if (anomaliesOnly) searchParams.set('anomaliesOnly', 'true');
 
     const queryString = searchParams.toString();
     return queryString ? `/api/rh/site-presences-live?${queryString}` : '/api/rh/site-presences-live';
-  }, [anomaliesOnly, assignedById, debouncedSearch, projectId, projectManagerId, resourceId, role, selectedDate, siteId, status]);
+  }, [anomaliesOnly, assignedById, context, debouncedSearch, lateOnly, projectId, projectManagerId, resourceId, role, selectedDate, siteId, status]);
 
   const liveQuery = useQuery({
     queryKey: ['rh-site-presences-live', requestPath],
@@ -88,6 +95,50 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
     },
     refetchInterval: selectedDate === new Date().toISOString().slice(0, 10) ? 45_000 : false,
     staleTime: 20_000,
+    placeholderData: (previousData) => previousData,
+  });
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      const response = await authFetch('/api/rh/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          format: 'xlsx',
+          from: `${selectedDate}T00:00:00.000Z`,
+          to: `${selectedDate}T23:59:59.999Z`,
+          userId: resourceId || null,
+          projectId: projectId || null,
+          siteIds: siteId ? [siteId] : [],
+          context: context || null,
+          lateOnly,
+          attendanceList: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await safeJson(response)) as { message?: string } | null;
+        throw new Error(errorBody?.message ?? 'Export de presence impossible.');
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('content-disposition');
+      const match = contentDisposition?.match(/filename="([^"]+)"/);
+      return {
+        blob,
+        fileName: match?.[1] ?? `liste-presence-${selectedDate}.xlsx`,
+      };
+    },
+    onSuccess: ({ blob, fileName }) => {
+      triggerDownload(blob, fileName);
+      pushToast({ type: 'success', title: 'Liste telechargee' });
+    },
+    onError: (error) => {
+      pushToast({
+        type: 'error',
+        title: 'Telechargement impossible',
+        message: error instanceof Error ? error.message : 'La liste de presence na pas pu etre generee.',
+      });
+    },
   });
 
   const data = liveQuery.data;
@@ -134,13 +185,13 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">
-              Presences chantiers
+              Presences
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-              Liste de presence terrain
+              Liste de presence
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Ressources attendues ou deja pointees sur la date selectionnee. Les ressources non assignees et sans pointage ne sont pas affichees.
+              Ressources attendues sur terrain ou deja pointees au bureau ou sur terrain a la date selectionnee.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -154,6 +205,16 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
             >
               Actualiser
             </button>
+            {canExportPresenceList ? (
+              <button
+                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                disabled={exportMutation.isPending}
+                onClick={() => exportMutation.mutate()}
+                type="button"
+              >
+                {exportMutation.isPending ? 'Generation...' : 'Telecharger la liste'}
+              </button>
+            ) : null}
           </div>
         </div>
       </section>
@@ -178,6 +239,13 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
               type="date"
               value={selectedDate}
             />
+          </Field>
+          <Field label="Contexte">
+            <select className={inputClassName} onChange={(event) => setContext(event.target.value)} value={context}>
+              <option value="">Terrain et bureau</option>
+              <option value="TERRAIN">Terrain</option>
+              <option value="OFFICE">Bureau</option>
+            </select>
           </Field>
           <Field label="Projet">
             <SearchableSelect
@@ -257,24 +325,38 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
           </Field>
         </div>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <input
-              checked={anomaliesOnly}
-              className="h-4 w-4 rounded border-slate-300 text-orange-600"
-              onChange={(event) => setAnomaliesOnly(event.target.checked)}
-              type="checkbox"
-            />
-            Afficher uniquement les anomalies
-          </label>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <input
+                checked={anomaliesOnly}
+                className="h-4 w-4 rounded border-slate-300 text-orange-600"
+                onChange={(event) => setAnomaliesOnly(event.target.checked)}
+                type="checkbox"
+              />
+              Afficher uniquement les anomalies
+            </label>
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <input
+                checked={lateOnly}
+                className="h-4 w-4 rounded border-slate-300 text-orange-600"
+                onChange={(event) => setLateOnly(event.target.checked)}
+                type="checkbox"
+              />
+              Retards uniquement
+            </label>
+          </div>
           <Badge tone="neutral">{formatRoleLabel(viewer.role)}</Badge>
         </div>
+        {liveQuery.isFetching ? (
+          <p className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Mise a jour de la liste...</p>
+        ) : null}
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Liste de presence</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">Ressources terrain aujourd&apos;hui</h2>
+            <h2 className="mt-2 text-xl font-semibold text-slate-950">Ressources du jour</h2>
             <p className="mt-1 text-sm text-slate-500">
               {resources.length} ressource(s) affichee(s), mise a jour {data ? formatTime(data.generatedAt) : '--:--'}.
             </p>
@@ -291,7 +373,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
         {resources.length === 0 ? (
           <EmptyState
             description="Aucune ressource ne correspond aux filtres actifs."
-            title="Aucune presence chantier"
+            title="Aucune presence"
           />
         ) : (
           <div className="divide-y divide-slate-100">
@@ -336,6 +418,11 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
                 Retard
               </span>
             ) : null}
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+              resource.presenceContext === 'OFFICE' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
+            }`}>
+              {presenceContextLabel(resource.presenceContext)}
+            </span>
           </div>
           <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
             {formatRoleLabel(resource.role as Role)}
@@ -352,12 +439,14 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
       </div>
 
       <details className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        <summary className="cursor-pointer font-bold text-slate-700">Chantiers et taches</summary>
+        <summary className="cursor-pointer font-bold text-slate-700">Details de presence</summary>
         <div className="mt-3 space-y-3">
           {resource.contexts.map((context, index) => (
             <div className="rounded-2xl bg-white p-3" key={`${context.siteId ?? 'mission'}:${context.userId}:${index}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold text-slate-950">{context.siteName}</p>
+                <p className="font-semibold text-slate-950">
+                  {presenceContextLabel(context.presenceContext)} - {context.siteName}
+                </p>
                 <Badge tone={liveStatusTone(context.status)}>{liveStatusLabel(context.status)}</Badge>
               </div>
               {context.isLate ? (
@@ -366,13 +455,13 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
                 </p>
               ) : null}
               <div className="mt-2 grid gap-2 lg:grid-cols-2">
-                <p><span className="font-semibold text-slate-950">Projet :</span> {context.projectName}</p>
-                <p><span className="font-semibold text-slate-950">Adresse :</span> {context.siteAddress}</p>
+                <p><span className="font-semibold text-slate-950">Projet :</span> {context.projectName || '-'}</p>
+                <p><span className="font-semibold text-slate-950">Position :</span> {context.siteAddress}</p>
                 <p>
                   <span className="font-semibold text-slate-950">Distance :</span>{' '}
                   {context.distanceKm === null ? '-' : `${context.distanceKm.toFixed(2)} km`}
                 </p>
-                <p><span className="font-semibold text-slate-950">Tache :</span> {context.taskAction ?? 'Aucune tache terrain planifiee'}</p>
+                <p><span className="font-semibold text-slate-950">Tache :</span> {context.taskAction ?? (context.presenceContext === 'OFFICE' ? 'Pointage bureau' : 'Aucune tache terrain planifiee')}</p>
               </div>
               {context.arrivalGps || context.departureGps ? (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -633,6 +722,10 @@ function isExpectedContext(context: LiveResourceContext) {
   return Boolean(context.taskAction) || context.status === 'EXPECTED_NOT_CLOCKED';
 }
 
+function presenceContextLabel(context: 'TERRAIN' | 'OFFICE') {
+  return context === 'OFFICE' ? 'Bureau' : 'Terrain';
+}
+
 function clockInTypeLabel(type: string | null) {
   if (type === 'ARRIVAL') return 'Entree';
   if (type === 'DEPARTURE') return 'Sortie';
@@ -650,6 +743,23 @@ function formatTime(value: string) {
 
 function buildGpsMapUrl(latitude: number, longitude: number) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`;
+}
+
+function triggerDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function safeJson(response: Response) {
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 function LoadingState() {

@@ -15,6 +15,7 @@ const inputClassName =
 
 export function RhResourcesPage() {
   const [role, setRole] = useState('');
+  const [presenceStatus, setPresenceStatus] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -26,10 +27,11 @@ export function RhResourcesPage() {
   const requestPath = useMemo(() => {
     const searchParams = new URLSearchParams();
     if (role) searchParams.set('role', role);
+    if (presenceStatus) searchParams.set('presenceStatus', presenceStatus);
     if (debouncedSearch) searchParams.set('q', debouncedSearch);
     const query = searchParams.toString();
     return query ? `/api/rh/resources?${query}` : '/api/rh/resources';
-  }, [debouncedSearch, role]);
+  }, [debouncedSearch, presenceStatus, role]);
 
   const resourcesQuery = useQuery({
     queryKey: ['rh-resources', requestPath],
@@ -41,6 +43,7 @@ export function RhResourcesPage() {
 
       return (await response.json()) as RhResourcesResponse;
     },
+    placeholderData: (previousData) => previousData,
     staleTime: 30_000,
   });
 
@@ -51,7 +54,11 @@ export function RhResourcesPage() {
   );
 
   if (resourcesQuery.isLoading && !data) {
-    return <p className="rounded-[2rem] border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500 shadow-panel">Chargement des ressources...</p>;
+    return (
+      <p className="rounded-[2rem] border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500 shadow-panel">
+        Chargement des ressources...
+      </p>
+    );
   }
 
   if (resourcesQuery.isError) {
@@ -64,18 +71,18 @@ export function RhResourcesPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">RH</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Ressources</h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-          Liste des ressources actives avec leur identifiant, rôle, email et matricule quand il est renseigné.
+          Liste des ressources actives avec leur identifiant, role, email, matricule et presence du jour.
         </p>
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
         <KpiCard label="Ressources actives" value={data?.totalItems ?? 0} />
         <KpiCard label="Matricules manquants" tone="warning" value={data?.missingMatricule ?? 0} />
-        <KpiCard label="Rôles affichés" value={data?.roles.length ?? 0} />
+        <KpiCard label="Roles affiches" value={data?.roles.length ?? 0} />
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <label className="space-y-2">
             <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Recherche</span>
             <input
@@ -87,10 +94,24 @@ export function RhResourcesPage() {
             />
           </label>
           <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Rôle</span>
-            <SearchableSelect onChange={setRole} options={roleOptions} placeholder="Tous les rôles" value={role} />
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Role</span>
+            <SearchableSelect onChange={setRole} options={roleOptions} placeholder="Tous les roles" value={role} />
+          </label>
+          <label className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Presence du jour</span>
+            <select className={inputClassName} onChange={(event) => setPresenceStatus(event.target.value)} value={presenceStatus}>
+              <option value="">Tous</option>
+              <option value="present-terrain">Presents terrain</option>
+              <option value="present-office">Presents bureau</option>
+              <option value="absent">Absents</option>
+              <option value="late">Retards</option>
+              <option value="none">Sans pointage</option>
+            </select>
           </label>
         </div>
+        {resourcesQuery.isFetching ? (
+          <p className="mt-4 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Recherche en cours...</p>
+        ) : null}
       </section>
 
       <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-panel">
@@ -101,8 +122,9 @@ export function RhResourcesPage() {
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                 <tr>
+                  <th className="px-5 py-4">Presence du jour</th>
                   <th className="px-5 py-4">Nom</th>
-                  <th className="px-5 py-4">Rôle</th>
+                  <th className="px-5 py-4">Role</th>
                   <th className="px-5 py-4">Identifiant</th>
                   <th className="px-5 py-4">Matricule</th>
                   <th className="px-5 py-4">Email</th>
@@ -111,6 +133,9 @@ export function RhResourcesPage() {
               <tbody className="divide-y divide-slate-100">
                 {(data?.items ?? []).map((resource) => (
                   <tr key={resource.id} className="align-top">
+                    <td className="px-5 py-4">
+                      <PresenceBadge presence={resource.todayPresence} />
+                    </td>
                     <td className="px-5 py-4">
                       <p className="font-black text-slate-950">{resource.firstName} {resource.lastName}</p>
                     </td>
@@ -137,6 +162,29 @@ export function RhResourcesPage() {
   );
 }
 
+function PresenceBadge({
+  presence,
+}: Readonly<{
+  presence: RhResourcesResponse['items'][number]['todayPresence'];
+}>) {
+  const tone =
+    presence.status === 'PRESENT' || presence.status === 'PAUSED'
+      ? 'success'
+      : presence.status === 'ABSENT' || presence.isLate
+        ? 'warning'
+        : presence.status === 'ANOMALY'
+          ? 'error'
+          : 'neutral';
+
+  return (
+    <div className="space-y-1">
+      <Badge tone={tone}>{presence.label}</Badge>
+      {presence.isLate ? <p className="text-xs font-bold text-orange-700">Retard</p> : null}
+      {presence.arrivalAt ? <p className="text-xs text-slate-500">Entree {formatTime(presence.arrivalAt)}</p> : null}
+    </div>
+  );
+}
+
 function KpiCard({
   label,
   value,
@@ -154,4 +202,11 @@ function KpiCard({
       <p className="mt-3 text-3xl font-semibold">{value}</p>
     </article>
   );
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
 }

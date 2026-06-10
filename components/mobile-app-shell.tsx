@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import type { Role } from '@prisma/client';
 import { BottomTabBar } from '@/components/bottom-tab-bar';
@@ -14,6 +14,7 @@ import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offli
 import { getMobileNavigationForRole } from '@/lib/navigation';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { ClockInHistoryItem, TodayClockInView } from '@/types/clock-in';
+import type { UserNotificationsResponse } from '@/types/notifications';
 
 type MobileAppShellProps = Readonly<{
   user: WebSessionUser;
@@ -32,6 +33,7 @@ const fieldRoles: readonly Role[] = [
 ];
 
 export function MobileAppShell({ user, children }: MobileAppShellProps) {
+  const queryClient = useQueryClient();
   const tabs = getMobileNavigationForRole(user.role);
   const shouldLoadClockInBadges = fieldRoles.includes(user.role);
   const shouldEnableTerrainOffline = fieldRoles.includes(user.role);
@@ -72,6 +74,32 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
     enabled: shouldLoadClockInBadges && tabs.some((tab) => tab.href === '/mobile/history'),
     refetchInterval: 60_000,
   });
+  const notificationsQuery = useQuery({
+    queryKey: ['mobile-notifications'],
+    queryFn: async () => {
+      const response = await authFetch('/api/notifications');
+      if (!response.ok) {
+        throw new Error('Notifications indisponibles.');
+      }
+
+      return (await response.json()) as UserNotificationsResponse;
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  const readNotificationMutation = useMutation({
+    mutationFn: async (notificationRecipientId: string) => {
+      const response = await authFetch(`/api/notifications/${notificationRecipientId}/read`, {
+        method: 'PATCH',
+      });
+      if (!response.ok && response.status !== 204) {
+        throw new Error('Lecture notification impossible.');
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['mobile-notifications'] });
+    },
+  });
 
   const hasOpenSession = Boolean(todayQuery.data?.activeSession);
   const incompleteSessionCount = historyQuery.data ?? 0;
@@ -105,6 +133,10 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
         {shouldEnableTerrainOffline ? <OfflineBanner /> : null}
         {shouldEnableTerrainOffline ? <MobileOfflineStatus /> : null}
 <MustChangePasswordBanner href="/mobile/profile" show={user.mustChangePassword} />
+        <MobileAdminNotificationBanner
+          notifications={(notificationsQuery.data?.items ?? []).filter((notification) => !notification.readAt)}
+          onMarkRead={(id) => readNotificationMutation.mutate(id)}
+        />
 
         <main className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-4">
           {children}
@@ -117,6 +149,32 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
         />
       </div>
     </div>
+  );
+}
+
+function MobileAdminNotificationBanner({
+  notifications,
+  onMarkRead,
+}: Readonly<{
+  notifications: UserNotificationsResponse['items'];
+  onMarkRead: (id: string) => void;
+}>) {
+  const notification = notifications[0];
+  if (!notification) return null;
+
+  return (
+    <section className="mx-4 mt-4 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-orange-950">
+      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-orange-700">Message administrateur</p>
+      <h2 className="mt-1 text-base font-black">{notification.title}</h2>
+      <p className="mt-2 text-sm font-semibold leading-6">{notification.message}</p>
+      <button
+        className="mt-3 min-h-10 rounded-xl bg-orange-600 px-4 text-sm font-black text-white"
+        onClick={() => onMarkRead(notification.id)}
+        type="button"
+      >
+        Marquer comme lu
+      </button>
+    </section>
   );
 }
 

@@ -183,10 +183,14 @@ type ExportQuery = {
   userId: string | null;
   projectId: string | null;
   siteIds: string[];
+  context: 'TERRAIN' | 'OFFICE' | null;
+  lateOnly: boolean;
+  attendanceList: boolean;
 };
 
 type SitePresenceLiveQuery = {
   date: Date;
+  context: 'TERRAIN' | 'OFFICE' | null;
   projectId: string | null;
   projectManagerId: string | null;
   siteId: string | null;
@@ -194,6 +198,7 @@ type SitePresenceLiveQuery = {
   assignedById: string | null;
   role: Role | null;
   status: RhSitePresenceLiveStatus | null;
+  lateOnly: boolean;
   search: string | null;
   anomaliesOnly: boolean;
 };
@@ -300,6 +305,9 @@ export function parseRhExportInput(body: unknown): RhExportInput | null {
     userId,
     projectId,
     siteIds,
+    context: parsePresenceContext(typeof body.context === 'string' ? body.context : null),
+    lateOnly: body.lateOnly === true,
+    attendanceList: body.attendanceList === true,
   };
 }
 
@@ -308,6 +316,7 @@ export function parseSitePresenceLiveQuery(searchParams: URLSearchParams): SiteP
 
   return {
     date: parsedDate ?? toDateOnlyDate(new Date()),
+    context: parsePresenceContext(searchParams.get('context')),
     projectId: sanitizeString(searchParams.get('projectId')),
     projectManagerId: sanitizeString(searchParams.get('projectManagerId')),
     siteId: sanitizeString(searchParams.get('siteId')),
@@ -315,6 +324,7 @@ export function parseSitePresenceLiveQuery(searchParams: URLSearchParams): SiteP
     assignedById: sanitizeString(searchParams.get('assignedById')),
     role: parseRole(searchParams.get('role')),
     status: parseLiveStatus(searchParams.get('status')),
+    lateOnly: searchParams.get('lateOnly') === 'true',
     search: sanitizeString(searchParams.get('q')),
     anomaliesOnly: searchParams.get('anomaliesOnly') === 'true',
   };
@@ -328,6 +338,14 @@ export async function getSitePresencesLive(
   const today = query.date;
   const tomorrow = new Date(today);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const includeTerrain = query.context !== 'OFFICE';
+  const includeOffice =
+    query.context !== 'TERRAIN' &&
+    canAccessRh(user.role) &&
+    !query.projectId &&
+    !query.projectManagerId &&
+    !query.siteId &&
+    !query.assignedById;
 
   const siteWhere: Prisma.SiteWhereInput = {
     status: 'ACTIVE',
@@ -339,8 +357,8 @@ export async function getSitePresencesLive(
     ...(query.siteId ? { id: query.siteId } : {}),
   };
 
-  const [sites, assignments, records, freeMissions] = await Promise.all([
-    prisma.site.findMany({
+  const [sites, assignments, records, freeMissions, officeRecords] = await Promise.all([
+    includeTerrain ? prisma.site.findMany({
       where: siteWhere,
       orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
       select: {
@@ -362,8 +380,8 @@ export async function getSitePresencesLive(
           },
         },
       },
-    }),
-    prisma.planningAssignment.findMany({
+    }) : Promise.resolve([]),
+    includeTerrain ? prisma.planningAssignment.findMany({
       where: {
         date: today,
         deletedAt: null,
@@ -397,8 +415,8 @@ export async function getSitePresencesLive(
           },
         },
       },
-    }),
-    prisma.clockInRecord.findMany({
+    }) : Promise.resolve([]),
+    includeTerrain ? prisma.clockInRecord.findMany({
       where: {
         status: ClockInStatus.VALID,
         site: siteWhere,
@@ -437,8 +455,8 @@ export async function getSitePresencesLive(
           },
         },
       },
-    }),
-    prisma.freeMission.findMany({
+    }) : Promise.resolve([]),
+    includeTerrain ? prisma.freeMission.findMany({
       where: {
         date: today,
         deletedAt: null,
@@ -523,16 +541,68 @@ export async function getSitePresencesLive(
           },
         },
       },
-    }),
+    }) : Promise.resolve([]),
+    includeOffice ? prisma.clockInRecord.findMany({
+      where: {
+        status: ClockInStatus.VALID,
+        officeClockInLocation: 'OFFICE',
+        timestampLocal: {
+          gte: today,
+          lt: tomorrow,
+        },
+        type: {
+          in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
+        },
+        ...(query.resourceId ? { userId: query.resourceId } : {}),
+        ...(query.role ? { user: { role: query.role } } : {}),
+      },
+      orderBy: [{ officeLocation: { name: 'asc' } }, { user: { firstName: 'asc' } }, { timestampLocal: 'asc' }],
+      select: {
+        id: true,
+        userId: true,
+        officeLocationId: true,
+        type: true,
+        timestampLocal: true,
+        distanceToSite: true,
+        latitude: true,
+        longitude: true,
+        accuracy: true,
+        isRemoteCheckout: true,
+        isAutoClosed: true,
+        isRegularized: true,
+        isLate: true,
+        officeLocation: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    }) : Promise.resolve([]),
   ]);
 
-  const siteRows = new Map(
+  type LivePresenceRow = RhSitePresenceLiveResponse['sites'][number] & {
+    projectManagerId: string;
+    projectManagerName: string;
+  };
+  const siteRows = new Map<string, LivePresenceRow>(
     sites.map((site) => [
       site.id,
       {
         siteId: site.id,
         siteName: site.name,
         siteAddress: site.address,
+        presenceContext: 'TERRAIN' as const,
         projectId: site.projectId,
         projectName: site.project.name,
         projectManagerId: site.project.projectManagerId,
@@ -553,6 +623,7 @@ export async function getSitePresencesLive(
       siteId: mission.id,
       siteName: mission.action,
       siteAddress: 'Mission libre',
+      presenceContext: 'TERRAIN',
       projectId: mission.projectId,
       projectName: mission.project.name,
       projectManagerId: mission.project.projectManagerId,
@@ -567,8 +638,40 @@ export async function getSitePresencesLive(
       resources: [] as RhSitePresenceLiveResource[],
     });
   }
+  for (const record of officeRecords) {
+    const rowId = `office:${record.officeLocationId ?? 'default'}`;
+    if (!siteRows.has(rowId)) {
+      siteRows.set(rowId, {
+        siteId: rowId,
+        siteName: record.officeLocation?.name ?? 'Bureau',
+        siteAddress: record.officeLocation?.address ?? 'Pointage bureau',
+        presenceContext: 'OFFICE',
+        projectId: '',
+        projectName: 'Bureau',
+        projectManagerId: '',
+        projectManagerName: 'Bureau',
+        expectedCount: 0,
+        presentCount: 0,
+        pausedCount: 0,
+        notClockedCount: 0,
+        leftCount: 0,
+        anomalyCount: 0,
+        lastActivityAt: null as string | null,
+        resources: [] as RhSitePresenceLiveResource[],
+      });
+    }
+  }
 
-  const recordsBySiteUser = new Map<string, (typeof records)[number][]>();
+  type LiveRecordWithUser = Parameters<typeof buildLiveResource>[2][number] & {
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string | null;
+      role: Role;
+    };
+  };
+  const recordsBySiteUser = new Map<string, LiveRecordWithUser[]>();
   for (const record of records) {
     if (!record.siteId) {
       continue;
@@ -579,6 +682,11 @@ export async function getSitePresencesLive(
   for (const mission of freeMissions) {
     const key = liveResourceKey(mission.id, mission.assigneeId);
     recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), ...mission.clockInRecords]);
+  }
+  for (const record of officeRecords) {
+    const rowId = `office:${record.officeLocationId ?? 'default'}`;
+    const key = liveResourceKey(rowId, record.userId);
+    recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), record]);
   }
 
   const assignmentBySiteUser = new Map<
@@ -625,7 +733,7 @@ export async function getSitePresencesLive(
     const user = assignment?.supervisor ?? siteRecords[0]?.user;
     if (!user) continue;
 
-    const resource = buildLiveResource(user, assignment?.action ?? null, siteRecords);
+    const resource = buildLiveResource(user, assignment?.action ?? null, siteRecords, site.presenceContext);
     if (!matchesLiveResourceFilters(resource, query)) continue;
 
     site.resources.push(resource);
@@ -637,10 +745,12 @@ export async function getSitePresencesLive(
     });
 
     if (assignment) site.expectedCount += 1;
-    projectManagersById.set(site.projectManagerId, {
-      id: site.projectManagerId,
-      label: site.projectManagerName,
-    });
+    if (site.projectManagerId) {
+      projectManagersById.set(site.projectManagerId, {
+        id: site.projectManagerId,
+        label: site.projectManagerName,
+      });
+    }
     if (assignment) {
       assignersById.set(assignment.createdById, {
         id: assignment.createdById,
@@ -684,6 +794,7 @@ export async function getSitePresencesLive(
       pausedResources: filteredSites.reduce((sum, site) => sum + site.pausedCount, 0),
       notClockedResources: filteredSites.reduce((sum, site) => sum + site.notClockedCount, 0),
       anomalies: filteredSites.reduce((sum, site) => sum + site.anomalyCount, 0),
+      lateResources: filteredSites.reduce((sum, site) => sum + site.resources.filter((resource) => resource.isLate).length, 0),
     },
     options: {
       projects: sites
@@ -1015,6 +1126,8 @@ export async function buildRhExportArtifact(
     userId: payload.input.userId,
     projectId: payload.input.projectId,
     siteIds: payload.input.siteIds,
+    context: payload.input.context,
+    lateOnly: payload.input.lateOnly,
   });
 
   const grouped = new Map<string, BuiltSession[]>();
@@ -1091,7 +1204,7 @@ export async function buildRhExportArtifact(
   const fileBaseName = `rh-export-${payload.input.from.slice(0, 10)}-${payload.input.to.slice(0, 10)}`;
 
   if (payload.input.format === 'csv') {
-    const buffer = buildCsvBuffer(rows);
+    const buffer = payload.input.attendanceList ? buildAttendanceCsvBuffer(rows) : buildCsvBuffer(rows);
     const fileName = `${fileBaseName}.csv`;
     const storageKey = buildRhExportStorageKey(fileName);
     const expiresAt = new Date(Date.now() + RH_EXPORT_ARTIFACT_TTL_MS).toISOString();
@@ -1112,7 +1225,7 @@ export async function buildRhExportArtifact(
     };
   }
 
-  const buffer = await buildXlsxBuffer(rows);
+  const buffer = payload.input.attendanceList ? await buildAttendanceXlsxBuffer(rows) : await buildXlsxBuffer(rows);
   const fileName = `${fileBaseName}.xlsx`;
   const storageKey = buildRhExportStorageKey(fileName);
   const expiresAt = new Date(Date.now() + RH_EXPORT_ARTIFACT_TTL_MS).toISOString();
@@ -1276,6 +1389,8 @@ async function getBuiltSessionsForRange(
     userId: string | null;
     projectId: string | null;
     siteIds: string[];
+    context?: 'TERRAIN' | 'OFFICE' | null;
+    lateOnly?: boolean;
   },
 ) {
   const records = await prisma.clockInRecord.findMany({
@@ -1332,7 +1447,12 @@ async function getBuiltSessionsForRange(
     select: rhClockInRecordSelect,
   });
 
-  return buildSessions(records);
+  return buildSessions(records).filter((session) => {
+    if (payload.context === 'OFFICE' && session.context !== 'OFFICE') return false;
+    if (payload.context === 'TERRAIN' && session.context === 'OFFICE') return false;
+    if (payload.lateOnly && !session.isLate) return false;
+    return true;
+  });
 }
 
 function buildSessions(records: SerializableRhClockInRecord[]) {
@@ -1808,6 +1928,66 @@ function escapeCsvValue(value: string | null) {
   return `"${normalized}"`;
 }
 
+function buildAttendanceCsvBuffer(rows: ExportRow[]) {
+  const headers = ['numero matricule', 'nom', 'prenom', 'position', 'heure arrivee', 'heure depart', 'temps passee'];
+  const lines = [
+    headers.join(','),
+    ...rows.map((row) =>
+      [
+        row.matricule,
+        row.lastName,
+        row.firstName,
+        buildAttendancePosition(row),
+        row.arrivalTime,
+        row.departureTime,
+        row.timeSpent,
+      ]
+        .map(escapeCsvValue)
+        .join(','),
+    ),
+  ];
+
+  return Buffer.from(`\uFEFF${lines.join('\r\n')}`, 'utf8');
+}
+
+async function buildAttendanceXlsxBuffer(rows: ExportRow[]) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Liste presence');
+
+  worksheet.columns = [
+    { header: 'numero matricule', key: 'matricule' },
+    { header: 'nom', key: 'lastName' },
+    { header: 'prenom', key: 'firstName' },
+    { header: 'position', key: 'attendancePosition' },
+    { header: 'heure arrivee', key: 'arrivalTime' },
+    { header: 'heure depart', key: 'departureTime' },
+    { header: 'temps passee', key: 'timeSpent' },
+  ];
+
+  worksheet.getRow(1).font = { bold: true };
+  for (const row of rows) {
+    worksheet.addRow({ ...row, attendancePosition: buildAttendancePosition(row) });
+  }
+  worksheet.columns.forEach((column) => {
+    let maxLength = column.header ? String(column.header).length : 10;
+    column.eachCell?.({ includeEmpty: true }, (cell) => {
+      maxLength = Math.max(maxLength, cell.text.length);
+    });
+    column.width = maxLength + 2;
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+function buildAttendancePosition(row: ExportRow) {
+  if (row.position === 'TOTAL EMPLOYE' || row.position === 'TOTAL GENERAL') {
+    return row.position;
+  }
+
+  return `${row.context === 'Bureau' ? 'Bureau' : 'Terrain'} - ${row.position}`;
+}
+
 function buildRhExportStorageKey(fileName: string) {
   const datePrefix = new Date().toISOString().slice(0, 10);
   const safeFileName = fileName.replace(/[^\w.-]+/g, '_');
@@ -1864,6 +2044,14 @@ function parseLiveStatus(value: string | null): RhSitePresenceLiveStatus | null 
   return statuses.includes(value as RhSitePresenceLiveStatus) ? (value as RhSitePresenceLiveStatus) : null;
 }
 
+function parsePresenceContext(value: string | null): 'TERRAIN' | 'OFFICE' | null {
+  if (value === 'TERRAIN' || value === 'OFFICE') {
+    return value;
+  }
+
+  return null;
+}
+
 function parseDateOnly(value: string | null) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return null;
@@ -1902,6 +2090,7 @@ function buildLiveResource(
     isRegularized: boolean;
     isLate: boolean;
   }[],
+  presenceContext: 'TERRAIN' | 'OFFICE',
 ): RhSitePresenceLiveResource {
   const latest = records.at(-1) ?? null;
   const arrival = [...records].reverse().find((record) => record.type === ClockInType.ARRIVAL) ?? null;
@@ -1922,6 +2111,7 @@ function buildLiveResource(
     name: `${user.firstName} ${user.lastName}`,
     email: user.email,
     role: user.role,
+    presenceContext,
     status,
     taskAction,
     arrivalAt: arrival?.timestampLocal.toISOString() ?? null,
@@ -1967,6 +2157,7 @@ function getLiveStatusFromLatestRecord(
 function matchesLiveResourceFilters(resource: RhSitePresenceLiveResource, query: SitePresenceLiveQuery) {
   if (query.status && resource.status !== query.status) return false;
   if (query.anomaliesOnly && resource.status !== 'ANOMALY') return false;
+  if (query.lateOnly && !resource.isLate) return false;
 
   if (query.search) {
     const normalized = query.search.toLowerCase();

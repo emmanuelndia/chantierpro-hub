@@ -13,12 +13,14 @@ import {
   setStoredMobilePhotoQuality,
   type MobilePhotoQuality,
 } from '@/lib/mobile-photo-quality';
+import type { UserNotificationsResponse } from '@/types/notifications';
 import type { UserDetail } from '@/types/users';
 
 type ProfileValues = {
   firstName: string;
   lastName: string;
   email: string;
+  matricule: string;
 };
 
 type PasswordValues = {
@@ -53,7 +55,12 @@ const roleLabels: Record<Role, string> = {
 
 export function MobileProfilePage() {
   const queryClient = useQueryClient();
-  const [profileValues, setProfileValues] = useState<ProfileValues>({ firstName: '', lastName: '', email: '' });
+  const [profileValues, setProfileValues] = useState<ProfileValues>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    matricule: '',
+  });
   const [passwordValues, setPasswordValues] = useState<PasswordValues>(initialPasswordValues);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -74,6 +81,18 @@ export function MobileProfilePage() {
     },
   });
 
+  const notificationsQuery = useQuery({
+    queryKey: ['mobile-notifications'],
+    queryFn: async () => {
+      const response = await authFetch('/api/notifications');
+      if (!response.ok) {
+        throw new Error(`Notifications failed with status ${response.status}`);
+      }
+
+      return (await response.json()) as UserNotificationsResponse;
+    },
+  });
+
   useEffect(() => {
     setQuality(getStoredMobilePhotoQuality());
   }, []);
@@ -87,6 +106,7 @@ export function MobileProfilePage() {
       firstName: profileQuery.data.firstName,
       lastName: profileQuery.data.lastName,
       email: profileQuery.data.email ?? '',
+      matricule: profileQuery.data.matricule ?? '',
     });
   }, [profileQuery.data]);
 
@@ -101,6 +121,7 @@ export function MobileProfilePage() {
           firstName: values.firstName.trim(),
           lastName: values.lastName.trim(),
           email: values.email.trim() || null,
+          matricule: values.matricule.trim() || null,
         }),
       });
 
@@ -113,7 +134,12 @@ export function MobileProfilePage() {
     },
     onSuccess: (user) => {
       setNotice({ tone: 'success', message: 'Profil mis à jour.' });
-      setProfileValues({ firstName: user.firstName, lastName: user.lastName, email: user.email ?? '' });
+      setProfileValues({
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email ?? '',
+        matricule: user.matricule ?? '',
+      });
       void queryClient.invalidateQueries({ queryKey: ['mobile-profile'] });
       void queryClient.invalidateQueries({ queryKey: ['auth-me'] });
     },
@@ -159,6 +185,22 @@ export function MobileProfilePage() {
     },
   });
 
+  const readNotificationMutation = useMutation({
+    mutationFn: async (notificationRecipientId: string) => {
+      const response = await authFetch(`/api/notifications/${notificationRecipientId}/read`, {
+        method: 'PATCH',
+      });
+
+      if (!response.ok) {
+        throw new Error('Notification introuvable.');
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['mobile-notifications'] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch('/api/auth/logout', {
@@ -189,9 +231,10 @@ export function MobileProfilePage() {
       profileValues.lastName.trim().length > 0 &&
       (profileValues.firstName.trim() !== user.firstName ||
         profileValues.lastName.trim() !== user.lastName ||
-        profileValues.email.trim().toLowerCase() !== (user.email ?? ''))
+        profileValues.email.trim().toLowerCase() !== (user.email ?? '') ||
+        profileValues.matricule.trim() !== (user.matricule ?? ''))
     );
-  }, [profileValues.email, profileValues.firstName, profileValues.lastName, user]);
+  }, [profileValues.email, profileValues.firstName, profileValues.lastName, profileValues.matricule, user]);
 
   const passwordSubmitDisabled =
     passwordMutation.isPending ||
@@ -253,6 +296,11 @@ export function MobileProfilePage() {
           />
           <ReadOnlyField label="Identifiant" value={user.username} />
           <TextField
+            label="Matricule facultatif"
+            onChange={(value) => setProfileValues((current) => ({ ...current, matricule: value }))}
+            value={profileValues.matricule}
+          />
+          <TextField
             label="Email facultatif"
             onChange={(value) => setProfileValues((current) => ({ ...current, email: value }))}
             inputMode="email"
@@ -269,6 +317,57 @@ export function MobileProfilePage() {
         >
           {profileMutation.isPending ? <Spinner className="h-5 w-5" /> : 'Enregistrer'}
         </button>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <SectionTitle title="Notifications" />
+        <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+          <span className="text-sm font-black text-slate-700">Messages reçus</span>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700">
+            {notificationsQuery.data?.unreadCount ?? 0} non lue(s)
+          </span>
+        </div>
+        <div className="mt-3 space-y-3">
+          {notificationsQuery.isLoading ? (
+            <p className="text-sm font-semibold text-slate-500">Chargement des notifications...</p>
+          ) : null}
+          {notificationsQuery.isError ? (
+            <p className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">
+              Notifications indisponibles pour le moment.
+            </p>
+          ) : null}
+          {notificationsQuery.data?.items.length === 0 ? (
+            <p className="rounded-lg bg-slate-50 p-3 text-sm font-semibold text-slate-500">
+              Aucune notification.
+            </p>
+          ) : null}
+          {notificationsQuery.data?.items.map((item) => (
+            <article
+              className={`rounded-lg border p-3 ${
+                item.readAt ? 'border-slate-200 bg-slate-50' : 'border-orange-200 bg-orange-50'
+              }`}
+              key={item.id}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-950">{item.title}</h3>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">{item.message}</p>
+                  <p className="mt-2 text-xs font-bold text-slate-400">{formatDate(item.createdAt)}</p>
+                </div>
+                {!item.readAt ? (
+                  <button
+                    className="shrink-0 rounded-full bg-slate-950 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                    disabled={readNotificationMutation.isPending}
+                    onClick={() => readNotificationMutation.mutate(item.id)}
+                    type="button"
+                  >
+                    Lu
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">

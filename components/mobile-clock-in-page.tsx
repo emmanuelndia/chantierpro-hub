@@ -412,6 +412,14 @@ export function MobileClockInPage() {
   const currentIntent = pauseActive && siteIntent === 'pause-start' ? 'pause-end' : siteIntent;
   const currentType = intentToType[currentIntent];
   const selectedDistance = selectedSite?.distanceKm ?? null;
+  const selectedOfficeDistance =
+    selectedOfficeLocation && geoState.status === 'ready'
+      ? haversineDistanceKm(
+          { latitude: geoState.latitude, longitude: geoState.longitude },
+          { latitude: selectedOfficeLocation.latitude, longitude: selectedOfficeLocation.longitude },
+        )
+      : null;
+  const isAfterOfficeStartTime = new Date(now).getHours() > 8 || (new Date(now).getHours() === 8 && new Date(now).getMinutes() > 0);
   const outsideRadius = currentType === 'ARRIVAL' && selectedDistance !== null && selectedSite ? selectedDistance > selectedSite.radiusKm : false;
   const remoteDeparture =
     currentType === 'DEPARTURE' &&
@@ -507,7 +515,7 @@ export function MobileClockInPage() {
       throw new Error('Vous etes hors du rayon autorise.');
     }
 
-    const timestampLocal = new Date().toISOString();
+    const timestampLocal = toLocalIsoWithOffset(new Date());
     const clientId = createOfflineClockInId();
     const payload = {
       siteId: selectedSite?.id ?? null,
@@ -767,17 +775,22 @@ export function MobileClockInPage() {
       ) : null}
 
       {selectedOffice ? (
-        <section className="space-y-3 rounded-lg border-2 border-slate-300 bg-white p-4 shadow-panel">
+        <section className="space-y-4 rounded-lg border-2 border-sky-200 bg-white p-4 shadow-panel">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Mode bureau</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Presence bureau</p>
               <h3 className="mt-2 text-lg font-black text-slate-950">Pointage bureau</h3>
               <p className="mt-1 text-sm font-semibold text-slate-600">Présence quotidienne indépendante du planning.</p>
             </div>
-            <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
+            <span className="rounded-full bg-sky-600 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
               Bureau
             </span>
           </div>
+          {isAfterOfficeStartTime && currentType === 'ARRIVAL' ? (
+            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm font-bold text-orange-900">
+              Arrivee apres 08:00 : ce pointage sera signale en retard.
+            </div>
+          ) : null}
           <div className="space-y-2">
             <label className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Bureau</label>
             <select
@@ -792,6 +805,18 @@ export function MobileClockInPage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Distance</p>
+              <p className="mt-1 text-sm font-black text-slate-950">
+                {selectedOfficeDistance === null ? 'GPS requis' : `${selectedOfficeDistance.toFixed(2)} km`}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Rayon bureau</p>
+              <p className="mt-1 text-sm font-black text-slate-950">{selectedOfficeLocation?.radiusKm ?? '-'} km</p>
+            </div>
           </div>
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">
             La position GPS est enregistrée comme preuve du pointage. Aucun chantier proche ne sera sélectionné.
@@ -943,7 +968,7 @@ export function MobileClockInPage() {
               <ActionButton
                 busy={clockInMutation.isPending && currentType === 'DEPARTURE'}
                 disabled={geoState.status !== 'ready' || clockInMutation.isPending}
-                label={remoteDeparture ? 'FERMER SESSION A DISTANCE' : 'POINTER SORTIE'}
+                label={selectedOffice ? 'POINTER SORTIE BUREAU' : remoteDeparture ? 'FERMER SESSION A DISTANCE' : 'POINTER SORTIE'}
                 onClick={() => {
                   setSelectedIntent('departure');
                   clockInMutation.mutate('departure');
@@ -953,7 +978,7 @@ export function MobileClockInPage() {
               <ActionButton
                 busy={clockInMutation.isPending && (currentType === 'PAUSE_START' || currentType === 'PAUSE_END')}
                 disabled={geoState.status !== 'ready' || clockInMutation.isPending}
-                label={pauseActive ? 'REPRENDRE' : 'PAUSE'}
+                label={pauseActive ? 'TERMINER PAUSE' : 'DEMARRER PAUSE'}
                 onClick={() => {
                   const intent = pauseActive ? 'pause-end' : 'pause-start';
                   setSelectedIntent(intent);
@@ -993,6 +1018,22 @@ export function MobileClockInPage() {
       </MobileOfflineLink>
     </div>
   );
+}
+
+function toLocalIsoWithOffset(value: Date) {
+  const offsetMinutes = -value.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const absoluteOffset = Math.abs(offsetMinutes);
+  const offsetHours = String(Math.floor(absoluteOffset / 60)).padStart(2, '0');
+  const offsetRemainderMinutes = String(absoluteOffset % 60).padStart(2, '0');
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hour = String(value.getHours()).padStart(2, '0');
+  const minute = String(value.getMinutes()).padStart(2, '0');
+  const second = String(value.getSeconds()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}${sign}${offsetHours}:${offsetRemainderMinutes}`;
 }
 
 function GpsPanel({

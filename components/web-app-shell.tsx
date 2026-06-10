@@ -89,6 +89,10 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
 
     return items;
   }, [notificationsQuery.data?.items, user.mustChangePassword]);
+  const unreadAdminNotifications = useMemo(
+    () => (notificationsQuery.data?.items ?? []).filter((notification) => !notification.readAt),
+    [notificationsQuery.data?.items],
+  );
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -280,8 +284,42 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
 
         <main className="custom-scrollbar h-[calc(100vh-4rem)] overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
 <MustChangePasswordBanner href="/settings/profil" show={user.mustChangePassword} />
+          <AdminNotificationBanner
+            notifications={unreadAdminNotifications}
+            onMarkRead={(id) => readNotificationMutation.mutate(id)}
+          />
           {children}
         </main>
+      </div>
+    </div>
+  );
+}
+
+function AdminNotificationBanner({
+  notifications,
+  onMarkRead,
+}: Readonly<{
+  notifications: NonNullable<UserNotificationsResponse['items']>;
+  onMarkRead: (id: string) => void;
+}>) {
+  const notification = notifications[0];
+  if (!notification) return null;
+
+  return (
+    <div className="mb-5 rounded-[2rem] border border-orange-200 bg-orange-50 p-4 text-orange-950 shadow-panel">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Message administrateur</p>
+          <h2 className="mt-1 text-base font-black">{notification.title}</h2>
+          <p className="mt-2 text-sm leading-6">{notification.message}</p>
+        </div>
+        <button
+          className="shrink-0 rounded-full bg-orange-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-700"
+          onClick={() => onMarkRead(notification.id)}
+          type="button"
+        >
+          Marquer comme lu
+        </button>
       </div>
     </div>
   );

@@ -560,7 +560,7 @@ export async function createClockInRecord(
       isRemoteCheckout: payload.isRemoteCheckout ?? false,
       isAutoClosed: payload.isAutoClosed ?? false,
       isRegularized: payload.isRegularized ?? false,
-      isLate: isLateClockIn(payload.input.type, timestampLocal),
+      isLate: isLateClockIn(payload.input.type, payload.input.timestampLocal),
     },
     select: clockInRecordSelect,
   });
@@ -607,7 +607,7 @@ export async function createBatchClockInRecord(
       isRemoteCheckout: payload.isRemoteCheckout ?? false,
       isAutoClosed: payload.isAutoClosed ?? false,
       isRegularized: payload.isRegularized ?? false,
-      isLate: isLateClockIn(payload.input.type, timestampLocal),
+      isLate: isLateClockIn(payload.input.type, payload.input.timestampLocal),
     },
     select: {
       id: true,
@@ -1022,13 +1022,23 @@ function sanitizeDateTimeString(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function isLateClockIn(type: ClockInType, timestampLocal: Date) {
+function isLateClockIn(type: ClockInType, timestampLocal: string | Date) {
   if (type !== ClockInType.ARRIVAL) {
     return false;
   }
 
-  const hour = timestampLocal.getHours();
-  const minute = timestampLocal.getMinutes();
+  if (typeof timestampLocal === 'string') {
+    const localTimeMatch = /T(\d{2}):(\d{2})/.exec(timestampLocal);
+    if (localTimeMatch) {
+      const hour = Number(localTimeMatch[1]);
+      const minute = Number(localTimeMatch[2]);
+      return hour > 8 || (hour === 8 && minute > 0);
+    }
+  }
+
+  const date = typeof timestampLocal === 'string' ? new Date(timestampLocal) : timestampLocal;
+  const hour = date.getUTCHours();
+  const minute = date.getUTCMinutes();
   return hour > 8 || (hour === 8 && minute > 0);
 }
 
