@@ -92,6 +92,7 @@ export function MobileClockInPage() {
   const queryClient = useQueryClient();
   const requestedSiteId = searchParams.get('siteId');
   const requestedFreeMissionId = searchParams.get('freeMissionId');
+  const requestedOffice = searchParams.get('office') === '1';
   const requestedIntent = parseIntent(searchParams.get('intent'));
   const networkState = useMobileNetworkState();
   
@@ -125,6 +126,7 @@ export function MobileClockInPage() {
   const [manualMode, setManualMode] = useState(Boolean(requestedSiteId));
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(requestedSiteId);
   const [selectedFreeMissionId] = useState<string | null>(requestedFreeMissionId);
+  const [selectedOffice, setSelectedOffice] = useState(requestedOffice);
   const [selectedIntent, setSelectedIntent] = useState<ClockInIntent>(requestedIntent ?? 'arrival');
   const [step, setStep] = useState<Step>('clock-in');
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -262,7 +264,7 @@ export function MobileClockInPage() {
 
       return (await response.json()) as NearbySitesResponse;
     },
-    enabled: geoState.status === 'ready' && !requestedSiteId && !requestedFreeMissionId && !shouldSelectFreeMissionFromTasks,
+    enabled: geoState.status === 'ready' && !requestedSiteId && !requestedFreeMissionId && !selectedOffice && !shouldSelectFreeMissionFromTasks,
     staleTime: 30_000,
   });
 
@@ -294,10 +296,13 @@ export function MobileClockInPage() {
       setSelectedSiteId(activeSession.siteId);
       setManualMode(true);
     }
-  }, [activeSession?.siteId, selectedSiteId]);
+    if (!selectedOffice && activeSession?.contextType === 'OFFICE') {
+      setSelectedOffice(true);
+    }
+  }, [activeSession?.contextType, activeSession?.siteId, selectedOffice, selectedSiteId]);
 
   useEffect(() => {
-    if (shouldSelectFreeMissionFromTasks || selectedFreeMission || selectedSiteId || todaySites.length === 0) {
+    if (selectedOffice || shouldSelectFreeMissionFromTasks || selectedFreeMission || selectedSiteId || todaySites.length === 0) {
       return;
     }
 
@@ -312,7 +317,7 @@ export function MobileClockInPage() {
     const closestAssignedSite = findClosestTodaySite(todaySites, geoState);
     setSelectedSiteId((closestAssignedSite ?? todaySites[0])?.id ?? null);
     setManualMode(true);
-  }, [geoState, selectedFreeMission, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
+  }, [geoState, selectedFreeMission, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
 
   const selectedSite = useMemo(() => {
     const siteFromToday = todaySites.find((site) => site.id === selectedSiteId);
@@ -321,16 +326,24 @@ export function MobileClockInPage() {
       return fromTodaySite(siteFromToday, geoState);
     }
 
-    if (!shouldSelectFreeMissionFromTasks && todaySites.length === 0 && !manualMode && quickSite) {
+    if (!selectedOffice && !shouldSelectFreeMissionFromTasks && todaySites.length === 0 && !manualMode && quickSite) {
       return fromNearbySite(quickSite);
     }
 
     return null;
-  }, [geoState, manualMode, quickSite, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
+  }, [geoState, manualMode, quickSite, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
 
   const sessionStatusQuery = useQuery({
-    queryKey: ['mobile-session-status', selectedSite?.id, selectedFreeMission?.freeMissionId],
+    queryKey: ['mobile-session-status', selectedSite?.id, selectedFreeMission?.freeMissionId, selectedOffice],
     queryFn: async () => {
+      if (selectedOffice) {
+        const response = await authFetch('/api/office-clock-in/session-status');
+        if (!response.ok) {
+          return null;
+        }
+        return (await response.json()) as SessionStatus;
+      }
+
       if (selectedFreeMission?.freeMissionId) {
         const response = await authFetch(`/api/free-missions/${selectedFreeMission.freeMissionId}/clock-in/session-status`);
         if (!response.ok) {
@@ -355,7 +368,7 @@ export function MobileClockInPage() {
         return buildOfflineSessionStatus(selectedSite.id, todayQuery.data?.items ?? [], pendingClockInsQuery.data ?? []);
       }
     },
-    enabled: Boolean(selectedSite ?? selectedFreeMission),
+    enabled: Boolean(selectedSite ?? selectedFreeMission ?? selectedOffice),
     refetchInterval: 15_000,
     staleTime: 30_000,
   });
@@ -368,7 +381,7 @@ export function MobileClockInPage() {
       ? localSessionStatus
       : sessionStatusQuery.data;
   const selectedSiteSessionLoaded = sessionStatus !== undefined || sessionStatusQuery.isError;
-  const hasOpenSession = selectedSite || selectedFreeMission ? Boolean(sessionStatus?.sessionOpen) : Boolean(activeSession);
+  const hasOpenSession = selectedSite || selectedFreeMission || selectedOffice ? Boolean(sessionStatus?.sessionOpen) : Boolean(activeSession);
   const openSessionDifferentSite =
     Boolean(
       selectedSite &&
@@ -378,7 +391,7 @@ export function MobileClockInPage() {
     );
   const pauseActive = Boolean(sessionStatus?.pauseActive);
   const pauseSeconds = pauseActive ? elapsedSeconds(null, now, sessionStatus?.pauseDuration) : 0;
-  const siteIntent = selectedSite && !sessionStatus?.sessionOpen ? 'arrival' : selectedIntent;
+  const siteIntent = (selectedSite || selectedFreeMission || selectedOffice) && !sessionStatus?.sessionOpen ? 'arrival' : selectedIntent;
   const currentIntent = pauseActive && siteIntent === 'pause-start' ? 'pause-end' : siteIntent;
   const currentType = intentToType[currentIntent];
   const selectedDistance = selectedSite?.distanceKm ?? null;
@@ -445,10 +458,10 @@ export function MobileClockInPage() {
   });
 
   const canSubmit =
-    Boolean(selectedSite ?? selectedFreeMission) &&
+    Boolean(selectedSite ?? selectedFreeMission ?? selectedOffice) &&
     geoState.status === 'ready' &&
     !outsideRadius &&
-    (selectedFreeMission ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
+    (selectedFreeMission || selectedOffice ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
     !clockInMutation.isPending;
 
   useEffect(() => {
@@ -461,7 +474,7 @@ export function MobileClockInPage() {
   }, [router, step]);
 
   async function submitClockIn(intentOverride?: ClockInIntent): Promise<Submission> {
-    if ((!selectedSite && !selectedFreeMission) || geoState.status !== 'ready') {
+    if ((!selectedSite && !selectedFreeMission && !selectedOffice) || geoState.status !== 'ready') {
       throw new Error('Position ou mission indisponible.');
     }
 
@@ -490,6 +503,36 @@ export function MobileClockInPage() {
       gpsCapturedAt: geoState.capturedAt,
       gpsSource: geoState.source,
     };
+
+    if (selectedOffice) {
+      if (!navigator.onLine) {
+        throw new Error('Le pointage bureau demande une connexion reseau pour cette version.');
+      }
+
+      const response = await authFetch('/api/office-clock-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiMessage(response, 'Pointage bureau refuse.'));
+      }
+
+      const data = (await response.json()) as { record: ClockInRecordItem };
+
+      return {
+        clientId,
+        offline: false,
+        record: data.record,
+        type: actionType,
+        siteId: null,
+        freeMissionId: null,
+        siteName: 'Bureau',
+        timestampLocal: data.record.timestampLocal,
+        durationSeconds: actionType === 'DEPARTURE' ? sessionStatus?.duration ?? activeSession?.durationSeconds ?? null : null,
+      };
+    }
 
     if (selectedFreeMission) {
       if (!navigator.onLine) {
@@ -577,7 +620,7 @@ export function MobileClockInPage() {
   
   function moveAfterComment() {
     if (submission?.type === 'DEPARTURE') {
-      if (submission.record) {
+      if (submission.record && (submission.siteId || submission.freeMissionId)) {
         router.push(`/rapport-session?sessionId=${encodeURIComponent(submission.record.id)}`);
         return;
       }
@@ -673,6 +716,49 @@ export function MobileClockInPage() {
         </section>
       ) : null}
 
+      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks && !selectedSite ? (
+        <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Pointage quotidien</p>
+            <h3 className="mt-2 text-lg font-black text-slate-950">Pointage bureau</h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              Si vous travaillez au bureau aujourd&apos;hui, pointez ici sans tâche planning.
+            </p>
+          </div>
+          <button
+            className={`min-h-12 w-full rounded-lg px-4 text-sm font-black ${
+              selectedOffice ? 'bg-slate-950 text-white' : 'border border-slate-300 bg-white text-slate-700'
+            }`}
+            onClick={() => {
+              setSelectedOffice(true);
+              setSelectedSiteId(null);
+              setManualMode(true);
+            }}
+            type="button"
+          >
+            {selectedOffice ? 'Bureau sélectionné' : 'Pointer au bureau'}
+          </button>
+        </section>
+      ) : null}
+
+      {selectedOffice ? (
+        <section className="space-y-3 rounded-lg border-2 border-slate-300 bg-white p-4 shadow-panel">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Mode bureau</p>
+              <h3 className="mt-2 text-lg font-black text-slate-950">Pointage bureau</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-600">Présence quotidienne indépendante du planning.</p>
+            </div>
+            <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
+              Bureau
+            </span>
+          </div>
+          <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">
+            La position GPS est enregistrée comme preuve du pointage. Aucun chantier proche ne sera sélectionné.
+          </p>
+        </section>
+      ) : null}
+
       {!selectedFreeMission && selectedSite ? (
         <section className="space-y-3 rounded-lg border-2 border-primary/30 bg-white p-4 shadow-panel">
           <div className="flex items-start justify-between gap-3">
@@ -718,12 +804,14 @@ export function MobileClockInPage() {
           <p className="mt-1 text-xs text-slate-500">
             {selectedFreeMission
               ? 'La position GPS sera enregistree comme preuve du pointage.'
+              : selectedOffice
+              ? 'La position GPS sera enregistree comme preuve du pointage.'
               : 'Le chantier est choisi manuellement, mais la distance est calculee avec votre position GPS.'}
           </p>
         </div>
       ) : null}
 
-      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks ? (
+      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks ? (
         <ManualSiteList
           geoState={geoState}
           loading={todaySitesQuery.isLoading}
@@ -736,7 +824,7 @@ export function MobileClockInPage() {
         />
       ) : null}
 
-      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks && geoState.status === 'ready' && todaySites.length === 0 ? (
+      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks && geoState.status === 'ready' && todaySites.length === 0 ? (
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
           {nearbyQuery.isLoading ? (
             <p className="text-sm font-semibold text-slate-500">Recherche du chantier le plus proche...</p>
@@ -766,7 +854,7 @@ export function MobileClockInPage() {
         </section>
       ) : null}
 
-      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks && nearbySuggestion ? (
+      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks && nearbySuggestion ? (
         <NearbySuggestionCard
           onSelect={() => {
             setSelectedSiteId(nearbySuggestion.id);
@@ -776,7 +864,7 @@ export function MobileClockInPage() {
         />
       ) : null}
 
-      {selectedSite || selectedFreeMission ? (
+      {selectedSite || selectedFreeMission || selectedOffice ? (
         <section className="space-y-3">
           {!selectedSiteSessionLoaded ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center text-sm font-bold text-slate-600">
@@ -843,7 +931,7 @@ export function MobileClockInPage() {
             <ActionButton
               busy={clockInMutation.isPending}
               disabled={!canSubmit}
-                label={selectedFreeMission ? 'POINTER ENTREE MISSION' : todaySites.length === 0 && quickSite && !manualMode ? 'POINTER ICI' : 'POINTER ENTREE'}
+                label={selectedFreeMission ? 'POINTER ENTREE MISSION' : selectedOffice ? 'POINTER ENTREE BUREAU' : todaySites.length === 0 && quickSite && !manualMode ? 'POINTER ICI' : 'POINTER ENTREE'}
               onClick={() => {
                 setSelectedIntent('arrival');
                 clockInMutation.mutate('arrival');

@@ -28,6 +28,7 @@ const HISTORY_RESOURCE_ROLES: readonly Role[] = [
 type UserFormValues = {
   username: string;
   email: string;
+  matricule: string;
   firstName: string;
   lastName: string;
   role: Role;
@@ -72,6 +73,7 @@ export function AdminUsersPage() {
       const body = {
         username: values.username,
         email: values.email.trim() || null,
+        matricule: values.matricule.trim() || null,
         firstName: values.firstName,
         lastName: values.lastName,
         role: values.role,
@@ -207,7 +209,7 @@ export function AdminUsersPage() {
                 setSearch(event.target.value);
                 resetFiltersPage();
               }}
-              placeholder="Nom, prenom, identifiant ou email"
+              placeholder="Nom, prenom, identifiant, email ou matricule"
               value={search}
             />
           </Field>
@@ -252,6 +254,7 @@ export function AdminUsersPage() {
               <tr>
                 <th className="px-5 py-4 font-semibold">Nom</th>
                 <th className="px-5 py-4 font-semibold">Identifiant</th>
+                <th className="px-5 py-4 font-semibold">Matricule</th>
                 <th className="px-5 py-4 font-semibold">Role</th>
                 <th className="px-5 py-4 font-semibold">Statut</th>
                 <th className="px-5 py-4 font-semibold">Derniere connexion</th>
@@ -262,19 +265,19 @@ export function AdminUsersPage() {
             <tbody className="divide-y divide-slate-100">
               {usersQuery.isLoading ? (
                 <tr>
-                  <td className="px-5 py-10 text-center text-slate-500" colSpan={7}>
+                  <td className="px-5 py-10 text-center text-slate-500" colSpan={8}>
                     Chargement des utilisateurs...
                   </td>
                 </tr>
               ) : usersQuery.isError ? (
                 <tr>
-                  <td className="px-5 py-10" colSpan={7}>
+                  <td className="px-5 py-10" colSpan={8}>
                     <EmptyState description="La liste des utilisateurs n'a pas pu etre chargee." title="Utilisateurs indisponibles" />
                   </td>
                 </tr>
               ) : (usersQuery.data?.items.length ?? 0) === 0 ? (
                 <tr>
-                  <td className="px-5 py-10" colSpan={7}>
+                  <td className="px-5 py-10" colSpan={8}>
                     <EmptyState description="Aucun compte ne correspond a ces filtres." title="Aucun utilisateur" />
                   </td>
                 </tr>
@@ -288,6 +291,7 @@ export function AdminUsersPage() {
                       <p className="font-semibold text-slate-900">{user.username}</p>
                       {user.email ? <p className="mt-1 text-xs text-slate-500">{user.email}</p> : null}
                     </td>
+                    <td className="px-5 py-4 text-slate-600">{user.matricule ?? '-'}</td>
                     <td className="px-5 py-4">
                       <Badge tone="neutral">{formatRole(user.role)}</Badge>
                       {user.role === Role.COORDINATOR ? (
@@ -542,6 +546,14 @@ function UserDrawer({
               value={values.email}
             />
           </Field>
+          <Field label="Matricule facultatif">
+            <input
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+              onChange={(event) => setValues((current) => ({ ...current, matricule: event.target.value }))}
+              placeholder="Ex. MAT-001"
+              value={values.matricule}
+            />
+          </Field>
           <Field label="Prenom">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
@@ -635,6 +647,7 @@ function buildInitialValues(user: UserListItem | null): UserFormValues {
   return {
     username: user?.username ?? '',
     email: user?.email ?? '',
+    matricule: user?.matricule ?? '',
     firstName: user?.firstName ?? '',
     lastName: user?.lastName ?? '',
     role: user?.role ?? 'SUPERVISOR',

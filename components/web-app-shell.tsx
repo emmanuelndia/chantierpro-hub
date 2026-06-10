@@ -2,15 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
 import type { Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
 import { MustChangePasswordBanner } from '@/components/must-change-password-banner';
 import { useToast } from '@/components/toast-provider';
+import { authFetch } from '@/lib/auth/client-session';
 import { getWebBreadcrumbs, getWebNavigationForRole } from '@/lib/navigation';
 import { formatRoleLabel } from '@/lib/role-labels';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { WebNavIcon } from '@/types/navigation';
+import type { UserNotificationsResponse } from '@/types/notifications';
 
 type WebAppShellProps = Readonly<{
   user: WebSessionUser;
@@ -18,8 +21,10 @@ type WebAppShellProps = Readonly<{
 }>;
 
 type WebNotification = Readonly<{
+  id?: string;
   href: string;
   message: string;
+  readAt?: string | null;
   title: string;
   tone: 'warning' | 'info';
 }>;
@@ -43,9 +48,22 @@ const roleTone: Record<Role, 'success' | 'warning' | 'error' | 'neutral' | 'info
 };
 
 export function WebAppShell({ user, children }: WebAppShellProps) {
+  const queryClient = useQueryClient();
   const pathname = usePathname();
   const navigation = useMemo(() => getWebNavigationForRole(user.role), [user.role]);
   const breadcrumbs = useMemo(() => getWebBreadcrumbs(pathname), [pathname]);
+  const notificationsQuery = useQuery({
+    queryKey: ['user-notifications'],
+    queryFn: fetchUserNotifications,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  const readNotificationMutation = useMutation({
+    mutationFn: markNotificationRead,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['user-notifications'] });
+    },
+  });
   const notifications = useMemo<WebNotification[]>(() => {
     const items: WebNotification[] = [];
 
@@ -58,8 +76,19 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
       });
     }
 
+    for (const notification of notificationsQuery.data?.items ?? []) {
+      items.push({
+        id: notification.id,
+        href: '/settings/profil',
+        message: notification.message,
+        readAt: notification.readAt,
+        title: notification.title,
+        tone: notification.readAt ? 'info' : 'warning',
+      });
+    }
+
     return items;
-  }, [user.mustChangePassword]);
+  }, [notificationsQuery.data?.items, user.mustChangePassword]);
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -198,6 +227,7 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
               {notificationsOpen ? (
                 <WebNotificationsPanel
                   notifications={notifications}
+                  onMarkRead={(id) => readNotificationMutation.mutate(id)}
                   onClose={() => setNotificationsOpen(false)}
                 />
               ) : null}
@@ -259,9 +289,11 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
 
 function WebNotificationsPanel({
   notifications,
+  onMarkRead,
   onClose,
 }: Readonly<{
   notifications: readonly WebNotification[];
+  onMarkRead: (id: string) => void;
   onClose: () => void;
 }>) {
   return (
@@ -285,13 +317,11 @@ function WebNotificationsPanel({
         {notifications.length > 0 ? (
           <div className="space-y-2">
             {notifications.map((notification) => (
-              <Link
+              <div
                 className="block rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-orange-200 hover:bg-orange-50"
-                href={notification.href}
-                key={`${notification.href}-${notification.title}`}
-                onClick={onClose}
+                key={`${notification.href}-${notification.title}-${notification.id ?? 'local'}`}
               >
-                <div className="flex items-start gap-3">
+                <Link className="flex items-start gap-3" href={notification.href} onClick={onClose}>
                   <span
                     className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
                       notification.tone === 'warning' ? 'bg-orange-500' : 'bg-sky-500'
@@ -301,8 +331,17 @@ function WebNotificationsPanel({
                     <p className="text-sm font-black text-slate-950">{notification.title}</p>
                     <p className="mt-1 text-sm leading-5 text-slate-600">{notification.message}</p>
                   </div>
-                </div>
-              </Link>
+                </Link>
+                {notification.id && !notification.readAt ? (
+                  <button
+                    className="mt-3 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-white"
+                    onClick={() => onMarkRead(notification.id!)}
+                    type="button"
+                  >
+                    Marquer comme lu
+                  </button>
+                ) : null}
+              </div>
             ))}
           </div>
         ) : (
@@ -314,6 +353,22 @@ function WebNotificationsPanel({
       </div>
     </div>
   );
+}
+
+async function fetchUserNotifications() {
+  const response = await authFetch('/api/notifications', { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error('Notifications indisponibles.');
+  }
+
+  return (await response.json()) as UserNotificationsResponse;
+}
+
+async function markNotificationRead(id: string) {
+  const response = await authFetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+  if (!response.ok && response.status !== 204) {
+    throw new Error('Lecture notification impossible.');
+  }
 }
 
 function NavigationIcon({

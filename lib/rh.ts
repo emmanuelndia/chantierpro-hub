@@ -31,6 +31,8 @@ const rhClockInRecordSelect = {
   id: true,
   userId: true,
   siteId: true,
+  freeMissionId: true,
+  officeClockInLocation: true,
   type: true,
   status: true,
   timestampLocal: true,
@@ -39,12 +41,14 @@ const rhClockInRecordSelect = {
   isRemoteCheckout: true,
   isAutoClosed: true,
   isRegularized: true,
+  isLate: true,
   user: {
     select: {
       id: true,
       firstName: true,
       lastName: true,
       email: true,
+      matricule: true,
       role: true,
     },
   },
@@ -53,6 +57,25 @@ const rhClockInRecordSelect = {
       id: true,
       name: true,
       projectId: true,
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+  freeMission: {
+    select: {
+      id: true,
+      action: true,
+      projectId: true,
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   },
 } satisfies Prisma.ClockInRecordSelect;
@@ -107,10 +130,13 @@ type BuiltSession = {
   firstName: string;
   lastName: string;
   email: string | null;
+  matricule: string | null;
   role: Role;
+  context: 'SITE' | 'FREE_MISSION' | 'OFFICE';
   siteId: string | null;
-  siteName: string;
-  projectId: string;
+  position: string;
+  projectId: string | null;
+  projectName: string | null;
   date: string;
   arrivalTime: string;
   departureTime: string | null;
@@ -123,6 +149,7 @@ type BuiltSession = {
   isRemoteCheckout: boolean;
   isAutoClosed: boolean;
   isRegularized: boolean;
+  isLate: boolean;
   startedAt: string;
 };
 
@@ -154,8 +181,10 @@ type ExportQuery = {
 type SitePresenceLiveQuery = {
   date: Date;
   projectId: string | null;
+  projectManagerId: string | null;
   siteId: string | null;
   resourceId: string | null;
+  assignedById: string | null;
   role: Role | null;
   status: RhSitePresenceLiveStatus | null;
   search: string | null;
@@ -172,16 +201,18 @@ type ExportArtifact = {
 };
 
 type ExportRow = {
+  matricule: string;
   lastName: string;
   firstName: string;
-  email: string | null;
-  siteName: string;
+  position: string;
+  context: string;
+  projectName: string;
   date: string;
   arrivalTime: string;
   departureTime: string;
   realDurationHours: string;
-  pauseDurationHours: string;
-  distanceMeters: string;
+  timeSpent: string;
+  isLate: string;
   status: string;
 };
 
@@ -271,8 +302,10 @@ export function parseSitePresenceLiveQuery(searchParams: URLSearchParams): SiteP
   return {
     date: parsedDate ?? toDateOnlyDate(new Date()),
     projectId: sanitizeString(searchParams.get('projectId')),
+    projectManagerId: sanitizeString(searchParams.get('projectManagerId')),
     siteId: sanitizeString(searchParams.get('siteId')),
     resourceId: sanitizeString(searchParams.get('resourceId')),
+    assignedById: sanitizeString(searchParams.get('assignedById')),
     role: parseRole(searchParams.get('role')),
     status: parseLiveStatus(searchParams.get('status')),
     search: sanitizeString(searchParams.get('q')),
@@ -291,7 +324,10 @@ export async function getSitePresencesLive(
 
   const siteWhere: Prisma.SiteWhereInput = {
     status: 'ACTIVE',
-    project: projectAccessWhere(user),
+    project: {
+      ...projectAccessWhere(user),
+      ...(query.projectManagerId ? { projectManagerId: query.projectManagerId } : {}),
+    },
     ...(query.projectId ? { projectId: query.projectId } : {}),
     ...(query.siteId ? { id: query.siteId } : {}),
   };
@@ -308,6 +344,14 @@ export async function getSitePresencesLive(
         project: {
           select: {
             name: true,
+            projectManagerId: true,
+            projectManager: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
           },
         },
       },
@@ -319,6 +363,7 @@ export async function getSitePresencesLive(
         workLocationType: 'ON_SITE',
         site: siteWhere,
         ...(query.resourceId ? { supervisorId: query.resourceId } : {}),
+        ...(query.assignedById ? { createdById: query.assignedById } : {}),
         ...(query.role ? { supervisor: { role: query.role } } : {}),
       },
       orderBy: [{ site: { project: { name: 'asc' } } }, { site: { name: 'asc' } }, { supervisor: { firstName: 'asc' } }],
@@ -327,6 +372,14 @@ export async function getSitePresencesLive(
         siteId: true,
         action: true,
         supervisorId: true,
+        createdById: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
         supervisor: {
           select: {
             id: true,
@@ -366,6 +419,7 @@ export async function getSitePresencesLive(
         isRemoteCheckout: true,
         isAutoClosed: true,
         isRegularized: true,
+        isLate: true,
         user: {
           select: {
             id: true,
@@ -383,7 +437,9 @@ export async function getSitePresencesLive(
         deletedAt: null,
         project: projectAccessWhere(user),
         ...(query.projectId ? { projectId: query.projectId } : {}),
+        ...(query.projectManagerId ? { project: { ...projectAccessWhere(user), projectManagerId: query.projectManagerId } } : {}),
         ...(query.resourceId ? { assigneeId: query.resourceId } : {}),
+        ...(query.assignedById ? { createdById: query.assignedById } : {}),
         ...(query.role ? { assignee: { role: query.role } } : {}),
       },
       orderBy: [{ project: { name: 'asc' } }, { action: 'asc' }, { id: 'asc' }],
@@ -394,6 +450,22 @@ export async function getSitePresencesLive(
         project: {
           select: {
             name: true,
+            projectManagerId: true,
+            projectManager: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        createdById: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
           },
         },
         assigneeId: true,
@@ -431,6 +503,7 @@ export async function getSitePresencesLive(
             isRemoteCheckout: true,
             isAutoClosed: true,
             isRegularized: true,
+            isLate: true,
             user: {
               select: {
                 id: true,
@@ -455,6 +528,8 @@ export async function getSitePresencesLive(
         siteAddress: site.address,
         projectId: site.projectId,
         projectName: site.project.name,
+        projectManagerId: site.project.projectManagerId,
+        projectManagerName: formatPersonName(site.project.projectManager),
         expectedCount: 0,
         presentCount: 0,
         pausedCount: 0,
@@ -473,6 +548,8 @@ export async function getSitePresencesLive(
       siteAddress: 'Mission libre',
       projectId: mission.projectId,
       projectName: mission.project.name,
+      projectManagerId: mission.project.projectManagerId,
+      projectManagerName: formatPersonName(mission.project.projectManager),
       expectedCount: 0,
       presentCount: 0,
       pausedCount: 0,
@@ -499,7 +576,13 @@ export async function getSitePresencesLive(
 
   const assignmentBySiteUser = new Map<
     string,
-    { action: string; supervisorId: string; supervisor: (typeof assignments)[number]['supervisor'] }
+    {
+      action: string;
+      supervisorId: string;
+      supervisor: (typeof assignments)[number]['supervisor'];
+      createdById: string;
+      createdBy: (typeof assignments)[number]['createdBy'];
+    }
   >();
   for (const assignment of assignments) {
     const key = liveResourceKey(assignment.siteId, assignment.supervisorId);
@@ -509,12 +592,20 @@ export async function getSitePresencesLive(
   for (const mission of freeMissions) {
     const key = liveResourceKey(mission.id, mission.assigneeId);
     const existing = assignmentBySiteUser.get(key);
-    const assignment = { action: mission.action, supervisorId: mission.assigneeId, supervisor: mission.assignee };
+    const assignment = {
+      action: mission.action,
+      supervisorId: mission.assigneeId,
+      supervisor: mission.assignee,
+      createdById: mission.createdById,
+      createdBy: mission.createdBy,
+    };
     assignmentBySiteUser.set(key, existing ? { ...existing, action: `${existing.action} / ${mission.action}` } : assignment);
   }
 
   const allKeys = new Set([...recordsBySiteUser.keys(), ...assignmentBySiteUser.keys()]);
   const resourcesById = new Map<string, { id: string; label: string; role: Role }>();
+  const projectManagersById = new Map<string, { id: string; label: string }>();
+  const assignersById = new Map<string, { id: string; label: string }>();
   const roles = new Set<Role>();
 
   for (const key of allKeys) {
@@ -539,6 +630,16 @@ export async function getSitePresencesLive(
     });
 
     if (assignment) site.expectedCount += 1;
+    projectManagersById.set(site.projectManagerId, {
+      id: site.projectManagerId,
+      label: site.projectManagerName,
+    });
+    if (assignment) {
+      assignersById.set(assignment.createdById, {
+        id: assignment.createdById,
+        label: formatPersonName(assignment.createdBy),
+      });
+    }
     if (resource.status === 'PRESENT') site.presentCount += 1;
     if (resource.status === 'PAUSED') site.pausedCount += 1;
     if (resource.status === 'EXPECTED_NOT_CLOCKED') site.notClockedCount += 1;
@@ -588,6 +689,8 @@ export async function getSitePresencesLive(
       resources: [...resourcesById.values()]
         .map((resource) => ({ id: resource.id, label: resource.label, role: resource.role }))
         .sort((a, b) => a.label.localeCompare(b.label)),
+      projectManagers: [...projectManagersById.values()].sort((a, b) => a.label.localeCompare(b.label)),
+      assigners: [...assignersById.values()].sort((a, b) => a.label.localeCompare(b.label)),
       roles: [...roles].sort(),
     },
     sites: filteredSites,
@@ -916,63 +1019,65 @@ export async function buildRhExportArtifact(
   const sortedUsers = [...grouped.values()].sort((left, right) => compareBuiltSession(left[0]!, right[0]!));
   const rows: ExportRow[] = [];
   let totalGeneralHours = 0;
-  let totalGeneralPauseHours = 0;
 
   for (const userSessions of sortedUsers) {
     const orderedSessions = [...userSessions].sort(compareBuiltSession);
     let employeeTotalHours = 0;
-    let employeePauseHours = 0;
 
     for (const session of orderedSessions) {
       employeeTotalHours += session.realDurationHours ?? 0;
-      employeePauseHours += session.pauseDurationHours;
 
       rows.push({
+        matricule: session.matricule ?? '',
         lastName: session.lastName,
         firstName: session.firstName,
-        email: session.email,
-        siteName: session.siteName,
+        position: session.position,
+        context: presenceContextLabel(session.context),
+        projectName: session.projectName ?? '',
         date: session.date,
         arrivalTime: session.arrivalTime,
         departureTime: session.departureTime ?? '',
         realDurationHours:
           session.realDurationHours === null ? '' : formatHours(session.realDurationHours),
-        pauseDurationHours: formatHours(session.pauseDurationHours),
-        distanceMeters: String(session.distanceMeters),
-        status: session.status,
+        timeSpent: session.realDurationHours === null ? '' : formatDurationLabel(session.realDurationHours),
+        isLate: session.isLate ? 'Oui' : 'Non',
+        status: rhSessionStatusLabel(session.status),
       });
     }
 
     totalGeneralHours += employeeTotalHours;
-    totalGeneralPauseHours += employeePauseHours;
 
     const owner = orderedSessions[0]!;
     rows.push({
+      matricule: owner.matricule ?? '',
       lastName: owner.lastName,
       firstName: owner.firstName,
-      email: owner.email,
-      siteName: 'TOTAL EMPLOYE',
+      position: 'TOTAL EMPLOYE',
+      context: '',
+      projectName: '',
       date: '',
       arrivalTime: '',
       departureTime: '',
       realDurationHours: formatHours(employeeTotalHours),
-      pauseDurationHours: formatHours(employeePauseHours),
-      distanceMeters: '',
+      timeSpent: formatDurationLabel(employeeTotalHours),
+      isLate: '',
       status: '',
     });
   }
 
   rows.push({
+    matricule: '',
     lastName: '',
     firstName: '',
-    email: '',
-    siteName: 'TOTAL GENERAL',
+    position: 'TOTAL GENERAL',
+    context: '',
+    projectName: '',
     date: '',
     arrivalTime: '',
     departureTime: '',
     realDurationHours: formatHours(totalGeneralHours),
-    pauseDurationHours: formatHours(totalGeneralPauseHours),
-    distanceMeters: '',
+    timeSpent: formatDurationLabel(totalGeneralHours),
+    isLate: '',
     status: '',
   });
 
@@ -1188,9 +1293,18 @@ async function getBuiltSessionsForRange(
         : {}),
       ...(payload.projectId
         ? {
-            site: {
-              projectId: payload.projectId,
-            },
+            OR: [
+              {
+                site: {
+                  projectId: payload.projectId,
+                },
+              },
+              {
+                freeMission: {
+                  projectId: payload.projectId,
+                },
+              },
+            ],
           }
         : {}),
       ...(payload.siteIds.length > 0
@@ -1219,7 +1333,7 @@ function buildSessions(records: SerializableRhClockInRecord[]) {
   const states = new Map<string, SessionBuildState>();
 
   for (const record of records) {
-    const key = `${record.userId}:${record.siteId}`;
+    const key = buildClockInContextKey(record);
     const state = states.get(key) ?? {
       arrival: null,
       activePauseStartedAt: null,
@@ -1282,6 +1396,91 @@ function buildSessions(records: SerializableRhClockInRecord[]) {
   return sessions;
 }
 
+function buildClockInContextKey(record: SerializableRhClockInRecord) {
+  if (record.siteId) {
+    return `${record.userId}:site:${record.siteId}`;
+  }
+
+  if (record.freeMissionId) {
+    return `${record.userId}:free-mission:${record.freeMissionId}`;
+  }
+
+  if (record.officeClockInLocation) {
+    return `${record.userId}:office:${record.officeClockInLocation}`;
+  }
+
+  return `${record.userId}:unknown`;
+}
+
+function getPresenceContext(record: SerializableRhClockInRecord): {
+  type: BuiltSession['context'];
+  position: string;
+  projectId: string | null;
+  projectName: string | null;
+} {
+  if (record.site) {
+    return {
+      type: 'SITE',
+      position: record.site.name,
+      projectId: record.site.projectId,
+      projectName: record.site.project.name,
+    };
+  }
+
+  if (record.freeMission) {
+    return {
+      type: 'FREE_MISSION',
+      position: record.freeMission.action,
+      projectId: record.freeMission.projectId,
+      projectName: record.freeMission.project.name,
+    };
+  }
+
+  return {
+    type: 'OFFICE',
+    position: 'Bureau',
+    projectId: null,
+    projectName: null,
+  };
+}
+
+function presenceContextLabel(context: BuiltSession['context']) {
+  if (context === 'FREE_MISSION') {
+    return 'Mission libre';
+  }
+
+  if (context === 'OFFICE') {
+    return 'Bureau';
+  }
+
+  return 'Chantier';
+}
+
+function rhSessionStatusLabel(status: BuiltSession['status']) {
+  switch (status) {
+    case 'COMPLETE':
+      return 'Complete';
+    case 'INCOMPLETE_SESSION':
+      return 'En cours';
+    case 'TO_REGULARIZE':
+      return 'A regulariser';
+    case 'TO_REVIEW_RH':
+      return 'A verifier RH';
+  }
+}
+
+function formatDurationLabel(hours: number) {
+  const totalMinutes = Math.max(0, Math.round(hours * 60));
+  const hourPart = Math.floor(totalMinutes / 60);
+  const minutePart = totalMinutes % 60;
+
+  if (hourPart === 0) {
+    return `${minutePart} min`;
+  }
+
+  return minutePart === 0 ? `${hourPart} h` : `${hourPart} h ${minutePart} min`;
+}
+
 function buildCompleteSession(
   arrival: SerializableRhClockInRecord,
   departure: SerializableRhClockInRecord,
@@ -1291,6 +1490,7 @@ function buildCompleteSession(
   const realDurationHours = roundHours((durationMs - accumulatedPauseMs) / 3_600_000);
   const pauseDurationHours = roundHours(accumulatedPauseMs / 3_600_000);
   const needsReview = departure.isRemoteCheckout && realDurationHours > 6;
+  const context = getPresenceContext(arrival);
 
   return {
     arrivalRecordId: arrival.id,
@@ -1299,10 +1499,13 @@ function buildCompleteSession(
     firstName: arrival.user.firstName,
     lastName: arrival.user.lastName,
     email: arrival.user.email,
+    matricule: arrival.user.matricule,
     role: arrival.user.role,
+    context: context.type,
     siteId: arrival.siteId,
-    siteName: arrival.site?.name ?? 'Mission libre',
-    projectId: arrival.site?.projectId ?? '',
+    position: context.position,
+    projectId: context.projectId,
+    projectName: context.projectName,
     date: arrival.timestampLocal.toISOString().slice(0, 10),
     arrivalTime: arrival.timestampLocal.toISOString().slice(11, 19),
     departureTime: departure.timestampLocal.toISOString().slice(11, 19),
@@ -1315,6 +1518,7 @@ function buildCompleteSession(
     isRemoteCheckout: departure.isRemoteCheckout,
     isAutoClosed: departure.isAutoClosed,
     isRegularized: departure.isRegularized,
+    isLate: arrival.isLate,
     startedAt: arrival.timestampLocal.toISOString(),
   };
 }
@@ -1324,6 +1528,7 @@ function buildIncompleteSession(
   accumulatedPauseMs: number,
 ): BuiltSession {
   const isPreviousDay = arrival.timestampLocal.toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10);
+  const context = getPresenceContext(arrival);
 
   return {
     arrivalRecordId: arrival.id,
@@ -1332,10 +1537,13 @@ function buildIncompleteSession(
     firstName: arrival.user.firstName,
     lastName: arrival.user.lastName,
     email: arrival.user.email,
+    matricule: arrival.user.matricule,
     role: arrival.user.role,
+    context: context.type,
     siteId: arrival.siteId,
-    siteName: arrival.site?.name ?? 'Mission libre',
-    projectId: arrival.site?.projectId ?? '',
+    position: context.position,
+    projectId: context.projectId,
+    projectName: context.projectName,
     date: arrival.timestampLocal.toISOString().slice(0, 10),
     arrivalTime: arrival.timestampLocal.toISOString().slice(11, 19),
     departureTime: null,
@@ -1348,6 +1556,7 @@ function buildIncompleteSession(
     isRemoteCheckout: false,
     isAutoClosed: isPreviousDay || arrival.isAutoClosed,
     isRegularized: arrival.isRegularized,
+    isLate: arrival.isLate,
     startedAt: arrival.timestampLocal.toISOString(),
   };
 }
@@ -1365,7 +1574,7 @@ function buildPresenceSummary(sessions: BuiltSession[]): RhPresenceSummaryItem {
 
   for (const session of orderedSessions) {
     totalPauseDuration += session.pauseDurationHours;
-    lastSite = session.siteName;
+    lastSite = session.position;
     if (session.siteId) {
       siteIds.add(session.siteId);
     }
@@ -1405,7 +1614,7 @@ function serializeRhPresenceSession(session: BuiltSession): RhPresenceSessionIte
     departureRecordId: session.departureRecordId,
     date: session.date,
     siteId: session.siteId,
-    siteName: session.siteName,
+    siteName: session.position,
     arrivalTime: session.arrivalTime,
     departureTime: session.departureTime,
     realDurationHours: session.realDurationHours,
@@ -1450,16 +1659,18 @@ function serializeRhExportHistory(item: SerializableRhExportHistory): RhExportHi
 
 function buildCsvBuffer(rows: ExportRow[]) {
   const headers = [
+    'Matricule',
     'Nom',
     'Prénom',
-    'Email',
-    'Chantier',
+    'Position',
+    'Contexte',
+    'Projet',
     'Date',
     'Heure entrée',
     'Heure sortie',
     'Durée réelle (h)',
     'Durée pauses (h)',
-    'Distance (m)',
+    'Retard',
     'Statut',
   ];
 
@@ -1467,16 +1678,18 @@ function buildCsvBuffer(rows: ExportRow[]) {
     headers.join(','),
     ...rows.map((row) =>
       [
+        row.matricule,
         row.lastName,
         row.firstName,
-        row.email,
-        row.siteName,
+        row.position,
+        row.context,
+        row.projectName,
         row.date,
         row.arrivalTime,
         row.departureTime,
         row.realDurationHours,
-        row.pauseDurationHours,
-        row.distanceMeters,
+        row.timeSpent,
+        row.isLate,
         row.status,
       ]
         .map(escapeCsvValue)
@@ -1492,16 +1705,18 @@ async function buildXlsxBuffer(rows: ExportRow[]) {
   const worksheet = workbook.addWorksheet('Presences RH');
 
   worksheet.columns = [
+    { header: 'Matricule', key: 'matricule' },
     { header: 'Nom', key: 'lastName' },
     { header: 'Prénom', key: 'firstName' },
-    { header: 'Email', key: 'email' },
-    { header: 'Chantier', key: 'siteName' },
+    { header: 'Position', key: 'position' },
+    { header: 'Contexte', key: 'context' },
+    { header: 'Projet', key: 'projectName' },
     { header: 'Date', key: 'date' },
     { header: 'Heure entrée', key: 'arrivalTime' },
     { header: 'Heure sortie', key: 'departureTime' },
     { header: 'Durée réelle (h)', key: 'realDurationHours' },
-    { header: 'Durée pauses (h)', key: 'pauseDurationHours' },
-    { header: 'Distance (m)', key: 'distanceMeters' },
+    { header: 'Temps passe', key: 'timeSpent' },
+    { header: 'Retard', key: 'isLate' },
     { header: 'Statut', key: 'status' },
   ];
 
@@ -1613,7 +1828,7 @@ function compareBuiltSession(left: BuiltSession, right: BuiltSession) {
     left.lastName.localeCompare(right.lastName) ||
     left.firstName.localeCompare(right.firstName) ||
     left.startedAt.localeCompare(right.startedAt) ||
-    (left.siteId ?? '').localeCompare(right.siteId ?? '')
+    (left.siteId ?? left.projectId ?? '').localeCompare(right.siteId ?? right.projectId ?? '')
   );
 }
 
@@ -1623,7 +1838,7 @@ function matchesRhSearch(session: BuiltSession, search: string) {
     return true;
   }
 
-  return `${session.firstName} ${session.lastName} ${session.email} ${session.siteName} ${session.role}`
+  return `${session.firstName} ${session.lastName} ${session.email} ${session.position} ${session.projectName ?? ''} ${session.role}`
     .toLowerCase()
     .includes(normalized);
 }
@@ -1678,6 +1893,7 @@ function buildLiveResource(
     isRemoteCheckout: boolean;
     isAutoClosed: boolean;
     isRegularized: boolean;
+    isLate: boolean;
   }[],
 ): RhSitePresenceLiveResource {
   const latest = records.at(-1) ?? null;
@@ -1710,6 +1926,7 @@ function buildLiveResource(
     isRemoteCheckout: records.some((record) => record.isRemoteCheckout),
     isAutoClosed: records.some((record) => record.isAutoClosed),
     isRegularized: records.some((record) => record.isRegularized),
+    isLate: records.some((record) => record.type === ClockInType.ARRIVAL && record.isLate),
   };
 }
 
@@ -1772,4 +1989,9 @@ function liveStatusRank(status: RhSitePresenceLiveStatus) {
 
 function uniqueOption<T extends { id: string }>(option: T, index: number, options: T[]) {
   return options.findIndex((item) => item.id === option.id) === index;
+}
+
+function formatPersonName(person: { firstName: string; lastName: string } | null) {
+  if (!person) return 'Non renseigné';
+  return `${person.firstName} ${person.lastName}`.trim();
 }

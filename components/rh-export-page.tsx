@@ -128,7 +128,8 @@ export function RhExportPage({ viewer }: RhExportPageProps) {
               Generer et suivre les exports
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Exporte les heures RH au format CSV ou XLSX et retrouve les 20 derniers artefacts pendant 24 h.
+              Exporte une liste de presence au format CSV ou XLSX avec matricule, nom, prenom,
+              position, contexte, heures, temps passe, retard et statut.
             </p>
           </div>
           <Badge tone="info">{viewer.role}</Badge>
@@ -255,6 +256,7 @@ export function RhExportPage({ viewer }: RhExportPageProps) {
           <h2 className="text-xl font-semibold text-slate-950">Regles</h2>
           <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
             <p>Les exports sont telecharges immediatement apres generation.</p>
+            <p>Les pointages bureau, chantier et mission libre sont identifies dans la colonne Contexte.</p>
             <p>Un artefact est conserve 24 heures dans Supabase Storage prive.</p>
             <p>Au-dela de 24 heures, le statut passe a EXPIRE et le lien devient inactif.</p>
           </div>

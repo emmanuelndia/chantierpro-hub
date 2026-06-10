@@ -27,6 +27,7 @@ export const GET = withAuth(async ({ user }) => {
         id: record.id,
         siteId: record.siteId,
         freeMissionId: record.freeMissionId,
+        officeClockInLocation: record.officeClockInLocation,
         userId: record.userId,
         type: record.type,
         status: record.status,

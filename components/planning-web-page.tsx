@@ -25,6 +25,7 @@ import type {
   PlanningWebUpdateRequest,
 } from '@/types/planning-web';
 import type { AvailableSite, UnassignedSupervisor } from '@/types/mobile-planning';
+import type { PlanningTaskTemplateItem, PlanningTaskTemplatesResponse } from '@/types/planning-templates';
 
 type PlanningWebPageProps = Readonly<{
   viewer: {
@@ -53,6 +54,7 @@ type AssignmentFormState = {
   targetQuantity: string;
   targetUnit: string;
   objectiveText: string;
+  plannedDurationMinutes: string;
   status: PlanningAssignmentStatus;
   workLocationType: PlanningWorkLocationType;
 };
@@ -86,9 +88,13 @@ const planningStatusLabel: Record<PlanningAssignmentStatus, string> = {
 
 const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
   ON_SITE: 'Présence chantier requise',
-  OFFICE: 'Tâche bureau / coordination',
+  OFFICE: 'Ancienne tâche bureau',
   FREE_MISSION: 'Mission libre',
 };
+const creatableWorkLocationTypes: PlanningWorkLocationType[] = [
+  PlanningWorkLocationType.ON_SITE,
+  PlanningWorkLocationType.FREE_MISSION,
+];
 
 const objectiveStatusConfig = {
   NOT_STARTED: { label: 'Non démarré', tone: 'neutral' },
@@ -113,6 +119,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     resourceId: '',
     role: '',
     workLocationType: '',
+    projectManagerId: '',
   });
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [form, setForm] = useState<AssignmentFormState>(() => createEmptyForm(selectedDate));
@@ -153,6 +160,12 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     enabled: canViewCentralized && viewMode === 'centralized',
     staleTime: 30_000,
   });
+  const templatesQuery = useQuery({
+    queryKey: ['planning-task-templates'],
+    queryFn: fetchPlanningTemplates,
+    enabled: canMutate,
+    staleTime: 60_000,
+  });
   const assignmentConflictsQuery = useQuery({
     queryKey: ['web-planning-resource-conflicts', form.date, form.supervisorId],
     queryFn: () =>
@@ -164,6 +177,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         resourceId: form.supervisorId,
         role: '',
         workLocationType: '',
+        projectManagerId: '',
       }),
     enabled: canMutate && canViewCentralized && Boolean(drawerMode && form.date && form.supervisorId),
     staleTime: 30_000,
@@ -232,6 +246,14 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     },
     onError: (error) => pushMutationError(error, 'Duplication impossible'),
   });
+  const saveTemplateMutation = useMutation({
+    mutationFn: savePlanningTemplate,
+    onSuccess: async () => {
+      pushToast({ type: 'success', title: 'Modèle enregistré' });
+      await queryClient.invalidateQueries({ queryKey: ['planning-task-templates'] });
+    },
+    onError: (error) => pushMutationError(error, 'Modèle impossible'),
+  });
 
   const data = dayQuery.data;
   const filteredAssignments = useMemo(
@@ -266,6 +288,10 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const centralizedResourceSelectOptions = useMemo(
     () => centralizedOptions.resources.map((resource) => ({ value: resource.id, label: resource.name })),
     [centralizedOptions.resources],
+  );
+  const centralizedProjectManagerSelectOptions = useMemo(
+    () => centralizedOptions.projectManagers.map((manager) => ({ value: manager.id, label: manager.name })),
+    [centralizedOptions.projectManagers],
   );
   const selectedDateObject = parseDateKey(selectedDate);
   const isMutating =
@@ -320,6 +346,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       targetQuantity: assignment.targetQuantity === null ? '' : String(assignment.targetQuantity),
       targetUnit: assignment.targetUnit ?? '',
       objectiveText: assignment.objectiveText ?? '',
+      plannedDurationMinutes: assignment.plannedDurationMinutes === null ? '' : String(assignment.plannedDurationMinutes),
       status: assignment.status,
       workLocationType: assignment.workLocationType,
     });
@@ -334,11 +361,12 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   function submitForm() {
     const targetProgress = form.targetProgress === '' ? null : Number(form.targetProgress);
     const targetQuantity = form.targetQuantity === '' ? null : Number(form.targetQuantity);
+    const plannedDurationMinutes = form.plannedDurationMinutes === '' ? null : Number(form.plannedDurationMinutes);
     const normalizedTargetProgress = targetQuantity !== null && targetQuantity > 0 ? null : targetProgress;
     const targetUnit = form.targetUnit.trim() || null;
 
     if (form.workLocationType === PlanningWorkLocationType.FREE_MISSION) {
-      const data = {
+      const data: FreeMissionWebRequest = {
         projectId: form.projectId,
         assigneeId: form.supervisorId,
         ...(drawerMode === 'create' ? { assigneeIds: form.supervisorIds } : {}),
@@ -360,6 +388,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         targetQuantity,
         targetUnit,
         objectiveText: form.objectiveText.trim() || null,
+        plannedDurationMinutes,
         date: form.date,
         workLocationType: form.workLocationType,
       };
@@ -376,6 +405,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           targetQuantity,
           targetUnit,
           objectiveText: form.objectiveText.trim() || null,
+          plannedDurationMinutes,
           status: form.status,
           workLocationType: form.workLocationType,
         },
@@ -529,7 +559,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
 
       {viewMode === 'centralized' ? (
         <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-          <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
+          <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
             <Field label="Du">
               <input
                 className={filterClassName}
@@ -552,6 +582,14 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
                 options={centralizedProjectSelectOptions}
                 placeholder="Tous les projets"
                 value={centralizedFilters.projectId}
+              />
+            </Field>
+            <Field label="Chef projet">
+              <SearchableSelect
+                onChange={(value) => setCentralizedFilter('projectManagerId', value)}
+                options={centralizedProjectManagerSelectOptions}
+                placeholder="Tous les chefs projets"
+                value={centralizedFilters.projectManagerId}
               />
             </Field>
             <Field label="Chantier">
@@ -719,8 +757,10 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           sites={sites}
           onCancel={closeDrawer}
           onChange={setForm}
+          onSaveTemplate={(name) => saveTemplateMutation.mutate({ name, form })}
           onSubmit={submitForm}
           conflicts={assignmentConflicts}
+          templates={templatesQuery.data?.items ?? []}
         />
       ) : null}
 
@@ -1085,10 +1125,12 @@ function AssignmentDrawer({
   sites,
   resources,
   conflicts,
+  templates,
   canEditIdentity,
   isSubmitting,
   onChange,
   onCancel,
+  onSaveTemplate,
   onSubmit,
 }: Readonly<{
   mode: DrawerMode;
@@ -1097,15 +1139,23 @@ function AssignmentDrawer({
   sites: AvailableSite[];
   resources: UnassignedSupervisor[];
   conflicts: CentralizedPlanningAssignment[];
+  templates: PlanningTaskTemplateItem[];
   canEditIdentity: boolean;
   isSubmitting: boolean;
   onChange: (form: AssignmentFormState) => void;
   onCancel: () => void;
+  onSaveTemplate: (name: string) => void;
   onSubmit: () => void;
 }>) {
+  const [templateName, setTemplateName] = useState('');
   const projectOptions = toProjectSelectOptions(projects);
   const siteOptions = toSiteSelectOptions(sites.filter((site) => !form.projectId || site.project.id === form.projectId));
   const resourceOptions = toResourceSelectOptions(resources);
+  const templateOptions = templates.map((template) => ({
+    value: template.id,
+    label: template.name,
+    description: template.action,
+  }));
   const progressNumber = form.targetProgress === '' ? null : Number(form.targetProgress);
   const quantityNumber = form.targetQuantity === '' ? null : Number(form.targetQuantity);
   const hasQuantityObjective = quantityNumber !== null && quantityNumber > 0;
@@ -1126,6 +1176,22 @@ function AssignmentDrawer({
           <h2 className="mt-2 text-2xl font-semibold text-slate-950">Planning terrain</h2>
         </div>
         <div className="custom-scrollbar flex-1 space-y-5 overflow-y-auto p-6">
+          {mode === 'create' && templates.length > 0 ? (
+            <Field label="Utiliser un modèle">
+              <SearchableSelect
+                allowClear={false}
+                emptyLabel="Aucun modèle trouvé."
+                onChange={(value) => {
+                  const template = templates.find((item) => item.id === value);
+                  if (!template) return;
+                  onChange(applyTemplateToForm(form, template));
+                }}
+                options={templateOptions}
+                placeholder="Rechercher un modèle"
+                value=""
+              />
+            </Field>
+          ) : null}
           <Field label="Date">
             <input
               className={filterClassName}
@@ -1148,14 +1214,14 @@ function AssignmentDrawer({
               }}
               value={form.workLocationType}
             >
-              {Object.values(PlanningWorkLocationType).map((type) => (
+              {creatableWorkLocationTypes.map((type) => (
                 <option key={type} value={type}>
                   {workLocationTypeLabel[type]}
                 </option>
               ))}
             </select>
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              Choisis d&apos;abord le type : il determine si la tache demande un chantier, une mission libre ou seulement une action bureau.
+              Choisis d&apos;abord le type : chantier fixe ou mission libre. Le bureau se pointe desormais dans le pointage quotidien.
             </p>
           </Field>
           <Field label={mode === 'create' ? 'Ressources' : 'Ressource'}>
@@ -1232,6 +1298,19 @@ function AssignmentDrawer({
               value={form.action}
             />
           </Field>
+          <Field label="Durée prévue (minutes)">
+            <input
+              className={filterClassName}
+              min={0}
+              onChange={(event) => onChange({ ...form, plannedDurationMinutes: event.target.value })}
+              placeholder="Ex : 120"
+              type="number"
+              value={form.plannedDurationMinutes}
+            />
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Sert au suivi de charge, de retard et de progression projet.
+            </p>
+          </Field>
           {!isFreeMission ? (
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
             <Field label="Objectif quantitatif">
@@ -1295,6 +1374,33 @@ function AssignmentDrawer({
               Precision libre pour expliquer le travail attendu. Ce champ ne calcule pas la progression.
             </p>
           </Field>
+          {mode === 'create' ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-black text-slate-800">Enregistrer comme modèle</p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input
+                  className={`${filterClassName} bg-white`}
+                  onChange={(event) => setTemplateName(event.target.value)}
+                  placeholder="Nom du modèle"
+                  value={templateName}
+                />
+                <button
+                  className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={!templateName.trim() || !form.action.trim()}
+                  onClick={() => {
+                    onSaveTemplate(templateName);
+                    setTemplateName('');
+                  }}
+                  type="button"
+                >
+                  Enregistrer
+                </button>
+              </div>
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                Le modèle garde l&apos;action, la consigne, l&apos;objectif, l&apos;unité et la durée prévue.
+              </p>
+            </div>
+          ) : null}
           {mode === 'edit' ? (
             <Field label="Statut">
               <select
@@ -1604,6 +1710,7 @@ async function fetchCentralizedPlanning(filters: CentralizedPlanningFilters) {
   if (filters.resourceId) searchParams.set('resourceId', filters.resourceId);
   if (filters.role) searchParams.set('role', filters.role);
   if (filters.workLocationType) searchParams.set('workLocationType', filters.workLocationType);
+  if (filters.projectManagerId) searchParams.set('projectManagerId', filters.projectManagerId);
 
   const response = await authFetch(`/api/planning/centralized?${searchParams.toString()}`, { cache: 'no-store' });
   if (!response.ok) {
@@ -1623,6 +1730,39 @@ async function createAssignment(data: PlanningWebCreateRequest) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de créer la tâche.'));
   }
   return (await response.json()) as PlanningWebMutationResponse;
+}
+
+async function fetchPlanningTemplates(): Promise<PlanningTaskTemplatesResponse> {
+  const response = await authFetch('/api/planning/templates', { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Modèles planning indisponibles.'));
+  }
+
+  return (await response.json()) as PlanningTaskTemplatesResponse;
+}
+
+async function savePlanningTemplate({ name, form }: { name: string; form: AssignmentFormState }) {
+  const targetQuantity = form.targetQuantity === '' ? null : Number(form.targetQuantity);
+  const plannedDurationMinutes = form.plannedDurationMinutes === '' ? null : Number(form.plannedDurationMinutes);
+  const targetProgress = targetQuantity !== null && targetQuantity > 0 ? null : form.targetProgress === '' ? null : Number(form.targetProgress);
+  const response = await authFetch('/api/planning/templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      action: form.action,
+      targetProgress,
+      targetQuantity,
+      targetUnit: form.targetUnit.trim() || null,
+      objectiveText: form.objectiveText.trim() || null,
+      plannedDurationMinutes,
+      workLocationType: form.workLocationType,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Modèle planning impossible.'));
+  }
 }
 
 async function updateAssignment(id: string, data: PlanningWebUpdateRequest) {
@@ -1778,12 +1918,14 @@ function getCentralizedOptions(items: CentralizedPlanningAssignment[]) {
   const projects = new Map<string, string>();
   const sites = new Map<string, { id: string; name: string; projectId: string }>();
   const resources = new Map<string, string>();
+  const projectManagers = new Map<string, string>();
   const roles = new Set<Role>();
 
   for (const item of items) {
     projects.set(item.projectId, item.projectName);
     sites.set(item.siteId, { id: item.siteId, name: item.siteName, projectId: item.projectId });
     resources.set(item.resourceId, item.resourceName);
+    projectManagers.set(item.projectManagerId, item.projectManagerName);
     roles.add(item.resourceRole);
   }
 
@@ -1791,6 +1933,7 @@ function getCentralizedOptions(items: CentralizedPlanningAssignment[]) {
     projects: [...projects.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
     sites: [...sites.values()].sort((a, b) => a.name.localeCompare(b.name)),
     resources: [...resources.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+    projectManagers: [...projectManagers.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
     roles: [...roles.values()].sort((a, b) => formatRoleLabel(a).localeCompare(formatRoleLabel(b))),
   };
 }
@@ -1859,8 +2002,23 @@ function createEmptyForm(date: string): AssignmentFormState {
     targetQuantity: '',
     targetUnit: '',
     objectiveText: '',
+    plannedDurationMinutes: '',
     status: PlanningAssignmentStatus.ASSIGNED,
     workLocationType: PlanningWorkLocationType.ON_SITE,
+  };
+}
+
+function applyTemplateToForm(form: AssignmentFormState, template: PlanningTaskTemplateItem): AssignmentFormState {
+  return {
+    ...form,
+    action: template.action,
+    targetProgress: template.targetProgress === null ? '' : String(template.targetProgress),
+    targetQuantity: template.targetQuantity ?? '',
+    targetUnit: template.targetUnit ?? '',
+    objectiveText: template.objectiveText ?? '',
+    plannedDurationMinutes: template.plannedDurationMinutes === null ? '' : String(template.plannedDurationMinutes),
+    workLocationType: template.workLocationType,
+    siteId: template.workLocationType === PlanningWorkLocationType.FREE_MISSION ? '' : form.siteId,
   };
 }
 

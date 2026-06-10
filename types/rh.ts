@@ -108,6 +108,23 @@ export type RhOptionsResponse = {
   resources: RhResourceOption[];
 };
 
+export type RhResourceListItem = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string | null;
+  matricule: string | null;
+  role: string;
+};
+
+export type RhResourcesResponse = {
+  items: RhResourceListItem[];
+  totalItems: number;
+  missingMatricule: number;
+  roles: string[];
+};
+
 export type RhSitePresenceLiveStatus =
   | 'PRESENT'
   | 'PAUSED'
@@ -131,6 +148,7 @@ export type RhSitePresenceLiveResource = {
   isRemoteCheckout: boolean;
   isAutoClosed: boolean;
   isRegularized: boolean;
+  isLate: boolean;
 };
 
 export type RhPresenceGpsPoint = {
@@ -170,9 +188,11 @@ export type RhSitePresenceLiveResponse = {
   options: {
     projects: RhFilterOption[];
     sites: (RhFilterOption & { projectId: string })[];
-    resources: RhResourceOption[];
-    roles: string[];
-  };
+  resources: RhResourceOption[];
+  projectManagers: RhFilterOption[];
+  assigners: RhFilterOption[];
+  roles: string[];
+};
   sites: RhSitePresenceLiveSite[];
 };
 

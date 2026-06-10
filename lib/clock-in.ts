@@ -31,6 +31,7 @@ export const clockInRecordSelect = {
   id: true,
   siteId: true,
   freeMissionId: true,
+  officeClockInLocation: true,
   userId: true,
   type: true,
   clockInDate: true,
@@ -45,6 +46,7 @@ export const clockInRecordSelect = {
   isRemoteCheckout: true,
   isAutoClosed: true,
   isRegularized: true,
+  isLate: true,
   createdAt: true,
   site: {
     select: {
@@ -68,6 +70,7 @@ const openSessionSelect = {
   id: true,
   siteId: true,
   freeMissionId: true,
+  officeClockInLocation: true,
   userId: true,
   type: true,
   status: true,
@@ -99,6 +102,7 @@ type PauseRecord = {
   id: string;
   siteId: string | null;
   freeMissionId?: string | null;
+  officeClockInLocation?: 'OFFICE' | null;
   userId: string;
   type: ClockInType;
   status: ClockInStatus;
@@ -395,11 +399,11 @@ export function findActivePauseFromRecords(records: PauseRecord[]) {
 }
 
 export function serializeClockInRecord(record: SerializableClockInRecord): ClockInRecordItem {
-  const contextType = record.freeMissionId ? 'FREE_MISSION' : 'SITE';
+  const contextType = record.officeClockInLocation ? 'OFFICE' : record.freeMissionId ? 'FREE_MISSION' : 'SITE';
   return {
     id: record.id,
     siteId: record.siteId,
-    siteName: record.site?.name ?? record.freeMission?.action ?? 'Mission libre',
+    siteName: record.site?.name ?? record.freeMission?.action ?? 'Bureau',
     freeMissionId: record.freeMissionId,
     freeMissionAction: record.freeMission?.action ?? null,
     projectId: record.freeMission?.projectId ?? null,
@@ -419,6 +423,7 @@ export function serializeClockInRecord(record: SerializableClockInRecord): Clock
     isRemoteCheckout: record.isRemoteCheckout,
     isAutoClosed: record.isAutoClosed,
     isRegularized: record.isRegularized,
+    isLate: record.isLate,
     createdAt: record.createdAt.toISOString(),
   };
 }
@@ -453,6 +458,7 @@ export function serializeSessionStatus(
       openSessionSiteId: null,
       openSessionSiteName: null,
       openSessionFreeMissionId: null,
+      openSessionContextType: null,
     };
   }
 
@@ -463,8 +469,9 @@ export function serializeSessionStatus(
     pauseActive: Boolean(activePause),
     pauseDuration: activePause ? durationSince(activePause.timestampLocal) : 0,
     openSessionSiteId: openSession.siteId,
-    openSessionSiteName: openSession.site?.name ?? openSession.freeMission?.action ?? null,
+    openSessionSiteName: openSession.site?.name ?? openSession.freeMission?.action ?? (openSession.officeClockInLocation ? 'Bureau' : null),
     openSessionFreeMissionId: openSession.freeMissionId,
+    openSessionContextType: openSession.officeClockInLocation ? 'OFFICE' : openSession.freeMissionId ? 'FREE_MISSION' : 'SITE',
   };
 }
 
@@ -475,9 +482,9 @@ export function serializeActiveSession(record: OpenSessionRecord | null): Active
 
   return {
     siteId: record.siteId,
-    siteName: record.site?.name ?? record.freeMission?.action ?? 'Mission libre',
+    siteName: record.site?.name ?? record.freeMission?.action ?? 'Bureau',
     freeMissionId: record.freeMissionId,
-    contextType: record.freeMissionId ? 'FREE_MISSION' : 'SITE',
+    contextType: record.officeClockInLocation ? 'OFFICE' : record.freeMissionId ? 'FREE_MISSION' : 'SITE',
     arrivalAt: record.timestampLocal.toISOString(),
     durationSeconds: durationSince(record.timestampLocal),
   };
@@ -502,6 +509,7 @@ export async function createClockInRecord(
   payload: {
     siteId?: string | null;
     freeMissionId?: string | null;
+    officeClockInLocation?: 'OFFICE' | null;
     userId: string;
     input: ClockInInput;
     distanceKm: number;
@@ -517,6 +525,7 @@ export async function createClockInRecord(
     data: {
       siteId: payload.siteId ?? null,
       freeMissionId: payload.freeMissionId ?? null,
+      officeClockInLocation: payload.officeClockInLocation ?? null,
       userId: payload.userId,
       type: payload.input.type,
       clockInDate: toDateOnlyDate(timestampLocal),
@@ -532,6 +541,7 @@ export async function createClockInRecord(
       isRemoteCheckout: payload.isRemoteCheckout ?? false,
       isAutoClosed: payload.isAutoClosed ?? false,
       isRegularized: payload.isRegularized ?? false,
+      isLate: isLateClockIn(payload.input.type, timestampLocal),
     },
     select: clockInRecordSelect,
   });
@@ -544,6 +554,7 @@ export async function createBatchClockInRecord(
   payload: {
     siteId?: string | null;
     freeMissionId?: string | null;
+    officeClockInLocation?: 'OFFICE' | null;
     userId: string;
     input: BatchSyncItemInput;
     distanceKm: number;
@@ -559,6 +570,7 @@ export async function createBatchClockInRecord(
     data: {
       siteId: payload.siteId ?? null,
       freeMissionId: payload.freeMissionId ?? null,
+      officeClockInLocation: payload.officeClockInLocation ?? null,
       userId: payload.userId,
       type: payload.input.type,
       clockInDate: toDateOnlyDate(timestampLocal),
@@ -574,6 +586,7 @@ export async function createBatchClockInRecord(
       isRemoteCheckout: payload.isRemoteCheckout ?? false,
       isAutoClosed: payload.isAutoClosed ?? false,
       isRegularized: payload.isRegularized ?? false,
+      isLate: isLateClockIn(payload.input.type, timestampLocal),
     },
     select: {
       id: true,
@@ -986,6 +999,16 @@ function sanitizeDateTimeString(value: unknown) {
 
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function isLateClockIn(type: ClockInType, timestampLocal: Date) {
+  if (type !== ClockInType.ARRIVAL) {
+    return false;
+  }
+
+  const hour = timestampLocal.getHours();
+  const minute = timestampLocal.getMinutes();
+  return hour > 8 || (hour === 8 && minute > 0);
 }
 
 function parseClockInType(value: unknown) {

@@ -31,6 +31,7 @@ export const userPublicSelect = {
   id: true,
   username: true,
   email: true,
+  matricule: true,
   firstName: true,
   lastName: true,
   role: true,
@@ -65,6 +66,7 @@ type SerializableUser = Prisma.UserGetPayload<{
 export type CreateUserInput = {
   username: string;
   email?: string | null;
+  matricule?: string | null;
   firstName: string;
   lastName: string;
   role: Role;
@@ -74,6 +76,7 @@ export type CreateUserInput = {
 export type UpdateUserInput = {
   username: string;
   email?: string | null;
+  matricule?: string | null;
   firstName: string;
   lastName: string;
   role: Role;
@@ -95,6 +98,7 @@ export type UpdateOwnProfileInput = {
   firstName: string;
   lastName: string;
   email?: string | null;
+  matricule?: string | null;
 };
 
 export type UpdateUserStatusInput = {
@@ -127,6 +131,7 @@ export function serializeUser(user: SerializableUser): UserListItem {
     id: user.id,
     username: user.username,
     email: user.email,
+    matricule: user.matricule,
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
@@ -231,6 +236,7 @@ export function buildUserListWhere(query: UserListQuery): Prisma.UserWhereInput 
             { lastName: { contains: query.search, mode: 'insensitive' } },
             { username: { contains: query.search, mode: 'insensitive' } },
             { email: { contains: query.search, mode: 'insensitive' } },
+            { matricule: { contains: query.search, mode: 'insensitive' } },
           ],
         }
       : {}),
@@ -253,17 +259,19 @@ export function parseCreateUserInput(body: unknown): CreateUserInput | null {
   const role = parseRole(body.role);
   const username = sanitizeUsername(body.username);
   const email = sanitizeOptionalEmail(body.email);
+  const matricule = sanitizeOptionalMatricule(body.matricule);
   const firstName = sanitizeString(body.firstName);
   const lastName = sanitizeString(body.lastName);
   const contact = sanitizeOptionalString(body.contact) ?? '';
 
-  if (!role || !username || email === undefined || !firstName || !lastName) {
+  if (!role || !username || email === undefined || matricule === undefined || !firstName || !lastName) {
     return null;
   }
 
   return {
     username,
     email,
+    matricule,
     firstName,
     lastName,
     role,
@@ -279,17 +287,19 @@ export function parseUpdateUserInput(body: unknown): UpdateUserInput | null {
   const role = parseRole(body.role);
   const username = sanitizeUsername(body.username);
   const email = sanitizeOptionalEmail(body.email);
+  const matricule = sanitizeOptionalMatricule(body.matricule);
   const firstName = sanitizeString(body.firstName);
   const lastName = sanitizeString(body.lastName);
   const contact = sanitizeOptionalString(body.contact) ?? '';
 
-  if (!role || !username || email === undefined || !firstName || !lastName) {
+  if (!role || !username || email === undefined || matricule === undefined || !firstName || !lastName) {
     return null;
   }
 
   return {
     username,
     email,
+    matricule,
     firstName,
     lastName,
     role,
@@ -313,8 +323,10 @@ export function parseUpdateOwnProfileInput(body: unknown): UpdateOwnProfileInput
   const lastName = sanitizeString(body.lastName);
   const hasEmail = 'email' in body;
   const email = hasEmail ? sanitizeOptionalEmail(body.email) : undefined;
+  const hasMatricule = 'matricule' in body;
+  const matricule = hasMatricule ? sanitizeOptionalMatricule(body.matricule) : undefined;
 
-  if (!firstName || !lastName || (hasEmail && email === undefined)) {
+  if (!firstName || !lastName || (hasEmail && email === undefined) || (hasMatricule && matricule === undefined)) {
     return null;
   }
 
@@ -325,6 +337,10 @@ export function parseUpdateOwnProfileInput(body: unknown): UpdateOwnProfileInput
 
   if (hasEmail) {
     input.email = email ?? null;
+  }
+
+  if (hasMatricule) {
+    input.matricule = matricule ?? null;
   }
 
   return input;
@@ -498,6 +514,7 @@ export async function createManagedUser(
     data: {
       username: input.username,
       email: input.email ?? null,
+      matricule: input.matricule ?? null,
       firstName: input.firstName,
       lastName: input.lastName,
       role: input.role,
@@ -583,6 +600,22 @@ function sanitizeOptionalEmail(value: unknown) {
   return sanitizeEmail(trimmed) ?? undefined;
 }
 
+function sanitizeOptionalMatricule(value: unknown) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim().toUpperCase();
+  if (!trimmed) {
+    return null;
+  }
+
+  return /^[A-Z0-9._/-]{2,40}$/.test(trimmed) ? trimmed : undefined;
+}
 
 function sanitizeUsername(value: unknown) {
   if (typeof value !== 'string') {

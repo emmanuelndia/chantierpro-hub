@@ -6,6 +6,7 @@ export const CLASSIC_FIELD_USER_ROLES: readonly Role[] = [
   Role.EXTERNAL_RESOURCE,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
+  Role.PROJECT_MANAGER,
 ];
 
 export const BE_FIELD_USER_ROLES: readonly Role[] = [Role.BE_RESOURCE];

@@ -20,6 +20,7 @@ export type UserListItem = {
   id: string;
   username: string;
   email: string | null;
+  matricule: string | null;
   firstName: string;
   lastName: string;
   role: Role;

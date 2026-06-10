@@ -19,9 +19,15 @@ export default function ForbiddenPage() {
           </Link>
           <Link
             className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            href="/login"
+            href="/web/login"
           >
-            Revenir a la connexion
+            Connexion web
+          </Link>
+          <Link
+            className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            href="/mobile/login"
+          >
+            Connexion mobile
           </Link>
         </div>
       </section>

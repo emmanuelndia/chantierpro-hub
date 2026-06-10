@@ -36,6 +36,7 @@ export type PlanningAssignment = {
   targetQuantity: number | null;
   targetUnit: string | null;
   objectiveText: string | null;
+  plannedDurationMinutes: number | null;
   actualProgress: number | null;
   actualQuantity: number | null;
   progressDelta: number | null;
@@ -112,6 +113,7 @@ export type CreateAssignmentRequest = {
   date: string;
   workLocationType: PlanningWorkLocationType;
   objectiveText?: string | null;
+  plannedDurationMinutes?: number | null;
 };
 
 export type UpdateAssignmentRequest = {
@@ -122,6 +124,7 @@ export type UpdateAssignmentRequest = {
   status?: PlanningAssignmentStatus;
   workLocationType?: PlanningWorkLocationType;
   objectiveText?: string | null;
+  plannedDurationMinutes?: number | null;
 };
 
 export type DuplicateAssignmentsRequest = {

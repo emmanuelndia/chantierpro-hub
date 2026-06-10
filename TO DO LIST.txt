@@ -85,7 +85,7 @@ Ajout du suivi par objectif quantitatif :
     - réalisé cumulé ;
     - progression calculée automatiquement. 
 
-++
+
 
 
 https://meet.google.com/pnk-uwwr-kpc
@@ -96,7 +96,12 @@ Au niveau du pointage, on a mis une option mission libre mais je ne pense pas qu
 - Leurs tâches ne se suivent pas de la même manière que les autres dans ce cas la j'ai mis des fichiers excel en fichier joint pour que tu puisses voir un peu comment ils recueillent leurs suivis journalier, ils procédent aussi à une méthode de suivi suivant : coordonnées gps du batiment, remarque à observer (ça peut être par exemple le client refuse de donner son accord, immeuble négocié ainsi de suite)
 - Le responsable négo aussi m'a fait savoir qu'il va sur le terrain aussi des fois donc il aimerait avoir les fonctionnalités terrain
 
-
-
+Pouvoir filtrer les ressources par pm au niveau de présence chantiers
+Listes des ressources dans le module rh 
+pouvoir extraire en pdf ou excel une liste de présence avec les colonnes numero matricule - nom - prenom - position - heure arrivée - heure départ - temps passée
+Désormais il faudra pointer quotidiennement au bureau il faudra donc revoir ce type de pointage ce n'est plus les chefs projets qui vont assigner des tâches aux ressources qui doivent pointer au bureau 
+Pouvoir ressortir ou mettre en évidence ceux qui pointent après 8h
+Mettre dans la logique un temps donné pour chaque tâche 
+Au niveau de âche centralisé pouvoir filtrer par chef projetPrévoir l'affichage de la progression des projets des projets chez les RH, PM, DIRECTION, ADMIN et pouvoir voir si les projets sont en retards et autres 
 
 

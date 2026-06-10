@@ -91,13 +91,14 @@ export const POST = withAuth(
         OR: [
           { username: input.username },
           ...(input.email ? [{ email: input.email }] : []),
+          ...(input.matricule ? [{ matricule: input.matricule }] : []),
         ],
       },
-      select: { id: true, username: true, email: true },
+      select: { id: true, username: true, email: true, matricule: true },
     });
 
     if (existingUser) {
-      return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant ou cet email existe deja.');
+      return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant, cet email ou ce matricule existe deja.');
     }
 
     try {
@@ -108,7 +109,7 @@ export const POST = withAuth(
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant ou cet email existe deja.');
+        return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant, cet email ou ce matricule existe deja.');
       }
 
       throw error;

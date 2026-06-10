@@ -48,13 +48,14 @@ export const PUT = withAuth<{ id: string }>(
         OR: [
           { username: input.username },
           ...(input.email ? [{ email: input.email }] : []),
+          ...(input.matricule ? [{ matricule: input.matricule }] : []),
         ],
       },
       select: { id: true },
     });
 
     if (conflictingUser) {
-      return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant ou cet email existe deja.');
+      return jsonUserError('CONFLICT', 409, 'Un utilisateur avec cet identifiant, cet email ou ce matricule existe deja.');
     }
 
     const updatedUser = await prisma.$transaction(async (tx) => {

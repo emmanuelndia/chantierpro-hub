@@ -42,6 +42,17 @@ export const PUT = withAuth(async ({ req, user }) => {
     }
   }
 
+  if (input.matricule) {
+    const existingUser = await prisma.user.findUnique({
+      where: { matricule: input.matricule },
+      select: { id: true },
+    });
+
+    if (existingUser && existingUser.id !== user.id) {
+      return jsonUserError('CONFLICT', 409, 'Ce matricule est deja utilise par un autre compte.');
+    }
+  }
+
   const updatedUser = await prisma.user.update({
     where: { id: user.id },
     data: input,

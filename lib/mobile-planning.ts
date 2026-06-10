@@ -329,7 +329,7 @@ async function createSinglePlanningAssignment(
       siteId: normalized.siteId,
       deletedAt: null,
     },
-    select: { id: true, action: true, targetProgress: true, targetQuantity: true, targetUnit: true, workLocationType: true },
+    select: { id: true, action: true, targetProgress: true, targetQuantity: true, targetUnit: true, plannedDurationMinutes: true, workLocationType: true },
   });
 
   if (existingTasks.some((task) => isSameTask(task, normalized))) {
@@ -351,6 +351,7 @@ async function createSinglePlanningAssignment(
         targetQuantity: normalized.targetQuantity,
         targetUnit: normalized.targetUnit,
         objectiveText: normalized.objectiveText,
+        plannedDurationMinutes: normalized.plannedDurationMinutes,
         workLocationType: normalized.workLocationType,
         status: PlanningAssignmentStatus.ASSIGNED,
         createdById: user.id,
@@ -405,6 +406,7 @@ export async function updatePlanningAssignment(
   const targetQuantity = normalizeQuantity(input.targetQuantity);
   const targetUnit = normalizeUnit(input.targetUnit);
   const objectiveText = normalizeOptionalText(input.objectiveText);
+  const plannedDurationMinutes = normalizePlannedDurationMinutes(input.plannedDurationMinutes);
   const status = normalizePlanningStatus(input.status);
   const workLocationType = normalizeWorkLocationType(input.workLocationType);
 
@@ -418,6 +420,10 @@ export async function updatePlanningAssignment(
 
   if (targetQuantity instanceof Response) {
     return targetQuantity;
+  }
+
+  if (plannedDurationMinutes instanceof Response) {
+    return plannedDurationMinutes;
   }
 
   if (input.status !== undefined && !status) {
@@ -443,6 +449,7 @@ export async function updatePlanningAssignment(
       ...(input.targetQuantity !== undefined ? { targetQuantity } : {}),
       ...(input.targetUnit !== undefined ? { targetUnit } : {}),
       ...(input.objectiveText !== undefined ? { objectiveText } : {}),
+      ...(input.plannedDurationMinutes !== undefined ? { plannedDurationMinutes } : {}),
       ...(status ? { status } : {}),
       ...(workLocationType ? { workLocationType } : {}),
     },
@@ -861,6 +868,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   const targetQuantity = normalizeQuantity(input.targetQuantity);
   const targetUnit = normalizeUnit(input.targetUnit);
   const objectiveText = normalizeOptionalText(input.objectiveText);
+  const plannedDurationMinutes = normalizePlannedDurationMinutes(input.plannedDurationMinutes);
   const workLocationType = normalizeWorkLocationType(input.workLocationType) ?? PlanningWorkLocationType.ON_SITE;
 
   if (!supervisorId || !siteId || !action) {
@@ -869,6 +877,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
 
   if (targetProgress instanceof Response) return targetProgress;
   if (targetQuantity instanceof Response) return targetQuantity;
+  if (plannedDurationMinutes instanceof Response) return plannedDurationMinutes;
 
   const [site, supervisorIds] = await Promise.all([
     prisma.site.findFirst({
@@ -900,6 +909,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
     targetQuantity,
     targetUnit,
     objectiveText,
+    plannedDurationMinutes,
     workLocationType,
   };
 }
@@ -1045,6 +1055,7 @@ function isSameTask(
     targetProgress: number | null;
     targetQuantity?: unknown;
     targetUnit?: string | null;
+    plannedDurationMinutes?: number | null;
     workLocationType: PlanningWorkLocationType;
   },
   normalized: {
@@ -1052,6 +1063,7 @@ function isSameTask(
     targetProgress: number | null;
     targetQuantity?: unknown;
     targetUnit?: string | null;
+    plannedDurationMinutes?: number | null;
     workLocationType: PlanningWorkLocationType;
   },
 ) {
@@ -1061,6 +1073,7 @@ function isSameTask(
       normalizeProgressForQuantity(normalized.targetProgress, normalized.targetQuantity) &&
     decimalToNumber(existing.targetQuantity) === decimalToNumber(normalized.targetQuantity) &&
     (existing.targetUnit ?? null) === (normalized.targetUnit ?? null) &&
+    (existing.plannedDurationMinutes ?? null) === (normalized.plannedDurationMinutes ?? null) &&
     existing.workLocationType === normalized.workLocationType
   );
 }
@@ -1139,6 +1152,7 @@ const planningAssignmentSelect = {
   targetQuantity: true,
   targetUnit: true,
   objectiveText: true,
+  plannedDurationMinutes: true,
   status: true,
   workLocationType: true,
   createdAt: true,
@@ -1228,6 +1242,7 @@ const supervisorAssignmentSelect = {
   targetQuantity: true,
   targetUnit: true,
   objectiveText: true,
+  plannedDurationMinutes: true,
   status: true,
   workLocationType: true,
   site: {
@@ -1274,6 +1289,7 @@ function serializePlanningAssignment(assignment: PlanningAssignmentRow, clockIns
     targetQuantity,
     targetUnit: assignment.targetUnit,
     objectiveText: assignment.objectiveText,
+    plannedDurationMinutes: assignment.plannedDurationMinutes,
     actualQuantity: objective.actualQuantity,
     actualProgress: objective.actualProgress,
     progressDelta: objective.progressDelta,
@@ -1310,6 +1326,7 @@ function serializeSupervisorAssignment(assignment: SupervisorAssignmentRow) {
     targetQuantity,
     targetUnit: assignment.targetUnit,
     objectiveText: assignment.objectiveText,
+    plannedDurationMinutes: assignment.plannedDurationMinutes,
     actualQuantity: objective.actualQuantity,
     actualProgress: objective.actualProgress,
     progressDelta: objective.progressDelta,
@@ -1344,6 +1361,7 @@ function serializeFreeMissionAsSupervisorAssignment(mission: Awaited<ReturnType<
     targetQuantity: null,
     targetUnit: null,
     objectiveText: mission.objectiveText,
+    plannedDurationMinutes: null,
     actualQuantity: null,
     actualProgress: mission.status === FreeMissionStatus.COMPLETED ? 100 : null,
     progressDelta: null,
@@ -1385,6 +1403,7 @@ function serializeFreeMissionAsPlanningAssignment(mission: Awaited<ReturnType<ty
     targetQuantity: null,
     targetUnit: null,
     objectiveText: mission.objectiveText,
+    plannedDurationMinutes: null,
     actualQuantity: null,
     actualProgress: mission.status === FreeMissionStatus.COMPLETED ? 100 : null,
     progressDelta: null,
@@ -1545,6 +1564,17 @@ function normalizeQuantity(value: unknown): number | null | Response {
   }
 
   return Math.round(numberValue * 100) / 100;
+}
+
+function normalizePlannedDurationMinutes(value: unknown): number | null | Response {
+  if (value === undefined || value === null || value === '') return null;
+
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue) || numberValue < 0) {
+    return planningError('INVALID_DURATION', 'La duree prevue doit etre un nombre entier positif.', 400);
+  }
+
+  return numberValue;
 }
 
 function normalizeTargetProgress(value: number | null | undefined): number | null | Response {

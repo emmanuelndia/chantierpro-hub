@@ -14,6 +14,7 @@ type ProfileFormValues = {
   firstName: string;
   lastName: string;
   email: string;
+  matricule: string;
 };
 
 type PasswordFormValues = {
@@ -31,7 +32,7 @@ const initialPasswordValues: PasswordFormValues = {
 export function SettingsProfilePage() {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
-  const [profileValues, setProfileValues] = useState<ProfileFormValues>({ firstName: '', lastName: '', email: '' });
+  const [profileValues, setProfileValues] = useState<ProfileFormValues>({ firstName: '', lastName: '', email: '', matricule: '' });
   const [passwordValues, setPasswordValues] = useState<PasswordFormValues>(initialPasswordValues);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
@@ -53,6 +54,7 @@ export function SettingsProfilePage() {
         firstName: profileQuery.data.firstName,
         lastName: profileQuery.data.lastName,
         email: profileQuery.data.email ?? '',
+        matricule: profileQuery.data.matricule ?? '',
       });
     }
   }, [profileQuery.data]);
@@ -68,6 +70,7 @@ export function SettingsProfilePage() {
           firstName: values.firstName.trim(),
           lastName: values.lastName.trim(),
           email: values.email.trim() || null,
+          matricule: values.matricule.trim() || null,
         }),
       });
 
@@ -154,7 +157,8 @@ export function SettingsProfilePage() {
     !profileValues.lastName.trim() ||
     (profileValues.firstName.trim() === user.firstName &&
       profileValues.lastName.trim() === user.lastName &&
-      profileValues.email.trim().toLowerCase() === (user.email ?? ''));
+      profileValues.email.trim().toLowerCase() === (user.email ?? '') &&
+      profileValues.matricule.trim().toUpperCase() === (user.matricule ?? ''));
   const passwordSubmitDisabled =
     passwordMutation.isPending ||
     !passwordValues.currentPassword ||
@@ -187,6 +191,7 @@ export function SettingsProfilePage() {
             <ReadOnlyField label="Nom" value={user.lastName} />
             <ReadOnlyField label="Identifiant" value={user.username} />
             <ReadOnlyField label="Email" value={user.email ?? 'Non renseigne'} />
+            <ReadOnlyField label="Matricule" value={user.matricule ?? 'Non renseigne'} />
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Role</p>
               <Badge tone="neutral">{user.role.replaceAll('_', ' ')}</Badge>
@@ -220,6 +225,14 @@ export function SettingsProfilePage() {
                 placeholder="prenom.nom@example.com"
                 type="email"
                 value={profileValues.email}
+              />
+            </Field>
+            <Field label="Matricule facultatif">
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
+                onChange={(event) => setProfileValues((current) => ({ ...current, matricule: event.target.value }))}
+                placeholder="Ex. MAT-001"
+                value={profileValues.matricule}
               />
             </Field>
           </div>

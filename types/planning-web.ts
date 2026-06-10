@@ -30,6 +30,8 @@ export type CentralizedPlanningAssignment = {
   date: string;
   projectId: string;
   projectName: string;
+  projectManagerId: string;
+  projectManagerName: string;
   siteId: string;
   siteName: string;
   siteAddress: string;
@@ -42,6 +44,7 @@ export type CentralizedPlanningAssignment = {
   targetQuantity: number | null;
   targetUnit: string | null;
   objectiveText: string | null;
+  plannedDurationMinutes: number | null;
   actualProgress: number | null;
   actualQuantity: number | null;
   progressDelta: number | null;
@@ -73,4 +76,5 @@ export type CentralizedPlanningFilters = {
   resourceId: string;
   role: string;
   workLocationType: string;
+  projectManagerId: string;
 };

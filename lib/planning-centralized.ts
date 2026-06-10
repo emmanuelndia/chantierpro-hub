@@ -41,6 +41,7 @@ export function parseCentralizedPlanningFilters(searchParams: URLSearchParams): 
     resourceId: sanitizeString(searchParams.get('resourceId')) ?? '',
     role: sanitizeString(searchParams.get('role')) ?? '',
     workLocationType: sanitizeString(searchParams.get('workLocationType')) ?? '',
+    projectManagerId: sanitizeString(searchParams.get('projectManagerId')) ?? '',
   };
 }
 
@@ -81,6 +82,7 @@ export async function getCentralizedPlanning(
     site: {
       status: 'ACTIVE',
       ...(filters.projectId ? { projectId: filters.projectId } : {}),
+      ...(filters.projectManagerId ? { project: { projectManagerId: filters.projectManagerId } } : {}),
     },
   };
 
@@ -102,6 +104,7 @@ export async function getCentralizedPlanning(
       targetQuantity: true,
       targetUnit: true,
       objectiveText: true,
+      plannedDurationMinutes: true,
       status: true,
       workLocationType: true,
       progressUpdates: {
@@ -143,6 +146,12 @@ export async function getCentralizedPlanning(
               id: true,
               name: true,
               projectManagerId: true,
+              projectManager: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
             },
           },
         },
@@ -172,6 +181,8 @@ export async function getCentralizedPlanning(
         date: assignment.date.toISOString().slice(0, 10),
         projectId: assignment.site.project.id,
         projectName: assignment.site.project.name,
+        projectManagerId: assignment.site.project.projectManagerId,
+        projectManagerName: `${assignment.site.project.projectManager.firstName} ${assignment.site.project.projectManager.lastName}`.trim(),
         siteId: assignment.site.id,
         siteName: assignment.site.name,
         siteAddress: assignment.site.address,
@@ -184,6 +195,7 @@ export async function getCentralizedPlanning(
         targetQuantity,
         targetUnit: assignment.targetUnit,
         objectiveText: assignment.objectiveText,
+        plannedDurationMinutes: assignment.plannedDurationMinutes,
         actualQuantity: objective.actualQuantity,
         actualProgress: objective.actualProgress,
         progressDelta: objective.progressDelta,

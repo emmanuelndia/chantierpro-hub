@@ -8,7 +8,7 @@ export type ClockInRecordItem = {
   freeMissionAction: string | null;
   projectId: string | null;
   projectName: string | null;
-  contextType: 'SITE' | 'FREE_MISSION';
+  contextType: 'SITE' | 'FREE_MISSION' | 'OFFICE';
   userId: string;
   type: ClockInType;
   clockInDate: string;
@@ -23,6 +23,7 @@ export type ClockInRecordItem = {
   isRemoteCheckout: boolean;
   isAutoClosed: boolean;
   isRegularized: boolean;
+  isLate: boolean;
   createdAt: string;
 };
 
@@ -30,7 +31,7 @@ export type ActiveClockInSession = {
   siteId: string | null;
   siteName: string;
   freeMissionId: string | null;
-  contextType: 'SITE' | 'FREE_MISSION';
+  contextType: 'SITE' | 'FREE_MISSION' | 'OFFICE';
   arrivalAt: string;
   durationSeconds: number;
 };
@@ -52,6 +53,7 @@ export type SessionStatus = {
   openSessionSiteId?: string | null;
   openSessionSiteName?: string | null;
   openSessionFreeMissionId?: string | null;
+  openSessionContextType?: 'SITE' | 'FREE_MISSION' | 'OFFICE' | null;
 };
 
 export type AttendancePersonItem = {

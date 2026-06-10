@@ -27,6 +27,12 @@ type LiveResourceListItem = RhSitePresenceLiveResource & {
   projectName: string;
 };
 
+type LiveResourceContext = LiveResourceListItem;
+
+type AggregatedLiveResource = RhSitePresenceLiveResource & {
+  contexts: LiveResourceContext[];
+};
+
 const inputClassName =
   'w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white';
 
@@ -35,8 +41,10 @@ const liveStatuses: RhSitePresenceLiveStatus[] = ['PRESENT', 'PAUSED', 'EXPECTED
 export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps) {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [projectId, setProjectId] = useState('');
+  const [projectManagerId, setProjectManagerId] = useState('');
   const [siteId, setSiteId] = useState('');
   const [resourceId, setResourceId] = useState('');
+  const [assignedById, setAssignedById] = useState('');
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
@@ -55,8 +63,10 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
     const searchParams = new URLSearchParams();
     if (selectedDate) searchParams.set('date', selectedDate);
     if (projectId) searchParams.set('projectId', projectId);
+    if (projectManagerId) searchParams.set('projectManagerId', projectManagerId);
     if (siteId) searchParams.set('siteId', siteId);
     if (resourceId) searchParams.set('resourceId', resourceId);
+    if (assignedById) searchParams.set('assignedById', assignedById);
     if (role) searchParams.set('role', role);
     if (status) searchParams.set('status', status);
     if (debouncedSearch) searchParams.set('q', debouncedSearch);
@@ -64,7 +74,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 
     const queryString = searchParams.toString();
     return queryString ? `/api/rh/site-presences-live?${queryString}` : '/api/rh/site-presences-live';
-  }, [anomaliesOnly, debouncedSearch, projectId, resourceId, role, selectedDate, siteId, status]);
+  }, [anomaliesOnly, assignedById, debouncedSearch, projectId, projectManagerId, resourceId, role, selectedDate, siteId, status]);
 
   const liveQuery = useQuery({
     queryKey: ['rh-site-presences-live', requestPath],
@@ -94,22 +104,16 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
     () => toPresenceResourceOptions(data?.options.resources ?? []),
     [data?.options.resources],
   );
-  const resources = useMemo(
-    () =>
-      filteredSites
-        .flatMap((site) =>
-          site.resources.map((resource) => ({
-            ...resource,
-            siteId: site.siteId,
-            siteName: site.siteName,
-            siteAddress: site.siteAddress,
-            projectName: site.projectName,
-          })),
-        )
-        .sort(compareLivePresenceResource),
-    [filteredSites],
+  const projectManagerOptions = useMemo(
+    () => (data?.options.projectManagers ?? []).map((manager) => ({ value: manager.id, label: manager.label })),
+    [data?.options.projectManagers],
   );
-  const leftCount = filteredSites.reduce((sum, site) => sum + site.leftCount, 0);
+  const assignerOptions = useMemo(
+    () => (data?.options.assigners ?? []).map((assigner) => ({ value: assigner.id, label: assigner.label })),
+    [data?.options.assigners],
+  );
+  const resources = useMemo(() => aggregateLiveResources(flattenLiveResources(filteredSites)), [filteredSites]);
+  const displaySummary = useMemo(() => buildDisplaySummary(resources), [resources]);
 
   if (liveQuery.isLoading && !data) {
     return <LoadingState />;
@@ -155,10 +159,10 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <LiveKpi label="Presentes" tone="success" value={data?.summary.presentResources ?? 0} />
-        <LiveKpi label="Attendues" value={data?.summary.expectedResources ?? 0} />
-        <LiveKpi label="Absentes" tone="warning" value={data?.summary.notClockedResources ?? 0} />
-        <LiveKpi label="Anomalies" tone={(data?.summary.anomalies ?? 0) > 0 ? 'danger' : 'neutral'} value={data?.summary.anomalies ?? 0} />
+        <LiveKpi label="Presentes" tone="success" value={displaySummary.present} />
+        <LiveKpi label="Attendues" value={displaySummary.expected} />
+        <LiveKpi label="Absentes" tone="warning" value={displaySummary.absent} />
+        <LiveKpi label="Retards" tone={displaySummary.late > 0 ? 'warning' : 'neutral'} value={displaySummary.late} />
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
@@ -186,6 +190,18 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
               value={projectId}
             />
           </Field>
+          <Field label="Chef projet">
+            <SearchableSelect
+              onChange={(value) => {
+                setProjectManagerId(value);
+                setProjectId('');
+                setSiteId('');
+              }}
+              options={projectManagerOptions}
+              placeholder="Tous les chefs projets"
+              value={projectManagerId}
+            />
+          </Field>
           <Field label="Chantier">
             <SearchableSelect
               onChange={setSiteId}
@@ -200,6 +216,14 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
               options={resourceOptions}
               placeholder="Toutes les ressources"
               value={resourceId}
+            />
+          </Field>
+          <Field label="Assignateur">
+            <SearchableSelect
+              onChange={setAssignedById}
+              options={assignerOptions}
+              placeholder="Tous les assignateurs"
+              value={assignedById}
             />
           </Field>
           <Field label="Role">
@@ -256,10 +280,11 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <SiteCounter label="Presents" tone="success" value={data?.summary.presentResources ?? 0} />
-            <SiteCounter label="Pause" tone="warning" value={data?.summary.pausedResources ?? 0} />
-            <SiteCounter label="Absents" tone="warning" value={data?.summary.notClockedResources ?? 0} />
-            <SiteCounter label="Sorties" value={leftCount} />
+            <SiteCounter label="Presents" tone="success" value={displaySummary.present} />
+            <SiteCounter label="Pause" tone="warning" value={displaySummary.paused} />
+            <SiteCounter label="Absents" tone="warning" value={displaySummary.absent} />
+            <SiteCounter label="Sorties" value={displaySummary.left} />
+            <SiteCounter label="Retards" tone="warning" value={displaySummary.late} />
           </div>
         </div>
 
@@ -271,7 +296,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
         ) : (
           <div className="divide-y divide-slate-100">
             {resources.map((resource) => (
-              <ResourcePresenceItem key={`${resource.siteId}:${resource.userId}`} resource={resource} />
+              <ResourcePresenceItem key={resource.userId} resource={resource} />
             ))}
           </div>
         )}
@@ -280,13 +305,14 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   );
 }
 
-function ResourcePresenceItem({ resource }: Readonly<{ resource: LiveResourceListItem }>) {
-  const isUnplannedClockIn = !resource.taskAction && resource.status !== 'EXPECTED_NOT_CLOCKED';
+function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveResource }>) {
+  const isUnplannedClockIn = resource.contexts.some((context) => !context.taskAction && context.status !== 'EXPECTED_NOT_CLOCKED');
   const flags = [
     isUnplannedClockIn ? 'Non prevu' : null,
     resource.isRemoteCheckout ? 'Sortie a distance' : null,
     resource.isAutoClosed ? 'Auto-cloturee' : null,
     resource.isRegularized ? 'Regularisee' : null,
+    resource.isLate ? 'Retard' : null,
   ].filter(Boolean);
 
   return (
@@ -295,9 +321,19 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: LiveResourceLis
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-base font-semibold text-slate-950">{resource.name}</p>
+            {resource.contexts.length > 1 ? (
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">
+                {resource.contexts.length} chantiers
+              </span>
+            ) : null}
             {isUnplannedClockIn ? (
               <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700">
                 Non prevu
+              </span>
+            ) : null}
+            {resource.isLate ? (
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">
+                Retard
               </span>
             ) : null}
           </div>
@@ -316,30 +352,42 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: LiveResourceLis
       </div>
 
       <details className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        <summary className="cursor-pointer font-bold text-slate-700">Projet, chantier et tache</summary>
-        <div className="mt-3 grid gap-2 lg:grid-cols-2">
-          <p><span className="font-semibold text-slate-950">Projet :</span> {resource.projectName}</p>
-          <p><span className="font-semibold text-slate-950">Chantier :</span> {resource.siteName}</p>
-          <p><span className="font-semibold text-slate-950">Adresse :</span> {resource.siteAddress}</p>
-          <p>
-            <span className="font-semibold text-slate-950">Distance :</span>{' '}
-            {resource.distanceKm === null ? '-' : `${resource.distanceKm.toFixed(2)} km`}
-          </p>
-          <p className="lg:col-span-2">
-            <span className="font-semibold text-slate-950">Tache :</span> {resource.taskAction ?? 'Aucune tache terrain planifiee'}
-          </p>
-          {flags.length > 0 ? (
-            <p className="lg:col-span-2"><span className="font-semibold text-slate-950">Indicateurs :</span> {flags.join(', ')}</p>
-          ) : null}
-          {resource.arrivalGps || resource.departureGps ? (
-            <div className="flex flex-wrap gap-2 lg:col-span-2">
-              {resource.arrivalGps ? (
-                <GpsPointLink label={`Position entree ${formatTime(resource.arrivalGps.recordedAt)}`} point={resource.arrivalGps} />
+        <summary className="cursor-pointer font-bold text-slate-700">Chantiers et taches</summary>
+        <div className="mt-3 space-y-3">
+          {resource.contexts.map((context, index) => (
+            <div className="rounded-2xl bg-white p-3" key={`${context.siteId ?? 'mission'}:${context.userId}:${index}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold text-slate-950">{context.siteName}</p>
+                <Badge tone={liveStatusTone(context.status)}>{liveStatusLabel(context.status)}</Badge>
+              </div>
+              {context.isLate ? (
+                <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">
+                  Arrivee apres 08:00
+                </p>
               ) : null}
-              {resource.departureGps ? (
-                <GpsPointLink label={`Position sortie ${formatTime(resource.departureGps.recordedAt)}`} point={resource.departureGps} />
+              <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                <p><span className="font-semibold text-slate-950">Projet :</span> {context.projectName}</p>
+                <p><span className="font-semibold text-slate-950">Adresse :</span> {context.siteAddress}</p>
+                <p>
+                  <span className="font-semibold text-slate-950">Distance :</span>{' '}
+                  {context.distanceKm === null ? '-' : `${context.distanceKm.toFixed(2)} km`}
+                </p>
+                <p><span className="font-semibold text-slate-950">Tache :</span> {context.taskAction ?? 'Aucune tache terrain planifiee'}</p>
+              </div>
+              {context.arrivalGps || context.departureGps ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {context.arrivalGps ? (
+                    <GpsPointLink label={`Position entree ${formatTime(context.arrivalGps.recordedAt)}`} point={context.arrivalGps} />
+                  ) : null}
+                  {context.departureGps ? (
+                    <GpsPointLink label={`Position sortie ${formatTime(context.departureGps.recordedAt)}`} point={context.departureGps} />
+                  ) : null}
+                </div>
               ) : null}
             </div>
+          ))}
+          {flags.length > 0 ? (
+            <p><span className="font-semibold text-slate-950">Indicateurs :</span> {flags.join(', ')}</p>
           ) : null}
         </div>
       </details>
@@ -446,7 +494,7 @@ function liveStatusTone(status: RhSitePresenceLiveStatus) {
   return 'neutral';
 }
 
-function compareLivePresenceResource(left: LiveResourceListItem, right: LiveResourceListItem) {
+function compareLivePresenceResource(left: AggregatedLiveResource, right: AggregatedLiveResource) {
   const statusDiff = liveStatusSortRank(left.status) - liveStatusSortRank(right.status);
   if (statusDiff !== 0) return statusDiff;
   return left.name.localeCompare(right.name);
@@ -471,6 +519,118 @@ function toPresenceResourceOptions(
     label: resource.label,
     description: formatRoleLabel(resource.role as Role),
   }));
+}
+
+function flattenLiveResources(sites: RhSitePresenceLiveResponse['sites']): LiveResourceContext[] {
+  return sites.flatMap((site) =>
+    site.resources.map((resource) => ({
+      ...resource,
+      siteId: site.siteId,
+      siteName: site.siteName,
+      siteAddress: site.siteAddress,
+      projectName: site.projectName,
+    })),
+  );
+}
+
+function aggregateLiveResources(contexts: LiveResourceContext[]): AggregatedLiveResource[] {
+  const groupedResources = new Map<string, LiveResourceContext[]>();
+
+  contexts.forEach((context) => {
+    const existingContexts = groupedResources.get(context.userId) ?? [];
+    existingContexts.push(context);
+    groupedResources.set(context.userId, existingContexts);
+  });
+
+  return Array.from(groupedResources.values())
+    .map((resourceContexts) => buildAggregatedLiveResource(resourceContexts))
+    .sort(compareLivePresenceResource);
+}
+
+function buildAggregatedLiveResource(contexts: LiveResourceContext[]): AggregatedLiveResource {
+  const sortedContexts = [...contexts].sort(compareLivePresenceContext);
+  const status = getAggregateLiveStatus(sortedContexts);
+  const primaryContext = pickPrimaryContext(sortedContexts, status);
+  const latestClockIn = getLatestClockIn(sortedContexts);
+  const firstArrival = getFirstArrival(sortedContexts);
+
+  return {
+    ...primaryContext,
+    status,
+    taskAction: primaryContext.taskAction,
+    arrivalAt: firstArrival ?? primaryContext.arrivalAt,
+    lastClockInAt: latestClockIn?.lastClockInAt ?? primaryContext.lastClockInAt,
+    lastClockInType: latestClockIn?.lastClockInType ?? primaryContext.lastClockInType,
+    isRemoteCheckout: sortedContexts.some((context) => context.isRemoteCheckout),
+    isAutoClosed: sortedContexts.some((context) => context.isAutoClosed),
+    isRegularized: sortedContexts.some((context) => context.isRegularized),
+    isLate: sortedContexts.some((context) => context.isLate),
+    contexts: sortedContexts,
+  };
+}
+
+function compareLivePresenceContext(left: LiveResourceContext, right: LiveResourceContext) {
+  const statusDiff = liveStatusSortRank(left.status) - liveStatusSortRank(right.status);
+  if (statusDiff !== 0) return statusDiff;
+  return left.siteName.localeCompare(right.siteName);
+}
+
+function getAggregateLiveStatus(contexts: LiveResourceContext[]): RhSitePresenceLiveStatus {
+  if (contexts.some((context) => context.status === 'ANOMALY')) return 'ANOMALY';
+  if (contexts.some((context) => context.status === 'PAUSED')) return 'PAUSED';
+  if (contexts.some((context) => context.status === 'PRESENT')) return 'PRESENT';
+  if (contexts.some((context) => context.status === 'LEFT')) return 'LEFT';
+  return 'EXPECTED_NOT_CLOCKED';
+}
+
+function pickPrimaryContext(
+  contexts: LiveResourceContext[],
+  status: RhSitePresenceLiveStatus,
+): LiveResourceContext {
+  return contexts.find((context) => context.status === status) ?? contexts[0]!;
+}
+
+function getLatestClockIn(contexts: LiveResourceContext[]) {
+  return contexts
+    .filter((context) => context.lastClockInAt)
+    .sort((left, right) => new Date(right.lastClockInAt ?? 0).getTime() - new Date(left.lastClockInAt ?? 0).getTime())[0];
+}
+
+function getFirstArrival(contexts: LiveResourceContext[]) {
+  const arrival = contexts
+    .map((context) => context.arrivalAt)
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => new Date(left).getTime() - new Date(right).getTime())[0];
+
+  return arrival ?? null;
+}
+
+function buildDisplaySummary(resources: AggregatedLiveResource[]) {
+  return resources.reduce(
+    (summary, resource) => {
+      if (resource.contexts.some(isExpectedContext)) summary.expected += 1;
+      if (resource.status === 'PRESENT') summary.present += 1;
+      if (resource.status === 'PAUSED') summary.paused += 1;
+      if (resource.status === 'EXPECTED_NOT_CLOCKED') summary.absent += 1;
+      if (resource.status === 'LEFT') summary.left += 1;
+      if (resource.status === 'ANOMALY') summary.anomaly += 1;
+      if (resource.isLate) summary.late += 1;
+      return summary;
+    },
+    {
+      expected: 0,
+      present: 0,
+      paused: 0,
+      absent: 0,
+      left: 0,
+      anomaly: 0,
+      late: 0,
+    },
+  );
+}
+
+function isExpectedContext(context: LiveResourceContext) {
+  return Boolean(context.taskAction) || context.status === 'EXPECTED_NOT_CLOCKED';
 }
 
 function clockInTypeLabel(type: string | null) {
