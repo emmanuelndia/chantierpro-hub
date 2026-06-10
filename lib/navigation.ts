@@ -136,6 +136,13 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Administration', 'Notifications'],
   },
   {
+    href: '/admin/office-locations',
+    label: 'Bureaux',
+    icon: 'rh',
+    roles: ['ADMIN'],
+    breadcrumb: ['Administration', 'Bureaux'],
+  },
+  {
     href: '/settings/profil',
     label: 'Mon profil',
     icon: 'profile',

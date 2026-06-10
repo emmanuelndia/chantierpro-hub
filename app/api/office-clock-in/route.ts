@@ -10,6 +10,8 @@ import {
   parseJsonBody,
 } from '@/lib/clock-in';
 import { withAuth } from '@/lib/auth/with-auth';
+import { haversineDistanceKm } from '@/lib/haversine';
+import { getActiveOfficeLocation } from '@/lib/office-locations';
 
 export const POST = withAuth(async ({ req, user }) => {
   if (user.role === Role.EXTERNAL_RESOURCE) {
@@ -18,8 +20,9 @@ export const POST = withAuth(async ({ req, user }) => {
 
   const body = await parseJsonBody<unknown>(req);
   const input = parseClockInInput(body);
+  const officeLocationId = parseOfficeLocationId(body);
 
-  if (!input) {
+  if (!input || (input.type === ClockInType.ARRIVAL && !officeLocationId)) {
     return jsonClockInError('BAD_REQUEST', 400, 'Payload de pointage bureau invalide.');
   }
 
@@ -29,6 +32,17 @@ export const POST = withAuth(async ({ req, user }) => {
   }
 
   const openSession = await getOpenSessionForUser(prisma, user.id);
+  const officeLocation =
+    input.type === ClockInType.ARRIVAL
+      ? await getActiveOfficeLocation(prisma, officeLocationId!)
+      : openSession?.officeLocationId
+        ? await getActiveOfficeLocation(prisma, openSession.officeLocationId)
+        : null;
+
+  if (!officeLocation) {
+    return jsonClockInError('PERMISSION_DENIED', 403, 'Bureau introuvable ou inactif.');
+  }
+
   if (input.type === ClockInType.ARRIVAL && openSession) {
     return jsonClockInError('SESSION_ALREADY_OPEN', 409, 'Une session de pointage est deja ouverte.');
   }
@@ -40,6 +54,23 @@ export const POST = withAuth(async ({ req, user }) => {
 
     if (openSession.officeClockInLocation !== 'OFFICE') {
       return jsonClockInError('PERMISSION_DENIED', 400, 'La session ouverte ne concerne pas le bureau.');
+    }
+  }
+
+  if (input.type === ClockInType.ARRIVAL) {
+    const distanceKm = haversineDistanceKm(
+      {
+        latitude: input.latitude,
+        longitude: input.longitude,
+      },
+      {
+        latitude: officeLocation.latitude.toNumber(),
+        longitude: officeLocation.longitude.toNumber(),
+      },
+    );
+
+    if (distanceKm > officeLocation.radiusKm.toNumber()) {
+      return jsonClockInError('OUTSIDE_RADIUS', 400, 'Vous etes hors du rayon autorise pour ce bureau.');
     }
   }
 
@@ -82,6 +113,7 @@ export const POST = withAuth(async ({ req, user }) => {
 
   const record = await createClockInRecord(prisma, {
     officeClockInLocation: 'OFFICE',
+    officeLocationId: officeLocation.id,
     userId: user.id,
     input,
     distanceKm: 0,
@@ -90,3 +122,12 @@ export const POST = withAuth(async ({ req, user }) => {
 
   return Response.json({ record });
 });
+
+function parseOfficeLocationId(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    return null;
+  }
+
+  const value = (body as Record<string, unknown>).officeLocationId;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}

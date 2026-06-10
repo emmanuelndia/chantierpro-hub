@@ -32,6 +32,7 @@ const rhClockInRecordSelect = {
   userId: true,
   siteId: true,
   freeMissionId: true,
+  officeLocationId: true,
   officeClockInLocation: true,
   type: true,
   status: true,
@@ -76,6 +77,12 @@ const rhClockInRecordSelect = {
           name: true,
         },
       },
+    },
+  },
+  officeLocation: {
+    select: {
+      id: true,
+      name: true,
     },
   },
 } satisfies Prisma.ClockInRecordSelect;
@@ -1438,7 +1445,7 @@ function getPresenceContext(record: SerializableRhClockInRecord): {
 
   return {
     type: 'OFFICE',
-    position: 'Bureau',
+    position: record.officeLocation?.name ?? 'Bureau',
     projectId: null,
     projectName: null,
   };

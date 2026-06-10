@@ -212,6 +212,7 @@ model User {
   notificationsReceived UserNotificationRecipient[] @relation("UserNotificationRecipientUser")
   notificationsCreated  UserNotification[]          @relation("UserNotificationCreator")
   createdPlanningTaskTemplates PlanningTaskTemplate[]
+  createdOfficeLocations       OfficeLocation[]    @relation("OfficeLocationCreator")
   planningAssignments        PlanningAssignment[] @relation("PlanningAssignmentSupervisor")
   createdPlanningAssignments PlanningAssignment[] @relation("PlanningAssignmentCreator")
   taskProgressUpdates        TaskProgressUpdate[]
@@ -293,6 +294,25 @@ model Site {
   @@index([createdById])
 }
 
+model OfficeLocation {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  city        String?
+  latitude    Decimal  @db.Decimal(9, 6)
+  longitude   Decimal  @db.Decimal(9, 6)
+  radiusKm    Decimal  @default(0.5) @db.Decimal(4, 2)
+  isActive    Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   User     @relation("OfficeLocationCreator", fields: [createdById], references: [id])
+  clockInRecords ClockInRecord[]
+
+  @@index([isActive])
+  @@index([createdById])
+}
+
 model Team {
   id          String     @id @default(cuid())
   name        String
@@ -333,6 +353,7 @@ model ClockInRecord {
   id             String         @id @default(cuid())
   siteId         String?
   freeMissionId  String?
+  officeLocationId String?
   officeClockInLocation OfficeClockInLocation?
   userId         String
   type           ClockInType
@@ -352,17 +373,20 @@ model ClockInRecord {
   createdAt      DateTime       @default(now())
   site           Site?          @relation(fields: [siteId], references: [id], onDelete: Cascade)
   freeMission    FreeMission?   @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
+  officeLocation OfficeLocation? @relation(fields: [officeLocationId], references: [id], onDelete: SetNull)
   user           User           @relation(fields: [userId], references: [id])
   report         Report?
   regularizations ClockInRegularization[]
 
   @@index([siteId])
   @@index([freeMissionId])
+  @@index([officeLocationId])
   @@index([officeClockInLocation])
   @@index([userId])
   @@index([userId, siteId, clockInDate])
   @@index([userId, freeMissionId, clockInDate])
   @@index([userId, officeClockInLocation, clockInDate])
+  @@index([userId, officeLocationId, clockInDate])
   @@index([isLate])
 }
 

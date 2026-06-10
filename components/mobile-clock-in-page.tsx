@@ -29,6 +29,7 @@ import { useMobileNetworkState } from '@/hooks/use-mobile-network-state';
 import { getMobileOfflinePreparationState } from '@/lib/mobile-offline-prepare';
 import type { TodaySiteItem } from '@/types/projects';
 import type { NearbySiteItem } from '@/types/reports';
+import type { OfficeLocationsResponse } from '@/types/office-locations';
 import { MobileOfflineLink } from '@/components/mobile-offline-link';
 import { useTodayOfficeAssignments } from '@/components/mobile-office-assignments-section';
 
@@ -127,6 +128,7 @@ export function MobileClockInPage() {
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(requestedSiteId);
   const [selectedFreeMissionId] = useState<string | null>(requestedFreeMissionId);
   const [selectedOffice, setSelectedOffice] = useState(requestedOffice);
+  const [selectedOfficeLocationId, setSelectedOfficeLocationId] = useState<string | null>(null);
   const [selectedIntent, setSelectedIntent] = useState<ClockInIntent>(requestedIntent ?? 'arrival');
   const [step, setStep] = useState<Step>('clock-in');
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -240,7 +242,22 @@ export function MobileClockInPage() {
     staleTime: 0,
   });
 
+  const officeLocationsQuery = useQuery({
+    queryKey: ['mobile-office-locations'],
+    queryFn: async () => {
+      const response = await authFetch('/api/mobile/office-locations');
+      if (!response.ok) {
+        throw new Error(`Office locations failed with status ${response.status}`);
+      }
+
+      return (await response.json()) as OfficeLocationsResponse;
+    },
+  });
+
   const todaySites = useMemo(() => todaySitesQuery.data?.items ?? [], [todaySitesQuery.data?.items]);
+  const officeLocations = officeLocationsQuery.data?.items ?? [];
+  const selectedOfficeLocation =
+    officeLocations.find((office) => office.id === selectedOfficeLocationId) ?? officeLocations[0] ?? null;
   const { assignments: todayAssignments } = useTodayOfficeAssignments();
   const hasFreeMissionToday = todayAssignments.some(
     (assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId),
@@ -505,6 +522,10 @@ export function MobileClockInPage() {
     };
 
     if (selectedOffice) {
+      if (!selectedOfficeLocation) {
+        throw new Error('Selectionnez un bureau actif avant de pointer.');
+      }
+
       if (!navigator.onLine) {
         throw new Error('Le pointage bureau demande une connexion reseau pour cette version.');
       }
@@ -512,7 +533,10 @@ export function MobileClockInPage() {
       const response = await authFetch('/api/office-clock-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          officeLocationId: selectedOfficeLocation.id,
+        }),
       });
 
       if (!response.ok) {
@@ -528,7 +552,7 @@ export function MobileClockInPage() {
         type: actionType,
         siteId: null,
         freeMissionId: null,
-        siteName: 'Bureau',
+        siteName: selectedOfficeLocation.name,
         timestampLocal: data.record.timestampLocal,
         durationSeconds: actionType === 'DEPARTURE' ? sessionStatus?.duration ?? activeSession?.durationSeconds ?? null : null,
       };
@@ -731,6 +755,7 @@ export function MobileClockInPage() {
             }`}
             onClick={() => {
               setSelectedOffice(true);
+              setSelectedOfficeLocationId(selectedOfficeLocation?.id ?? null);
               setSelectedSiteId(null);
               setManualMode(true);
             }}
@@ -752,6 +777,21 @@ export function MobileClockInPage() {
             <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
               Bureau
             </span>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Bureau</label>
+            <select
+              className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none"
+              onChange={(event) => setSelectedOfficeLocationId(event.target.value)}
+              value={selectedOfficeLocation?.id ?? ''}
+            >
+              {officeLocations.length === 0 ? <option value="">Aucun bureau actif</option> : null}
+              {officeLocations.map((office) => (
+                <option key={office.id} value={office.id}>
+                  {office.name} - {office.address}
+                </option>
+              ))}
+            </select>
           </div>
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">
             La position GPS est enregistrée comme preuve du pointage. Aucun chantier proche ne sera sélectionné.

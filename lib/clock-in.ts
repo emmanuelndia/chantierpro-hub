@@ -31,6 +31,7 @@ export const clockInRecordSelect = {
   id: true,
   siteId: true,
   freeMissionId: true,
+  officeLocationId: true,
   officeClockInLocation: true,
   userId: true,
   type: true,
@@ -64,12 +65,18 @@ export const clockInRecordSelect = {
       },
     },
   },
+  officeLocation: {
+    select: {
+      name: true,
+    },
+  },
 } satisfies Prisma.ClockInRecordSelect;
 
 const openSessionSelect = {
   id: true,
   siteId: true,
   freeMissionId: true,
+  officeLocationId: true,
   officeClockInLocation: true,
   userId: true,
   type: true,
@@ -83,6 +90,11 @@ const openSessionSelect = {
   freeMission: {
     select: {
       action: true,
+    },
+  },
+  officeLocation: {
+    select: {
+      name: true,
     },
   },
 } satisfies Prisma.ClockInRecordSelect;
@@ -102,6 +114,7 @@ type PauseRecord = {
   id: string;
   siteId: string | null;
   freeMissionId?: string | null;
+  officeLocationId?: string | null;
   officeClockInLocation?: 'OFFICE' | null;
   userId: string;
   type: ClockInType;
@@ -403,7 +416,7 @@ export function serializeClockInRecord(record: SerializableClockInRecord): Clock
   return {
     id: record.id,
     siteId: record.siteId,
-    siteName: record.site?.name ?? record.freeMission?.action ?? 'Bureau',
+    siteName: record.site?.name ?? record.freeMission?.action ?? record.officeLocation?.name ?? 'Bureau',
     freeMissionId: record.freeMissionId,
     freeMissionAction: record.freeMission?.action ?? null,
     projectId: record.freeMission?.projectId ?? null,
@@ -469,7 +482,11 @@ export function serializeSessionStatus(
     pauseActive: Boolean(activePause),
     pauseDuration: activePause ? durationSince(activePause.timestampLocal) : 0,
     openSessionSiteId: openSession.siteId,
-    openSessionSiteName: openSession.site?.name ?? openSession.freeMission?.action ?? (openSession.officeClockInLocation ? 'Bureau' : null),
+    openSessionSiteName:
+      openSession.site?.name ??
+      openSession.freeMission?.action ??
+      openSession.officeLocation?.name ??
+      (openSession.officeClockInLocation ? 'Bureau' : null),
     openSessionFreeMissionId: openSession.freeMissionId,
     openSessionContextType: openSession.officeClockInLocation ? 'OFFICE' : openSession.freeMissionId ? 'FREE_MISSION' : 'SITE',
   };
@@ -482,7 +499,7 @@ export function serializeActiveSession(record: OpenSessionRecord | null): Active
 
   return {
     siteId: record.siteId,
-    siteName: record.site?.name ?? record.freeMission?.action ?? 'Bureau',
+    siteName: record.site?.name ?? record.freeMission?.action ?? record.officeLocation?.name ?? 'Bureau',
     freeMissionId: record.freeMissionId,
     contextType: record.officeClockInLocation ? 'OFFICE' : record.freeMissionId ? 'FREE_MISSION' : 'SITE',
     arrivalAt: record.timestampLocal.toISOString(),
@@ -509,6 +526,7 @@ export async function createClockInRecord(
   payload: {
     siteId?: string | null;
     freeMissionId?: string | null;
+    officeLocationId?: string | null;
     officeClockInLocation?: 'OFFICE' | null;
     userId: string;
     input: ClockInInput;
@@ -525,6 +543,7 @@ export async function createClockInRecord(
     data: {
       siteId: payload.siteId ?? null,
       freeMissionId: payload.freeMissionId ?? null,
+      officeLocationId: payload.officeLocationId ?? null,
       officeClockInLocation: payload.officeClockInLocation ?? null,
       userId: payload.userId,
       type: payload.input.type,
@@ -554,6 +573,7 @@ export async function createBatchClockInRecord(
   payload: {
     siteId?: string | null;
     freeMissionId?: string | null;
+    officeLocationId?: string | null;
     officeClockInLocation?: 'OFFICE' | null;
     userId: string;
     input: BatchSyncItemInput;
@@ -570,6 +590,7 @@ export async function createBatchClockInRecord(
     data: {
       siteId: payload.siteId ?? null,
       freeMissionId: payload.freeMissionId ?? null,
+      officeLocationId: payload.officeLocationId ?? null,
       officeClockInLocation: payload.officeClockInLocation ?? null,
       userId: payload.userId,
       type: payload.input.type,
