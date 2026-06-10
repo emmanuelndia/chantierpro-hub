@@ -59,6 +59,13 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Rapports terrain'],
   },
   {
+    href: '/web/negotiation',
+    label: 'Suivi negociation',
+    icon: 'reports',
+    roles: ['NEGOTIATION_MANAGER', 'DIRECTION', 'ADMIN'],
+    breadcrumb: ['Suivi negociation'],
+  },
+  {
     href: '/web/planning',
     label: 'Planning',
     icon: 'planning',
@@ -191,6 +198,12 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     label: 'Taches',
     icon: 'calendar',
     roles: ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER'],
+  },
+  {
+    href: '/mobile/negotiation',
+    label: 'Nego',
+    icon: 'calendar',
+    roles: ['NEGOTIATION_RESOURCE', 'NEGOTIATION_MANAGER'],
   },
   {
     href: '/mobile/photo',

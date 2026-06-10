@@ -133,6 +133,29 @@ enum FreeMissionStatus {
   CANCELLED
 }
 
+enum NegotiationAssignmentStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum NegotiationSessionStatus {
+  OPEN
+  CLOSED
+  ANOMALY
+}
+
+enum NegotiationVisitStatus {
+  OK
+  EN_COURS
+  REFUS
+  ABSENT
+  A_REVISITER
+  LITIGE_TRAVAUX
+  AUTRE
+}
+
 enum GeneralSupervisorSiteScopeStatus {
   ACTIVE
   INACTIVE
@@ -180,6 +203,10 @@ model User {
   taskProgressUpdates        TaskProgressUpdate[]
   assignedFreeMissions       FreeMission[]        @relation("FreeMissionAssignee")
   createdFreeMissions        FreeMission[]        @relation("FreeMissionCreator")
+  negotiationAssignments     NegotiationAssignment[] @relation("NegotiationAssignmentAssignee")
+  createdNegotiationAssignments NegotiationAssignment[] @relation("NegotiationAssignmentCreator")
+  negotiationSessions        NegotiationSession[] @relation("NegotiationSessionUser")
+  negotiationVisits          NegotiationVisit[] @relation("NegotiationVisitCreatedBy")
   generalSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeGeneralSupervisor")
   managedGeneralSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeProjectManager")
   generalSupervisorProjectScopes GeneralSupervisorProjectScope[] @relation("GeneralSupervisorProjectScopeGeneralSupervisor")
@@ -205,6 +232,10 @@ model Project {
   createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
   sites            Site[]
   freeMissions     FreeMission[]
+  negotiationBuildings NegotiationBuilding[]
+  negotiationAssignments NegotiationAssignment[]
+  negotiationSessions NegotiationSession[]
+  negotiationVisits NegotiationVisit[]
   documentAttachments DocumentAttachment[]
   generalSupervisorProjectScopes GeneralSupervisorProjectScope[]
 
@@ -387,6 +418,124 @@ model FreeMission {
   @@index([deletedAt])
 }
 
+model NegotiationBuilding {
+  id               String   @id @default(cuid())
+  projectId        String
+  cluster          String?
+  city             String
+  commune          String?
+  plaque           String?
+  habitation       String?
+  name             String
+  contactInfo      String?
+  level            String?
+  targetEl         Int?
+  actualEl         Int?
+  longitude        Decimal? @db.Decimal(10, 7)
+  latitude         Decimal? @db.Decimal(10, 7)
+  layer            String?
+  color            String?
+  operatorPresence String?
+  negotiationStatus String?
+  remark           String?
+  sourceImportName String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  visits           NegotiationVisit[]
+
+  @@index([projectId])
+  @@index([city])
+  @@index([commune])
+  @@index([negotiationStatus])
+}
+
+model NegotiationAssignment {
+  id          String                      @id @default(cuid())
+  projectId   String
+  assigneeId  String
+  date        DateTime                    @db.Date
+  plannedZone String?
+  instruction String?
+  status      NegotiationAssignmentStatus @default(PLANNED)
+  createdById String
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  deletedAt   DateTime?
+  project     Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User                        @relation("NegotiationAssignmentAssignee", fields: [assigneeId], references: [id])
+  createdBy   User                        @relation("NegotiationAssignmentCreator", fields: [createdById], references: [id])
+  sessions    NegotiationSession[]
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([date])
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+model NegotiationSession {
+  id              String                   @id @default(cuid())
+  assignmentId    String?
+  projectId       String
+  userId          String
+  date            DateTime                 @db.Date
+  startTime       DateTime
+  startLatitude   Decimal                  @db.Decimal(10, 7)
+  startLongitude  Decimal                  @db.Decimal(10, 7)
+  startAccuracy   Decimal?                 @db.Decimal(7, 2)
+  endTime         DateTime?
+  endLatitude     Decimal?                 @db.Decimal(10, 7)
+  endLongitude    Decimal?                 @db.Decimal(10, 7)
+  endAccuracy     Decimal?                 @db.Decimal(7, 2)
+  comment         String?
+  status          NegotiationSessionStatus @default(OPEN)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  assignment      NegotiationAssignment?   @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  project         Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user            User                     @relation("NegotiationSessionUser", fields: [userId], references: [id])
+  visits          NegotiationVisit[]
+
+  @@index([assignmentId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([date])
+  @@index([status])
+}
+
+model NegotiationVisit {
+  id              String                 @id @default(cuid())
+  sessionId       String
+  buildingId      String?
+  projectId       String
+  visitedAt       DateTime               @default(now())
+  buildingName    String
+  city            String?
+  commune         String?
+  contactInfo     String?
+  latitude        Decimal?               @db.Decimal(10, 7)
+  longitude       Decimal?               @db.Decimal(10, 7)
+  accuracy        Decimal?               @db.Decimal(7, 2)
+  status          NegotiationVisitStatus
+  remark          String
+  createdById     String
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  session         NegotiationSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  building        NegotiationBuilding?   @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy       User                   @relation("NegotiationVisitCreatedBy", fields: [createdById], references: [id])
+  photos          Photo[]
+
+  @@index([sessionId])
+  @@index([buildingId])
+  @@index([projectId])
+  @@index([createdById])
+  @@index([status])
+  @@index([visitedAt])
+}
+
 model PlanningAssignment {
   id             String                   @id @default(cuid())
   date           DateTime                 @db.Date
@@ -462,6 +611,7 @@ model Photo {
   id          String             @id @default(cuid())
   siteId      String?
   freeMissionId String?
+  negotiationVisitId String?
   uploadedById String
   planningAssignmentId String?
   category    PhotoCategory
@@ -482,6 +632,7 @@ model Photo {
   createdAt   DateTime           @default(now())
   site        Site?              @relation(fields: [siteId], references: [id], onDelete: Cascade)
   freeMission FreeMission?       @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
+  negotiationVisit NegotiationVisit? @relation(fields: [negotiationVisitId], references: [id], onDelete: Cascade)
   uploadedBy  User               @relation("PhotoUploader", fields: [uploadedById], references: [id])
   planningAssignment PlanningAssignment? @relation(fields: [planningAssignmentId], references: [id], onDelete: SetNull)
   deletedBy   User?              @relation("PhotoDeleter", fields: [deletedById], references: [id])
@@ -489,6 +640,7 @@ model Photo {
 
   @@index([siteId])
   @@index([freeMissionId])
+  @@index([negotiationVisitId])
   @@index([uploadedById])
   @@index([planningAssignmentId])
   @@index([deletedById])

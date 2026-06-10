@@ -85,11 +85,16 @@ Ajout du suivi par objectif quantitatif :
     - réalisé cumulé ;
     - progression calculée automatiquement. 
 
-
+++
 
 
 https://meet.google.com/pnk-uwwr-kpc
 
+Pour le service négociation avec les rôles responsable et ressources il y'a plusieurs changements qui vont s'opérer dans l'appli : 
+- Le pointage négo ne se fait pas comme les autres pointages, ils n'ont pas de sites pédéfinis ils interviennent par exemple quand le client refuse de donner son accord pour des constructions ou quand il est faché parce que le travail n'a pas été bien fait donc les "sites" si on peut les appeler comme ça varient de jours en jours et peut même varier dans la même journée aujourd'hui par exemple ils prévoient d'aller à Yopougon on peut les appeler en route pour leur dire de venir faire des opérations à Bingervilles donc c'est un peu ça 
+Au niveau du pointage, on a mis une option mission libre mais je ne pense pas que ça soit bien optimal pour ça 
+- Leurs tâches ne se suivent pas de la même manière que les autres dans ce cas la j'ai mis des fichiers excel en fichier joint pour que tu puisses voir un peu comment ils recueillent leurs suivis journalier, ils procédent aussi à une méthode de suivi suivant : coordonnées gps du batiment, remarque à observer (ça peut être par exemple le client refuse de donner son accord, immeuble négocié ainsi de suite)
+- Le responsable négo aussi m'a fait savoir qu'il va sur le terrain aussi des fois donc il aimerait avoir les fonctionnalités terrain
 
 
 
