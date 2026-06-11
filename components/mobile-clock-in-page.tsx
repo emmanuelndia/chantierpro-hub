@@ -349,8 +349,25 @@ export function MobileClockInPage() {
       return fromNearbySite(quickSite);
     }
 
+    if (
+      selectedSiteId &&
+      activeSession?.contextType === 'SITE' &&
+      activeSession.siteId === selectedSiteId
+    ) {
+      return {
+        id: selectedSiteId,
+        name: activeSession.siteName,
+        address: 'Session ouverte',
+        latitude: null,
+        longitude: null,
+        radiusKm: 0,
+        distanceKm: null,
+        siteType: null,
+      } satisfies SelectableSite;
+    }
+
     return null;
-  }, [geoState, quickSite, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
+  }, [activeSession, geoState, quickSite, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
 
   const sessionStatusQuery = useQuery({
     queryKey: ['mobile-session-status', selectedSite?.id, selectedFreeMission?.freeMissionId, selectedOffice],
@@ -839,7 +856,9 @@ export function MobileClockInPage() {
             </span>
           </div>
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">
-            Ce pointage sera rattache a ce chantier. La distance et le rayon autorise sont verifies avec votre position GPS.
+            {selectedSite.address === 'Session ouverte'
+              ? 'Une session est encore ouverte sur ce chantier. Vous pouvez pointer la sortie meme si vous etes hors zone.'
+              : 'Ce pointage sera rattache a ce chantier. La distance et le rayon autorise sont verifies avec votre position GPS.'}
           </p>
         </section>
       ) : null}

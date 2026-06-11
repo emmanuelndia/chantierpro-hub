@@ -388,7 +388,12 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 }
 
 function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveResource }>) {
-  const isUnplannedClockIn = resource.contexts.some((context) => !context.taskAction && context.status !== 'EXPECTED_NOT_CLOCKED');
+  const isUnplannedClockIn = resource.contexts.some(
+    (context) =>
+      context.presenceContext === 'TERRAIN' &&
+      !context.taskAction &&
+      context.status !== 'EXPECTED_NOT_CLOCKED',
+  );
   const flags = [
     isUnplannedClockIn ? 'Non prevu' : null,
     resource.isRemoteCheckout ? 'Sortie a distance' : null,
