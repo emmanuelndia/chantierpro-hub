@@ -220,6 +220,7 @@ type ExportArtifact = {
 };
 
 type ExportRow = {
+  userId: string;
   matricule: string;
   lastName: string;
   firstName: string;
@@ -233,6 +234,7 @@ type ExportRow = {
   timeSpent: string;
   isLate: string;
   status: string;
+  detailPositions: string;
 };
 
 export function jsonRhError(code: RhApiErrorCode, status: number, message: string) {
@@ -1172,6 +1174,7 @@ export async function buildRhExportArtifact(
       employeeTotalHours += session.realDurationHours ?? 0;
 
       rows.push({
+        userId: session.userId,
         matricule: session.matricule ?? '',
         lastName: session.lastName,
         firstName: session.firstName,
@@ -1186,6 +1189,13 @@ export async function buildRhExportArtifact(
         timeSpent: session.realDurationHours === null ? '' : formatDurationLabel(session.realDurationHours),
         isLate: session.isLate ? 'Oui' : 'Non',
         status: rhSessionStatusLabel(session.status),
+        detailPositions: buildAttendanceDetailPosition({
+          position: session.position,
+          context: presenceContextLabel(session.context),
+          arrivalTime: session.arrivalTime,
+          departureTime: session.departureTime ?? '',
+          status: rhSessionStatusLabel(session.status),
+        }),
       });
     }
 
@@ -1194,6 +1204,7 @@ export async function buildRhExportArtifact(
 
       const owner = orderedSessions[0]!;
       rows.push({
+        userId: owner.userId,
         matricule: owner.matricule ?? '',
         lastName: owner.lastName,
         firstName: owner.firstName,
@@ -1207,12 +1218,14 @@ export async function buildRhExportArtifact(
         timeSpent: formatDurationLabel(employeeTotalHours),
         isLate: '',
         status: '',
+        detailPositions: '',
       });
     }
   }
 
   if (includeSummaryRows) {
     rows.push({
+      userId: '',
       matricule: '',
       lastName: '',
       firstName: '',
@@ -1226,13 +1239,15 @@ export async function buildRhExportArtifact(
       timeSpent: formatDurationLabel(totalGeneralHours),
       isLate: '',
       status: '',
+      detailPositions: '',
     });
   }
 
+  const exportRows = payload.input.attendanceList ? aggregateAttendanceRows(rows) : rows;
   const fileBaseName = `rh-export-${payload.input.from.slice(0, 10)}-${payload.input.to.slice(0, 10)}`;
 
   if (payload.input.format === 'csv') {
-    const buffer = payload.input.attendanceList ? buildAttendanceCsvBuffer(rows) : buildCsvBuffer(rows);
+    const buffer = payload.input.attendanceList ? buildAttendanceCsvBuffer(exportRows) : buildCsvBuffer(exportRows);
     const fileName = `${fileBaseName}.csv`;
     const storageKey = buildRhExportStorageKey(fileName);
     const expiresAt = new Date(Date.now() + RH_EXPORT_ARTIFACT_TTL_MS).toISOString();
@@ -1247,14 +1262,14 @@ export async function buildRhExportArtifact(
       contentType: 'text/csv; charset=utf-8',
       fileName,
       buffer,
-      rowCount: sessions.length,
+      rowCount: exportRows.length,
       storageKey,
       expiresAt,
     };
   }
 
   if (payload.input.format === 'pdf') {
-    const buffer = buildAttendancePdfBuffer(rows, {
+    const buffer = buildAttendancePdfBuffer(exportRows, {
       from: payload.input.from,
       to: payload.input.to,
     });
@@ -1272,13 +1287,13 @@ export async function buildRhExportArtifact(
       contentType: 'application/pdf',
       fileName,
       buffer,
-      rowCount: sessions.length,
+      rowCount: exportRows.length,
       storageKey,
       expiresAt,
     };
   }
 
-  const buffer = payload.input.attendanceList ? await buildAttendanceXlsxBuffer(rows) : await buildXlsxBuffer(rows);
+  const buffer = payload.input.attendanceList ? await buildAttendanceXlsxBuffer(exportRows) : await buildXlsxBuffer(exportRows);
   const fileName = `${fileBaseName}.xlsx`;
   const storageKey = buildRhExportStorageKey(fileName);
   const expiresAt = new Date(Date.now() + RH_EXPORT_ARTIFACT_TTL_MS).toISOString();
@@ -1293,7 +1308,7 @@ export async function buildRhExportArtifact(
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     fileName,
     buffer,
-    rowCount: sessions.length,
+    rowCount: exportRows.length,
     storageKey,
     expiresAt,
   };
@@ -1981,8 +1996,76 @@ function escapeCsvValue(value: string | null) {
   return `"${normalized}"`;
 }
 
+function aggregateAttendanceRows(rows: ExportRow[]) {
+  const groupedRows = new Map<string, ExportRow[]>();
+
+  for (const row of rows) {
+    const key = `${row.userId}:${row.date}`;
+    groupedRows.set(key, [...(groupedRows.get(key) ?? []), row]);
+  }
+
+  return [...groupedRows.values()]
+    .map((group) => aggregateAttendanceGroup(group))
+    .sort((left, right) => left.date.localeCompare(right.date) || left.lastName.localeCompare(right.lastName) || left.firstName.localeCompare(right.firstName));
+}
+
+function aggregateAttendanceGroup(group: ExportRow[]): ExportRow {
+  const sortedRows = [...group].sort((left, right) => left.arrivalTime.localeCompare(right.arrivalTime));
+  const firstRow = sortedRows[0]!;
+  const contexts = new Set(sortedRows.map((row) => row.context));
+  const hasOffice = contexts.has('Bureau');
+  const hasTerrain = sortedRows.some((row) => row.context !== 'Bureau');
+  const terrainRows = sortedRows.filter((row) => row.context !== 'Bureau');
+  const uniqueTerrainPositions = new Set(terrainRows.map((row) => row.position).filter(Boolean));
+  const isMixed = hasOffice && hasTerrain;
+  const isMultiTerrain = uniqueTerrainPositions.size > 1 || terrainRows.length > 1;
+  const allSessionsClosed = sortedRows.every((row) => row.departureTime);
+  const totalHours = sortedRows.reduce((sum, row) => sum + parseExportHours(row.realDurationHours), 0);
+
+  return {
+    ...firstRow,
+    position: isMixed ? 'Bureau + Terrain' : isMultiTerrain ? 'Multi-chantiers' : firstRow.position,
+    context: isMixed ? 'Mixte' : hasOffice && !hasTerrain ? 'Bureau' : 'Terrain',
+    projectName: joinUnique(sortedRows.map((row) => row.projectName)),
+    arrivalTime: sortedRows.map((row) => row.arrivalTime).filter(Boolean).sort()[0] ?? '',
+    departureTime: allSessionsClosed
+      ? sortedRows.map((row) => row.departureTime).filter(Boolean).sort().at(-1) ?? ''
+      : '',
+    realDurationHours: totalHours > 0 ? formatHours(totalHours) : '',
+    timeSpent: totalHours > 0 ? formatDurationLabel(totalHours) : '',
+    isLate: sortedRows.some((row) => row.isLate === 'Oui') ? 'Oui' : 'Non',
+    status: aggregateAttendanceStatus(sortedRows),
+    detailPositions: sortedRows.map((row) => row.detailPositions || buildAttendanceDetailPosition(row)).join('; '),
+  };
+}
+
+function aggregateAttendanceStatus(rows: ExportRow[]) {
+  if (rows.some((row) => row.status === 'A verifier RH')) return 'A verifier RH';
+  if (rows.some((row) => row.status === 'En cours')) return 'En cours';
+  if (rows.every((row) => row.status === 'Complete')) return 'Complete';
+  return rows[0]?.status ?? '';
+}
+
+function parseExportHours(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function joinUnique(values: string[]) {
+  return [...new Set(values.filter(Boolean))].join(', ');
+}
+
 function buildAttendanceCsvBuffer(rows: ExportRow[]) {
-  const headers = ['numero matricule', 'nom', 'prenom', 'position', 'heure arrivee', 'heure depart', 'temps passee'];
+  const headers = [
+    'numero matricule',
+    'nom',
+    'prenom',
+    'position',
+    'heure arrivee',
+    'heure depart',
+    'temps passee',
+    'detail positions',
+  ];
   const lines = [
     headers.join(','),
     ...rows.map((row) =>
@@ -1994,6 +2077,7 @@ function buildAttendanceCsvBuffer(rows: ExportRow[]) {
         row.arrivalTime,
         row.departureTime,
         row.timeSpent,
+        row.detailPositions,
       ]
         .map(escapeCsvValue)
         .join(','),
@@ -2015,6 +2099,7 @@ async function buildAttendanceXlsxBuffer(rows: ExportRow[]) {
     { header: 'heure arrivee', key: 'arrivalTime' },
     { header: 'heure depart', key: 'departureTime' },
     { header: 'temps passee', key: 'timeSpent' },
+    { header: 'detail positions', key: 'detailPositions' },
   ];
 
   worksheet.getRow(1).font = { bold: true };
@@ -2047,6 +2132,7 @@ function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to:
     { label: 'heure arrivee', key: 'arrivalTime', width: 30 },
     { label: 'heure depart', key: 'departureTime', width: 30 },
     { label: 'temps passee', key: 'timeSpent', width: 34 },
+    { label: 'detail positions', key: 'detailPositions', width: 75 },
   ];
   const scale = tableWidth / columns.reduce((sum, column) => sum + column.width, 0);
   const scaledColumns = columns.map((column) => ({ ...column, width: column.width * scale }));
@@ -2097,6 +2183,7 @@ function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to:
       arrivalTime: row.arrivalTime,
       departureTime: row.departureTime,
       timeSpent: row.timeSpent,
+      detailPositions: row.detailPositions,
     };
     const lineGroups = scaledColumns.map((column) =>
       pdf.splitTextToSize(String(cells[column.key as keyof typeof cells] ?? ''), column.width - 3) as string[],
@@ -2129,7 +2216,22 @@ function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to:
 }
 
 function buildAttendancePosition(row: ExportRow) {
+  if (row.context === 'Mixte') {
+    return 'Mixte - Bureau + Terrain';
+  }
+
   return `${row.context === 'Bureau' ? 'Bureau' : 'Terrain'} - ${row.position}`;
+}
+
+function buildAttendanceDetailPosition(row: Pick<ExportRow, 'position' | 'context' | 'arrivalTime' | 'departureTime' | 'status'>) {
+  const prefix = row.context === 'Bureau' ? 'Bureau' : row.context === 'Mixte' ? 'Mixte' : 'Terrain';
+  const timeRange = row.departureTime
+    ? `${row.arrivalTime || '-'}-${row.departureTime}`
+    : row.arrivalTime
+      ? `${row.arrivalTime}-en cours`
+      : row.status || 'absent';
+
+  return `${prefix} ${row.position}: ${timeRange}`;
 }
 
 function buildRhExportStorageKey(fileName: string) {

@@ -398,6 +398,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 }
 
 function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveResource }>) {
+  const contextSummary = getResourceContextSummary(resource.contexts);
   const isUnplannedClockIn = resource.contexts.some(
     (context) =>
       context.presenceContext === 'TERRAIN' &&
@@ -418,9 +419,9 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-base font-semibold text-slate-950">{resource.name}</p>
-            {resource.contexts.length > 1 ? (
+            {contextSummary ? (
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">
-                {resource.contexts.length} chantiers
+                {contextSummary}
               </span>
             ) : null}
             {isUnplannedClockIn ? (
@@ -472,6 +473,8 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
               <div className="mt-2 grid gap-2 lg:grid-cols-2">
                 <p><span className="font-semibold text-slate-950">Projet :</span> {context.projectName || '-'}</p>
                 <p><span className="font-semibold text-slate-950">Position :</span> {context.siteAddress}</p>
+                <p><span className="font-semibold text-slate-950">Entree :</span> {context.arrivalAt ? formatTime(context.arrivalAt) : '-'}</p>
+                <p><span className="font-semibold text-slate-950">Sortie :</span> {context.lastClockInType === 'DEPARTURE' && context.lastClockInAt ? formatTime(context.lastClockInAt) : '-'}</p>
                 <p>
                   <span className="font-semibold text-slate-950">Distance :</span>{' '}
                   {context.distanceKm === null ? '-' : `${context.distanceKm.toFixed(2)} km`}
@@ -683,6 +686,7 @@ function getAggregateLiveStatus(contexts: LiveResourceContext[]): RhSitePresence
   if (contexts.some((context) => context.status === 'ANOMALY')) return 'ANOMALY';
   if (contexts.some((context) => context.status === 'PAUSED')) return 'PAUSED';
   if (contexts.some((context) => context.status === 'PRESENT')) return 'PRESENT';
+  if (contexts.some((context) => context.status === 'EXPECTED_NOT_CLOCKED')) return 'EXPECTED_NOT_CLOCKED';
   if (contexts.some((context) => context.status === 'LEFT')) return 'LEFT';
   return 'EXPECTED_NOT_CLOCKED';
 }
@@ -707,6 +711,22 @@ function getFirstArrival(contexts: LiveResourceContext[]) {
     .sort((left, right) => new Date(left).getTime() - new Date(right).getTime())[0];
 
   return arrival ?? null;
+}
+
+function getResourceContextSummary(contexts: LiveResourceContext[]) {
+  const terrainContexts = contexts.filter((context) => context.presenceContext === 'TERRAIN');
+  const officeContexts = contexts.filter((context) => context.presenceContext === 'OFFICE');
+  const uniqueTerrainSites = new Set(terrainContexts.map((context) => context.siteId ?? context.siteName));
+
+  if (terrainContexts.length > 0 && officeContexts.length > 0) {
+    return 'Mixte';
+  }
+
+  if (uniqueTerrainSites.size > 1) {
+    return `${uniqueTerrainSites.size} chantiers`;
+  }
+
+  return null;
 }
 
 function buildDisplaySummary(resources: AggregatedLiveResource[]) {
