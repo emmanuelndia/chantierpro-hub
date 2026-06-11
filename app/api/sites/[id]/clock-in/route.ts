@@ -142,21 +142,17 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const distanceKm = calculateDistanceToSite(site, input);
   const withinGeofence = isWithinSiteGeofence(site, input, distanceKm);
-  const remoteCheckoutSite =
-    input.type === ClockInType.DEPARTURE && !withinGeofence
-      ? await findRemoteCheckoutTarget(site.id, user.id, input)
-      : null;
   const remoteDepartureAllowed =
     input.type === ClockInType.DEPARTURE &&
     !withinGeofence &&
-    Boolean(remoteCheckoutSite);
+    openSession?.siteId === site.id;
   const status = withinGeofence || remoteDepartureAllowed ? ClockInStatus.VALID : ClockInStatus.REJECTED;
   const recordInput = remoteDepartureAllowed
     ? {
         ...input,
         comment: appendClockInComment(
           input.comment,
-          'Sortie distante autorisee - ressource deplacee vers un autre chantier assigne.',
+          'Sortie distante autorisee - fermeture de session hors zone.',
         ),
       }
     : input;
@@ -184,51 +180,6 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   return Response.json({ record }, { status: 201 });
 });
-
-async function findRemoteCheckoutTarget(
-  siteId: string,
-  userId: string,
-  input: {
-    latitude: number;
-    longitude: number;
-    timestampLocal: string;
-  },
-) {
-  const clockInDate = new Date(`${new Date(input.timestampLocal).toISOString().slice(0, 10)}T00:00:00.000Z`);
-  const assignments = await prisma.planningAssignment.findMany({
-    where: {
-      supervisorId: userId,
-      date: clockInDate,
-      deletedAt: null,
-      workLocationType: 'ON_SITE',
-      siteId: {
-        not: siteId,
-      },
-      site: {
-        requiresClockIn: true,
-      },
-    },
-    select: {
-      site: {
-        select: {
-          id: true,
-          name: true,
-          requiresClockIn: true,
-          latitude: true,
-          longitude: true,
-          radiusKm: true,
-          geofenceType: true,
-          geofencePolygon: true,
-        },
-      },
-    },
-  });
-
-  return assignments.find((assignment) => {
-    const distance = calculateDistanceToSite(assignment.site, input);
-    return isWithinSiteGeofence(assignment.site, input, distance);
-  })?.site ?? null;
-}
 
 function appendClockInComment(existing: string | null | undefined, note: string) {
   const trimmed = existing?.trim();

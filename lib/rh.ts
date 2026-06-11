@@ -3,6 +3,7 @@ import { ClockInStatus, ClockInType, Prisma, Role, type PrismaClient } from '@pr
 import { createSignedStorageUrl, uploadPrivateStorageObject } from '@/lib/storage';
 import { projectAccessWhere } from '@/lib/projects';
 import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
+import { getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
 import type {
   RhApiErrorCode,
   RhOptionsResponse,
@@ -25,6 +26,9 @@ const SITE_PRESENCE_LIVE_ALLOWED_ROLES: readonly Role[] = [
   Role.ADMIN,
   Role.PROJECT_MANAGER,
   Role.GENERAL_SUPERVISOR,
+  Role.BE_MANAGER,
+  Role.NEGOTIATION_MANAGER,
+  Role.FLEET_MANAGER,
 ];
 const RH_EXPORT_HISTORY_LIMIT = 20;
 const RH_EXPORT_ARTIFACT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -348,6 +352,9 @@ export async function getSitePresencesLive(
     !query.projectManagerId &&
     !query.siteId &&
     !query.assignedById;
+  const managedResourceRoles = isBusinessManagerRole(user.role)
+    ? [...getBusinessManagedResourceRoles(user.role)]
+    : null;
 
   const siteWhere: Prisma.SiteWhereInput = user.role === Role.GENERAL_SUPERVISOR
     ? {
@@ -398,7 +405,9 @@ export async function getSitePresencesLive(
         site: siteWhere,
         ...(query.resourceId ? { supervisorId: query.resourceId } : {}),
         ...(query.assignedById ? { createdById: query.assignedById } : {}),
-        ...(query.role ? { supervisor: { role: query.role } } : {}),
+        ...(query.role || managedResourceRoles
+          ? { supervisor: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
+          : {}),
       },
       orderBy: [{ site: { project: { name: 'asc' } } }, { site: { name: 'asc' } }, { supervisor: { firstName: 'asc' } }],
       select: {
@@ -437,7 +446,9 @@ export async function getSitePresencesLive(
           in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
         },
         ...(query.resourceId ? { userId: query.resourceId } : {}),
-        ...(query.role ? { user: { role: query.role } } : {}),
+        ...(query.role || managedResourceRoles
+          ? { user: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
+          : {}),
       },
       orderBy: [{ site: { project: { name: 'asc' } } }, { site: { name: 'asc' } }, { user: { firstName: 'asc' } }, { timestampLocal: 'asc' }],
       select: {
@@ -474,7 +485,9 @@ export async function getSitePresencesLive(
         ...(query.projectManagerId ? { project: { ...projectAccessWhere(user), projectManagerId: query.projectManagerId } } : {}),
         ...(query.resourceId ? { assigneeId: query.resourceId } : {}),
         ...(query.assignedById ? { createdById: query.assignedById } : {}),
-        ...(query.role ? { assignee: { role: query.role } } : {}),
+        ...(query.role || managedResourceRoles
+          ? { assignee: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
+          : {}),
       },
       orderBy: [{ project: { name: 'asc' } }, { action: 'asc' }, { id: 'asc' }],
       select: {

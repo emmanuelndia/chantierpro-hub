@@ -102,7 +102,7 @@ pouvoir extraire en pdf ou excel une liste de présence avec les colonnes numero
 Désormais il faudra pointer quotidiennement au bureau il faudra donc revoir ce type de pointage ce n'est plus les chefs projets qui vont assigner des tâches aux ressources qui doivent pointer au bureau 
 Pouvoir ressortir ou mettre en évidence ceux qui pointent après 8h
 Mettre dans la logique un temps donné pour chaque tâche 
-Au niveau de âche centralisé pouvoir filtrer par chef projet
+Au niveau de âche centralisé pouvoir filtrer par chef pr    ojet
 Prévoir l'affichage de la progression des projets des projets chez les RH, PM, DIRECTION, ADMIN et pouvoir voir si les projets sont en retards et autres 
 
 

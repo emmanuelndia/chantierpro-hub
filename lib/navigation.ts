@@ -48,7 +48,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/web/rh/presences-chantiers',
     label: 'Presences',
     icon: 'rh',
-    roles: ['HR', 'DIRECTION', 'ADMIN', 'PROJECT_MANAGER', 'GENERAL_SUPERVISOR'],
+    roles: ['HR', 'DIRECTION', 'ADMIN', 'PROJECT_MANAGER', 'GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER'],
     breadcrumb: ['Presences / RH', 'Presences'],
   },
   {
