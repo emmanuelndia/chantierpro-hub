@@ -35,7 +35,7 @@ export function AdminNotificationsPage() {
   const [title, setTitle] = useState('Veuillez renseigner votre matricule');
   const [message, setMessage] = useState('Merci de compléter votre matricule depuis votre profil.');
   const [audience, setAudience] = useState<UserNotificationAudience>(UserNotificationAudience.ALL);
-  const [targetRole, setTargetRole] = useState<Role>(Role.RESOURCE);
+  const [targetRoles, setTargetRoles] = useState<Role[]>([Role.RESOURCE]);
   const [userIds, setUserIds] = useState<string[]>([]);
 
   const usersQuery = useQuery({
@@ -67,7 +67,7 @@ export function AdminNotificationsPage() {
         title: title.trim(),
         message: message.trim(),
         audience,
-        ...(audience === UserNotificationAudience.ROLE ? { targetRole } : {}),
+        ...(audience === UserNotificationAudience.ROLE ? { targetRoles } : {}),
         ...(audience === UserNotificationAudience.USERS ? { userIds } : {}),
       };
 
@@ -106,6 +106,7 @@ export function AdminNotificationsPage() {
   const canSubmit =
     title.trim().length >= 3 &&
     message.trim().length >= 3 &&
+    (audience !== UserNotificationAudience.ROLE || targetRoles.length > 0) &&
     (audience !== UserNotificationAudience.USERS || userIds.length > 0);
 
   return (
@@ -171,20 +172,53 @@ export function AdminNotificationsPage() {
             </div>
 
             {audience === UserNotificationAudience.ROLE ? (
-              <label className="block text-sm font-bold text-slate-700">
-                Rôle concerné
-                <select
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-orange-500"
-                  onChange={(event) => setTargetRole(event.target.value as Role)}
-                  value={targetRole}
-                >
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-bold text-slate-700">Roles concernes</p>
+                  <div className="flex gap-2">
+                    <button
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                      onClick={() => setTargetRoles(Object.values(Role))}
+                      type="button"
+                    >
+                      Tout cocher
+                    </button>
+                    <button
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                      onClick={() => setTargetRoles([])}
+                      type="button"
+                    >
+                      Effacer
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
                   {Object.values(Role).map((role) => (
-                    <option key={role} value={role}>
+                    <label
+                      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-bold transition ${
+                        targetRoles.includes(role)
+                          ? 'border-slate-950 bg-slate-950 text-white'
+                          : 'border-slate-200 bg-white text-slate-700'
+                      }`}
+                      key={role}
+                    >
+                      <input
+                        checked={targetRoles.includes(role)}
+                        className="h-4 w-4"
+                        onChange={(event) => {
+                          setTargetRoles((current) =>
+                            event.target.checked
+                              ? [...new Set([...current, role])]
+                              : current.filter((item) => item !== role),
+                          );
+                        }}
+                        type="checkbox"
+                      />
                       {formatRoleLabel(role)}
-                    </option>
+                    </label>
                   ))}
-                </select>
-              </label>
+                </div>
+              </div>
             ) : null}
 
             {audience === UserNotificationAudience.USERS ? (

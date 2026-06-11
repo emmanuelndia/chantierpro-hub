@@ -21,6 +21,9 @@ type PhotoGalleryProps = Readonly<{
         type: 'project';
         projectId: string;
         sites?: PhotoSiteOption[];
+      }
+    | {
+        type: 'global';
       };
   viewer: {
     id: string;
@@ -70,7 +73,17 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
   const [captureOpen, setCaptureOpen] = useState(false);
 
   const queryKey = useMemo(
-    () => ['photo-gallery', scope.type, scope.type === 'site' ? scope.siteId : scope.projectId, page, from, to, authorIds, tag, sort],
+    () => [
+      'photo-gallery',
+      scope.type,
+      scope.type === 'site' ? scope.siteId : scope.type === 'project' ? scope.projectId : 'global',
+      page,
+      from,
+      to,
+      authorIds,
+      tag,
+      sort,
+    ],
     [authorIds, from, page, scope, sort, tag, to],
   );
 
@@ -96,7 +109,9 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
       const endpoint =
         scope.type === 'site'
           ? `/api/sites/${scope.siteId}/photos?${searchParams.toString()}`
-          : `/api/projects/${scope.projectId}/photos?${searchParams.toString()}`;
+          : scope.type === 'project'
+            ? `/api/projects/${scope.projectId}/photos?${searchParams.toString()}`
+            : `/api/mobile/photos/gallery?${searchParams.toString()}`;
       const response = await authFetch(endpoint, { cache: 'no-store' });
       if (!response.ok) {
         throw new Error(`Photos request failed with status ${response.status}`);
@@ -206,7 +221,12 @@ export function PhotoGallery({ scope, viewer, title = 'Galerie photos', descript
   const canUpload = UPLOAD_ROLES.includes(viewer.role);
   const uploadSites = useMemo(() => {
     const fromResponse = photosQuery.data?.sites ?? [];
-    const fromProps = scope.type === 'project' ? (scope.sites ?? []) : [{ id: scope.siteId, name: scope.siteName ?? 'Chantier' }];
+    const fromProps =
+      scope.type === 'project'
+        ? (scope.sites ?? [])
+        : scope.type === 'site'
+          ? [{ id: scope.siteId, name: scope.siteName ?? 'Chantier' }]
+          : [];
     const merged = new Map<string, PhotoSiteOption>();
 
     for (const site of [...fromProps, ...fromResponse]) {

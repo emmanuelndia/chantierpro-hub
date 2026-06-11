@@ -122,19 +122,23 @@ export function RhResourcesPage() {
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                 <tr>
-                  <th className="px-5 py-4">Presence du jour</th>
+                  <th className="px-5 py-4">Matricule</th>
                   <th className="px-5 py-4">Nom</th>
                   <th className="px-5 py-4">Role</th>
                   <th className="px-5 py-4">Identifiant</th>
-                  <th className="px-5 py-4">Matricule</th>
                   <th className="px-5 py-4">Email</th>
+                  <th className="px-5 py-4">Presence du jour</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {(data?.items ?? []).map((resource) => (
                   <tr key={resource.id} className="align-top">
                     <td className="px-5 py-4">
-                      <PresenceBadge presence={resource.todayPresence} />
+                      {resource.matricule ? (
+                        <span className="font-semibold text-slate-800">{resource.matricule}</span>
+                      ) : (
+                        <Badge tone="warning">A renseigner</Badge>
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       <p className="font-black text-slate-950">{resource.firstName} {resource.lastName}</p>
@@ -143,14 +147,10 @@ export function RhResourcesPage() {
                       <Badge tone="neutral">{formatRoleLabel(resource.role as Role)}</Badge>
                     </td>
                     <td className="px-5 py-4 font-semibold text-slate-700">{resource.username}</td>
-                    <td className="px-5 py-4">
-                      {resource.matricule ? (
-                        <span className="font-semibold text-slate-800">{resource.matricule}</span>
-                      ) : (
-                        <Badge tone="warning">A renseigner</Badge>
-                      )}
-                    </td>
                     <td className="px-5 py-4 text-slate-600">{resource.email ?? '-'}</td>
+                    <td className="px-5 py-4">
+                      <PresenceBadge presence={resource.todayPresence} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

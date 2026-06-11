@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import { ClockInStatus, ClockInType, Prisma, Role, type PrismaClient } from '@prisma/client';
 import { createSignedStorageUrl, uploadPrivateStorageObject } from '@/lib/storage';
 import { projectAccessWhere } from '@/lib/projects';
+import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 import type {
   RhApiErrorCode,
   RhOptionsResponse,
@@ -23,6 +24,7 @@ const SITE_PRESENCE_LIVE_ALLOWED_ROLES: readonly Role[] = [
   Role.DIRECTION,
   Role.ADMIN,
   Role.PROJECT_MANAGER,
+  Role.GENERAL_SUPERVISOR,
 ];
 const RH_EXPORT_HISTORY_LIMIT = 20;
 const RH_EXPORT_ARTIFACT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -347,15 +349,22 @@ export async function getSitePresencesLive(
     !query.siteId &&
     !query.assignedById;
 
-  const siteWhere: Prisma.SiteWhereInput = {
-    status: 'ACTIVE',
-    project: {
-      ...projectAccessWhere(user),
-      ...(query.projectManagerId ? { projectManagerId: query.projectManagerId } : {}),
-    },
-    ...(query.projectId ? { projectId: query.projectId } : {}),
-    ...(query.siteId ? { id: query.siteId } : {}),
-  };
+  const siteWhere: Prisma.SiteWhereInput = user.role === Role.GENERAL_SUPERVISOR
+    ? {
+        ...generalSupervisorPlanningSiteWhere(user, today),
+        ...(query.projectId ? { projectId: query.projectId } : {}),
+        ...(query.siteId ? { id: query.siteId } : {}),
+        ...(query.projectManagerId ? { project: { ...projectAccessWhere(user), projectManagerId: query.projectManagerId } } : {}),
+      }
+    : {
+        status: 'ACTIVE',
+        project: {
+          ...projectAccessWhere(user),
+          ...(query.projectManagerId ? { projectManagerId: query.projectManagerId } : {}),
+        },
+        ...(query.projectId ? { projectId: query.projectId } : {}),
+        ...(query.siteId ? { id: query.siteId } : {}),
+      };
 
   const [sites, assignments, records, freeMissions, officeRecords] = await Promise.all([
     includeTerrain ? prisma.site.findMany({
@@ -724,7 +733,7 @@ export async function getSitePresencesLive(
   const roles = new Set<Role>();
 
   for (const key of allKeys) {
-    const [siteId] = key.split(':');
+    const { siteId } = parseLiveResourceKey(key);
     const site = siteId ? siteRows.get(siteId) : null;
     if (!site) continue;
 
@@ -2066,7 +2075,25 @@ function toDateOnlyDate(value: Date) {
 }
 
 function liveResourceKey(siteId: string, userId: string) {
-  return `${siteId}:${userId}`;
+  return JSON.stringify([siteId, userId]);
+}
+
+function parseLiveResourceKey(key: string) {
+  try {
+    const parsed = JSON.parse(key) as unknown;
+    if (
+      Array.isArray(parsed) &&
+      typeof parsed[0] === 'string' &&
+      typeof parsed[1] === 'string'
+    ) {
+      return { siteId: parsed[0], userId: parsed[1] };
+    }
+  } catch {
+    // Fall back to the legacy delimiter for older in-memory keys.
+  }
+
+  const [siteId = '', userId = ''] = key.split(':');
+  return { siteId, userId };
 }
 
 function buildLiveResource(

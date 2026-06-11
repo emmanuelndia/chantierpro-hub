@@ -27,5 +27,6 @@ export type CreateUserNotificationRequest = {
   message: string;
   audience: UserNotificationAudience;
   targetRole?: Role | null;
+  targetRoles?: Role[];
   userIds?: string[];
 };

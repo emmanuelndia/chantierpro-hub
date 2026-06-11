@@ -124,12 +124,12 @@ export function MobileClockInPage() {
     };
   }, [geolocation.accuracy, geolocation.capturedAt, geolocation.error, geolocation.latitude, geolocation.loading, geolocation.longitude, geolocation.source]);
 
-  const [manualMode, setManualMode] = useState(Boolean(requestedSiteId));
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(requestedSiteId);
   const [selectedFreeMissionId] = useState<string | null>(requestedFreeMissionId);
   const [selectedOffice, setSelectedOffice] = useState(requestedOffice);
   const [selectedOfficeLocationId, setSelectedOfficeLocationId] = useState<string | null>(null);
   const [selectedIntent, setSelectedIntent] = useState<ClockInIntent>(requestedIntent ?? 'arrival');
+  const [nearbySearchRequested, setNearbySearchRequested] = useState(false);
   const [step, setStep] = useState<Step>('clock-in');
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [comment, setComment] = useState('');
@@ -281,7 +281,13 @@ export function MobileClockInPage() {
 
       return (await response.json()) as NearbySitesResponse;
     },
-    enabled: geoState.status === 'ready' && !requestedSiteId && !requestedFreeMissionId && !selectedOffice && !shouldSelectFreeMissionFromTasks,
+    enabled:
+      nearbySearchRequested &&
+      geoState.status === 'ready' &&
+      !requestedSiteId &&
+      !requestedFreeMissionId &&
+      !selectedOffice &&
+      !shouldSelectFreeMissionFromTasks,
     staleTime: 30_000,
   });
 
@@ -294,8 +300,6 @@ export function MobileClockInPage() {
   );
   const activeSession = todayQuery.data?.activeSession ?? null;
   const quickSite = nearbyQuery.data?.sites[0] ?? null;
-  const nearbySuggestion =
-    quickSite && !todaySites.some((site) => site.id === quickSite.id) ? quickSite : null;
 
   useEffect(() => {
     if (requestedIntent) {
@@ -311,7 +315,6 @@ export function MobileClockInPage() {
   useEffect(() => {
     if (!selectedSiteId && activeSession?.siteId) {
       setSelectedSiteId(activeSession.siteId);
-      setManualMode(true);
     }
     if (!selectedOffice && activeSession?.contextType === 'OFFICE') {
       setSelectedOffice(true);
@@ -319,7 +322,7 @@ export function MobileClockInPage() {
   }, [activeSession?.contextType, activeSession?.siteId, selectedOffice, selectedSiteId]);
 
   useEffect(() => {
-    if (selectedOffice || shouldSelectFreeMissionFromTasks || selectedFreeMission || selectedSiteId || todaySites.length === 0) {
+    if (selectedOffice || shouldSelectFreeMissionFromTasks || selectedFreeMission || selectedSiteId) {
       return;
     }
 
@@ -327,14 +330,8 @@ export function MobileClockInPage() {
 
     if (openSessionSite) {
       setSelectedSiteId(openSessionSite.id);
-      setManualMode(true);
-      return;
     }
-
-    const closestAssignedSite = findClosestTodaySite(todaySites, geoState);
-    setSelectedSiteId((closestAssignedSite ?? todaySites[0])?.id ?? null);
-    setManualMode(true);
-  }, [geoState, selectedFreeMission, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
+  }, [selectedFreeMission, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
 
   const selectedSite = useMemo(() => {
     const siteFromToday = todaySites.find((site) => site.id === selectedSiteId);
@@ -343,12 +340,17 @@ export function MobileClockInPage() {
       return fromTodaySite(siteFromToday, geoState);
     }
 
-    if (!selectedOffice && !shouldSelectFreeMissionFromTasks && todaySites.length === 0 && !manualMode && quickSite) {
+    if (
+      selectedSiteId &&
+      quickSite?.id === selectedSiteId &&
+      !selectedOffice &&
+      !shouldSelectFreeMissionFromTasks
+    ) {
       return fromNearbySite(quickSite);
     }
 
     return null;
-  }, [geoState, manualMode, quickSite, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
+  }, [geoState, quickSite, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
 
   const sessionStatusQuery = useQuery({
     queryKey: ['mobile-session-status', selectedSite?.id, selectedFreeMission?.freeMissionId, selectedOffice],
@@ -748,7 +750,7 @@ export function MobileClockInPage() {
         </section>
       ) : null}
 
-      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks && !selectedSite ? (
+      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks && !selectedOffice ? (
         <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Pointage quotidien</p>
@@ -765,7 +767,7 @@ export function MobileClockInPage() {
               setSelectedOffice(true);
               setSelectedOfficeLocationId(selectedOfficeLocation?.id ?? null);
               setSelectedSiteId(null);
-              setManualMode(true);
+              setNearbySearchRequested(false);
             }}
             type="button"
           >
@@ -882,50 +884,57 @@ export function MobileClockInPage() {
           loading={todaySitesQuery.isLoading}
           onSelect={(siteId) => {
             setSelectedSiteId(siteId);
-            setManualMode(true);
+            setNearbySearchRequested(false);
           }}
           selectedSiteId={selectedSite?.id ?? null}
           sites={todaySites}
         />
       ) : null}
 
-      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks && geoState.status === 'ready' && todaySites.length === 0 ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
-          {nearbyQuery.isLoading ? (
+      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks ? (
+        <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Aide GPS</p>
+            <h3 className="mt-2 text-lg font-black text-slate-950">Chantier proche</h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              Lancez la recherche uniquement si vous voulez pointer sur un chantier proche non selectionne.
+            </p>
+          </div>
+          <button
+            className="min-h-12 w-full rounded-lg border border-slate-300 bg-white px-4 text-sm font-black text-slate-800"
+            onClick={() => {
+              setNearbySearchRequested(true);
+              if (geoState.status !== 'ready') {
+                geolocation.refresh();
+                return;
+              }
+              void nearbyQuery.refetch();
+            }}
+            type="button"
+          >
+            Rechercher un chantier proche
+          </button>
+          {nearbySearchRequested && geoState.status !== 'ready' ? (
+            <p className="text-sm font-semibold text-slate-500">GPS requis pour rechercher un chantier proche.</p>
+          ) : null}
+          {nearbySearchRequested && nearbyQuery.isFetching ? (
             <p className="text-sm font-semibold text-slate-500">Recherche du chantier le plus proche...</p>
-          ) : quickSite ? (
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
-                Chantier detecte
-              </p>
-              <h3 className="mt-2 text-lg font-black text-slate-950">{quickSite.name}</h3>
-              <p className="mt-1 text-sm text-slate-500">{quickSite.address}</p>
-              <p className="mt-3 text-sm font-bold text-emerald-700">
-                {quickSite.distance.toFixed(2)} km - rayon : {quickSite.radiusKm} km
-              </p>
-            </div>
-          ) : (
-            <div>
-              <p className="text-base font-black text-slate-950">Aucun chantier dans votre zone</p>
-              <button
-                className="mt-4 min-h-14 rounded-lg border border-slate-300 px-4 text-sm font-bold text-slate-700"
-                onClick={() => setManualMode(true)}
-                type="button"
-              >
-                Choisir manuellement
-              </button>
-            </div>
-          )}
+          ) : null}
+          {nearbySearchRequested && !nearbyQuery.isFetching && geoState.status === 'ready' && !quickSite ? (
+            <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm font-semibold text-slate-500">
+              Aucun chantier proche trouve. Vous pouvez choisir un chantier assigne ou pointer au bureau.
+            </p>
+          ) : null}
         </section>
       ) : null}
 
-      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks && nearbySuggestion ? (
+      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks && nearbySearchRequested && quickSite ? (
         <NearbySuggestionCard
           onSelect={() => {
-            setSelectedSiteId(nearbySuggestion.id);
-            setManualMode(false);
+            setSelectedSiteId(quickSite.id);
           }}
-          site={nearbySuggestion}
+          isAssignedToday={todaySites.some((site) => site.id === quickSite.id)}
+          site={quickSite}
         />
       ) : null}
 
@@ -951,7 +960,6 @@ export function MobileClockInPage() {
                 onClick={() => {
                   if (sessionStatus?.openSessionSiteId) {
                     setSelectedSiteId(sessionStatus.openSessionSiteId);
-                    setManualMode(true);
                     setSelectedIntent('departure');
                   }
                 }}
@@ -996,7 +1004,7 @@ export function MobileClockInPage() {
             <ActionButton
               busy={clockInMutation.isPending}
               disabled={!canSubmit}
-                label={selectedFreeMission ? 'POINTER ENTREE MISSION' : selectedOffice ? 'POINTER ENTREE BUREAU' : todaySites.length === 0 && quickSite && !manualMode ? 'POINTER ICI' : 'POINTER ENTREE'}
+                label={selectedFreeMission ? 'POINTER ENTREE MISSION' : selectedOffice ? 'POINTER ENTREE BUREAU' : 'POINTER ENTREE'}
               onClick={() => {
                 setSelectedIntent('arrival');
                 clockInMutation.mutate('arrival');
@@ -1174,9 +1182,11 @@ function ManualSiteList({
 }
 
 function NearbySuggestionCard({
+  isAssignedToday,
   onSelect,
   site,
 }: Readonly<{
+  isAssignedToday: boolean;
   onSelect: () => void;
   site: NearbySiteItem;
 }>) {
@@ -1187,7 +1197,9 @@ function NearbySuggestionCard({
         <div className="min-w-0">
           <h3 className="truncate text-base font-black text-slate-950">{site.name}</h3>
           <p className="mt-1 truncate text-sm text-slate-600">{site.address}</p>
-          <p className="mt-2 text-xs font-bold text-sky-700">Non assigne aujourd&apos;hui</p>
+          <p className="mt-2 text-xs font-bold text-sky-700">
+            {isAssignedToday ? 'Assigne aujourd&apos;hui' : 'Non assigne aujourd&apos;hui'}
+          </p>
         </div>
         <span className="shrink-0 text-sm font-bold text-sky-700">{site.distance.toFixed(2)} km</span>
       </div>
@@ -1368,22 +1380,6 @@ function fromNearbySite(site: NearbySiteItem): SelectableSite {
     distanceKm: site.distance,
     siteType: null,
   };
-}
-
-function findClosestTodaySite(sites: TodaySiteItem[], geoState: GeoState) {
-  if (geoState.status !== 'ready') {
-    return null;
-  }
-
-  return sites
-    .map((site) => ({
-      site,
-      distanceKm: haversineDistanceKm(
-        { latitude: geoState.latitude, longitude: geoState.longitude },
-        { latitude: site.latitude, longitude: site.longitude },
-      ),
-    }))
-    .sort((left, right) => left.distanceKm - right.distanceKm)[0]?.site ?? null;
 }
 
 function buildOfflineSessionStatus(

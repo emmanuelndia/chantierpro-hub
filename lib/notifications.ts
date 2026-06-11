@@ -41,12 +41,15 @@ export function parseCreateUserNotificationInput(body: unknown): CreateUserNotif
   const message = sanitizeText(body.message, 500);
   const audience = parseAudience(body.audience);
   const targetRole = body.targetRole === undefined || body.targetRole === null ? null : parseRole(body.targetRole);
+  const targetRoles = Array.isArray(body.targetRoles)
+    ? body.targetRoles.filter((item): item is Role => Boolean(parseRole(item)))
+    : [];
   const userIds = Array.isArray(body.userIds)
     ? body.userIds.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : [];
 
   if (!title || !message || !audience) return null;
-  if (audience === UserNotificationAudience.ROLE && !targetRole) return null;
+  if (audience === UserNotificationAudience.ROLE && !targetRole && targetRoles.length === 0) return null;
   if (audience === UserNotificationAudience.USERS && userIds.length === 0) return null;
 
   return {
@@ -54,6 +57,7 @@ export function parseCreateUserNotificationInput(body: unknown): CreateUserNotif
     message,
     audience,
     targetRole,
+    targetRoles,
     userIds,
   };
 }
@@ -80,8 +84,8 @@ export async function createUserNotification(
   const recipientWhere: Prisma.UserWhereInput =
     input.audience === UserNotificationAudience.ALL
       ? { isActive: true }
-      : input.audience === UserNotificationAudience.ROLE && input.targetRole
-        ? { isActive: true, role: input.targetRole }
+      : input.audience === UserNotificationAudience.ROLE
+        ? { isActive: true, role: { in: input.targetRoles?.length ? input.targetRoles : input.targetRole ? [input.targetRole] : [] } }
         : { isActive: true, id: { in: input.userIds ?? [] } };
 
   const recipients = await prisma.user.findMany({
@@ -89,7 +93,10 @@ export async function createUserNotification(
     select: { id: true },
   });
 
-  const targetRole = input.audience === UserNotificationAudience.ROLE ? input.targetRole ?? null : null;
+  const targetRole =
+    input.audience === UserNotificationAudience.ROLE && (input.targetRoles?.length ?? 0) <= 1
+      ? input.targetRoles?.[0] ?? input.targetRole ?? null
+      : null;
   const notification = await prisma.userNotification.create({
     data: {
       title: input.title,
