@@ -24,6 +24,7 @@ import {
   getBusinessManagedResourceRoles,
   isBusinessManagerRole,
 } from '@/lib/field-roles';
+import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 import type {
   AdminDeletionLogItem,
   AdminLogsApiErrorCode,
@@ -449,6 +450,25 @@ export async function getAccessibleSiteForPhoto(
             },
           },
         },
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        project: {
+          select: {
+            projectManagerId: true,
+          },
+        },
+      },
+    });
+  }
+
+  if (user.role === Role.GENERAL_SUPERVISOR) {
+    return prisma.site.findFirst({
+      where: {
+        id: siteId,
+        ...generalSupervisorPlanningSiteWhere(user, options.date ?? new Date()),
       },
       select: {
         id: true,
