@@ -10,7 +10,6 @@ import type {
   MobileManagementAlertItem,
   MobileManagementDashboardResponse,
   MobileManagementDashboardWidget,
-  MobileManagementSiteItem,
 } from '@/types/mobile-management';
 
 type MobileManagementDashboardPageProps = Readonly<{
@@ -45,7 +44,7 @@ export function MobileManagementDashboardPage({ user }: MobileManagementDashboar
           <div className="min-w-0 flex-1">
             <p className="text-base font-bold text-slate-950">Supervision mobile</p>
             <p className="mt-1 truncate text-sm text-slate-600">
-              Bonjour {user.firstName}, suivi des chantiers actifs
+              Bonjour {user.firstName}, vos raccourcis de suivi et terrain
             </p>
           </div>
           <MobileNotificationBell
@@ -83,34 +82,14 @@ export function MobileManagementDashboardPage({ user }: MobileManagementDashboar
             <div className="grid grid-cols-2 gap-3">
               <QuickActionCard href="/mobile/projects" icon={<ProjectsIcon />} label="Projets" />
               <QuickActionCard href="/mobile/sites" icon={<SitesIcon />} label="Chantiers" />
-              <QuickActionCard href="/mobile/teams" icon={<TeamsIcon />} label="Équipes" />
-              <QuickActionCard href="/mobile/presences" icon={<PresenceIcon />} label="Présences" />
+              <QuickActionCard href="/mobile/planning" icon={<PlanningIcon />} label="Planning" />
+              <QuickActionCard href="/mobile/tasks" icon={<PlanningIcon />} label="Taches" />
+              <QuickActionCard href="/mobile/supervisor-scopes" icon={<TeamsIcon />} label="Perimetres" />
+              <QuickActionCard href="/mobile/presences" icon={<PresenceIcon />} label="Presences" />
               <QuickActionCard href="/mobile/reports" icon={<ReportsIcon />} label="Rapports" />
               <QuickActionCard href="/mobile/gallery" icon={<GalleryIcon />} label="Galerie" />
             </div>
           </section>
-
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-                Sites actifs
-              </h2>
-              <span className="text-xs font-semibold text-slate-400">
-                {dashboard.sites.length} sites
-              </span>
-            </div>
-
-            {dashboard.sites.length > 0 ? (
-              <div className="space-y-3">
-                {dashboard.sites.map((site) => (
-                  <SiteCard key={site.id} site={site} />
-                ))}
-              </div>
-            ) : (
-              <EmptyPanel text="Aucun chantier actif dans votre perimetre." />
-            )}
-          </section>
-
         </>
       ) : null}
     </div>
@@ -156,53 +135,6 @@ function QuickActionCard({
   );
 }
 
-function SiteCard({ site }: Readonly<{ site: MobileManagementSiteItem }>) {
-  const alert = site.presentCount === 0;
-
-  return (
-    <Link
-      className={`block rounded-lg border p-4 shadow-panel transition active:scale-[0.99] ${
-        alert ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'
-      }`}
-      href={`/mobile/sites/${encodeURIComponent(site.id)}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {alert ? (
-              <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white">
-                Alerte
-              </span>
-            ) : null}
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-              {formatSiteStatus(site.status)}
-            </span>
-          </div>
-          <h3 className="mt-3 truncate text-base font-black text-slate-950">{site.name}</h3>
-          <p className="mt-1 truncate text-sm font-medium text-slate-500">{site.projectName}</p>
-        </div>
-        <ChevronRightIcon className="mt-2 h-5 w-5 shrink-0 text-slate-400" />
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <MetricTile label="Presents" value={`${site.presentCount}/${site.totalResources}`} />
-        <MetricTile label="Dernier pointage" value={formatClockInTime(site.lastClockInAt)} />
-      </div>
-    </Link>
-  );
-}
-
-function MetricTile({ label, value }: Readonly<{ label: string; value: string }>) {
-  return (
-    <div className="rounded-lg bg-white/80 p-3">
-      <div className="truncate text-base font-black text-slate-950">{value}</div>
-      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </div>
-    </div>
-  );
-}
-
 function AlertRow({ alert }: Readonly<{ alert: MobileManagementAlertItem }>) {
   const content = (
     <div className="flex items-start gap-3">
@@ -238,14 +170,6 @@ function AlertRow({ alert }: Readonly<{ alert: MobileManagementAlertItem }>) {
   );
 }
 
-function EmptyPanel({ text }: Readonly<{ text: string }>) {
-  return (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm font-semibold text-slate-500">
-      {text}
-    </div>
-  );
-}
-
 function DashboardLoadingState() {
   return (
     <div className="space-y-5">
@@ -258,21 +182,9 @@ function DashboardLoadingState() {
       <section className="space-y-3">
         <div className="h-5 w-32 animate-pulse rounded bg-slate-100" />
         <div className="h-36 animate-pulse rounded-lg bg-slate-100" />
-        <div className="h-36 animate-pulse rounded-lg bg-slate-100" />
       </section>
     </div>
   );
-}
-
-function formatClockInTime(value: string | null) {
-  if (!value) {
-    return 'Aucun';
-  }
-
-  return new Intl.DateTimeFormat('fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
 }
 
 function formatEventTime(value: string | null) {
@@ -286,14 +198,6 @@ function formatEventTime(value: string | null) {
   }).format(new Date(value));
 }
 
-function formatSiteStatus(status: string) {
-  if (status === 'ACTIVE') {
-    return 'Actif';
-  }
-
-  return status.replaceAll('_', ' ').toLowerCase();
-}
-
 function baseIcon(className: string, children: ReactNode) {
   return (
     <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
@@ -305,16 +209,7 @@ function baseIcon(className: string, children: ReactNode) {
 function DashboardIcon({ className }: Readonly<{ className: string }>) {
   return baseIcon(
     className,
-    <>
-      <path d="M4 13h6v7H4zM14 4h6v16h-6zM4 4h6v5H4z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
-    </>,
-  );
-}
-
-function ChevronRightIcon({ className }: Readonly<{ className: string }>) {
-  return baseIcon(
-    className,
-    <path d="m9 5 7 7-7 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />,
+    <path d="M4 13h6v7H4zM14 4h6v16h-6zM4 4h6v5H4z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />,
   );
 }
 
@@ -350,4 +245,8 @@ function ReportsIcon() {
 
 function GalleryIcon() {
   return baseIcon('h-5 w-5', <path d="M4 6h16v12H4zM7 15l3-3 2 2 2-3 3 4M8 9h.01" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />);
+}
+
+function PlanningIcon() {
+  return baseIcon('h-5 w-5', <path d="M5 5h14v14H5zM8 3v4M16 3v4M5 10h14M8 14h3M13 14h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />);
 }

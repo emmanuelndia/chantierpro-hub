@@ -12,6 +12,7 @@ const mobileCameraRoles: readonly Role[] = [
   Role.BE_RESOURCE,
   Role.NEGOTIATION_RESOURCE,
   Role.DRIVER,
+  Role.PROJECT_MANAGER,
 ];
 
 export default async function MobilePhotoPage() {
@@ -21,7 +22,7 @@ export default async function MobilePhotoPage() {
     redirect('/mobile/login?next=/mobile/photo');
   }
 
-  if (session.role === Role.DIRECTION || session.role === Role.PROJECT_MANAGER) {
+  if (session.role === Role.DIRECTION) {
     redirect('/mobile/gallery');
   }
 

@@ -53,22 +53,12 @@ export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: Mobi
   });
 
   const sites = useMemo(() => sitesQuery.data?.items ?? [], [sitesQuery.data?.items]);
-  const selectedSite = sites.find((site) => site.id === siteId) ?? sites[0] ?? null;
-
-  useEffect(() => {
-    if (!siteId && selectedSite) {
-      setSiteId(selectedSite.id);
-    }
-  }, [selectedSite, siteId]);
+  const selectedSite = sites.find((site) => site.id === siteId) ?? null;
 
   const photosQuery = useInfiniteQuery({
-    queryKey: ['mobile-gallery-photos', selectedSite?.id ?? '', from, to, authorIds, tag],
+    queryKey: ['mobile-gallery-photos', selectedSite?.id ?? 'all', from, to, authorIds, tag],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
-      if (!selectedSite) {
-        return emptyPhotoPage(pageParam);
-      }
-
       const searchParams = new URLSearchParams({
         page: String(pageParam),
         sort: 'desc',
@@ -89,7 +79,10 @@ export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: Mobi
         searchParams.set('tag', tag);
       }
 
-      const response = await authFetch(`/api/sites/${selectedSite.id}/photos?${searchParams.toString()}`);
+      const endpoint = selectedSite
+        ? `/api/sites/${selectedSite.id}/photos?${searchParams.toString()}`
+        : `/api/mobile/photos/gallery?${searchParams.toString()}`;
+      const response = await authFetch(endpoint);
 
       if (!response.ok) {
         throw new Error(`Photos request failed with status ${response.status}`);
@@ -99,7 +92,7 @@ export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: Mobi
     },
     staleTime: 30_000,
     getNextPageParam: (lastPage) => (lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined),
-    enabled: Boolean(selectedSite),
+    enabled: true,
   });
 
   const pages = useMemo(() => photosQuery.data?.pages ?? [], [photosQuery.data?.pages]);
@@ -174,7 +167,7 @@ export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: Mobi
             {selectedSite?.name ?? 'Choisir un chantier'}
           </h2>
           <p className="mt-1 truncate text-sm text-slate-600">
-            {selectedSite?.projectName ?? 'Photos chantier'}
+            {selectedSite?.projectName ?? 'Vue globale des photos'}
           </p>
         </button>
       </section>
@@ -256,7 +249,7 @@ export function MobilePhotoGalleryPage({ initialSiteId, canShowCameraFab }: Mobi
 
       {canShowCameraFab ? (
         <a
-          href="/mobile/camera-management"
+          href="/mobile/photo"
           className="fixed right-4 z-40 flex min-h-14 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition active:scale-[0.98]"
           style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5rem)' }}
         >
@@ -402,6 +395,16 @@ function SiteSheet({
         </div>
         {loading ? <div className="h-20 animate-pulse rounded-lg bg-slate-100" /> : null}
         <div className="space-y-2">
+          <button
+            className={`w-full rounded-lg border p-4 text-left ${
+              selectedSiteId === '' ? 'border-primary bg-primary/10' : 'border-slate-200 bg-white'
+            }`}
+            onClick={() => onSelect('')}
+            type="button"
+          >
+            <p className="truncate text-base font-black text-slate-950">Toutes les photos</p>
+            <p className="mt-1 truncate text-sm text-slate-500">Vue globale avant filtrage</p>
+          </button>
           {sites.map((site) => (
             <button
               className={`w-full rounded-lg border p-4 text-left ${
@@ -512,18 +515,6 @@ function LoadingGrid() {
       <div className="h-56 animate-pulse rounded-lg bg-slate-100" />
     </section>
   );
-}
-
-function emptyPhotoPage(page: number): PaginatedPhotosResponse {
-  return {
-    items: [],
-    page,
-    pageSize: 20,
-    totalItems: 0,
-    totalPages: 1,
-    authors: [],
-    sites: [],
-  };
 }
 
 function mergeAuthors(pages: PaginatedPhotosResponse[]) {

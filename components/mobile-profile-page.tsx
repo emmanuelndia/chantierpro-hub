@@ -201,6 +201,22 @@ export function MobileProfilePage() {
     },
   });
 
+  const deleteNotificationMutation = useMutation({
+    mutationFn: async (notificationRecipientId: string) => {
+      const response = await authFetch(`/api/notifications/${notificationRecipientId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Notification introuvable.');
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['mobile-notifications'] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch('/api/auth/logout', {
@@ -354,16 +370,26 @@ export function MobileProfilePage() {
                   <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">{item.message}</p>
                   <p className="mt-2 text-xs font-bold text-slate-400">{formatDate(item.createdAt)}</p>
                 </div>
-                {!item.readAt ? (
+                <div className="flex shrink-0 flex-col gap-2">
+                  {!item.readAt ? (
+                    <button
+                      className="rounded-full bg-slate-950 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                      disabled={readNotificationMutation.isPending}
+                      onClick={() => readNotificationMutation.mutate(item.id)}
+                      type="button"
+                    >
+                      Lu
+                    </button>
+                  ) : null}
                   <button
-                    className="shrink-0 rounded-full bg-slate-950 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
-                    disabled={readNotificationMutation.isPending}
-                    onClick={() => readNotificationMutation.mutate(item.id)}
+                    className="rounded-full border border-red-100 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-50"
+                    disabled={deleteNotificationMutation.isPending}
+                    onClick={() => deleteNotificationMutation.mutate(item.id)}
                     type="button"
                   >
-                    Lu
+                    Supprimer
                   </button>
-                ) : null}
+                </div>
               </div>
             </article>
           ))}

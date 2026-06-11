@@ -64,6 +64,12 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
       void queryClient.invalidateQueries({ queryKey: ['user-notifications'] });
     },
   });
+  const deleteNotificationMutation = useMutation({
+    mutationFn: deleteNotification,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['user-notifications'] });
+    },
+  });
   const notifications = useMemo<WebNotification[]>(() => {
     const items: WebNotification[] = [];
 
@@ -231,6 +237,7 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
               {notificationsOpen ? (
                 <WebNotificationsPanel
                   notifications={notifications}
+                  onDelete={(id) => deleteNotificationMutation.mutate(id)}
                   onMarkRead={(id) => readNotificationMutation.mutate(id)}
                   onClose={() => setNotificationsOpen(false)}
                 />
@@ -327,10 +334,12 @@ function AdminNotificationBanner({
 
 function WebNotificationsPanel({
   notifications,
+  onDelete,
   onMarkRead,
   onClose,
 }: Readonly<{
   notifications: readonly WebNotification[];
+  onDelete: (id: string) => void;
   onMarkRead: (id: string) => void;
   onClose: () => void;
 }>) {
@@ -370,14 +379,25 @@ function WebNotificationsPanel({
                     <p className="mt-1 text-sm leading-5 text-slate-600">{notification.message}</p>
                   </div>
                 </Link>
-                {notification.id && !notification.readAt ? (
-                  <button
-                    className="mt-3 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-white"
-                    onClick={() => onMarkRead(notification.id!)}
-                    type="button"
-                  >
-                    Marquer comme lu
-                  </button>
+                {notification.id ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {!notification.readAt ? (
+                      <button
+                        className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-white"
+                        onClick={() => onMarkRead(notification.id!)}
+                        type="button"
+                      >
+                        Marquer comme lu
+                      </button>
+                    ) : null}
+                    <button
+                      className="rounded-full border border-red-100 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-white"
+                      onClick={() => onDelete(notification.id!)}
+                      type="button"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
                 ) : null}
               </div>
             ))}
@@ -406,6 +426,13 @@ async function markNotificationRead(id: string) {
   const response = await authFetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
   if (!response.ok && response.status !== 204) {
     throw new Error('Lecture notification impossible.');
+  }
+}
+
+async function deleteNotification(id: string) {
+  const response = await authFetch(`/api/notifications/${id}`, { method: 'DELETE' });
+  if (!response.ok && response.status !== 204) {
+    throw new Error('Suppression notification impossible.');
   }
 }
 

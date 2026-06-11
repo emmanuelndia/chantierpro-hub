@@ -30,6 +30,7 @@ const fieldRoles: readonly Role[] = [
   'BE_RESOURCE',
   'NEGOTIATION_RESOURCE',
   'DRIVER',
+  'PROJECT_MANAGER',
 ];
 
 export function MobileAppShell({ user, children }: MobileAppShellProps) {

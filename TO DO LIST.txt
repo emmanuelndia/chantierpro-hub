@@ -116,6 +116,14 @@ Au niveau du mobile dans pointer la détéction de chantier à proximité désac
 Arrivr à 8h00 est un peu +
 
 
+Quand on marque la notif comme lu chez soi est ce que ça disparais ? faudra prévoir la suppréssion 
 
+Les versions mobiles ne sont plus adaptés : 
 
+Au niveau du PM : 
+- Dans le bottombar on va garder que Accueil - Pointage - Photo - Perimètre Historique - Profil, tous le reste qui était dans le bottom on affiche ça sur l'écran d'accueil comme on affiché projets rapports et autres sur l'accueils et on va enlever SITES ACTIFS pour ne pas surchager l'écran
+- Quand on clique sur Galerie sur l'écran d'accueil on accède à l'ecran de galerie avec le bouton flottant prendre une photo et quand on veut prendre une photo on doit voir l'ecran photo comme chez les ressources non ?
+- Le Pointer du PM nous ramène sur profil modifie ça on a dit que les PM peut aller sur chantier ou même pointer quotidiennement au bureau
+
+J'ai bien dit que le pointage au bureau peut se faire par TOUTES les ressources non ? pourquoi je ne vois pas pointer chez le BE_MANAGER
 

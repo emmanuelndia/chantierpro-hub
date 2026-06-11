@@ -135,6 +135,17 @@ export async function markNotificationRead(prisma: PrismaClient, user: AuthLikeU
   return updated.count > 0;
 }
 
+export async function deleteUserNotificationRecipient(prisma: PrismaClient, user: AuthLikeUser, recipientId: string) {
+  const deleted = await prisma.userNotificationRecipient.deleteMany({
+    where: {
+      id: recipientId,
+      userId: user.id,
+    },
+  });
+
+  return deleted.count > 0;
+}
+
 function serializeNotification(row: NotificationRecipientRow): UserNotificationItem {
   return {
     id: row.id,

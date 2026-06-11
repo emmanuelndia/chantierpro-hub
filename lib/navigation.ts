@@ -210,7 +210,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
   },
   {
     href: '/mobile/clock-in',
-    label: 'Pointer',
+    label: 'Pointage',
     icon: 'clock-in',
     roles: ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER', 'PROJECT_MANAGER'],
   },
@@ -313,6 +313,19 @@ export function canAccessMobileNavigationItem(role: Role, item: MobileNavigation
 }
 
 export function getMobileNavigationForRole(role: Role) {
+  if (role === 'PROJECT_MANAGER') {
+    const projectManagerBottomTabs = new Set([
+      '/mobile/home',
+      '/mobile/clock-in',
+      '/mobile/photo',
+      '/mobile/supervisor-scopes',
+      '/mobile/history',
+      '/mobile/profile',
+    ]);
+
+    return mobileTabNavigation.filter((item) => projectManagerBottomTabs.has(item.href));
+  }
+
   return mobileTabNavigation.filter((item) => canAccessMobileNavigationItem(role, item));
 }
 
