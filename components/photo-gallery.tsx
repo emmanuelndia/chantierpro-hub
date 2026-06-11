@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PhotoCategory, PhotoTag, type Role } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -465,13 +464,10 @@ function PhotoTile({
   return (
     <article className="group overflow-hidden rounded-3xl border border-slate-200 bg-white">
       <button className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-100 text-left" onClick={onOpen} type="button">
-        <Image
+        <AuthenticatedPhotoImage
           alt={photo.description || photo.filename}
-          className="object-cover transition duration-500 group-hover:scale-105"
-          fill
-          sizes="(min-width: 1024px) 33vw, 100vw"
-          src={getPhotoContentUrl(photo.id)}
-          unoptimized
+          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          photoId={photo.id}
         />
         <div className="absolute inset-0 flex items-end bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent p-4 opacity-0 transition group-hover:opacity-100">
           <div className="space-y-1 text-white">
@@ -501,6 +497,73 @@ function PhotoTile({
       </div>
     </article>
   );
+}
+
+function AuthenticatedPhotoImage({
+  alt,
+  className,
+  photoId,
+}: Readonly<{
+  alt: string;
+  className: string;
+  photoId: string;
+}>) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let nextObjectUrl: string | null = null;
+
+    async function loadPhoto() {
+      setFailed(false);
+      setObjectUrl(null);
+
+      try {
+        const response = await authFetch(getPhotoContentUrl(photoId), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Photo failed with status ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        nextObjectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setObjectUrl(nextObjectUrl);
+        }
+      } catch {
+        if (!cancelled) {
+          setFailed(true);
+        }
+        if (nextObjectUrl) {
+          URL.revokeObjectURL(nextObjectUrl);
+        }
+      }
+    }
+
+    void loadPhoto();
+
+    return () => {
+      cancelled = true;
+      if (nextObjectUrl) {
+        URL.revokeObjectURL(nextObjectUrl);
+      }
+    };
+  }, [photoId]);
+
+  if (failed) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-slate-100 p-4 text-center text-xs font-bold text-slate-500">
+        Image indisponible
+      </div>
+    );
+  }
+
+  if (!objectUrl) {
+    return <div className="absolute inset-0 animate-pulse bg-slate-100" />;
+  }
+
+  // eslint-disable-next-line @next/next/no-img-element -- Loaded through authFetch so scoped/private photos keep the session headers.
+  return <img alt={alt} className={className} src={objectUrl} />;
 }
 
 function Lightbox({
@@ -553,13 +616,10 @@ function Lightbox({
             {loading ? <p className="text-sm text-white/70">Chargement...</p> : null}
             {!loading && photo ? (
               <div className="relative h-full w-full">
-                <Image
+                <AuthenticatedPhotoImage
                   alt={photo.description || photo.filename}
-                  className="object-contain"
-                  fill
-                  sizes="100vw"
-                  src={getPhotoContentUrl(photo.id)}
-                  unoptimized
+                  className="absolute inset-0 h-full w-full object-contain"
+                  photoId={photo.id}
                 />
               </div>
             ) : null}

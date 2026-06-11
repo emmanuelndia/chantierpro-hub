@@ -891,7 +891,7 @@ export async function listSitePhotos(
   ]);
 
   return {
-    items: photos.map((photo) => serializePhoto(photo, { includeUrl: false })),
+    items: photos.map((photo) => serializePhoto(photo)),
     page: payload.page,
     pageSize: PHOTO_PAGE_SIZE,
     totalItems,
@@ -1003,7 +1003,7 @@ export async function listProjectPhotos(
   ]);
 
   return {
-    items: photos.map((photo) => serializePhotoWithSiteName(photo, photo.site?.name ?? 'Mission libre', { includeUrl: false })),
+    items: photos.map((photo) => serializePhotoWithSiteName(photo, photo.site?.name ?? 'Mission libre')),
     page: payload.page,
     pageSize: PHOTO_PAGE_SIZE,
     totalItems,
