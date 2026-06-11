@@ -1,4 +1,4 @@
-import { ClockInStatus, ClockInType, Role } from '@prisma/client';
+import { ClockInStatus, ClockInType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   createClockInRecord,
@@ -14,10 +14,6 @@ import { haversineDistanceKm } from '@/lib/haversine';
 import { getActiveOfficeLocation } from '@/lib/office-locations';
 
 export const POST = withAuth(async ({ req, user }) => {
-  if (user.role === Role.EXTERNAL_RESOURCE) {
-    return jsonClockInError('PERMISSION_DENIED', 403, 'Acces refuse au pointage bureau.');
-  }
-
   const body = await parseJsonBody<unknown>(req);
   const input = parseClockInInput(body);
   const officeLocationId = parseOfficeLocationId(body);

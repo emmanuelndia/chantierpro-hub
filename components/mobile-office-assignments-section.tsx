@@ -17,7 +17,7 @@ import type {
   TaskProgressUpdateResponse,
 } from '@/types/mobile-planning';
 
-export function useTodayOfficeAssignments() {
+export function useTodayOfficeAssignments(enabled = true) {
   const [usingOfflineAssignments, setUsingOfflineAssignments] = useState(false);
 
   const assignmentsQuery = useQuery({
@@ -48,6 +48,7 @@ export function useTodayOfficeAssignments() {
         throw new Error('My assignments request failed');
       }
     },
+    enabled,
     refetchInterval: 60_000,
     staleTime: 300_000,
   });

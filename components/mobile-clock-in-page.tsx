@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlanningWorkLocationType, type ClockInType } from '@prisma/client';
+import { PlanningWorkLocationType, type ClockInType, type Role } from '@prisma/client';
 import { authFetch } from '@/lib/auth/client-session';
 import { haversineDistanceKm } from '@/lib/haversine';
 import {
@@ -35,6 +35,18 @@ import { useTodayOfficeAssignments } from '@/components/mobile-office-assignment
 
 type ClockInIntent = 'arrival' | 'departure' | 'pause-start' | 'pause-end';
 type Step = 'clock-in' | 'comment' | 'confirmation';
+
+const TERRAIN_CLOCK_IN_ROLES: readonly Role[] = [
+  'SUPERVISOR',
+  'RESOURCE',
+  'EXTERNAL_RESOURCE',
+  'COORDINATOR',
+  'GENERAL_SUPERVISOR',
+  'BE_RESOURCE',
+  'NEGOTIATION_RESOURCE',
+  'DRIVER',
+  'PROJECT_MANAGER',
+];
 
 type GeoState =
   | { status: 'loading' }
@@ -87,9 +99,10 @@ const typeLabels: Record<string, string> = {
   INTERMEDIATE: 'Intermediaire',
 };
 
-export function MobileClockInPage() {
+export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const canUseTerrainClockIn = TERRAIN_CLOCK_IN_ROLES.includes(userRole);
   const queryClient = useQueryClient();
   const requestedSiteId = searchParams.get('siteId');
   const requestedFreeMissionId = searchParams.get('freeMissionId');
@@ -233,6 +246,7 @@ export function MobileClockInPage() {
       await setMobileOfflineCache('sites-today', payload, 24 * 60 * 60 * 1000);
       return payload;
     },
+    enabled: canUseTerrainClockIn,
     staleTime: 300_000,
   });
 
@@ -258,7 +272,7 @@ export function MobileClockInPage() {
   const officeLocations = officeLocationsQuery.data?.items ?? [];
   const selectedOfficeLocation =
     officeLocations.find((office) => office.id === selectedOfficeLocationId) ?? officeLocations[0] ?? null;
-  const { assignments: todayAssignments } = useTodayOfficeAssignments();
+  const { assignments: todayAssignments } = useTodayOfficeAssignments(canUseTerrainClockIn);
   const hasFreeMissionToday = todayAssignments.some(
     (assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId),
   );
@@ -283,6 +297,7 @@ export function MobileClockInPage() {
     },
     enabled:
       nearbySearchRequested &&
+      canUseTerrainClockIn &&
       geoState.status === 'ready' &&
       !requestedSiteId &&
       !requestedFreeMissionId &&
@@ -897,7 +912,7 @@ export function MobileClockInPage() {
         </div>
       ) : null}
 
-      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks ? (
+      {canUseTerrainClockIn && !selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks ? (
         <ManualSiteList
           geoState={geoState}
           loading={todaySitesQuery.isLoading}
@@ -910,7 +925,7 @@ export function MobileClockInPage() {
         />
       ) : null}
 
-      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks ? (
+      {canUseTerrainClockIn && !selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks ? (
         <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Aide GPS</p>

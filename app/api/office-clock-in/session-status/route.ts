@@ -1,18 +1,13 @@
-import { ClockInStatus, ClockInType, Role } from '@prisma/client';
+import { ClockInStatus, ClockInType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   findActivePauseFromRecords,
   findOpenSessionFromRecords,
-  jsonClockInError,
   serializeSessionStatus,
 } from '@/lib/clock-in';
 import { withAuth } from '@/lib/auth/with-auth';
 
 export const GET = withAuth(async ({ user }) => {
-  if (user.role === Role.EXTERNAL_RESOURCE) {
-    return jsonClockInError('PERMISSION_DENIED', 403, 'Acces refuse au pointage bureau.');
-  }
-
   const records = await prisma.clockInRecord.findMany({
     where: {
       userId: user.id,

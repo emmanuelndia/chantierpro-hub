@@ -158,7 +158,7 @@ export function jsonClockInError(
 }
 
 export function isTechnician(role: Role) {
-  return FIELD_ROLES.includes(role);
+  return FIELD_ROLES.includes(role) || role === Role.PROJECT_MANAGER;
 }
 
 export async function parseJsonBody<T>(request: Request): Promise<T | null> {

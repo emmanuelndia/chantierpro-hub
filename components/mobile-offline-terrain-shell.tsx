@@ -54,7 +54,7 @@ export function MobileOfflineTerrainShell() {
 
 function renderOfflineRoute(pathname: string, user: WebSessionUser) {
   if (pathname === '/mobile/clock-in') {
-    return <MobileClockInPage />;
+    return <MobileClockInPage userRole={user.role} />;
   }
 
   if (pathname === '/mobile/photo') {

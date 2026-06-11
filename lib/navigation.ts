@@ -212,7 +212,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/clock-in',
     label: 'Pointage',
     icon: 'clock-in',
-    roles: ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER', 'PROJECT_MANAGER'],
+    roles: 'all',
   },
   {
     href: '/mobile/tasks',

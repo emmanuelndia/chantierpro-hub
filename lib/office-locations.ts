@@ -20,7 +20,7 @@ export function canManageOfficeLocations(role: Role) {
 }
 
 export function canUseOfficeClockIn(role: Role) {
-  return role !== Role.EXTERNAL_RESOURCE;
+  return Boolean(role);
 }
 
 export function parseOfficeLocationPayload(body: unknown): OfficeLocationPayload | null {

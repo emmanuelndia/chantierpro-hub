@@ -36,7 +36,7 @@ const fieldRoles: readonly Role[] = [
 export function MobileAppShell({ user, children }: MobileAppShellProps) {
   const queryClient = useQueryClient();
   const tabs = getMobileNavigationForRole(user.role);
-  const shouldLoadClockInBadges = fieldRoles.includes(user.role);
+  const shouldLoadClockInBadges = tabs.some((tab) => tab.href === '/mobile/clock-in');
   const shouldEnableTerrainOffline = fieldRoles.includes(user.role);
 
   const todayQuery = useQuery({
