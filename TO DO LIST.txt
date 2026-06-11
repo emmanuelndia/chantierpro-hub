@@ -112,3 +112,5 @@ Dans galerie photo on est directement dirigé sur un filtre au lieu d'avoir une 
 Dans notification au niveau de destinataire quand on choisi un rôle on doit pouvoir cocher les rôles à qui on veut envoyer les notifs 
 Les superviseur généraux doivent avoir présence et galerie photo et voyent les informations de leurs périmètres là
 Au niveau du mobile dans pointer la détéction de chantier à proximité désactive pointer au bureau on ne voit même plus 
+
+Arrivr à 8h00 est un peu +

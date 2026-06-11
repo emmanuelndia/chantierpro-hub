@@ -1,0 +1,1 @@
+ALTER TYPE "RhExportFormat" ADD VALUE IF NOT EXISTS 'PDF';

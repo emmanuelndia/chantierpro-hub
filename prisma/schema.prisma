@@ -99,6 +99,7 @@ enum PhotoTag {
 enum RhExportFormat {
   CSV
   XLSX
+  PDF
 }
 
 enum ReportStatus {

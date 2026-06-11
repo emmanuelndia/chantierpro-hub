@@ -56,7 +56,7 @@ export type RhUserPresenceDetail = {
 };
 
 export type RhExportInput = {
-  format: 'csv' | 'xlsx';
+  format: 'csv' | 'xlsx' | 'pdf';
   from: string;
   to: string;
   userId: string | null;
@@ -70,7 +70,7 @@ export type RhExportInput = {
 export type RhExportHistoryItem = {
   id: string;
   createdById: string;
-  format: 'csv' | 'xlsx';
+  format: 'csv' | 'xlsx' | 'pdf';
   from: string;
   to: string;
   userId: string | null;

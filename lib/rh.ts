@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { jsPDF } from 'jspdf';
 import { ClockInStatus, ClockInType, Prisma, Role, type PrismaClient } from '@prisma/client';
 import { createSignedStorageUrl, uploadPrivateStorageObject } from '@/lib/storage';
 import { projectAccessWhere } from '@/lib/projects';
@@ -183,7 +184,7 @@ type UserPresenceQuery = {
 };
 
 type ExportQuery = {
-  format: 'csv' | 'xlsx';
+  format: 'csv' | 'xlsx' | 'pdf';
   from: string;
   to: string;
   userId: string | null;
@@ -1161,6 +1162,7 @@ export async function buildRhExportArtifact(
   const sortedUsers = [...grouped.values()].sort((left, right) => compareBuiltSession(left[0]!, right[0]!));
   const rows: ExportRow[] = [];
   let totalGeneralHours = 0;
+  const includeSummaryRows = !payload.input.attendanceList && payload.input.format !== 'pdf';
 
   for (const userSessions of sortedUsers) {
     const orderedSessions = [...userSessions].sort(compareBuiltSession);
@@ -1187,41 +1189,45 @@ export async function buildRhExportArtifact(
       });
     }
 
-    totalGeneralHours += employeeTotalHours;
+    if (includeSummaryRows) {
+      totalGeneralHours += employeeTotalHours;
 
-    const owner = orderedSessions[0]!;
+      const owner = orderedSessions[0]!;
+      rows.push({
+        matricule: owner.matricule ?? '',
+        lastName: owner.lastName,
+        firstName: owner.firstName,
+        position: 'TOTAL EMPLOYE',
+        context: '',
+        projectName: '',
+        date: '',
+        arrivalTime: '',
+        departureTime: '',
+        realDurationHours: formatHours(employeeTotalHours),
+        timeSpent: formatDurationLabel(employeeTotalHours),
+        isLate: '',
+        status: '',
+      });
+    }
+  }
+
+  if (includeSummaryRows) {
     rows.push({
-      matricule: owner.matricule ?? '',
-      lastName: owner.lastName,
-      firstName: owner.firstName,
-      position: 'TOTAL EMPLOYE',
+      matricule: '',
+      lastName: '',
+      firstName: '',
+      position: 'TOTAL GENERAL',
       context: '',
       projectName: '',
       date: '',
       arrivalTime: '',
       departureTime: '',
-      realDurationHours: formatHours(employeeTotalHours),
-      timeSpent: formatDurationLabel(employeeTotalHours),
+      realDurationHours: formatHours(totalGeneralHours),
+      timeSpent: formatDurationLabel(totalGeneralHours),
       isLate: '',
       status: '',
     });
   }
-
-  rows.push({
-    matricule: '',
-    lastName: '',
-    firstName: '',
-    position: 'TOTAL GENERAL',
-    context: '',
-    projectName: '',
-    date: '',
-    arrivalTime: '',
-    departureTime: '',
-    realDurationHours: formatHours(totalGeneralHours),
-    timeSpent: formatDurationLabel(totalGeneralHours),
-    isLate: '',
-    status: '',
-  });
 
   const fileBaseName = `rh-export-${payload.input.from.slice(0, 10)}-${payload.input.to.slice(0, 10)}`;
 
@@ -1239,6 +1245,31 @@ export async function buildRhExportArtifact(
 
     return {
       contentType: 'text/csv; charset=utf-8',
+      fileName,
+      buffer,
+      rowCount: sessions.length,
+      storageKey,
+      expiresAt,
+    };
+  }
+
+  if (payload.input.format === 'pdf') {
+    const buffer = buildAttendancePdfBuffer(rows, {
+      from: payload.input.from,
+      to: payload.input.to,
+    });
+    const fileName = `${fileBaseName}.pdf`;
+    const storageKey = buildRhExportStorageKey(fileName);
+    const expiresAt = new Date(Date.now() + RH_EXPORT_ARTIFACT_TTL_MS).toISOString();
+
+    await uploadPrivateStorageObject({
+      storageKey,
+      body: buffer,
+      contentType: 'application/pdf',
+    });
+
+    return {
+      contentType: 'application/pdf',
       fileName,
       buffer,
       rowCount: sessions.length,
@@ -1283,7 +1314,7 @@ export async function logRhExport(
   await prisma.rhExportHistory.create({
     data: {
       createdById: payload.createdById,
-      format: payload.input.format === 'csv' ? 'CSV' : 'XLSX',
+      format: payload.input.format === 'csv' ? 'CSV' : payload.input.format === 'pdf' ? 'PDF' : 'XLSX',
       from: new Date(payload.input.from),
       to: new Date(payload.input.to),
       userId: payload.input.userId,
@@ -1785,7 +1816,7 @@ function serializeRhExportHistory(item: SerializableRhExportHistory): RhExportHi
   return {
     id: item.id,
     createdById: item.createdById,
-    format: item.format === 'CSV' ? 'csv' : 'xlsx',
+    format: item.format === 'CSV' ? 'csv' : item.format === 'PDF' ? 'pdf' : 'xlsx',
     from: item.from.toISOString(),
     to: item.to.toISOString(),
     userId: item.userId,
@@ -1917,7 +1948,7 @@ function parseYear(value: string | null) {
 }
 
 function parseExportFormat(value: unknown) {
-  return value === 'csv' || value === 'xlsx' ? value : null;
+  return value === 'csv' || value === 'xlsx' || value === 'pdf' ? value : null;
 }
 
 function parseCsvList(value: string | null) {
@@ -2002,11 +2033,102 @@ async function buildAttendanceXlsxBuffer(rows: ExportRow[]) {
   return Buffer.from(buffer);
 }
 
-function buildAttendancePosition(row: ExportRow) {
-  if (row.position === 'TOTAL EMPLOYE' || row.position === 'TOTAL GENERAL') {
-    return row.position;
+function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to: string }) {
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 8;
+  const tableWidth = pageWidth - margin * 2;
+  const columns = [
+    { label: 'numero matricule', key: 'matricule', width: 26 },
+    { label: 'nom', key: 'lastName', width: 34 },
+    { label: 'prenom', key: 'firstName', width: 34 },
+    { label: 'position', key: 'attendancePosition', width: 78 },
+    { label: 'heure arrivee', key: 'arrivalTime', width: 30 },
+    { label: 'heure depart', key: 'departureTime', width: 30 },
+    { label: 'temps passee', key: 'timeSpent', width: 34 },
+  ];
+  const scale = tableWidth / columns.reduce((sum, column) => sum + column.width, 0);
+  const scaledColumns = columns.map((column) => ({ ...column, width: column.width * scale }));
+  let y = margin;
+
+  const periodLabel = `${period.from.slice(0, 10)} au ${period.to.slice(0, 10)}`;
+
+  const drawTitle = () => {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.text('Liste de presence - ChantierPro', margin, y + 5);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.text(`Periode : ${periodLabel}`, margin, y + 11);
+    pdf.text(`Lignes : ${rows.length}`, pageWidth - margin, y + 11, { align: 'right' });
+    y += 17;
+  };
+
+  const drawHeader = () => {
+    let x = margin;
+    pdf.setFillColor(239, 243, 248);
+    pdf.setDrawColor(210, 219, 232);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    for (const column of scaledColumns) {
+      pdf.rect(x, y, column.width, 9, 'FD');
+      pdf.text(column.label, x + 1.5, y + 5.8);
+      x += column.width;
+    }
+    y += 9;
+  };
+
+  const drawPageHeader = () => {
+    drawTitle();
+    drawHeader();
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+  };
+
+  drawPageHeader();
+
+  for (const row of rows) {
+    const cells = {
+      matricule: row.matricule,
+      lastName: row.lastName,
+      firstName: row.firstName,
+      attendancePosition: buildAttendancePosition(row),
+      arrivalTime: row.arrivalTime,
+      departureTime: row.departureTime,
+      timeSpent: row.timeSpent,
+    };
+    const lineGroups = scaledColumns.map((column) =>
+      pdf.splitTextToSize(String(cells[column.key as keyof typeof cells] ?? ''), column.width - 3) as string[],
+    );
+    const rowHeight = Math.max(8, ...lineGroups.map((lines) => lines.length * 3.4 + 4));
+
+    if (y + rowHeight > pageHeight - margin) {
+      pdf.addPage();
+      y = margin;
+      drawPageHeader();
+    }
+
+    let x = margin;
+    pdf.setDrawColor(225, 231, 240);
+    scaledColumns.forEach((column, index) => {
+      pdf.rect(x, y, column.width, rowHeight);
+      pdf.text(lineGroups[index] ?? [''], x + 1.5, y + 4.8);
+      x += column.width;
+    });
+    y += rowHeight;
   }
 
+  if (rows.length === 0) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.text('Aucune presence pour les filtres selectionnes.', margin, y + 10);
+  }
+
+  return Buffer.from(pdf.output('arraybuffer'));
+}
+
+function buildAttendancePosition(row: ExportRow) {
   return `${row.context === 'Bureau' ? 'Bureau' : 'Terrain'} - ${row.position}`;
 }
 

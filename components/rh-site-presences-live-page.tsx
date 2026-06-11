@@ -98,12 +98,12 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
     placeholderData: (previousData) => previousData,
   });
   const exportMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (format: 'xlsx' | 'pdf') => {
       const response = await authFetch('/api/rh/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          format: 'xlsx',
+          format,
           from: `${selectedDate}T00:00:00.000Z`,
           to: `${selectedDate}T23:59:59.999Z`,
           userId: resourceId || null,
@@ -125,7 +125,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
       const match = contentDisposition?.match(/filename="([^"]+)"/);
       return {
         blob,
-        fileName: match?.[1] ?? `liste-presence-${selectedDate}.xlsx`,
+        fileName: match?.[1] ?? `liste-presence-${selectedDate}.${format}`,
       };
     },
     onSuccess: ({ blob, fileName }) => {
@@ -206,14 +206,24 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
               Actualiser
             </button>
             {canExportPresenceList ? (
-              <button
-                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
-                disabled={exportMutation.isPending}
-                onClick={() => exportMutation.mutate()}
-                type="button"
-              >
-                {exportMutation.isPending ? 'Generation...' : 'Telecharger la liste'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                  disabled={exportMutation.isPending}
+                  onClick={() => exportMutation.mutate('xlsx')}
+                  type="button"
+                >
+                  {exportMutation.isPending ? 'Generation...' : 'Telecharger XLSX'}
+                </button>
+                <button
+                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                  disabled={exportMutation.isPending}
+                  onClick={() => exportMutation.mutate('pdf')}
+                  type="button"
+                >
+                  PDF
+                </button>
+              </div>
             ) : null}
           </div>
         </div>

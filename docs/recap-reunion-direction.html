@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChantierPro - Priorites apres reunion Direction</title>
+  <style>
+    :root {
+      --ink: #081225;
+      --muted: #5d6c83;
+      --line: #dce4ef;
+      --soft: #f4f7fb;
+      --paper: #ffffff;
+      --orange: #f45b0b;
+      --red: #d93025;
+      --red-soft: #fff0ef;
+      --blue: #2357d7;
+      --blue-soft: #edf3ff;
+      --green: #0f9f6e;
+      --green-soft: #e9fbf4;
+      --amber: #b86b00;
+      --amber-soft: #fff7df;
+      --shadow: 0 18px 50px rgba(8, 18, 37, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--soft);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: 26px;
+      background: linear-gradient(135deg, #071123 0%, #101a33 58%, #3b1f10 100%);
+      color: white;
+      padding: 44px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -120px;
+      bottom: -160px;
+      width: 360px;
+      height: 360px;
+      border-radius: 999px;
+      background: rgba(244, 91, 11, 0.28);
+      filter: blur(10px);
+    }
+
+    .brand {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 34px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .brand-name {
+      letter-spacing: 0.24em;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .brand-name span { color: var(--orange); }
+
+    .date-pill {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      padding: 10px 16px;
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .highlight {
+      display: inline-flex;
+      margin-bottom: 18px;
+      border-radius: 999px;
+      background: var(--orange);
+      color: white;
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      position: relative;
+      z-index: 1;
+    }
+
+    h1 {
+      position: relative;
+      z-index: 1;
+      margin: 0;
+      max-width: 900px;
+      font-size: clamp(34px, 5vw, 64px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      position: relative;
+      z-index: 1;
+      margin: 22px 0 0;
+      max-width: 830px;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 18px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+      margin-top: 22px;
+    }
+
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .span-12 { grid-column: span 12; }
+    .span-8 { grid-column: span 8; }
+    .span-6 { grid-column: span 6; }
+    .span-4 { grid-column: span 4; }
+
+    .section-kicker {
+      margin: 0 0 10px;
+      color: var(--orange);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 28px;
+      line-height: 1.15;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .tag {
+      display: inline-flex;
+      border-radius: 999px;
+      background: #eef2f7;
+      color: #314057;
+      padding: 7px 11px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .tag.red { background: var(--red-soft); color: var(--red); }
+    .tag.orange { background: #fff1e8; color: #c74700; }
+    .tag.blue { background: var(--blue-soft); color: #183fa5; }
+    .tag.green { background: var(--green-soft); color: #087b55; }
+    .tag.amber { background: var(--amber-soft); color: var(--amber); }
+
+    .priority-card {
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #fff, #f9fbfe);
+      padding: 20px;
+      min-height: 100%;
+    }
+
+    .priority-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .priority-badge {
+      display: inline-grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      color: white;
+      font-weight: 950;
+      letter-spacing: 0.04em;
+      flex: 0 0 auto;
+    }
+
+    .p1 { background: var(--red); }
+    .p2 { background: var(--orange); }
+    .p3 { background: var(--blue); }
+    .p4 { background: var(--green); }
+
+    .priority-title {
+      display: grid;
+      gap: 2px;
+    }
+
+    .priority-title strong {
+      font-size: 18px;
+    }
+
+    .priority-title span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .list {
+      display: grid;
+      gap: 11px;
+      margin: 16px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .list li {
+      display: grid;
+      grid-template-columns: 26px 1fr;
+      gap: 10px;
+      align-items: start;
+      color: #1d2a3d;
+    }
+
+    .check {
+      display: inline-grid;
+      place-items: center;
+      width: 23px;
+      height: 23px;
+      border-radius: 50%;
+      background: var(--green-soft);
+      color: var(--green);
+      font-weight: 900;
+      font-size: 12px;
+      margin-top: 1px;
+    }
+
+    .issue-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .issue {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 16px;
+    }
+
+    .issue h3 {
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+
+    .footer {
+      margin: 22px 0 0;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      .page { padding: 16px; }
+      .hero {
+        padding: 30px 22px;
+        border-radius: 22px;
+      }
+      .brand {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .span-8,
+      .span-6,
+      .span-4 {
+        grid-column: span 12;
+      }
+      .issue-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="brand">
+        <div class="brand-name">Chantier<span>Pro</span></div>
+        <div class="date-pill">R&eacute;capitulatif prioris&eacute;</div>
+      </div>
+      <div class="highlight">Modifications &agrave; apporter apr&egrave;s r&eacute;union avec la Direction</div>
+      <h1>Priorit&eacute;s fonctionnelles pour stabiliser le suivi terrain, bureau et RH.</h1>
+      <p>
+        Cette page classe les demandes Direction et les probl&egrave;mes op&eacute;rationnels par ordre de priorit&eacute;,
+        pour savoir quoi traiter d'abord et pourquoi.
+      </p>
+    </section>
+
+    <section class="grid">
+      <article class="card span-12">
+        <p class="section-kicker">Lecture rapide</p>
+        <h2>Ordre de priorit&eacute; propos&eacute;</h2>
+        <p>
+          Les priorit&eacute;s sont organis&eacute;es selon l'impact m&eacute;tier : d'abord ce qui bloque la paie,
+          les pr&eacute;sences et les pointages, ensuite le pilotage des projets, puis les am&eacute;liorations
+          qui r&eacute;duisent le travail r&eacute;p&eacute;titif et les erreurs.
+        </p>
+        <div class="tag-row">
+          <span class="tag red">P1 - Critique RH / pointage</span>
+          <span class="tag orange">P2 - Pilotage terrain</span>
+          <span class="tag blue">P3 - Productivit&eacute;</span>
+          <span class="tag green">P4 - Confort et corrections</span>
+        </div>
+      </article>
+
+      <article class="card span-6">
+        <div class="priority-card">
+          <div class="priority-head">
+            <span class="priority-badge p1">P1</span>
+            <div class="priority-title">
+              <strong>Pr&eacute;sences, pointage et RH</strong>
+              <span>&Agrave; faire en premier</span>
+            </div>
+          </div>
+          <p>
+            Ces sujets conditionnent la fiabilit&eacute; des heures, des retards, des absences et des exports RH.
+          </p>
+          <ul class="list">
+            <li><span class="check">1</span><span>Refondre la page <strong>Pr&eacute;sences</strong> avec seulement deux contextes : Terrain et Bureau.</span></li>
+            <li><span class="check">2</span><span>Mettre en place le <strong>pointage bureau quotidien</strong>, ind&eacute;pendant du planning.</span></li>
+            <li><span class="check">3</span><span>Corriger la r&egrave;gle des <strong>retards apr&egrave;s 08:00</strong> sur tous les pointages.</span></li>
+            <li><span class="check">4</span><span>Afficher les pr&eacute;sences bureau dans la page Pr&eacute;sences.</span></li>
+            <li><span class="check">5</span><span>Ajouter l'export liste de pr&eacute;sence : matricule, nom, pr&eacute;nom, position, arriv&eacute;e, d&eacute;part, temps pass&eacute;.</span></li>
+            <li><span class="check">6</span><span>Supprimer le menu <strong>Pr&eacute;sences &eacute;quipe</strong> si la page Pr&eacute;sences couvre d&eacute;sormais le besoin.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="card span-6">
+        <div class="priority-card">
+          <div class="priority-head">
+            <span class="priority-badge p1">P1</span>
+            <div class="priority-title">
+              <strong>Ressources RH et matricules</strong>
+              <span>Base n&eacute;cessaire pour les exports</span>
+            </div>
+          </div>
+          <p>
+            Le matricule et l'&eacute;tat du jour doivent devenir visibles sans surcharger les &eacute;crans.
+          </p>
+          <ul class="list">
+            <li><span class="check">1</span><span>Ajouter le <strong>matricule facultatif</strong> sur tous les utilisateurs.</span></li>
+            <li><span class="check">2</span><span>Permettre &agrave; l'utilisateur et &agrave; l'admin de modifier le matricule.</span></li>
+            <li><span class="check">3</span><span>Dans Ressources RH : mettre le matricule au d&eacute;but et la <strong>pr&eacute;sence du jour</strong> &agrave; la fin.</span></li>
+            <li><span class="check">4</span><span>Ajouter les filtres : pr&eacute;sents terrain, pr&eacute;sents bureau, absents, retards, sans pointage.</span></li>
+            <li><span class="check">5</span><span>Stabiliser la recherche RH pour qu'elle ne donne plus l'impression de recharger la page &agrave; chaque lettre.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="card span-6">
+        <div class="priority-card">
+          <div class="priority-head">
+            <span class="priority-badge p2">P2</span>
+            <div class="priority-title">
+              <strong>Planning, t&acirc;ches et progression</strong>
+              <span>Pour mieux piloter le terrain</span>
+            </div>
+          </div>
+          <p>
+            Ces modifications rendent le planning plus exploitable et limitent les erreurs de suivi.
+          </p>
+          <ul class="list">
+            <li><span class="check">1</span><span>Retirer la cr&eacute;ation des t&acirc;ches <strong>Bureau / coordination</strong> : le bureau passe par le pointage bureau.</span></li>
+            <li><span class="check">2</span><span>Ajouter une <strong>dur&eacute;e pr&eacute;vue</strong> sur les t&acirc;ches.</span></li>
+            <li><span class="check">3</span><span>Afficher la progression globale des projets et les alertes de retard.</span></li>
+            <li><span class="check">4</span><span>Ajouter un filtre chef projet dans le planning centralis&eacute;.</span></li>
+            <li><span class="check">5</span><span>Permettre aux chefs projets d'utiliser les fonctionnalit&eacute;s terrain mobile.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="card span-6">
+        <div class="priority-card">
+          <div class="priority-head">
+            <span class="priority-badge p2">P2</span>
+            <div class="priority-title">
+              <strong>N&eacute;gociation terrain</strong>
+              <span>Module &agrave; part, pas un chantier classique</span>
+            </div>
+          </div>
+          <p>
+            Les ressources n&eacute;go bougent entre plusieurs immeubles et zones dans la journ&eacute;e.
+          </p>
+          <ul class="list">
+            <li><span class="check">1</span><span>Cr&eacute;er une journ&eacute;e n&eacute;gociation avec entr&eacute;e et sortie GPS.</span></li>
+            <li><span class="check">2</span><span>Ajouter plusieurs visites immeubles dans une m&ecirc;me journ&eacute;e.</span></li>
+            <li><span class="check">3</span><span>Associer GPS, remarque, statut, interlocuteur, photos et rapport.</span></li>
+            <li><span class="check">4</span><span>Compter la n&eacute;gociation comme <strong>Terrain</strong> dans les pr&eacute;sences RH.</span></li>
+            <li><span class="check">5</span><span>Donner aussi les fonctions terrain au responsable n&eacute;gociation.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="card span-6">
+        <div class="priority-card">
+          <div class="priority-head">
+            <span class="priority-badge p3">P3</span>
+            <div class="priority-title">
+              <strong>Productivit&eacute; planning</strong>
+              <span>R&eacute;duire les saisies r&eacute;p&eacute;titives</span>
+            </div>
+          </div>
+          <ul class="list">
+            <li><span class="check">1</span><span>Ajouter <strong>Enregistrer comme mod&egrave;le</strong> dans le planning.</span></li>
+            <li><span class="check">2</span><span>Ajouter <strong>Utiliser un mod&egrave;le</strong> dans Nouvelle t&acirc;che.</span></li>
+            <li><span class="check">3</span><span>Dupliquer des t&acirc;ches vers une date choisie.</span></li>
+            <li><span class="check">4</span><span>S&eacute;lectionner plusieurs ressources pour cr&eacute;er la m&ecirc;me t&acirc;che en une fois.</span></li>
+            <li><span class="check">5</span><span>Corriger l'affichage des projets sans site pour les missions libres.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="card span-6">
+        <div class="priority-card">
+          <div class="priority-head">
+            <span class="priority-badge p3">P3</span>
+            <div class="priority-title">
+              <strong>Notifications internes</strong>
+              <span>Communication admin vers utilisateurs</span>
+            </div>
+          </div>
+          <ul class="list">
+            <li><span class="check">1</span><span>Permettre &agrave; l'admin d'envoyer une notification &agrave; tous, &agrave; plusieurs r&ocirc;les ou &agrave; une s&eacute;lection d'utilisateurs.</span></li>
+            <li><span class="check">2</span><span>Afficher la notification dans la cloche et aussi en <strong>banni&egrave;re visible</strong> tant qu'elle n'est pas lue.</span></li>
+            <li><span class="check">3</span><span>Pr&eacute;voir des messages types : renseigner le matricule, changer le mot de passe, annonce libre.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="card span-12">
+        <p class="section-kicker">P4 - Corrections et petits probl&egrave;mes</p>
+        <h2>Points op&eacute;rationnels &agrave; traiter apr&egrave;s les gros blocs</h2>
+        <div class="issue-grid">
+          <div class="issue">
+            <h3>D&eacute;tection chantier proche</h3>
+            <p>La recherche d'un chantier proche doit &ecirc;tre manuelle pour &eacute;viter les erreurs entre bureau, chantier et mission libre.</p>
+          </div>
+          <div class="issue">
+            <h3>Pointage bureau visible</h3>
+            <p>Le bouton bureau doit rester visible m&ecirc;me si l'utilisateur est proche d'un chantier.</p>
+          </div>
+          <div class="issue">
+            <h3>Sortie oubli&eacute;e sur chantier</h3>
+            <p>La sortie distante doit &ecirc;tre possible et affich&eacute;e clairement comme sortie distante.</p>
+          </div>
+          <div class="issue">
+            <h3>Pr&eacute;sence bureau non pr&eacute;vue</h3>
+            <p>Le badge Non pr&eacute;vu ne doit pas appara&icirc;tre pour une pr&eacute;sence bureau normale.</p>
+          </div>
+          <div class="issue">
+            <h3>Galerie photos GS</h3>
+            <p>Les superviseurs g&eacute;n&eacute;raux doivent voir correctement les photos de leur p&eacute;rim&egrave;tre.</p>
+          </div>
+          <div class="issue">
+            <h3>Galerie globale</h3>
+            <p>La galerie doit s'ouvrir sans filtre pr&eacute;s&eacute;lectionn&eacute;, puis laisser l'utilisateur filtrer.</p>
+          </div>
+          <div class="issue">
+            <h3>Page 403</h3>
+            <p>Le bouton Revenir &agrave; la connexion doit renvoyer vers la bonne page web ou mobile.</p>
+          </div>
+          <div class="issue">
+            <h3>Images indisponibles</h3>
+            <p>Si le stockage renvoie 404, afficher un message propre et traiter l'objet photo manquant.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card span-12">
+        <p class="section-kicker">D&eacute;cision m&eacute;tier &agrave; retenir</p>
+        <h2>Ce qui guide le classement</h2>
+        <ul class="list">
+          <li><span class="check">✓</span><span>Les sujets qui touchent les heures, les absences, les retards et les exports RH passent en priorit&eacute; absolue.</span></li>
+          <li><span class="check">✓</span><span>Tout ce qui n'est pas bureau est consid&eacute;r&eacute; comme Terrain : chantier, mission libre, n&eacute;gociation et intervention sp&eacute;ciale.</span></li>
+          <li><span class="check">✓</span><span>Le planning doit rester orient&eacute; terrain, pendant que le bureau est suivi par un pointage quotidien.</span></li>
+          <li><span class="check">✓</span><span>Les am&eacute;liorations de confort viennent apr&egrave;s la fiabilit&eacute; RH et le pilotage projet.</span></li>
+        </ul>
+      </article>
+    </section>
+
+    <p class="footer">Document de synth&egrave;se - ChantierPro - R&eacute;union Direction</p>
+  </main>
+</body>
+</html>
