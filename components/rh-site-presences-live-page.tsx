@@ -405,13 +405,18 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
       !context.taskAction &&
       context.status !== 'EXPECTED_NOT_CLOCKED',
   );
+  const anomalyLabel = resource.status === 'ANOMALY'
+    ? resource.anomalyReason ?? 'Pointage a verifier'
+    : null;
   const flags = [
     isUnplannedClockIn ? 'Non prevu' : null,
-    resource.isRemoteCheckout ? 'Sortie a distance' : null,
-    resource.isAutoClosed ? 'Auto-cloturee' : null,
+    anomalyLabel,
+    resource.status !== 'ANOMALY' && resource.isRemoteCheckout ? 'Sortie a distance' : null,
+    resource.status !== 'ANOMALY' && resource.isAutoClosed ? 'Auto-cloturee' : null,
     resource.isRegularized ? 'Regularisee' : null,
     resource.isLate ? 'Retard' : null,
   ].filter(Boolean);
+  const statusLabel = getLiveResourceStatusLabel(resource);
 
   return (
     <article className="py-4">
@@ -445,7 +450,7 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
             
           </p>
         </div>
-        <Badge tone={liveStatusTone(resource.status)}>{liveStatusLabel(resource.status)}</Badge>
+        <Badge tone={liveStatusTone(resource.status)}>{statusLabel}</Badge>
         <div className="text-sm font-semibold text-slate-700">
           <p>Entree : {resource.arrivalAt ? formatTime(resource.arrivalAt) : '-'}</p>
           <p className="mt-1 text-xs text-slate-500">
@@ -463,7 +468,7 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
                 <p className="font-semibold text-slate-950">
                   {presenceContextLabel(context.presenceContext)} - {context.siteName}
                 </p>
-                <Badge tone={liveStatusTone(context.status)}>{liveStatusLabel(context.status)}</Badge>
+                <Badge tone={liveStatusTone(context.status)}>{getLiveResourceStatusLabel(context)}</Badge>
               </div>
               {context.isLate ? (
                 <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">
@@ -594,6 +599,11 @@ function liveStatusLabel(status: RhSitePresenceLiveStatus) {
   return labels[status];
 }
 
+function getLiveResourceStatusLabel(resource: Pick<RhSitePresenceLiveResource, 'status' | 'anomalyReason'>) {
+  if (resource.status !== 'ANOMALY') return liveStatusLabel(resource.status);
+  return resource.anomalyReason ?? 'Pointage a verifier';
+}
+
 function liveStatusTone(status: RhSitePresenceLiveStatus) {
   if (status === 'PRESENT') return 'success';
   if (status === 'PAUSED' || status === 'EXPECTED_NOT_CLOCKED') return 'warning';
@@ -671,6 +681,7 @@ function buildAggregatedLiveResource(contexts: LiveResourceContext[]): Aggregate
     isRemoteCheckout: sortedContexts.some((context) => context.isRemoteCheckout),
     isAutoClosed: sortedContexts.some((context) => context.isAutoClosed),
     isRegularized: sortedContexts.some((context) => context.isRegularized),
+    anomalyReason: sortedContexts.find((context) => context.anomalyReason)?.anomalyReason ?? null,
     isLate: sortedContexts.some((context) => context.isLate),
     contexts: sortedContexts,
   };

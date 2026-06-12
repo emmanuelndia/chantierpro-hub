@@ -75,6 +75,7 @@ function aggregateResources(
       departureAt,
       durationSeconds,
       isLate: resources.some((resource) => resource.isLate),
+      anomalyReason: resources.find((resource) => resource.anomalyReason)?.anomalyReason ?? null,
       positionLabel: buildPositionLabel(contexts),
       detailsCount: contexts.length,
     };

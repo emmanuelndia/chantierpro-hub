@@ -65,6 +65,7 @@ export type MobilePresenceListResource = {
   departureAt: string | null;
   durationSeconds: number | null;
   isLate: boolean;
+  anomalyReason: string | null;
   positionLabel: string;
   detailsCount: number;
 };

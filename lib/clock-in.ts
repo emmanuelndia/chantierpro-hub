@@ -1081,8 +1081,9 @@ function sanitizeDateTimeString(value: unknown) {
     return null;
   }
 
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  const trimmed = value.trim();
+  const date = new Date(trimmed);
+  return Number.isNaN(date.getTime()) ? null : trimmed;
 }
 
 function isLateClockIn(type: ClockInType, timestampLocal: string | Date) {

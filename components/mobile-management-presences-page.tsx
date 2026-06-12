@@ -178,7 +178,11 @@ function PresenceResourceCard({ resource }: Readonly<{ resource: MobilePresenceL
           <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{resource.role}</p>
         </div>
         <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${statusTone(resource.status, resource.isLate)}`}>
-          {resource.isLate ? 'Retard' : statusLabel(resource.status)}
+          {resource.status === 'ANOMALY'
+            ? resource.anomalyReason ?? 'Pointage a verifier'
+            : resource.isLate
+              ? 'Retard'
+              : statusLabel(resource.status)}
         </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -211,7 +215,7 @@ function statusLabel(status: MobilePresenceListStatus) {
   if (status === 'PAUSED') return 'Pause';
   if (status === 'LEFT') return 'Sorti';
   if (status === 'ABSENT') return 'Absent';
-  return 'Anomalie';
+  return 'Pointage a verifier';
 }
 
 function statusTone(status: MobilePresenceListStatus, isLate: boolean) {

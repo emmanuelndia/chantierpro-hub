@@ -1778,7 +1778,7 @@ function buildCompleteSession(
     isRemoteCheckout: departure.isRemoteCheckout,
     isAutoClosed: departure.isAutoClosed,
     isRegularized: departure.isRegularized,
-    isLate: arrival.isLate,
+    isLate: isLateArrival(arrival.timestampLocal),
     startedAt: arrival.timestampLocal.toISOString(),
   };
 }
@@ -1816,7 +1816,7 @@ function buildIncompleteSession(
     isRemoteCheckout: false,
     isAutoClosed: isPreviousDay || arrival.isAutoClosed,
     isRegularized: arrival.isRegularized,
-    isLate: arrival.isLate,
+    isLate: isLateArrival(arrival.timestampLocal),
     startedAt: arrival.timestampLocal.toISOString(),
   };
 }
@@ -2442,8 +2442,11 @@ function buildLiveResource(
   presenceContext: 'TERRAIN' | 'OFFICE',
 ): RhSitePresenceLiveResource {
   const latest = records.at(-1) ?? null;
-  const arrival = [...records].reverse().find((record) => record.type === ClockInType.ARRIVAL) ?? null;
-  const departure = [...records].reverse().find((record) => record.type === ClockInType.DEPARTURE) ?? null;
+  const arrivalIndex = findLastRecordIndex(records, (record) => record.type === ClockInType.ARRIVAL);
+  const arrival = arrivalIndex === -1 ? null : records[arrivalIndex] ?? null;
+  const departure = arrivalIndex === -1
+    ? null
+    : [...records.slice(arrivalIndex + 1)].reverse().find((record) => record.type === ClockInType.DEPARTURE) ?? null;
   const today = new Date().toISOString().slice(0, 10);
   const hasStaleOpenSession =
     Boolean(arrival) &&
@@ -2459,6 +2462,11 @@ function buildLiveResource(
   });
   const hasAnomaly = records.some((record) => record.isAutoClosed) || hasRemoteReview || hasStaleOpenSession;
   const status = hasAnomaly ? 'ANOMALY' : getLiveStatusFromLatestRecord(latest);
+  const anomalyReason = getLiveAnomalyReason({
+    records,
+    hasRemoteReview,
+    hasStaleOpenSession,
+  });
 
   return {
     userId: user.id,
@@ -2477,8 +2485,44 @@ function buildLiveResource(
     isRemoteCheckout: records.some((record) => record.isRemoteCheckout),
     isAutoClosed: records.some((record) => record.isAutoClosed),
     isRegularized: records.some((record) => record.isRegularized),
-    isLate: records.some((record) => record.type === ClockInType.ARRIVAL && record.isLate),
+    anomalyReason,
+    isLate: records.some((record) => record.type === ClockInType.ARRIVAL && isLateArrival(record.timestampLocal)),
   };
+}
+
+function findLastRecordIndex<T>(items: T[], predicate: (item: T) => boolean) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index]!)) return index;
+  }
+
+  return -1;
+}
+
+function isLateArrival(value: Date) {
+  const hour = value.getUTCHours();
+  const minute = value.getUTCMinutes();
+  return hour > 8 || (hour === 8 && minute > 30);
+}
+
+function getLiveAnomalyReason({
+  records,
+  hasRemoteReview,
+  hasStaleOpenSession,
+}: {
+  records: {
+    isRemoteCheckout: boolean;
+    isAutoClosed: boolean;
+    isRegularized: boolean;
+  }[];
+  hasRemoteReview: boolean;
+  hasStaleOpenSession: boolean;
+}) {
+  if (hasStaleOpenSession) return 'Session ancienne ouverte';
+  if (records.some((record) => record.isAutoClosed)) return 'Sortie oubliee';
+  if (hasRemoteReview) return 'Sortie distante a verifier';
+  if (records.some((record) => record.isRemoteCheckout)) return 'Sortie distante';
+  if (records.some((record) => record.isRegularized)) return 'Regularisee';
+  return null;
 }
 
 function serializeGpsPoint(record: {

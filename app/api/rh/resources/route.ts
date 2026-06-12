@@ -160,8 +160,11 @@ function buildTodayPresence(
   expectedTerrain: boolean,
 ) {
   const latest = records.at(-1) ?? null;
-  const arrival = [...records].reverse().find((record) => record.type === ClockInType.ARRIVAL) ?? null;
-  const departure = [...records].reverse().find((record) => record.type === ClockInType.DEPARTURE) ?? null;
+  const arrivalIndex = findLastRecordIndex(records, (record) => record.type === ClockInType.ARRIVAL);
+  const arrival = arrivalIndex === -1 ? null : records[arrivalIndex] ?? null;
+  const departure = arrivalIndex === -1
+    ? null
+    : [...records.slice(arrivalIndex + 1)].reverse().find((record) => record.type === ClockInType.DEPARTURE) ?? null;
   const context = latest
     ? latest.officeClockInLocation === 'OFFICE'
       ? 'OFFICE'
@@ -209,8 +212,22 @@ function buildTodayPresence(
     status,
     arrivalAt: arrival?.timestampLocal.toISOString() ?? null,
     departureAt: departure?.timestampLocal.toISOString() ?? null,
-    isLate: records.some((record) => record.type === ClockInType.ARRIVAL && record.isLate),
+    isLate: records.some((record) => record.type === ClockInType.ARRIVAL && isLateArrival(record.timestampLocal)),
   };
+}
+
+function findLastRecordIndex<T>(items: T[], predicate: (item: T) => boolean) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index]!)) return index;
+  }
+
+  return -1;
+}
+
+function isLateArrival(value: Date) {
+  const hour = value.getUTCHours();
+  const minute = value.getUTCMinutes();
+  return hour > 8 || (hour === 8 && minute > 30);
 }
 
 function matchesPresenceStatus(

@@ -162,6 +162,7 @@ export type RhSitePresenceLiveResource = {
   isRemoteCheckout: boolean;
   isAutoClosed: boolean;
   isRegularized: boolean;
+  anomalyReason: string | null;
   isLate: boolean;
 };
 
