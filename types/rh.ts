@@ -118,7 +118,9 @@ export type RhResourceListItem = {
   username: string;
   email: string | null;
   matricule: string | null;
+  contact: string;
   role: string;
+  resourceType: 'INTERNAL' | 'EXTERNAL';
   todayPresence: {
     label: string;
     context: 'TERRAIN' | 'OFFICE' | null;

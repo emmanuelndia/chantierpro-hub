@@ -467,7 +467,7 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
               </div>
               {context.isLate ? (
                 <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">
-                  Arrivee apres 08:00
+                  Arrivee apres 08:30
                 </p>
               ) : null}
               <div className="mt-2 grid gap-2 lg:grid-cols-2">

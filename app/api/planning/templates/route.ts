@@ -112,7 +112,11 @@ function parseTemplateInput(value: unknown) {
 }
 
 function parseWorkLocationType(value: unknown) {
-  if (value === PlanningWorkLocationType.ON_SITE || value === PlanningWorkLocationType.FREE_MISSION) {
+  if (
+    value === PlanningWorkLocationType.ON_SITE ||
+    value === PlanningWorkLocationType.OFFICE ||
+    value === PlanningWorkLocationType.FREE_MISSION
+  ) {
     return value;
   }
   return null;

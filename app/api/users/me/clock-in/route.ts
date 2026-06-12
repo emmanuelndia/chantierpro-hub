@@ -17,6 +17,7 @@ export const GET = withAuth(async ({ user }) => {
         id: record.id,
         siteId: record.siteId,
         freeMissionId: record.freeMissionId,
+        planningAssignmentId: record.planningAssignmentId,
         officeLocationId: record.officeLocationId,
         officeClockInLocation: record.officeClockInLocation,
         userId: record.userId,
@@ -26,6 +27,9 @@ export const GET = withAuth(async ({ user }) => {
         site: record.site ? { name: record.site.name } : null,
         freeMission: record.freeMission ? { action: record.freeMission.action } : null,
         officeLocation: record.officeLocation ? { name: record.officeLocation.name } : null,
+        planningAssignment: record.planningAssignment
+          ? { id: record.planningAssignment.id, action: record.planningAssignment.action, workLocationType: record.planningAssignment.workLocationType }
+          : null,
       })),
   );
 

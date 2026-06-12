@@ -1,4 +1,4 @@
-import { ClockInStatus, ClockInType } from '@prisma/client';
+import { ClockInStatus, ClockInType, PlanningWorkLocationType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   createClockInRecord,
@@ -17,6 +17,7 @@ export const POST = withAuth(async ({ req, user }) => {
   const body = await parseJsonBody<unknown>(req);
   const input = parseClockInInput(body);
   const officeLocationId = parseOfficeLocationId(body);
+  const requestedPlanningAssignmentId = parsePlanningAssignmentId(body);
 
   if (!input || (input.type === ClockInType.ARRIVAL && !officeLocationId)) {
     return jsonClockInError('BAD_REQUEST', 400, 'Payload de pointage bureau invalide.');
@@ -70,6 +71,17 @@ export const POST = withAuth(async ({ req, user }) => {
     }
   }
 
+  const assignmentValidation =
+    input.type === ClockInType.ARRIVAL
+      ? await validateOfficePlanningAssignment(user.id, requestedPlanningAssignmentId, input.timestampLocal)
+      : { ok: true as const, assignmentId: openSession?.planningAssignmentId ?? null };
+
+  if (!assignmentValidation.ok) {
+    return jsonClockInError('NOT_FOUND', 404, assignmentValidation.message);
+  }
+
+  const linkedAssignmentId = assignmentValidation.assignmentId;
+
   if (input.type === ClockInType.PAUSE_START || input.type === ClockInType.PAUSE_END) {
     const officeRecords = await prisma.clockInRecord.findMany({
       where: {
@@ -82,6 +94,7 @@ export const POST = withAuth(async ({ req, user }) => {
         id: true,
         siteId: true,
         freeMissionId: true,
+        planningAssignmentId: true,
         officeClockInLocation: true,
         userId: true,
         type: true,
@@ -110,6 +123,7 @@ export const POST = withAuth(async ({ req, user }) => {
   const record = await createClockInRecord(prisma, {
     officeClockInLocation: 'OFFICE',
     officeLocationId: officeLocation.id,
+    planningAssignmentId: linkedAssignmentId,
     userId: user.id,
     input,
     distanceKm: 0,
@@ -126,4 +140,38 @@ function parseOfficeLocationId(body: unknown) {
 
   const value = (body as Record<string, unknown>).officeLocationId;
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function parsePlanningAssignmentId(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    return null;
+  }
+
+  const value = (body as Record<string, unknown>).planningAssignmentId;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+async function validateOfficePlanningAssignment(userId: string, assignmentId: string | null, timestampLocal: string) {
+  if (!assignmentId) {
+    return { ok: true as const, assignmentId: null };
+  }
+
+  const date = new Date(timestampLocal);
+  const day = new Date(`${date.toISOString().slice(0, 10)}T00:00:00.000Z`);
+  const assignment = await prisma.planningAssignment.findFirst({
+    where: {
+      id: assignmentId,
+      supervisorId: userId,
+      date: day,
+      deletedAt: null,
+      workLocationType: PlanningWorkLocationType.OFFICE,
+    },
+    select: { id: true },
+  });
+
+  if (!assignment) {
+    return { ok: false as const, message: 'Tache bureau introuvable ou non accessible.' };
+  }
+
+  return { ok: true as const, assignmentId: assignment.id };
 }

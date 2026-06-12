@@ -127,3 +127,16 @@ Au niveau du PM :
 
 J'ai bien dit que le pointage au bureau peut se faire par TOUTES les ressources non ? pourquoi je ne vois pas pointer chez le BE_MANAGER ? TOUS LES rôles même l'admin doit avoir dans sa version mobile le pointer et pouvoir pointer au bureau
 
+
+
+Une ressource à qui on a attribuer une mission libre ne voit pas pointer au bureau parce qu'il y'a voir tâches qui cache 
+Considérer les pointages après 8h00 pas optimal on va prendre les pointages après 8h30 ça laisse une marge aux ressources
+Vu que toutes les ressources pointent vu que y'a la compta dans l'entreprise et d'autres services faudra créer les autres rôles comme la compta ?
+Dans le planning on avait enlevé les tâches bureau mais on va les remettre parce quand on fait un planning  avec les tâches ceux qui sont au bureau pointe au bureau
+
+
+Pouvoir connecter la tâche bureau au pointage bureau je sais pas si tu vois ce que je veux dire ?
+Dans Ressource RH devant chaque ressource faudra mettre le bouton modifier Permettre de modifier les informations de chaque ressource matricule nom email et autre
+
+
+Certaines ressources rencontrent encore des problèmes de sorties pointage : il y'a marqué non pointé à l'accueil mais quand il pointe que ce soit zone ou chantier ou même bureau on lui dit qu'il a une session déjà ouverte et peu importe comment on vérifie il n'a pas pointé même dans présence chez le rh ou l'admin on le voit absent mais quand il pointe on lui dit session déjà ouverte

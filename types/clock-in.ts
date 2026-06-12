@@ -6,6 +6,8 @@ export type ClockInRecordItem = {
   siteName: string;
   freeMissionId: string | null;
   freeMissionAction: string | null;
+  planningAssignmentId: string | null;
+  planningAssignmentAction: string | null;
   projectId: string | null;
   projectName: string | null;
   contextType: 'SITE' | 'FREE_MISSION' | 'OFFICE';
@@ -31,6 +33,8 @@ export type ActiveClockInSession = {
   siteId: string | null;
   siteName: string;
   freeMissionId: string | null;
+  planningAssignmentId: string | null;
+  planningAssignmentAction: string | null;
   contextType: 'SITE' | 'FREE_MISSION' | 'OFFICE';
   arrivalAt: string;
   durationSeconds: number;
@@ -53,6 +57,8 @@ export type SessionStatus = {
   openSessionSiteId?: string | null;
   openSessionSiteName?: string | null;
   openSessionFreeMissionId?: string | null;
+  openSessionPlanningAssignmentId?: string | null;
+  openSessionPlanningAssignmentAction?: string | null;
   openSessionContextType?: 'SITE' | 'FREE_MISSION' | 'OFFICE' | null;
 };
 

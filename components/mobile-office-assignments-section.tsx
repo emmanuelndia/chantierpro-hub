@@ -192,6 +192,7 @@ export function MobileOfficeAssignmentsSection({
       <div className="mt-4 space-y-3">
         {assignments.map((assignment) => {
           const isFreeMission = assignment.workLocationType === 'FREE_MISSION';
+          const isOfficeTask = assignment.workLocationType === 'OFFICE';
           const status = objectiveStatusConfig[assignment.objectiveStatus];
           const progressValue = Math.max(0, Math.min(100, assignment.actualProgress ?? 0));
           const unit = assignment.targetUnit ?? '';
@@ -212,7 +213,7 @@ export function MobileOfficeAssignmentsSection({
                 <p className="mt-2 text-sm leading-5 text-slate-700">{assignment.action}</p>
               </div>
               <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                {isFreeMission ? 'Mission libre' : assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                {isFreeMission ? 'Zone' : assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Chantier'}
               </span>
             </div>
             {isFreeMission ? (
@@ -281,6 +282,22 @@ export function MobileOfficeAssignmentsSection({
                 >
                   Photo
                 </Link>
+              </div>
+            ) : isOfficeTask ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link
+                  className="rounded-lg bg-slate-950 px-3 py-2 text-center text-xs font-black text-white"
+                  href={`/mobile/clock-in?office=1&assignmentId=${encodeURIComponent(assignment.id)}`}
+                >
+                  Pointer bureau
+                </Link>
+                <button
+                  className={`rounded-lg px-3 py-2 text-xs font-black text-white ${status.buttonClassName}`}
+                  onClick={() => openProgressModal(assignment)}
+                  type="button"
+                >
+                  Avancement
+                </button>
               </div>
             ) : (
               <button

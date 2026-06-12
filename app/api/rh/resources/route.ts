@@ -3,8 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { canAccessRh, jsonRhError } from '@/lib/rh';
 
-const excludedRoles: Role[] = [Role.ADMIN, Role.DIRECTION, Role.HR];
-
 export const GET = withAuth(async ({ req, user }) => {
   if (!canAccessRh(user.role)) {
     return jsonRhError('FORBIDDEN', 403, 'Acces refuse a la liste des ressources RH.');
@@ -20,7 +18,7 @@ export const GET = withAuth(async ({ req, user }) => {
 
   const where: Prisma.UserWhereInput = {
     isActive: true,
-    role: role ?? { notIn: excludedRoles },
+    ...(role ? { role } : {}),
     ...(q
       ? {
           OR: [
@@ -46,20 +44,19 @@ export const GET = withAuth(async ({ req, user }) => {
         username: true,
         email: true,
         matricule: true,
+        contact: true,
         role: true,
       },
     }),
     prisma.user.count({
       where: {
         isActive: true,
-        role: { notIn: excludedRoles },
         OR: [{ matricule: null }, { matricule: '' }],
       },
     }),
     prisma.user.findMany({
       where: {
         isActive: true,
-        role: { notIn: excludedRoles },
       },
       distinct: ['role'],
       select: { role: true },
@@ -125,6 +122,7 @@ export const GET = withAuth(async ({ req, user }) => {
   }
   const enrichedItems = items.map((item) => ({
     ...item,
+    resourceType: item.role === Role.EXTERNAL_RESOURCE ? ('EXTERNAL' as const) : ('INTERNAL' as const),
     todayPresence: buildTodayPresence(recordsByUser.get(item.id) ?? [], expectedTerrainUserIds.has(item.id)),
   }));
   const filteredItems = presenceStatus

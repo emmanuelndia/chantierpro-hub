@@ -9,9 +9,9 @@ type TaskFilter = 'ALL' | 'ON_SITE' | 'OFFICE' | 'FREE_MISSION' | 'BLOCKED' | 'C
 
 const taskFilters: { key: TaskFilter; label: string }[] = [
   { key: 'ALL', label: 'Toutes' },
-  { key: 'ON_SITE', label: 'Terrain' },
+  { key: 'ON_SITE', label: 'Chantier' },
   { key: 'OFFICE', label: 'Bureau' },
-  { key: 'FREE_MISSION', label: 'Missions libres' },
+  { key: 'FREE_MISSION', label: 'Zones' },
   { key: 'BLOCKED', label: 'Bloquees' },
   { key: 'COMPLETED', label: 'Terminees' },
 ];
@@ -36,8 +36,8 @@ export function MobileTasksPage() {
         </p>
         <div className="mt-4 grid grid-cols-4 gap-2">
           <TaskKpi label="Total" value={assignments.length} />
-          <TaskKpi label="Terrain" value={terrainCount} />
-          <TaskKpi label="Missions" value={freeMissionCount} />
+          <TaskKpi label="Chantier" value={terrainCount} />
+          <TaskKpi label="Zones" value={freeMissionCount} />
           <TaskKpi label="Bloquees" value={blockedCount} />
         </div>
       </section>
@@ -74,7 +74,7 @@ export function MobileTasksPage() {
       ) : (
         <MobileOfficeAssignmentsSection
           assignments={filteredAssignments}
-          description={`Terrain ${terrainCount} - Bureau ${officeCount} - Terminees ${completedCount}`}
+          description={`Chantier ${terrainCount} - Bureau ${officeCount} - Terminees ${completedCount}`}
           title="Liste des taches"
           usingOfflineData={usingOfflineAssignments}
         />

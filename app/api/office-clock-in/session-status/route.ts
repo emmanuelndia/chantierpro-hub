@@ -19,6 +19,7 @@ export const GET = withAuth(async ({ user }) => {
       id: true,
       siteId: true,
       freeMissionId: true,
+      planningAssignmentId: true,
       officeLocationId: true,
       officeClockInLocation: true,
       userId: true,
@@ -28,6 +29,7 @@ export const GET = withAuth(async ({ user }) => {
       site: { select: { name: true } },
       freeMission: { select: { action: true } },
       officeLocation: { select: { name: true } },
+      planningAssignment: { select: { id: true, action: true, workLocationType: true } },
     },
   });
 

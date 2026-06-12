@@ -45,6 +45,7 @@ const roleTone: Record<Role, 'success' | 'warning' | 'error' | 'neutral' | 'info
   DIRECTION: 'error',
   HR: 'info',
   ADMIN: 'neutral',
+  OFFICE_STAFF: 'info',
 };
 
 export function WebAppShell({ user, children }: WebAppShellProps) {

@@ -570,7 +570,7 @@ function AssignmentCard({
         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${clockStatus.className}`}>{clockStatus.label}</span>
         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${planningStatus.className}`}>{planningStatus.label}</span>
         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-          {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+          {workLocationTypeLabel[assignment.workLocationType]}
         </span>
       </div>
     </article>
@@ -697,7 +697,7 @@ function AssignmentTaskRow({
           {planningStatus.label}
         </span>
         <span className="ml-2 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700">
-          {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+          {workLocationTypeLabel[assignment.workLocationType]}
         </span>
       </div>
     </section>
@@ -1144,14 +1144,19 @@ const planningStatusConfig: Record<PlanningAssignmentStatus, { label: string; cl
 };
 
 const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
-  ON_SITE: 'Présence chantier requise',
-  OFFICE: 'Ancienne tâche bureau',
-  FREE_MISSION: 'Mission libre',
+  ON_SITE: 'Chantier',
+  OFFICE: 'Bureau',
+  FREE_MISSION: 'Zone',
 };
 const creatableWorkLocationTypes: PlanningWorkLocationType[] = [
   PlanningWorkLocationType.ON_SITE,
+  PlanningWorkLocationType.OFFICE,
   PlanningWorkLocationType.FREE_MISSION,
 ];
+
+workLocationTypeLabel.ON_SITE = 'Chantier';
+workLocationTypeLabel.OFFICE = 'Bureau';
+workLocationTypeLabel.FREE_MISSION = 'Zone';
 
 const objectiveStatusConfig: Record<PlanningAssignment['objectiveStatus'], { label: string; className: string }> = {
   NOT_STARTED: { label: 'Non démarré', className: 'bg-slate-100 text-slate-700' },

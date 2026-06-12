@@ -35,6 +35,7 @@ import { useTodayOfficeAssignments } from '@/components/mobile-office-assignment
 
 type ClockInIntent = 'arrival' | 'departure' | 'pause-start' | 'pause-end';
 type Step = 'clock-in' | 'comment' | 'confirmation';
+type ClockContext = 'OFFICE' | 'SITE' | 'ZONE';
 
 const TERRAIN_CLOCK_IN_ROLES: readonly Role[] = [
   'SUPERVISOR',
@@ -99,6 +100,12 @@ const typeLabels: Record<string, string> = {
   INTERMEDIATE: 'Intermediaire',
 };
 
+const contextLabels: Record<ClockContext, string> = {
+  OFFICE: 'Bureau',
+  SITE: 'Chantier',
+  ZONE: 'Zone',
+};
+
 export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -107,6 +114,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const requestedSiteId = searchParams.get('siteId');
   const requestedFreeMissionId = searchParams.get('freeMissionId');
   const requestedOffice = searchParams.get('office') === '1';
+  const requestedOfficeAssignmentId = searchParams.get('assignmentId');
   const requestedIntent = parseIntent(searchParams.get('intent'));
   const networkState = useMobileNetworkState();
   
@@ -139,8 +147,12 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
 
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(requestedSiteId);
   const [selectedFreeMissionId] = useState<string | null>(requestedFreeMissionId);
-  const [selectedOffice, setSelectedOffice] = useState(requestedOffice);
+  const [selectedOffice, setSelectedOffice] = useState(requestedOffice || (!requestedSiteId && !requestedFreeMissionId));
+  const [selectedOfficeAssignmentId, setSelectedOfficeAssignmentId] = useState<string | null>(requestedOfficeAssignmentId);
   const [selectedOfficeLocationId, setSelectedOfficeLocationId] = useState<string | null>(null);
+  const [selectedClockContext, setSelectedClockContext] = useState<ClockContext>(
+    requestedFreeMissionId ? 'ZONE' : requestedSiteId ? 'SITE' : 'OFFICE',
+  );
   const [selectedIntent, setSelectedIntent] = useState<ClockInIntent>(requestedIntent ?? 'arrival');
   const [nearbySearchRequested, setNearbySearchRequested] = useState(false);
   const [step, setStep] = useState<Step>('clock-in');
@@ -272,7 +284,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const officeLocations = officeLocationsQuery.data?.items ?? [];
   const selectedOfficeLocation =
     officeLocations.find((office) => office.id === selectedOfficeLocationId) ?? officeLocations[0] ?? null;
-  const { assignments: todayAssignments } = useTodayOfficeAssignments(canUseTerrainClockIn);
+  const { assignments: todayAssignments, officeAssignments } = useTodayOfficeAssignments(true);
   const hasFreeMissionToday = todayAssignments.some(
     (assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId),
   );
@@ -301,19 +313,26 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       geoState.status === 'ready' &&
       !requestedSiteId &&
       !requestedFreeMissionId &&
-      !selectedOffice &&
+      selectedClockContext === 'SITE' &&
       !shouldSelectFreeMissionFromTasks,
     staleTime: 30_000,
   });
 
-  const selectedFreeMission = useMemo(
+  const selectedFreeMissionFromAssignments = useMemo(
     () =>
       selectedFreeMissionId
         ? todayAssignments.find((assignment) => assignment.freeMissionId === selectedFreeMissionId || assignment.id === selectedFreeMissionId) ?? null
         : null,
     [selectedFreeMissionId, todayAssignments],
   );
+  const selectedFreeMission = selectedClockContext === 'ZONE' ? selectedFreeMissionFromAssignments : null;
+  const selectedOfficeAssignment = useMemo(
+    () => officeAssignments.find((assignment) => assignment.id === selectedOfficeAssignmentId) ?? null,
+    [officeAssignments, selectedOfficeAssignmentId],
+  );
+  const singleOfficeAssignment = officeAssignments.length === 1 ? officeAssignments[0] ?? null : null;
   const activeSession = todayQuery.data?.activeSession ?? null;
+  const hasZoneOption = hasFreeMissionToday || Boolean(requestedFreeMissionId) || activeSession?.contextType === 'FREE_MISSION';
   const quickSite = nearbyQuery.data?.sites[0] ?? null;
 
   useEffect(() => {
@@ -334,7 +353,40 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     if (!selectedOffice && activeSession?.contextType === 'OFFICE') {
       setSelectedOffice(true);
     }
+    if (activeSession?.contextType === 'OFFICE') {
+      setSelectedClockContext('OFFICE');
+    } else if (activeSession?.contextType === 'FREE_MISSION') {
+      setSelectedClockContext('ZONE');
+    } else if (activeSession?.contextType === 'SITE') {
+      setSelectedClockContext('SITE');
+    }
   }, [activeSession?.contextType, activeSession?.siteId, selectedOffice, selectedSiteId]);
+
+  useEffect(() => {
+    if (selectedClockContext === 'OFFICE') {
+      setSelectedOffice(true);
+      setSelectedSiteId(null);
+      setNearbySearchRequested(false);
+      return;
+    }
+
+    setSelectedOffice(false);
+    if (selectedClockContext === 'ZONE') {
+      setSelectedSiteId(null);
+      setNearbySearchRequested(false);
+    }
+  }, [selectedClockContext]);
+
+  useEffect(() => {
+    if (!selectedOffice || selectedOfficeAssignmentId || officeAssignments.length !== 1) {
+      return;
+    }
+
+    const [onlyOfficeAssignment] = officeAssignments;
+    if (onlyOfficeAssignment) {
+      setSelectedOfficeAssignmentId(onlyOfficeAssignment.id);
+    }
+  }, [officeAssignments, selectedOffice, selectedOfficeAssignmentId]);
 
   useEffect(() => {
     if (selectedOffice || shouldSelectFreeMissionFromTasks || selectedFreeMission || selectedSiteId) {
@@ -349,6 +401,10 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   }, [selectedFreeMission, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
 
   const selectedSite = useMemo(() => {
+    if (selectedClockContext !== 'SITE') {
+      return null;
+    }
+
     const siteFromToday = todaySites.find((site) => site.id === selectedSiteId);
 
     if (siteFromToday) {
@@ -382,7 +438,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     }
 
     return null;
-  }, [activeSession, geoState, quickSite, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
+  }, [activeSession, geoState, quickSite, selectedClockContext, selectedOffice, selectedSiteId, shouldSelectFreeMissionFromTasks, todaySites]);
 
   const sessionStatusQuery = useQuery({
     queryKey: ['mobile-session-status', selectedSite?.id, selectedFreeMission?.freeMissionId, selectedOffice],
@@ -453,7 +509,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           { latitude: selectedOfficeLocation.latitude, longitude: selectedOfficeLocation.longitude },
         )
       : null;
-  const isAfterOfficeStartTime = new Date(now).getHours() > 8 || (new Date(now).getHours() === 8 && new Date(now).getMinutes() > 0);
+  const isAfterOfficeStartTime = isAfterLateThreshold(now);
   const outsideRadius = currentType === 'ARRIVAL' && selectedDistance !== null && selectedSite ? selectedDistance > selectedSite.radiusKm : false;
   const remoteDeparture =
     currentType === 'DEPARTURE' &&
@@ -462,6 +518,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     selectedDistance !== null &&
     selectedSite !== null &&
     selectedDistance > selectedSite.radiusKm;
+  const activeContextLabel = contextLabels[selectedClockContext];
 
   useEffect(() => {
     if (!requestedIntent && sessionStatus?.sessionOpen) {
@@ -578,6 +635,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         body: JSON.stringify({
           ...payload,
           officeLocationId: selectedOfficeLocation.id,
+          planningAssignmentId: selectedOfficeAssignmentId,
         }),
       });
 
@@ -731,30 +789,57 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         </div>
       ) : null}
 
-      <section className="rounded-lg border border-primary/20 bg-primary/10 p-4">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Pointage</p>
-        <h2 className="mt-2 text-2xl font-black text-slate-950">{typeLabels[currentType]}</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Verifie le contexte ci-dessous avant de pointer.
-        </p>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-panel">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Pointage</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">{activeContextLabel}</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">{typeLabels[currentType]}</p>
+          </div>
+          {activeSession ? (
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-700">
+              Session en cours
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
+          <ContextButton
+            active={selectedClockContext === 'OFFICE'}
+            icon={<BuildingIcon className="h-4 w-4" />}
+            label="Bureau"
+            onClick={() => setSelectedClockContext('OFFICE')}
+          />
+          <ContextButton
+            active={selectedClockContext === 'SITE'}
+            disabled={!canUseTerrainClockIn}
+            icon={<MapPinIcon className="h-4 w-4" />}
+            label="Chantier"
+            onClick={() => setSelectedClockContext('SITE')}
+          />
+          <ContextButton
+            active={selectedClockContext === 'ZONE'}
+            disabled={!hasZoneOption}
+            icon={<NavigationIcon className="h-4 w-4" />}
+            label="Zone"
+            onClick={() => setSelectedClockContext('ZONE')}
+          />
+        </div>
       </section>
 
-      {selectedFreeMission ? (
-        <section className="space-y-4 rounded-lg border-2 border-orange-300 bg-orange-50 p-4 shadow-panel">
+      {selectedClockContext === 'ZONE' && selectedFreeMission ? (
+        <section className="space-y-3 rounded-2xl border border-orange-100 bg-orange-50 p-4 shadow-panel">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Mode mission libre</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Zone</p>
               <h3 className="mt-2 text-lg font-black text-slate-950">{selectedFreeMission.action}</h3>
               <p className="mt-1 text-sm font-semibold text-slate-600">{selectedFreeMission.projectName}</p>
             </div>
-            <span className="rounded-full bg-orange-600 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
-              Sans chantier
-            </span>
+            <NavigationIcon className="h-7 w-7 text-orange-700" />
           </div>
-          <div className="rounded-lg border border-orange-200 bg-white p-3">
-            <p className="text-sm font-black text-slate-950">Ce pointage sera rattache a la mission libre.</p>
+          <div className="rounded-xl bg-white p-3">
+            <p className="text-sm font-black text-slate-950">Pointage GPS sans chantier fixe.</p>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-              L&apos;application enregistre votre position GPS reelle comme preuve. Elle ne choisit pas automatiquement le chantier le plus proche.
+              Aucun chantier proche ne sera detecte automatiquement.
             </p>
           </div>
           {selectedFreeMission.objectiveText ? (
@@ -763,13 +848,13 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         </section>
       ) : null}
 
-      {shouldSelectFreeMissionFromTasks ? (
-        <section className="space-y-4 rounded-lg border-2 border-orange-300 bg-orange-50 p-4 shadow-panel">
+      {selectedClockContext === 'ZONE' && shouldSelectFreeMissionFromTasks ? (
+        <section className="space-y-4 rounded-2xl border border-orange-100 bg-orange-50 p-4 shadow-panel">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Mission libre a selectionner</p>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Zone a selectionner</p>
             <h3 className="mt-2 text-lg font-black text-slate-950">Ouvrez Taches pour pointer</h3>
             <p className="mt-2 text-sm font-semibold leading-6 text-orange-900">
-              Vous avez une mission libre aujourd&apos;hui. Pour eviter une erreur de pointage, ouvrez Taches et choisissez la mission a pointer.
+              Si vous etes au bureau, utilisez l&apos;onglet Bureau. Si vous partez en zone, choisissez la zone depuis Taches.
             </p>
           </div>
           <button
@@ -782,7 +867,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         </section>
       ) : null}
 
-      {!selectedFreeMission && !shouldSelectFreeMissionFromTasks && !selectedOffice ? (
+      {false ? (
         <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Pointage quotidien</p>
@@ -808,8 +893,8 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         </section>
       ) : null}
 
-      {selectedOffice ? (
-        <section className="space-y-4 rounded-lg border-2 border-sky-200 bg-white p-4 shadow-panel">
+      {selectedClockContext === 'OFFICE' ? (
+        <section className="space-y-4 rounded-2xl border border-sky-100 bg-white p-4 shadow-panel">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Presence bureau</p>
@@ -822,7 +907,39 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           </div>
           {isAfterOfficeStartTime && currentType === 'ARRIVAL' ? (
             <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm font-bold text-orange-900">
-              Arrivee apres 08:00 : ce pointage sera signale en retard.
+              Arrivee apres 08:30 : ce pointage sera signale en retard.
+            </div>
+          ) : null}
+          {officeAssignments.length > 0 ? (
+            <div className="space-y-3 rounded-lg border border-sky-100 bg-sky-50 p-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Taches bureau prevues</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                  Le pointage bureau prouve la presence. La tache selectionnee indique le travail prevu.
+                </p>
+              </div>
+              {singleOfficeAssignment ? (
+                <div className="rounded-lg bg-white p-3">
+                  <p className="text-sm font-black text-slate-950">{singleOfficeAssignment.action}</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">{singleOfficeAssignment.projectName}</p>
+                </div>
+              ) : (
+                <label className="space-y-2">
+                  <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Tache liee</span>
+                  <select
+                    className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 outline-none"
+                    onChange={(event) => setSelectedOfficeAssignmentId(event.target.value || null)}
+                    value={selectedOfficeAssignment?.id ?? ''}
+                  >
+                    <option value="">Pointage bureau sans tache precise</option>
+                    {officeAssignments.map((assignment) => (
+                      <option key={assignment.id} value={assignment.id}>
+                        {assignment.action}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
           ) : null}
           <div className="space-y-2">
@@ -858,7 +975,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         </section>
       ) : null}
 
-      {!selectedFreeMission && selectedSite ? (
+      {selectedClockContext === 'SITE' && selectedSite ? (
         <section className="space-y-3 rounded-lg border-2 border-primary/30 bg-white p-4 shadow-panel">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -878,54 +995,48 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         </section>
       ) : null}
 
-      <GpsPanel
-        geoState={geoState}
-        onRetry={geolocation.refresh}
-        outsideRadius={outsideRadius}
-        selectedSite={selectedSite}
-        canRetry={geolocation.canRetry}
-      />
+      {geoState.status === 'unavailable' || outsideRadius ? (
+        <GpsPanel
+          geoState={geoState}
+          onRetry={geolocation.refresh}
+          outsideRadius={outsideRadius}
+          selectedSite={selectedSite}
+          canRetry={geolocation.canRetry}
+        />
+      ) : (
+        <GpsStatusBar geoState={geoState} selectedSite={selectedSite} />
+      )}
 
-      {geoState.status === 'ready' && geoState.accuracy !== null && geoState.accuracy > 100 ? (
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm font-semibold text-yellow-900">
-          Precision GPS faible ({Math.round(geoState.accuracy)} m). Vous pouvez continuer, mais le serveur verifiera la position.
-        </div>
-      ) : null}
-      {geoState.status === 'ready' && geoState.source === 'CACHED' ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-          Derniere position recente utilisee ({formatTime(geoState.capturedAt)}).
-        </div>
-      ) : null}
-      {geoState.status === 'ready' ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700">
-          <p>
-            {geoState.source === 'LIVE' ? 'Position live' : 'Position cachee'} a {formatTime(geoState.capturedAt)}
-            {geoState.accuracy !== null ? ` - precision ${Math.round(geoState.accuracy)} m` : ''}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {selectedFreeMission
-              ? 'La position GPS sera enregistree comme preuve du pointage.'
-              : selectedOffice
-              ? 'La position GPS sera enregistree comme preuve du pointage.'
-              : 'Le chantier est choisi manuellement, mais la distance est calculee avec votre position GPS.'}
-          </p>
-        </div>
-      ) : null}
-
-      {canUseTerrainClockIn && !selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks ? (
+      {selectedClockContext === 'SITE' && canUseTerrainClockIn && !shouldSelectFreeMissionFromTasks ? (
         <ManualSiteList
           geoState={geoState}
           loading={todaySitesQuery.isLoading}
+          nearbySearchRequested={nearbySearchRequested}
+          nearbyQueryFetching={nearbyQuery.isFetching}
           onSelect={(siteId) => {
             setSelectedSiteId(siteId);
             setNearbySearchRequested(false);
+          }}
+          onSearchNearby={() => {
+            setNearbySearchRequested(true);
+            if (geoState.status !== 'ready') {
+              geolocation.refresh();
+              return;
+            }
+            void nearbyQuery.refetch();
           }}
           selectedSiteId={selectedSite?.id ?? null}
           sites={todaySites}
         />
       ) : null}
 
-      {canUseTerrainClockIn && !selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks ? (
+      {selectedClockContext === 'SITE' && nearbySearchRequested && !nearbyQuery.isFetching && geoState.status === 'ready' && !quickSite ? (
+        <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm font-semibold text-slate-500">
+          Aucun chantier proche trouve.
+        </p>
+      ) : null}
+
+      {false ? (
         <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Aide GPS</p>
@@ -962,7 +1073,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         </section>
       ) : null}
 
-      {!selectedFreeMission && !selectedOffice && !shouldSelectFreeMissionFromTasks && nearbySearchRequested && quickSite ? (
+      {selectedClockContext === 'SITE' && !shouldSelectFreeMissionFromTasks && nearbySearchRequested && quickSite ? (
         <NearbySuggestionCard
           onSelect={() => {
             setSelectedSiteId(quickSite.id);
@@ -1038,7 +1149,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
             <ActionButton
               busy={clockInMutation.isPending}
               disabled={!canSubmit}
-                label={selectedFreeMission ? 'POINTER ENTREE MISSION' : selectedOffice ? 'POINTER ENTREE BUREAU' : 'POINTER ENTREE'}
+                label={selectedFreeMission ? 'POINTER ENTREE ZONE' : selectedOffice ? 'POINTER ENTREE BUREAU' : 'POINTER ENTREE'}
               onClick={() => {
                 setSelectedIntent('arrival');
                 clockInMutation.mutate('arrival');
@@ -1076,6 +1187,75 @@ function toLocalIsoWithOffset(value: Date) {
   const second = String(value.getSeconds()).padStart(2, '0');
 
   return `${year}-${month}-${day}T${hour}:${minute}:${second}${sign}${offsetHours}:${offsetRemainderMinutes}`;
+}
+
+function ContextButton({
+  active,
+  disabled = false,
+  icon,
+  label,
+  onClick,
+}: Readonly<{
+  active: boolean;
+  disabled?: boolean;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}>) {
+  return (
+    <button
+      className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-2 text-xs font-black transition ${
+        active ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600'
+      } disabled:cursor-not-allowed disabled:opacity-40`}
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function GpsStatusBar({
+  geoState,
+  selectedSite,
+}: Readonly<{
+  geoState: GeoState;
+  selectedSite: SelectableSite | null;
+}>) {
+  if (geoState.status === 'loading') {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm font-bold text-slate-600">
+        <Spinner className="h-4 w-4" />
+        GPS en cours...
+      </div>
+    );
+  }
+
+  if (geoState.status === 'unavailable') {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm font-bold text-orange-800">
+        <MapPinIcon className="h-4 w-4" />
+        GPS indisponible
+      </div>
+    );
+  }
+
+  const precision = geoState.accuracy === null ? 'precision inconnue' : `precision ${Math.round(geoState.accuracy)} m`;
+  const weak = geoState.accuracy !== null && geoState.accuracy > 100;
+  const distance = selectedSite?.distanceKm ?? null;
+
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm font-bold ${
+        weak ? 'border-yellow-200 bg-yellow-50 text-yellow-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      }`}
+    >
+      <span>{weak ? 'GPS faible' : 'GPS pret'} · {precision}</span>
+      {selectedSite && distance !== null ? <span>{distance.toFixed(2)} km du chantier</span> : null}
+    </div>
+  );
 }
 
 function GpsPanel({
@@ -1157,21 +1337,37 @@ function GpsPanel({
 function ManualSiteList({
   geoState,
   loading,
+  nearbyQueryFetching,
+  nearbySearchRequested,
   onSelect,
+  onSearchNearby,
   selectedSiteId,
   sites,
 }: Readonly<{
   geoState: GeoState;
   loading: boolean;
+  nearbyQueryFetching: boolean;
+  nearbySearchRequested: boolean;
   onSelect: (siteId: string) => void;
+  onSearchNearby: () => void;
   selectedSiteId: string | null;
   sites: TodaySiteItem[];
 }>) {
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-        Chantiers du jour
-      </h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
+          Chantiers du jour
+        </h3>
+        <button
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-700"
+          onClick={onSearchNearby}
+          type="button"
+        >
+          <SearchIcon className="h-4 w-4" />
+          Chercher autour
+        </button>
+      </div>
       {loading ? (
         <div className="h-24 animate-pulse rounded-lg bg-slate-100" />
       ) : sites.length === 0 ? (
@@ -1211,6 +1407,12 @@ function ManualSiteList({
           })}
         </div>
       )}
+      {nearbySearchRequested && geoState.status !== 'ready' ? (
+        <p className="rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-500">GPS requis pour chercher autour.</p>
+      ) : null}
+      {nearbySearchRequested && nearbyQueryFetching ? (
+        <p className="rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-500">Recherche du chantier proche...</p>
+      ) : null}
     </section>
   );
 }
@@ -1476,6 +1678,13 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
+function isAfterLateThreshold(value: number | string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  const hour = date.getHours();
+  const minute = date.getMinutes();
+  return hour > 8 || (hour === 8 && minute > 30);
+}
+
 function Spinner({ className }: Readonly<{ className: string }>) {
   return (
     <svg aria-hidden="true" className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24">
@@ -1499,6 +1708,35 @@ function MapPinIcon({ className }: Readonly<{ className: string }>) {
     <>
       <path d="M12 21s7-5.1 7-11a7 7 0 1 0-14 0c0 5.9 7 11 7 11Z" stroke="currentColor" strokeWidth="1.8" />
       <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function BuildingIcon({ className }: Readonly<{ className: string }>) {
+  return baseIcon(
+    className,
+    <>
+      <path d="M4 21h16" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M9 8h1M14 8h1M9 12h1M14 12h1" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path d="M10 21v-5h4v5" stroke="currentColor" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function NavigationIcon({ className }: Readonly<{ className: string }>) {
+  return baseIcon(
+    className,
+    <path d="m12 2 7 19-7-4-7 4 7-19Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />,
+  );
+}
+
+function SearchIcon({ className }: Readonly<{ className: string }>) {
+  return baseIcon(
+    className,
+    <>
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m20 20-3.5-3.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
     </>,
   );
 }

@@ -39,5 +39,9 @@ export default async function MobileHomePage() {
     return <MobileAdminDashboardPage user={session} />;
   }
 
+  if (session.role === 'OFFICE_STAFF') {
+    redirect('/mobile/clock-in');
+  }
+
   redirect('/mobile/profile');
 }

@@ -51,6 +51,7 @@ const roleLabels: Record<Role, string> = {
   DRIVER: 'Chauffeur',
   PROJECT_MANAGER: 'Chef de projet',
   DIRECTION: 'Direction',
+  OFFICE_STAFF: 'Personnel bureau',
 };
 
 export function MobileProfilePage() {

@@ -87,12 +87,13 @@ const planningStatusLabel: Record<PlanningAssignmentStatus, string> = {
 };
 
 const workLocationTypeLabel: Record<PlanningWorkLocationType, string> = {
-  ON_SITE: 'Présence chantier requise',
-  OFFICE: 'Ancienne tâche bureau',
-  FREE_MISSION: 'Mission libre',
+  ON_SITE: 'Chantier',
+  OFFICE: 'Bureau',
+  FREE_MISSION: 'Zone',
 };
 const creatableWorkLocationTypes: PlanningWorkLocationType[] = [
   PlanningWorkLocationType.ON_SITE,
+  PlanningWorkLocationType.OFFICE,
   PlanningWorkLocationType.FREE_MISSION,
 ];
 
@@ -217,11 +218,11 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     mutationFn: ({ id, data }: { id?: string; data: FreeMissionWebRequest }) =>
       id ? updateFreeMission(id, data) : createFreeMission(data),
     onSuccess: async (result) => {
-      pushToast({ type: 'success', title: formatCreateSuccessTitle(result, 'Mission libre enregistree') });
+      pushToast({ type: 'success', title: formatCreateSuccessTitle(result, 'Zone enregistree') });
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
-    onError: (error) => pushMutationError(error, 'Mission libre impossible'),
+    onError: (error) => pushMutationError(error, 'Zone impossible'),
   });
 
   const deleteMutation = useMutation({
@@ -631,7 +632,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
                 <option value="">Tous</option>
                 {Object.values(PlanningWorkLocationType).map((type) => (
                   <option key={type} value={type}>
-                    {type === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                    {workLocationTypeLabel[type]}
                   </option>
                 ))}
               </select>
@@ -839,11 +840,7 @@ function DayPlanningCards({
                     </div>
                     <div className="flex shrink-0 flex-wrap justify-end gap-2">
                       <Badge tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : assignment.workLocationType === 'FREE_MISSION' ? 'warning' : 'info'}>
-                        {assignment.workLocationType === 'OFFICE'
-                          ? 'Bureau'
-                          : assignment.workLocationType === 'FREE_MISSION'
-                            ? 'Mission libre'
-                            : 'Terrain'}
+                        {workLocationTypeLabel[assignment.workLocationType]}
                       </Badge>
                       {assignment.siteType === 'FREE_MISSION' ? <Badge tone="warning">Sans chantier fixe</Badge> : null}
                       {site?.siteType === 'INTERVENTION_ZONE' ? <Badge tone="success">Zone d&apos;intervention</Badge> : null}
@@ -942,7 +939,7 @@ function WeekPlanningGrid({
                   </p>
                   <p className="truncate text-xs text-slate-600">{assignment.siteName}</p>
                   <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                    {assignment.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                    {workLocationTypeLabel[assignment.workLocationType]}
                   </p>
                 </div>
               ))}
@@ -1032,7 +1029,7 @@ function CentralizedPlanningTable({
                 </td>
                 <td className="px-5 py-4">
                   <Badge tone={item.workLocationType === 'OFFICE' ? 'neutral' : 'info'}>
-                    {item.workLocationType === 'OFFICE' ? 'Bureau' : 'Terrain'}
+                    {workLocationTypeLabel[item.workLocationType]}
                   </Badge>
                 </td>
                 <td className="px-5 py-4">
@@ -1221,7 +1218,7 @@ function AssignmentDrawer({
               ))}
             </select>
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              Choisis d&apos;abord le type : chantier fixe ou mission libre. Le bureau se pointe desormais dans le pointage quotidien.
+              Choisis d&apos;abord le type. Une tâche bureau organise le travail, mais la présence reste enregistrée avec le pointage bureau.
             </p>
           </Field>
           <Field label={mode === 'create' ? 'Ressources' : 'Ressource'}>

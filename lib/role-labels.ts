@@ -16,6 +16,7 @@ const ROLE_LABELS: Record<Role, string> = {
   DIRECTION: 'Direction',
   HR: 'Ressources humaines',
   ADMIN: 'Administrateur',
+  OFFICE_STAFF: 'Personnel bureau',
 };
 
 export function formatRoleLabel(role: Role) {

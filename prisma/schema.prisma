@@ -23,6 +23,7 @@ enum Role {
   DIRECTION
   HR
   ADMIN
+  OFFICE_STAFF
 }
 
 enum ProjectStatus {
@@ -354,6 +355,7 @@ model ClockInRecord {
   id             String         @id @default(cuid())
   siteId         String?
   freeMissionId  String?
+  planningAssignmentId String?
   officeLocationId String?
   officeClockInLocation OfficeClockInLocation?
   userId         String
@@ -374,6 +376,7 @@ model ClockInRecord {
   createdAt      DateTime       @default(now())
   site           Site?          @relation(fields: [siteId], references: [id], onDelete: Cascade)
   freeMission    FreeMission?   @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
+  planningAssignment PlanningAssignment? @relation(fields: [planningAssignmentId], references: [id], onDelete: SetNull)
   officeLocation OfficeLocation? @relation(fields: [officeLocationId], references: [id], onDelete: SetNull)
   user           User           @relation(fields: [userId], references: [id])
   report         Report?
@@ -381,6 +384,7 @@ model ClockInRecord {
 
   @@index([siteId])
   @@index([freeMissionId])
+  @@index([planningAssignmentId])
   @@index([officeLocationId])
   @@index([officeClockInLocation])
   @@index([userId])
@@ -602,6 +606,7 @@ model PlanningAssignment {
   createdBy      User                     @relation("PlanningAssignmentCreator", fields: [createdById], references: [id])
   photos         Photo[]
   progressUpdates TaskProgressUpdate[]
+  clockInRecords ClockInRecord[]
 
   @@index([date])
   @@index([siteId])

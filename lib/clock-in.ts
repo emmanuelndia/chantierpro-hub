@@ -31,6 +31,7 @@ export const clockInRecordSelect = {
   id: true,
   siteId: true,
   freeMissionId: true,
+  planningAssignmentId: true,
   officeLocationId: true,
   officeClockInLocation: true,
   userId: true,
@@ -70,12 +71,20 @@ export const clockInRecordSelect = {
       name: true,
     },
   },
+  planningAssignment: {
+    select: {
+      id: true,
+      action: true,
+      workLocationType: true,
+    },
+  },
 } satisfies Prisma.ClockInRecordSelect;
 
 const openSessionSelect = {
   id: true,
   siteId: true,
   freeMissionId: true,
+  planningAssignmentId: true,
   officeLocationId: true,
   officeClockInLocation: true,
   userId: true,
@@ -97,6 +106,13 @@ const openSessionSelect = {
       name: true,
     },
   },
+  planningAssignment: {
+    select: {
+      id: true,
+      action: true,
+      workLocationType: true,
+    },
+  },
 } satisfies Prisma.ClockInRecordSelect;
 
 const MAX_CLOCK_IN_FUTURE_SKEW_MS = 10 * 60 * 1000;
@@ -114,6 +130,7 @@ type PauseRecord = {
   id: string;
   siteId: string | null;
   freeMissionId?: string | null;
+  planningAssignmentId?: string | null;
   officeLocationId?: string | null;
   officeClockInLocation?: 'OFFICE' | null;
   userId: string;
@@ -419,6 +436,8 @@ export function serializeClockInRecord(record: SerializableClockInRecord): Clock
     siteName: record.site?.name ?? record.freeMission?.action ?? record.officeLocation?.name ?? 'Bureau',
     freeMissionId: record.freeMissionId,
     freeMissionAction: record.freeMission?.action ?? null,
+    planningAssignmentId: record.planningAssignmentId,
+    planningAssignmentAction: record.planningAssignment?.action ?? null,
     projectId: record.freeMission?.projectId ?? null,
     projectName: record.freeMission?.project.name ?? null,
     contextType,
@@ -488,6 +507,8 @@ export function serializeSessionStatus(
       openSession.officeLocation?.name ??
       (openSession.officeClockInLocation ? 'Bureau' : null),
     openSessionFreeMissionId: openSession.freeMissionId,
+    openSessionPlanningAssignmentId: openSession.planningAssignmentId,
+    openSessionPlanningAssignmentAction: openSession.planningAssignment?.action ?? null,
     openSessionContextType: openSession.officeClockInLocation ? 'OFFICE' : openSession.freeMissionId ? 'FREE_MISSION' : 'SITE',
   };
 }
@@ -501,6 +522,8 @@ export function serializeActiveSession(record: OpenSessionRecord | null): Active
     siteId: record.siteId,
     siteName: record.site?.name ?? record.freeMission?.action ?? record.officeLocation?.name ?? 'Bureau',
     freeMissionId: record.freeMissionId,
+    planningAssignmentId: record.planningAssignmentId,
+    planningAssignmentAction: record.planningAssignment?.action ?? null,
     contextType: record.officeClockInLocation ? 'OFFICE' : record.freeMissionId ? 'FREE_MISSION' : 'SITE',
     arrivalAt: record.timestampLocal.toISOString(),
     durationSeconds: durationSince(record.timestampLocal),
@@ -526,6 +549,7 @@ export async function createClockInRecord(
   payload: {
     siteId?: string | null;
     freeMissionId?: string | null;
+    planningAssignmentId?: string | null;
     officeLocationId?: string | null;
     officeClockInLocation?: 'OFFICE' | null;
     userId: string;
@@ -543,6 +567,7 @@ export async function createClockInRecord(
     data: {
       siteId: payload.siteId ?? null,
       freeMissionId: payload.freeMissionId ?? null,
+      planningAssignmentId: payload.planningAssignmentId ?? null,
       officeLocationId: payload.officeLocationId ?? null,
       officeClockInLocation: payload.officeClockInLocation ?? null,
       userId: payload.userId,
@@ -573,6 +598,7 @@ export async function createBatchClockInRecord(
   payload: {
     siteId?: string | null;
     freeMissionId?: string | null;
+    planningAssignmentId?: string | null;
     officeLocationId?: string | null;
     officeClockInLocation?: 'OFFICE' | null;
     userId: string;
@@ -590,6 +616,7 @@ export async function createBatchClockInRecord(
     data: {
       siteId: payload.siteId ?? null,
       freeMissionId: payload.freeMissionId ?? null,
+      planningAssignmentId: payload.planningAssignmentId ?? null,
       officeLocationId: payload.officeLocationId ?? null,
       officeClockInLocation: payload.officeClockInLocation ?? null,
       userId: payload.userId,
@@ -1028,18 +1055,18 @@ function isLateClockIn(type: ClockInType, timestampLocal: string | Date) {
   }
 
   if (typeof timestampLocal === 'string') {
-    const localTimeMatch = /T(\d{2}):(\d{2})/.exec(timestampLocal);
+      const localTimeMatch = /T(\d{2}):(\d{2})/.exec(timestampLocal);
     if (localTimeMatch) {
       const hour = Number(localTimeMatch[1]);
       const minute = Number(localTimeMatch[2]);
-      return hour > 8 || (hour === 8 && minute > 0);
+      return hour > 8 || (hour === 8 && minute > 30);
     }
   }
 
   const date = typeof timestampLocal === 'string' ? new Date(timestampLocal) : timestampLocal;
   const hour = date.getUTCHours();
   const minute = date.getUTCMinutes();
-  return hour > 8 || (hour === 8 && minute > 0);
+  return hour > 8 || (hour === 8 && minute > 30);
 }
 
 function parseClockInType(value: unknown) {

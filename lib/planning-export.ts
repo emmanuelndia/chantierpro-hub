@@ -33,9 +33,9 @@ type PlanningExportRow = {
 };
 
 const workLocationLabels: Record<PlanningWorkLocationType, string> = {
-  ON_SITE: 'Terrain',
+  ON_SITE: 'Chantier',
   OFFICE: 'Bureau',
-  FREE_MISSION: 'Mission libre',
+  FREE_MISSION: 'Zone',
 };
 
 const roleLabels: Partial<Record<Role, string>> = {

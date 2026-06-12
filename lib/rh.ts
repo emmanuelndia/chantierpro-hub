@@ -39,6 +39,7 @@ const rhClockInRecordSelect = {
   userId: true,
   siteId: true,
   freeMissionId: true,
+  planningAssignmentId: true,
   officeLocationId: true,
   officeClockInLocation: true,
   type: true,
@@ -90,6 +91,13 @@ const rhClockInRecordSelect = {
     select: {
       id: true,
       name: true,
+    },
+  },
+  planningAssignment: {
+    select: {
+      id: true,
+      action: true,
+      workLocationType: true,
     },
   },
 } satisfies Prisma.ClockInRecordSelect;
@@ -596,6 +604,13 @@ export async function getSitePresencesLive(
         isAutoClosed: true,
         isRegularized: true,
         isLate: true,
+        planningAssignment: {
+          select: {
+            id: true,
+            action: true,
+            workLocationType: true,
+          },
+        },
         officeLocation: {
           select: {
             id: true,
@@ -688,6 +703,10 @@ export async function getSitePresencesLive(
   }
 
   type LiveRecordWithUser = Parameters<typeof buildLiveResource>[2][number] & {
+    planningAssignment?: {
+      action: string;
+      workLocationType: string;
+    } | null;
     user: {
       id: string;
       firstName: string;
@@ -758,7 +777,8 @@ export async function getSitePresencesLive(
     const user = assignment?.supervisor ?? siteRecords[0]?.user;
     if (!user) continue;
 
-    const resource = buildLiveResource(user, assignment?.action ?? null, siteRecords, site.presenceContext);
+    const officeTaskAction = site.presenceContext === 'OFFICE' ? getOfficeTaskAction(siteRecords) : null;
+    const resource = buildLiveResource(user, assignment?.action ?? officeTaskAction, siteRecords, site.presenceContext);
     if (!matchesLiveResourceFilters(resource, query)) continue;
 
     site.resources.push(resource);
@@ -2331,6 +2351,26 @@ function parseLiveResourceKey(key: string) {
 
   const [siteId = '', userId = ''] = key.split(':');
   return { siteId, userId };
+}
+
+function getOfficeTaskAction(
+  records: {
+    planningAssignment?: {
+      action: string;
+      workLocationType: string;
+    } | null;
+  }[],
+) {
+  const actions = [
+    ...new Set(
+      records
+        .filter((record) => record.planningAssignment?.workLocationType === 'OFFICE')
+        .map((record) => record.planningAssignment?.action.trim())
+        .filter((action): action is string => Boolean(action)),
+    ),
+  ];
+
+  return actions.length > 0 ? actions.join(' / ') : null;
 }
 
 function buildLiveResource(
