@@ -33,6 +33,24 @@ type ProjectDetailPageProps = Readonly<{
   };
 }>;
 
+type NegotiationScopeItem = {
+  id: string;
+  name: string;
+  city: string;
+  commune: string | null;
+  plaque: string | null;
+  cluster: string | null;
+  contactInfo: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  negotiationStatus: string | null;
+  remark: string | null;
+};
+
+type NegotiationScopesResponse = {
+  buildings: NegotiationScopeItem[];
+};
+
 type SiteFormValues = {
   projectId: string;
   name: string;
@@ -90,6 +108,8 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
   const [activeTab, setActiveTab] = useState<'sites' | 'team' | 'presences' | 'photos' | 'documents'>('sites');
   const [siteDrawerOpen, setSiteDrawerOpen] = useState(false);
   const [siteImportOpen, setSiteImportOpen] = useState(false);
+  const [scopeDrawerOpen, setScopeDrawerOpen] = useState(false);
+  const [scopeImportOpen, setScopeImportOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<ProjectSiteItem | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
@@ -135,6 +155,19 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
       }
       return (await response.json()) as ProjectPresenceSummary;
     },
+  });
+
+  const isNegotiationProjectMode = viewer.role === 'NEGOTIATION_MANAGER';
+  const scopesQuery = useQuery({
+    queryKey: ['negotiation-project-scopes', projectId],
+    queryFn: async () => {
+      const response = await authFetch(`/api/negotiation/buildings?projectId=${encodeURIComponent(projectId)}`);
+      if (!response.ok) {
+        throw new Error('Scopes indisponibles.');
+      }
+      return (await response.json()) as NegotiationScopesResponse;
+    },
+    enabled: isNegotiationProjectMode,
   });
 
   const saveSiteMutation = useMutation({
@@ -234,13 +267,13 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
 
   const tabs = useMemo(
     () => [
-      { id: 'sites', label: 'Sites' },
+      { id: 'sites', label: isNegotiationProjectMode ? 'Scopes' : 'Sites' },
       { id: 'team', label: 'Equipe' },
       { id: 'presences', label: 'Presences' },
       { id: 'photos', label: 'Photos' },
       ...(canManageProjectDocuments ? [{ id: 'documents' as const, label: 'Documents' }] : []),
     ] as const,
-    [canManageProjectDocuments],
+    [canManageProjectDocuments, isNegotiationProjectMode],
   );
 
   if (projectQuery.isLoading) {
@@ -266,7 +299,9 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
             <div className="flex flex-wrap items-center gap-3">
               <Badge tone={projectStatusTone(project.status)}>{humanizeProjectStatus(project.status)}</Badge>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {project.sitesCount} site(s) - {project.resourcesCount} ressource(s)
+                {isNegotiationProjectMode
+                  ? `${scopesQuery.data?.buildings.length ?? 0} scope(s)`
+                  : `${project.sitesCount} site(s) - ${project.resourcesCount} ressource(s)`}
               </p>
             </div>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{project.name}</h1>
@@ -281,20 +316,24 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
             <button
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => {
+                if (isNegotiationProjectMode) {
+                  setScopeDrawerOpen(true);
+                  return;
+                }
                 setEditingSite(null);
                 setSiteDrawerOpen(true);
               }}
               type="button"
             >
-              Créer chantier
+              {isNegotiationProjectMode ? 'Créer scope' : 'Créer chantier'}
             </button>
             <button
               className="rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
               hidden={!canManageSites}
-              onClick={() => setSiteImportOpen(true)}
+              onClick={() => (isNegotiationProjectMode ? setScopeImportOpen(true) : setSiteImportOpen(true))}
               type="button"
             >
-              Importer des chantiers
+              {isNegotiationProjectMode ? 'Importer scopes' : 'Importer des chantiers'}
             </button>
             <Link
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
@@ -330,7 +369,55 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
         ))}
       </section>
 
-      {activeTab === 'sites' ? (
+      {activeTab === 'sites' && isNegotiationProjectMode ? (
+        <section className="grid gap-4 xl:grid-cols-2">
+          {scopesQuery.isLoading ? (
+            <div className="xl:col-span-2">
+              <LoadingCard message="Chargement des scopes..." />
+            </div>
+          ) : (scopesQuery.data?.buildings.length ?? 0) === 0 ? (
+            <div className="xl:col-span-2">
+              <EmptyState
+                description="Ce projet n'a pas encore de scope de negociation. Cree un scope ou importe la base a traiter."
+                title="Aucun scope"
+              />
+            </div>
+          ) : (
+            scopesQuery.data?.buildings.map((scope) => (
+              <article key={scope.id} className="space-y-4 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h2 className="text-xl font-semibold text-slate-950">{scope.name}</h2>
+                      {scope.negotiationStatus ? <Badge tone="info">{scope.negotiationStatus}</Badge> : <Badge tone="neutral">Non traite</Badge>}
+                    </div>
+                    <p className="mt-3 text-sm text-slate-500">
+                      {[scope.city, scope.commune].filter(Boolean).join(' - ') || 'Zone non renseignee'}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {scope.cluster ? <Badge tone="info">{scope.cluster}</Badge> : null}
+                      {scope.plaque ? <Badge tone="neutral">{scope.plaque}</Badge> : null}
+                    </div>
+                    {scope.contactInfo ? <p className="mt-3 text-sm font-semibold text-slate-600">Contact : {scope.contactInfo}</p> : null}
+                    {scope.remark ? <p className="mt-2 text-sm text-slate-500">{scope.remark}</p> : null}
+                  </div>
+                  {scope.latitude && scope.longitude ? (
+                    <a
+                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      href={`https://www.google.com/maps?q=${scope.latitude},${scope.longitude}`}
+                      target="_blank"
+                    >
+                      Voir GPS
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+            ))
+          )}
+        </section>
+      ) : null}
+
+      {activeTab === 'sites' && !isNegotiationProjectMode ? (
         <section className="grid gap-4 xl:grid-cols-2">
           {project.sites.length === 0 ? (
             <div className="xl:col-span-2">
@@ -366,30 +453,16 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Link
-                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                      href={`/web/projects/${projectId}?tab=photos&siteId=${encodeURIComponent(site.id)}`}
-                    >
+                    <Link className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href={`/web/projects/${projectId}?tab=photos&siteId=${encodeURIComponent(site.id)}`}>
                       Photos
                     </Link>
-                    <Link
-                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                      href={`/web/sites/${site.id}/presences`}
-                    >
+                    <Link className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href={`/web/sites/${site.id}/presences`}>
                       Présences
                     </Link>
-                    <Link
-                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                      href={`/web/teams?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`}
-                      hidden={!canManageProject}
-                    >
+                    <Link className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href={`/web/teams?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`} hidden={!canManageProject}>
                       Equipes
                     </Link>
-                    <Link
-                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                      href={`/web/teams/new?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`}
-                      hidden={!canManageProject}
-                    >
+                    <Link className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href={`/web/teams/new?projectId=${encodeURIComponent(projectId)}&siteId=${encodeURIComponent(site.id)}`} hidden={!canManageProject}>
                       Créer équipe
                     </Link>
                     <button
@@ -405,13 +478,13 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                   </div>
                 </div>
                 {canManageProjectDocuments ? (
-                <DocumentAttachmentsPanel
-                  canUpload={canManageProjectDocuments}
-                  compact
-                  context={{ siteId: site.id }}
-                  description="Documents rattachés à  ce chantier."
-                  title="Documents chantier"
-                />
+                  <DocumentAttachmentsPanel
+                    canUpload={canManageProjectDocuments}
+                    compact
+                    context={{ siteId: site.id }}
+                    description="Documents rattachés à ce chantier."
+                    title="Documents chantier"
+                  />
                 ) : null}
               </article>
             ))
@@ -540,6 +613,26 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
           title={`Documents - ${project.name}`}
         />
       ) : null}
+
+      <ScopeFormDrawer
+        onClose={() => setScopeDrawerOpen(false)}
+        onCreated={() => {
+          void queryClient.invalidateQueries({ queryKey: ['negotiation-project-scopes', projectId] });
+          void queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
+        }}
+        open={scopeDrawerOpen}
+        projectId={projectId}
+      />
+
+      <ScopeImportModal
+        onClose={() => setScopeImportOpen(false)}
+        onImported={() => {
+          void queryClient.invalidateQueries({ queryKey: ['negotiation-project-scopes', projectId] });
+          void queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
+        }}
+        open={scopeImportOpen}
+        projectId={projectId}
+      />
 
       <SiteFormDrawer
         canManageRadius={canManageRadius}
@@ -810,6 +903,252 @@ function SiteImportModal({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ScopeFormDrawer({
+  open,
+  projectId,
+  onCreated,
+  onClose,
+}: Readonly<{
+  open: boolean;
+  projectId: string;
+  onCreated: () => void;
+  onClose: () => void;
+}>) {
+  const { pushToast } = useToast();
+  const [form, setForm] = useState({
+    name: '',
+    city: '',
+    commune: '',
+    plaque: '',
+    cluster: '',
+    contactInfo: '',
+    latitude: '',
+    longitude: '',
+    remark: '',
+  });
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const response = await authFetch('/api/negotiation/buildings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          ...form,
+        }),
+      });
+      if (!response.ok) {
+        const errorBody = (await safeJson(response)) as { message?: string } | null;
+        throw new Error(errorBody?.message ?? 'Impossible de creer le scope.');
+      }
+      return response.json() as Promise<unknown>;
+    },
+    onSuccess: () => {
+      pushToast({ type: 'success', title: 'Scope cree' });
+      setForm({ name: '', city: '', commune: '', plaque: '', cluster: '', contactInfo: '', latitude: '', longitude: '', remark: '' });
+      onCreated();
+      onClose();
+    },
+    onError: (error) => {
+      pushToast({
+        type: 'error',
+        title: 'Creation impossible',
+        message: error instanceof Error ? error.message : 'Le scope n a pas pu etre cree.',
+      });
+    },
+  });
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/45">
+      <aside className="custom-scrollbar h-full w-full max-w-xl overflow-y-auto bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Nouveau scope</p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-950">Créer un scope</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Un scope peut être un immeuble, un client, un point bloquant ou tout élément à négocier.
+            </p>
+          </div>
+          <button className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" onClick={onClose} type="button">
+            Fermer
+          </button>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <ScopeInput label="Nom du scope" required value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ScopeInput label="Ville" value={form.city} onChange={(value) => setForm((current) => ({ ...current, city: value }))} />
+            <ScopeInput label="Commune / zone" value={form.commune} onChange={(value) => setForm((current) => ({ ...current, commune: value }))} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ScopeInput label="Cluster" value={form.cluster} onChange={(value) => setForm((current) => ({ ...current, cluster: value }))} />
+            <ScopeInput label="Plaque" value={form.plaque} onChange={(value) => setForm((current) => ({ ...current, plaque: value }))} />
+          </div>
+          <ScopeInput label="Contact / interlocuteur" value={form.contactInfo} onChange={(value) => setForm((current) => ({ ...current, contactInfo: value }))} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ScopeInput label="Latitude" value={form.latitude} onChange={(value) => setForm((current) => ({ ...current, latitude: value }))} />
+            <ScopeInput label="Longitude" value={form.longitude} onChange={(value) => setForm((current) => ({ ...current, longitude: value }))} />
+          </div>
+          <label className="block text-sm font-semibold text-slate-700">
+            Remarque
+            <textarea
+              className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500"
+              onChange={(event) => setForm((current) => ({ ...current, remark: event.target.value }))}
+              value={form.remark}
+            />
+          </label>
+        </div>
+
+        <button
+          className="mt-6 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!form.name.trim() || mutation.isPending}
+          onClick={() => mutation.mutate()}
+          type="button"
+        >
+          {mutation.isPending ? 'Creation...' : 'Créer le scope'}
+        </button>
+      </aside>
+    </div>
+  );
+}
+
+function ScopeImportModal({
+  open,
+  projectId,
+  onImported,
+  onClose,
+}: Readonly<{
+  open: boolean;
+  projectId: string;
+  onImported: () => void;
+  onClose: () => void;
+}>) {
+  const { pushToast } = useToast();
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<{ totalRows: number; validRows: number; invalidRows: number } | null>(null);
+
+  const importMutation = useMutation({
+    mutationFn: async (mode: 'preview' | 'commit') => {
+      if (!file) throw new Error('Choisis un fichier Excel.');
+      const formData = new FormData();
+      formData.set('projectId', projectId);
+      formData.set('mode', mode);
+      formData.set('file', file);
+      const response = await authFetch('/api/negotiation/buildings/import', { method: 'POST', body: formData });
+      if (!response.ok) {
+        const errorBody = (await safeJson(response)) as { message?: string } | null;
+        throw new Error(errorBody?.message ?? 'Import scopes impossible.');
+      }
+      return (await response.json()) as { totalRows: number; validRows: number; invalidRows: number };
+    },
+    onSuccess: (data, mode) => {
+      setPreview(data);
+      pushToast({
+        type: data.invalidRows > 0 ? 'warning' : 'success',
+        title: mode === 'commit' ? 'Scopes importes' : 'Prévisualisation prête',
+        message: `${data.validRows} ligne(s) valide(s), ${data.invalidRows} ligne(s) ignoree(s).`,
+      });
+      if (mode === 'commit') {
+        onImported();
+      }
+    },
+    onError: (error) => {
+      pushToast({
+        type: 'error',
+        title: 'Import impossible',
+        message: error instanceof Error ? error.message : 'Le fichier n a pas pu etre importe.',
+      });
+    },
+  });
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[78] flex items-center justify-center bg-slate-950/55 p-4">
+      <div className="w-full max-w-4xl rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Import scopes</p>
+            <h2 className="mt-3 text-2xl font-semibold text-slate-950">Importer une base de scopes</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              Télécharge le modèle, renseigne les scopes à visiter ou négocier, puis prévisualise avant import.
+            </p>
+          </div>
+          <button className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" onClick={onClose} type="button">
+            Fermer
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">1. Modèle</p>
+            <p className="mt-2 text-sm text-slate-600">Le modèle contient les colonnes attendues pour les scopes.</p>
+            <a className="mt-4 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800" href="/api/negotiation/buildings/import/template">
+              Télécharger le modèle
+            </a>
+          </article>
+          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">2. Fichier</p>
+            <input
+              accept=".xlsx"
+              className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+              onChange={(event) => {
+                setFile(event.target.files?.[0] ?? null);
+                setPreview(null);
+              }}
+              type="file"
+            />
+            <button
+              className="mt-4 rounded-full bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!file || importMutation.isPending}
+              onClick={() => importMutation.mutate('preview')}
+              type="button"
+            >
+              Prévisualiser
+            </button>
+          </article>
+          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">3. Import</p>
+            <p className="mt-2 text-sm text-slate-600">Importer les lignes valides après contrôle.</p>
+            <button
+              className="mt-4 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!file || !preview || preview.validRows === 0 || importMutation.isPending}
+              onClick={() => importMutation.mutate('commit')}
+              type="button"
+            >
+              Importer les scopes
+            </button>
+          </article>
+        </div>
+
+        {preview ? (
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <MetricCard label="Total lignes" value={preview.totalRows} />
+            <MetricCard label="Valides" value={preview.validRows} />
+            <MetricCard label="Ignorées" value={preview.invalidRows} />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ScopeInput({ label, value, onChange, required = false }: Readonly<{ label: string; value: string; onChange: (value: string) => void; required?: boolean }>) {
+  return (
+    <label className="block text-sm font-semibold text-slate-700">
+      {label}
+      {required ? <span className="text-orange-600"> *</span> : null}
+      <input
+        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      />
+    </label>
   );
 }
 

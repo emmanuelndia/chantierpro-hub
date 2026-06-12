@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, FileSpreadsheet, Upload } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Download } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
@@ -75,12 +75,8 @@ type NegotiationVisit = {
 const todayKey = new Date().toISOString().slice(0, 10);
 
 export function NegotiationWebPage() {
-  const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [date, setDate] = useState(todayKey);
-  const [importProjectId, setImportProjectId] = useState('');
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importMode, setImportMode] = useState<'preview' | 'commit'>('preview');
   const [filters, setFilters] = useState({
     projectId: '',
     resourceId: '',
@@ -95,7 +91,6 @@ export function NegotiationWebPage() {
     refetchInterval: 60_000,
   });
   const overview = overviewQuery.data;
-  const selectedImportProject = useMemo(() => overview?.projects.find((project) => project.id === importProjectId), [overview?.projects, importProjectId]);
   const projectSummaries = useMemo(
     () => (filters.projectId ? overview?.projectScopeSummaries.filter((summary) => summary.projectId === filters.projectId) : overview?.projectScopeSummaries) ?? [],
     [filters.projectId, overview?.projectScopeSummaries],
@@ -119,29 +114,8 @@ export function NegotiationWebPage() {
     };
   }, [projectSummaries]);
 
-  const importMutation = useMutation({
-    mutationFn: importNegotiationBuildings,
-    onSuccess: async (result) => {
-      pushToast({
-        type: 'success',
-        title: importMode === 'commit' ? `${result.validRows} scope(s) importes` : `${result.validRows} ligne(s) valides`,
-        ...(result.invalidRows > 0 ? { message: `${result.invalidRows} ligne(s) ignoree(s).` } : {}),
-      });
-      await queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
-    },
-    onError: (error) => pushToast({ type: 'error', title: 'Import impossible', message: getErrorMessage(error) }),
-  });
-
   function setFilter(name: keyof typeof filters, value: string) {
     setFilters((current) => ({ ...current, [name]: value }));
-  }
-
-  function submitImport() {
-    if (!importProjectId || !importFile) {
-      pushToast({ type: 'error', title: 'Import incomplet', message: 'Choisis un projet et un fichier Excel.' });
-      return;
-    }
-    importMutation.mutate({ projectId: importProjectId, file: importFile, mode: importMode });
   }
 
   return (
@@ -229,72 +203,44 @@ export function NegotiationWebPage() {
             <Metric label="Non traites" value={scopeTotals.untreated} />
           </section>
 
-          <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-              <h2 className="text-lg font-black text-slate-950">Progression par projet</h2>
-              <div className="mt-4 overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                    <tr>
-                      <th className="px-3 py-3">Projet</th>
-                      <th className="px-3 py-3">Total</th>
-                      <th className="px-3 py-3">Traites</th>
-                      <th className="px-3 py-3">Autorisations</th>
-                      <th className="px-3 py-3">Refus</th>
-                      <th className="px-3 py-3">A revisiter</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {projectSummaries.map((summary) => {
-                      const project = overview.projects.find((item) => item.id === summary.projectId);
-                      return (
-                        <tr key={summary.projectId}>
-                          <td className="max-w-sm px-3 py-3 font-black text-slate-950">{project?.name ?? 'Projet'}</td>
-                          <td className="px-3 py-3">{summary.totalScopes}</td>
-                          <td className="px-3 py-3">{summary.processed} ({summary.treatmentRate}%)</td>
-                          <td className="px-3 py-3 text-emerald-700">{summary.authorized}</td>
-                          <td className="px-3 py-3 text-red-700">{summary.refused}</td>
-                          <td className="px-3 py-3 text-amber-700">{summary.revisit}</td>
-                        </tr>
-                      );
-                    })}
-                    {projectSummaries.length === 0 ? (
-                      <tr>
-                        <td className="px-3 py-6 text-center text-sm font-bold text-slate-500" colSpan={6}>Aucun scope pour ces filtres.</td>
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+            <h2 className="text-lg font-black text-slate-950">Progression par projet</h2>
+            <p className="mt-2 text-sm font-semibold text-slate-500">
+              Pour créer ou importer les scopes, ouvre le détail du projet concerné.
+            </p>
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                  <tr>
+                    <th className="px-3 py-3">Projet</th>
+                    <th className="px-3 py-3">Total</th>
+                    <th className="px-3 py-3">Traites</th>
+                    <th className="px-3 py-3">Autorisations</th>
+                    <th className="px-3 py-3">Refus</th>
+                    <th className="px-3 py-3">A revisiter</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {projectSummaries.map((summary) => {
+                    const project = overview.projects.find((item) => item.id === summary.projectId);
+                    return (
+                      <tr key={summary.projectId}>
+                        <td className="max-w-sm px-3 py-3 font-black text-slate-950">{project?.name ?? 'Projet'}</td>
+                        <td className="px-3 py-3">{summary.totalScopes}</td>
+                        <td className="px-3 py-3">{summary.processed} ({summary.treatmentRate}%)</td>
+                        <td className="px-3 py-3 text-emerald-700">{summary.authorized}</td>
+                        <td className="px-3 py-3 text-red-700">{summary.refused}</td>
+                        <td className="px-3 py-3 text-amber-700">{summary.revisit}</td>
                       </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-              <h2 className="text-lg font-black text-slate-950">Importer la base scopes</h2>
-              <p className="mt-2 text-sm font-semibold text-slate-500">
-                Importe la liste des scopes a visiter ou negocier sur un projet donne.
-              </p>
-              <div className="mt-4 grid gap-3">
-                <Select label="Projet cible" value={importProjectId} onChange={setImportProjectId}>
-                  <option value="">Choisir un projet</option>
-                  {overview.projects.map((project) => (
-                    <option key={project.id} value={project.id}>{project.name}</option>
-                  ))}
-                </Select>
-                {selectedImportProject ? <p className="text-xs font-bold text-slate-500">Projet selectionne : {selectedImportProject.name}</p> : null}
-              </div>
-              <button className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50" onClick={() => void downloadScopeTemplate(pushToast)} type="button">
-                <FileSpreadsheet className="h-4 w-4" />
-                Télécharger le modèle
-              </button>
-              <input className="mt-4 block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" onChange={(event) => setImportFile(event.target.files?.[0] ?? null)} type="file" accept=".xlsx" />
-              <select className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" onChange={(event) => setImportMode(event.target.value as 'preview' | 'commit')} value={importMode}>
-                <option value="preview">Previsualiser</option>
-                <option value="commit">Importer vraiment</option>
-              </select>
-              <button className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-orange-600 px-5 py-3 text-sm font-black text-white disabled:opacity-50" disabled={!importProjectId || !importFile || importMutation.isPending} onClick={submitImport} type="button">
-                <Upload className="h-4 w-4" />
-                {importMode === 'commit' ? 'Importer' : 'Previsualiser'}
-              </button>
+                    );
+                  })}
+                  {projectSummaries.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-sm font-bold text-slate-500" colSpan={6}>Aucun scope pour ces filtres.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
           </section>
 
@@ -380,18 +326,6 @@ async function fetchNegotiationOverview(
   return response.json() as Promise<NegotiationOverview>;
 }
 
-async function importNegotiationBuildings(data: { projectId: string; file: File; mode: 'preview' | 'commit' }) {
-  const formData = new FormData();
-  formData.set('projectId', data.projectId);
-  formData.set('mode', data.mode);
-  formData.set('file', data.file);
-  const response = await authFetch('/api/negotiation/buildings/import', { method: 'POST', body: formData });
-  if (!response.ok) {
-    throw new Error(await readError(response));
-  }
-  return response.json() as Promise<{ validRows: number; invalidRows: number }>;
-}
-
 async function downloadNegotiationExport(date: string, pushToast: ReturnType<typeof useToast>['pushToast']) {
   const response = await authFetch(`/api/negotiation/export?date=${encodeURIComponent(date)}`);
   if (!response.ok) {
@@ -407,30 +341,11 @@ async function downloadNegotiationExport(date: string, pushToast: ReturnType<typ
   URL.revokeObjectURL(url);
 }
 
-async function downloadScopeTemplate(pushToast: ReturnType<typeof useToast>['pushToast']) {
-  const response = await authFetch('/api/negotiation/buildings/import/template');
-  if (!response.ok) {
-    pushToast({ type: 'error', title: 'Modèle indisponible', message: await readError(response) });
-    return;
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'modele-import-scopes-negociation.xlsx';
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
 async function readError(response: Response) {
   const payload: unknown = await response.json().catch(() => null);
   return payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string'
     ? payload.message
     : 'Operation refusee.';
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Operation refusee.';
 }
 
 function mapsHref(latitude: number, longitude: number) {
