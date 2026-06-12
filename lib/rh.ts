@@ -851,7 +851,7 @@ export async function getSitePresencesLive(
     if (resource.status === 'PAUSED') site.pausedCount += 1;
     if (resource.status === 'EXPECTED_NOT_CLOCKED') site.notClockedCount += 1;
     if (resource.status === 'LEFT') site.leftCount += 1;
-    if (resource.status === 'ANOMALY') site.anomalyCount += 1;
+    if (resource.status === 'ANOMALY' || resource.anomalyReason) site.anomalyCount += 1;
 
     if (resource.lastClockInAt && (!site.lastActivityAt || resource.lastClockInAt > site.lastActivityAt)) {
       site.lastActivityAt = resource.lastClockInAt;
@@ -2449,12 +2449,18 @@ function buildLiveResource(
     ? null
     : [...records.slice(arrivalIndex + 1)].reverse().find((record) => record.type === ClockInType.DEPARTURE) ?? null;
   const today = referenceDate.toISOString().slice(0, 10);
+  const hasTodayRecord = records.some((record) => record.timestampLocal.toISOString().slice(0, 10) === today);
   const hasStaleOpenSession =
     Boolean(arrival) &&
     !departure &&
     arrival!.timestampLocal.toISOString().slice(0, 10) !== today;
-  const hasAnomaly = records.some((record) => record.isAutoClosed) || hasStaleOpenSession;
-  const status = hasAnomaly ? 'ANOMALY' : getLiveStatusFromLatestRecord(latest);
+  const hasStaleOpenSessionWithoutToday = hasStaleOpenSession && !hasTodayRecord;
+  const hasAnomaly = records.some((record) => record.isAutoClosed) || (hasStaleOpenSession && hasTodayRecord);
+  const status = hasStaleOpenSessionWithoutToday
+    ? 'EXPECTED_NOT_CLOCKED'
+    : hasAnomaly
+      ? 'ANOMALY'
+      : getLiveStatusFromLatestRecord(latest);
   const anomalyReason = getLiveAnomalyReason({
     records,
     hasStaleOpenSession,
@@ -2509,8 +2515,6 @@ function getLiveAnomalyReason({
 }) {
   if (hasStaleOpenSession) return 'Sortie oubliee';
   if (records.some((record) => record.isAutoClosed)) return 'Sortie oubliee';
-  if (records.some((record) => record.isRemoteCheckout)) return 'Sortie distante';
-  if (records.some((record) => record.isRegularized)) return 'Regularisee';
   return null;
 }
 
@@ -2543,7 +2547,7 @@ function getLiveStatusFromLatestRecord(
 
 function matchesLiveResourceFilters(resource: RhSitePresenceLiveResource, query: SitePresenceLiveQuery) {
   if (query.status && resource.status !== query.status) return false;
-  if (query.anomaliesOnly && resource.status !== 'ANOMALY') return false;
+  if (query.anomaliesOnly && resource.status !== 'ANOMALY' && !resource.anomalyReason) return false;
   if (query.lateOnly && !resource.isLate) return false;
 
   if (query.search) {

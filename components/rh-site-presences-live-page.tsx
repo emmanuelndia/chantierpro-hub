@@ -405,14 +405,12 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
       !context.taskAction &&
       context.status !== 'EXPECTED_NOT_CLOCKED',
   );
-  const anomalyLabel = resource.status === 'ANOMALY'
-    ? resource.anomalyReason ?? 'Pointage a verifier'
-    : null;
+  const anomalyLabel = resource.anomalyReason ?? (resource.status === 'ANOMALY' ? 'Pointage a verifier' : null);
   const flags = [
     isUnplannedClockIn ? 'Non prevu' : null,
     anomalyLabel,
-    resource.status !== 'ANOMALY' && resource.isRemoteCheckout ? 'Sortie a distance' : null,
-    resource.status !== 'ANOMALY' && resource.isAutoClosed ? 'Auto-cloturee' : null,
+    !anomalyLabel && resource.isRemoteCheckout ? 'Sortie a distance' : null,
+    !anomalyLabel && resource.isAutoClosed ? 'Auto-cloturee' : null,
     resource.isRegularized ? 'Regularisee' : null,
     resource.isLate ? 'Retard' : null,
   ].filter(Boolean);
@@ -437,6 +435,11 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
             {resource.isLate ? (
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">
                 Retard
+              </span>
+            ) : null}
+            {resource.anomalyReason ? (
+              <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-red-700">
+                {resource.anomalyReason}
               </span>
             ) : null}
             <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
@@ -473,6 +476,11 @@ function ResourcePresenceItem({ resource }: Readonly<{ resource: AggregatedLiveR
               {context.isLate ? (
                 <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">
                   Arrivee apres 08:30
+                </p>
+              ) : null}
+              {context.anomalyReason ? (
+                <p className="mt-2 inline-flex rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-red-700">
+                  {context.anomalyReason}
                 </p>
               ) : null}
               <div className="mt-2 grid gap-2 lg:grid-cols-2">

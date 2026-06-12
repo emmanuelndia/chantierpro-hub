@@ -187,6 +187,9 @@ function PresenceResourceCard({ resource }: Readonly<{ resource: MobilePresenceL
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{resource.contextLabel}</span>
+        {resource.anomalyReason ? (
+          <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">{resource.anomalyReason}</span>
+        ) : null}
         {resource.detailsCount > 1 ? (
           <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">{resource.detailsCount} positions</span>
         ) : null}

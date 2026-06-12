@@ -37,7 +37,7 @@ export const GET = withAuth(async ({ req, user }) => {
       terrain: resources.filter((resource) => resource.presenceContext === 'TERRAIN').length,
       absent: resources.filter((resource) => resource.status === 'ABSENT').length,
       late: resources.filter((resource) => resource.isLate).length,
-      anomalies: resources.filter((resource) => resource.status === 'ANOMALY').length,
+      anomalies: resources.filter((resource) => resource.status === 'ANOMALY' || resource.anomalyReason).length,
     },
     options: data.options,
     resources,
