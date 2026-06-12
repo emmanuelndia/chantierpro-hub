@@ -35,7 +35,7 @@ export type CentralizedPlanningAssignment = {
   siteId: string;
   siteName: string;
   siteAddress: string;
-  siteType: SiteType;
+  siteType: SiteType | 'FREE_MISSION';
   resourceId: string;
   resourceName: string;
   resourceRole: Role;

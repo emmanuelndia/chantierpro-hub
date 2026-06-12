@@ -49,6 +49,12 @@ export const freeMissionSelect = {
       name: true,
       projectManagerId: true,
       status: true,
+      projectManager: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
     },
   },
   assignee: {
@@ -405,6 +411,8 @@ export function serializeFreeMission(row: FreeMissionRow) {
     id: row.id,
     projectId: row.projectId,
     projectName: row.project.name,
+    projectManagerId: row.project.projectManagerId,
+    projectManagerName: `${row.project.projectManager.firstName} ${row.project.projectManager.lastName}`.trim(),
     assigneeId: row.assigneeId,
     assigneeFirstName: row.assignee.firstName,
     assigneeLastName: row.assignee.lastName,

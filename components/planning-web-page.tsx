@@ -65,7 +65,11 @@ type FreeMissionWebRequest = {
   assigneeIds?: string[];
   date: string;
   action: string;
+  targetProgress: number | null;
+  targetQuantity: number | null;
+  targetUnit: string | null;
   objectiveText: string | null;
+  plannedDurationMinutes: number | null;
 };
 
 type CreateSummaryResponse = {
@@ -196,8 +200,11 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
 
   const createMutation = useMutation({
     mutationFn: createAssignment,
-    onSuccess: async (result) => {
+    onSuccess: async (result, payload) => {
       pushToast({ type: 'success', title: formatCreateSuccessTitle(result, 'Tâche créée') });
+      if (payload.date !== selectedDate) {
+        setSelectedDate(payload.date);
+      }
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -217,8 +224,11 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const freeMissionMutation = useMutation({
     mutationFn: ({ id, data }: { id?: string; data: FreeMissionWebRequest }) =>
       id ? updateFreeMission(id, data) : createFreeMission(data),
-    onSuccess: async (result) => {
+    onSuccess: async (result, variables) => {
       pushToast({ type: 'success', title: formatCreateSuccessTitle(result, 'Zone enregistree') });
+      if (variables.data.date !== selectedDate) {
+        setSelectedDate(variables.data.date);
+      }
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -373,7 +383,11 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         ...(drawerMode === 'create' ? { assigneeIds: form.supervisorIds } : {}),
         date: form.date,
         action: form.action,
+        targetProgress: normalizedTargetProgress,
+        targetQuantity,
+        targetUnit,
         objectiveText: form.objectiveText.trim() || null,
+        plannedDurationMinutes,
       };
       freeMissionMutation.mutate(drawerMode === 'edit' && form.id ? { id: form.id, data } : { data });
       return;

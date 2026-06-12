@@ -1,4 +1,4 @@
-import { PlanningWorkLocationType, Prisma, Role, type PrismaClient } from '@prisma/client';
+import { FreeMissionStatus, PlanningAssignmentStatus, PlanningWorkLocationType, Prisma, Role, type PrismaClient } from '@prisma/client';
 import type {
   CentralizedPlanningAssignment,
   CentralizedPlanningFilters,
@@ -6,6 +6,7 @@ import type {
 } from '@/types/planning-web';
 import type { TaskProgressUpdateItem } from '@/types/mobile-planning';
 import { BUSINESS_MANAGER_ROLES } from '@/lib/field-roles';
+import { listFreeMissions } from '@/lib/free-missions';
 
 type AuthLikeUser = {
   id: string;
@@ -86,7 +87,8 @@ export async function getCentralizedPlanning(
     },
   };
 
-  const assignments = await prisma.planningAssignment.findMany({
+  const [assignments, freeMissionResponses] = await Promise.all([
+    prisma.planningAssignment.findMany({
     where,
     orderBy: [
       { date: 'asc' },
@@ -165,13 +167,81 @@ export async function getCentralizedPlanning(
         },
       },
     },
-  });
+    }),
+    Promise.all(
+      eachDate(from, to).map((date) => listFreeMissions(prisma, user, date.toISOString().slice(0, 10))),
+    ),
+  ]);
+
+  const freeMissionItems = freeMissionResponses
+    .flatMap((response) => response.missions)
+    .filter((mission) => {
+      if (filters.siteId) return false;
+      if (workLocationType && workLocationType !== PlanningWorkLocationType.FREE_MISSION) return false;
+      if (filters.projectId && mission.projectId !== filters.projectId) return false;
+      if (filters.resourceId && mission.assigneeId !== filters.resourceId) return false;
+      if (resourceRole && mission.assigneeRole !== resourceRole) return false;
+      if (filters.projectManagerId && mission.projectManagerId !== filters.projectManagerId) return false;
+      return true;
+    })
+    .map((mission): CentralizedPlanningAssignment => {
+      const targetQuantity = mission.targetQuantity;
+      const actualProgress = mission.status === FreeMissionStatus.COMPLETED ? 100 : null;
+      const objective = buildObjectiveState(mission.targetProgress, targetQuantity, null);
+
+      return {
+        id: mission.id,
+        date: mission.date,
+        projectId: mission.projectId,
+        projectName: mission.projectName,
+        projectManagerId: mission.projectManagerId,
+        projectManagerName: mission.projectManagerName,
+        siteId: mission.id,
+        siteName: mission.action,
+        siteAddress: mission.projectName,
+        siteType: 'FREE_MISSION',
+        resourceId: mission.assigneeId,
+        resourceName: mission.assigneeName,
+        resourceRole: mission.assigneeRole,
+        action: mission.action,
+        targetProgress: mission.targetProgress,
+        targetQuantity,
+        targetUnit: mission.targetUnit,
+        objectiveText: mission.objectiveText,
+        plannedDurationMinutes: mission.plannedDurationMinutes,
+        actualQuantity: null,
+        actualProgress,
+        progressDelta: actualProgress !== null ? actualProgress - (targetQuantity && targetQuantity > 0 ? 100 : mission.targetProgress ?? 0) : objective.progressDelta,
+        remainingQuantity: objective.remainingQuantity,
+        objectiveStatus:
+          mission.status === FreeMissionStatus.COMPLETED
+            ? 'ACHIEVED'
+            : mission.status === FreeMissionStatus.IN_PROGRESS
+              ? 'PARTIAL'
+              : 'NOT_STARTED',
+        latestProgressUpdate: null,
+        status:
+          mission.status === FreeMissionStatus.COMPLETED
+            ? PlanningAssignmentStatus.COMPLETED
+            : mission.status === FreeMissionStatus.IN_PROGRESS
+              ? PlanningAssignmentStatus.IN_PROGRESS
+              : PlanningAssignmentStatus.ASSIGNED,
+        workLocationType: PlanningWorkLocationType.FREE_MISSION,
+        createdBy: {
+          id: mission.createdBy.id,
+          name: `${mission.createdBy.firstName} ${mission.createdBy.lastName}`.trim(),
+          role: mission.createdBy.role,
+        },
+        canEdit: false,
+      };
+    });
 
   return {
     generatedAt: new Date().toISOString(),
     from: filters.from,
     to: filters.to,
-    items: assignments.map((assignment): CentralizedPlanningAssignment => {
+    items: [
+      ...assignments.map((assignment): CentralizedPlanningAssignment => {
       const latestProgressUpdate = assignment.progressUpdates[0] ? serializeTaskProgressUpdate(assignment.progressUpdates[0]) : null;
       const targetQuantity = decimalToNumber(assignment.targetQuantity);
       const objective = buildObjectiveState(assignment.targetProgress, targetQuantity, latestProgressUpdate);
@@ -214,8 +284,30 @@ export async function getCentralizedPlanning(
             ? assignment.site.project.projectManagerId === user.id
             : false,
       };
-    }),
+      }),
+      ...freeMissionItems,
+    ].sort(compareCentralizedItems),
   };
+}
+
+function compareCentralizedItems(left: CentralizedPlanningAssignment, right: CentralizedPlanningAssignment) {
+  return (
+    left.date.localeCompare(right.date) ||
+    left.projectName.localeCompare(right.projectName) ||
+    left.siteName.localeCompare(right.siteName) ||
+    left.resourceName.localeCompare(right.resourceName) ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+function eachDate(from: Date, to: Date) {
+  const dates: Date[] = [];
+  const cursor = new Date(from);
+  while (cursor <= to) {
+    dates.push(new Date(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
 }
 
 function serializeTaskProgressUpdate(update: {
