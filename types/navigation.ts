@@ -29,7 +29,7 @@ export type WebNavigationItem = {
   breadcrumb: readonly string[];
 };
 
-export type MobileTabIcon = 'home' | 'clock-in' | 'photo' | 'calendar' | 'history' | 'reports' | 'teams' | 'profile' | 'folder';
+export type MobileTabIcon = 'home' | 'clock-in' | 'photo' | 'calendar' | 'history' | 'reports' | 'teams' | 'profile' | 'folder' | 'presence';
 
 export type MobileNavigationItem = {
   href: string;

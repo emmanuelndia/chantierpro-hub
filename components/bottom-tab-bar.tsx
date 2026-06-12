@@ -76,6 +76,8 @@ function MobileTabIconView({ icon }: Readonly<{ icon: MobileTabIcon }>) {
       return <ReportsIcon />;
     case 'teams':
       return <TeamsIcon />;
+    case 'presence':
+      return <PresenceIcon />;
     case 'profile':
       return <ProfileIcon />;
     case 'folder':
@@ -184,6 +186,15 @@ function TeamsIcon() {
       <path d="M3.5 20a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
       <path d="M16 11a2.7 2.7 0 1 0-.8-5.3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
       <path d="M17 14.5a5 5 0 0 1 3.5 4.7" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function PresenceIcon() {
+  return baseIcon(
+    <>
+      <path d="M5 6h14M5 12h14M5 18h14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path d="M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
     </>,
   );
 }

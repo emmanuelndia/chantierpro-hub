@@ -4,6 +4,7 @@ import { MobileCoordinatorHomePage } from '@/components/mobile-coordinator-home-
 import { MobileGeneralSupervisorHomePage } from '@/components/mobile-general-supervisor-home-page';
 import { MobileManagementDashboardPage } from '@/components/mobile-management-dashboard-page';
 import { MobileAdminDashboardPage } from '@/components/mobile-admin-dashboard-page';
+import { MobileRhOfficeHomePage } from '@/components/mobile-rh-office-home-page';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
 
 const fieldRoles = ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER'] as const;
@@ -11,6 +12,7 @@ const generalSupervisorRoles = ['GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION
 const coordinatorRoles = ['COORDINATOR'] as const;
 const managementRoles = ['PROJECT_MANAGER', 'DIRECTION'] as const;
 const adminRoles = ['ADMIN'] as const;
+const rhRoles = ['HR'] as const;
 
 export default async function MobileHomePage() {
   const session = await getCurrentWebSession();
@@ -39,8 +41,12 @@ export default async function MobileHomePage() {
     return <MobileAdminDashboardPage user={session} />;
   }
 
+  if (rhRoles.includes(session.role as (typeof rhRoles)[number])) {
+    return <MobileRhOfficeHomePage mode="HR" user={session} />;
+  }
+
   if (session.role === 'OFFICE_STAFF') {
-    redirect('/mobile/clock-in');
+    return <MobileRhOfficeHomePage mode="OFFICE_STAFF" user={session} />;
   }
 
   redirect('/mobile/profile');

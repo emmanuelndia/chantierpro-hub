@@ -287,6 +287,12 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     roles: ['COORDINATOR'],
   },
   {
+    href: '/mobile/presences',
+    label: 'Presences',
+    icon: 'presence',
+    roles: ['HR', 'DIRECTION', 'ADMIN', 'PROJECT_MANAGER', 'GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER'],
+  },
+  {
     href: '/mobile/teams',
     label: 'Equipes',
     icon: 'teams',
@@ -313,6 +319,16 @@ export function canAccessMobileNavigationItem(role: Role, item: MobileNavigation
 }
 
 export function getMobileNavigationForRole(role: Role) {
+  if (role === 'HR') {
+    const hrBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/presences', '/mobile/profile']);
+    return mobileTabNavigation.filter((item) => hrBottomTabs.has(item.href));
+  }
+
+  if (role === 'OFFICE_STAFF') {
+    const officeStaffBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/profile']);
+    return mobileTabNavigation.filter((item) => officeStaffBottomTabs.has(item.href));
+  }
+
   if (role === 'PROJECT_MANAGER') {
     const projectManagerBottomTabs = new Set([
       '/mobile/home',

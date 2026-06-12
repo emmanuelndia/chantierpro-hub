@@ -44,3 +44,46 @@ export type MobileManagementPresencesResponse = {
   projects: MobileManagementPresencesProject[];
   sites: MobileManagementPresenceSite[];
 };
+
+export type MobilePresenceListStatus =
+  | 'PRESENT'
+  | 'PAUSED'
+  | 'LEFT'
+  | 'ABSENT'
+  | 'ANOMALY';
+
+export type MobilePresenceListContext = 'OFFICE' | 'TERRAIN';
+
+export type MobilePresenceListResource = {
+  userId: string;
+  name: string;
+  role: string;
+  presenceContext: MobilePresenceListContext;
+  contextLabel: string;
+  status: MobilePresenceListStatus;
+  arrivalAt: string | null;
+  departureAt: string | null;
+  durationSeconds: number | null;
+  isLate: boolean;
+  positionLabel: string;
+  detailsCount: number;
+};
+
+export type MobilePresenceListResponse = {
+  generatedAt: string;
+  date: string;
+  summary: {
+    total: number;
+    present: number;
+    office: number;
+    terrain: number;
+    absent: number;
+    late: number;
+    anomalies: number;
+  };
+  options: {
+    projects: { id: string; label: string }[];
+    sites: { id: string; label: string; projectId: string }[];
+  };
+  resources: MobilePresenceListResource[];
+};

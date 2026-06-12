@@ -1,64 +1,62 @@
 'use client';
 
-import Link from 'next/link';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type {
-  MobileManagementPresenceResource,
-  MobileManagementPresenceSite,
-  MobileManagementPresencesResponse,
-  MobileManagementPresencesWidget,
+  MobilePresenceListResource,
+  MobilePresenceListResponse,
+  MobilePresenceListStatus,
 } from '@/types/mobile-management-presences';
 
-type PresenceStatusFilter = 'all' | 'present' | 'paused' | 'alerts';
+type ContextFilter = 'all' | 'TERRAIN' | 'OFFICE';
+type StatusFilter = 'all' | 'present' | 'paused' | 'left' | 'absent' | 'late' | 'anomaly';
+
+const contextFilters: { value: ContextFilter; label: string }[] = [
+  { value: 'all', label: 'Tous' },
+  { value: 'TERRAIN', label: 'Terrain' },
+  { value: 'OFFICE', label: 'Bureau' },
+];
+
+const statusFilters: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'Tous' },
+  { value: 'present', label: 'Presents' },
+  { value: 'paused', label: 'Pause' },
+  { value: 'left', label: 'Sortis' },
+  { value: 'absent', label: 'Absents' },
+  { value: 'late', label: 'Retards' },
+  { value: 'anomaly', label: 'Anomalies' },
+];
 
 type MobileManagementPresencesPageProps = Readonly<{
   user: WebSessionUser;
 }>;
 
-const statusFilters: { value: PresenceStatusFilter; label: string }[] = [
-  { value: 'all', label: 'Tous' },
-  { value: 'present', label: 'Présents' },
-  { value: 'paused', label: 'En pause' },
-  { value: 'alerts', label: 'Alertes' },
-];
-
 export function MobileManagementPresencesPage({ user }: MobileManagementPresencesPageProps) {
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [query, setQuery] = useState('');
+  const [context, setContext] = useState<ContextFilter>('all');
+  const [status, setStatus] = useState<StatusFilter>('all');
   const [projectId, setProjectId] = useState('all');
-  const [status, setStatus] = useState<PresenceStatusFilter>('all');
 
   const requestPath = useMemo(() => {
-    const params = new URLSearchParams();
-
-    if (query.trim()) {
-      params.set('q', query.trim());
-    }
-
-    if (projectId !== 'all') {
-      params.set('projectId', projectId);
-    }
-
-    if (status !== 'all') {
-      params.set('status', status);
-    }
-
-    const queryString = params.toString();
-    return queryString ? `/api/mobile/presences?${queryString}` : '/api/mobile/presences';
-  }, [projectId, query, status]);
+    const params = new URLSearchParams({ date });
+    if (query.trim()) params.set('q', query.trim());
+    if (context !== 'all') params.set('context', context);
+    if (status !== 'all') params.set('status', status);
+    if (projectId !== 'all') params.set('projectId', projectId);
+    return `/api/mobile/presences?${params.toString()}`;
+  }, [context, date, projectId, query, status]);
 
   const presencesQuery = useQuery({
-    queryKey: ['mobile-management-presences', requestPath],
+    queryKey: ['mobile-presence-list', requestPath],
     queryFn: async () => {
       const response = await authFetch(requestPath);
-
       if (!response.ok) {
         throw new Error(`Mobile presences request failed with status ${response.status}`);
       }
-
-      return (await response.json()) as MobileManagementPresencesResponse;
+      return (await response.json()) as MobilePresenceListResponse;
     },
     staleTime: 30_000,
   });
@@ -67,341 +65,180 @@ export function MobileManagementPresencesPage({ user }: MobileManagementPresence
 
   return (
     <div className="space-y-5 pb-20">
-      <section className="rounded-lg border border-primary/20 bg-primary/10 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
-            <PresenceIcon className="h-6 w-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-black text-slate-950">Présences</p>
-            <p className="mt-1 truncate text-sm font-semibold text-slate-600">
-              Suivi multi-chantiers pour {user.firstName}
-            </p>
-          </div>
+      <section className="rounded-3xl bg-slate-950 p-5 text-white shadow-xl">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Liste de presence</p>
+        <h1 className="mt-2 text-2xl font-black">Presences</h1>
+        <p className="mt-2 text-sm font-semibold leading-6 text-white/70">
+          Suivi bureau et terrain pour {user.firstName}.
+        </p>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <Kpi label="Presents" value={data?.summary.present ?? 0} />
+          <Kpi label="Bureau" value={data?.summary.office ?? 0} />
+          <Kpi label="Retards" value={data?.summary.late ?? 0} />
         </div>
       </section>
 
-      <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-3 shadow-panel">
-        <label className="block">
-          <span className="sr-only">Rechercher</span>
-          <input
-            className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-base font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary focus:bg-white"
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Rechercher un chantier, projet, ressource"
-            type="search"
-            value={query}
-          />
-        </label>
-
-        <div className="flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
-          {statusFilters.map((filter) => (
-            <button
-              className={`min-h-11 shrink-0 rounded-lg border px-3 text-sm font-bold transition ${
-                status === filter.value
-                  ? 'border-primary bg-primary text-white'
-                  : 'border-slate-200 bg-white text-slate-600'
-              }`}
-              key={filter.value}
-              onClick={() => setStatus(filter.value)}
-              type="button"
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-
-        {data?.projects.length ? (
-          <div className="flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
-            <button
-              className={`min-h-11 shrink-0 rounded-lg border px-3 text-sm font-bold transition ${
-                projectId === 'all'
-                  ? 'border-slate-950 bg-slate-950 text-white'
-                  : 'border-slate-200 bg-white text-slate-600'
-              }`}
-              onClick={() => setProjectId('all')}
-              type="button"
-            >
-              Tous les projets
-            </button>
-            {data.projects.map((project) => (
-              <button
-                className={`min-h-11 shrink-0 rounded-lg border px-3 text-sm font-bold transition ${
-                  projectId === project.id
-                    ? 'border-slate-950 bg-slate-950 text-white'
-                    : 'border-slate-200 bg-white text-slate-600'
-                }`}
-                key={project.id}
-                onClick={() => setProjectId(project.id)}
-                type="button"
-              >
-                {project.name}
-              </button>
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-panel">
+        <input
+          className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-base font-semibold text-slate-950 outline-none focus:border-primary focus:bg-white"
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Rechercher une ressource"
+          type="search"
+          value={query}
+        />
+        <input
+          className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-base font-semibold text-slate-950 outline-none"
+          onChange={(event) => setDate(event.target.value)}
+          type="date"
+          value={date}
+        />
+        <FilterBar items={contextFilters} onChange={setContext} value={context} />
+        <FilterBar items={statusFilters} onChange={setStatus} value={status} />
+        {data?.options.projects?.length ? (
+          <select
+            className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none"
+            onChange={(event) => setProjectId(event.target.value)}
+            value={projectId}
+          >
+            <option value="all">Tous les projets</option>
+            {data.options.projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.label}
+              </option>
             ))}
-          </div>
+          </select>
         ) : null}
       </section>
 
-      {presencesQuery.isLoading ? <PresencesLoadingState /> : null}
-
+      {presencesQuery.isLoading ? <LoadingState /> : null}
       {presencesQuery.isError ? (
-        <section className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
-          Impossible de charger les présences. Vérifiez la connexion puis réessayez.
+        <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+          Impossible de charger les presences. Verifiez la connexion puis reessayez.
         </section>
       ) : null}
-
-      {data ? (
-        <>
-          <section className="grid grid-cols-2 gap-3">
-            {data.widgets.map((widget) => (
-              <WidgetTile key={widget.id} widget={widget} />
-            ))}
-          </section>
-
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-                Chantiers
-              </h2>
-              <span className="text-xs font-semibold text-slate-400">
-                {data.sites.length} résultat{data.sites.length > 1 ? 's' : ''}
-              </span>
-            </div>
-
-            {data.sites.length > 0 ? (
-              <div className="space-y-3">
-                {data.sites.map((site) => (
-                  <PresenceSiteCard key={site.id} site={site} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState />
-            )}
-          </section>
-        </>
+      {data?.resources.length === 0 ? (
+        <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center">
+          <p className="text-sm font-black text-slate-900">Aucune presence</p>
+          <p className="mt-2 text-sm font-semibold text-slate-500">Aucune ressource ne correspond aux filtres actifs.</p>
+        </section>
+      ) : null}
+      {data?.resources.length ? (
+        <section className="space-y-3">
+          {data.resources.map((resource) => (
+            <PresenceResourceCard key={resource.userId} resource={resource} />
+          ))}
+        </section>
       ) : null}
     </div>
   );
 }
 
-function WidgetTile({ widget }: Readonly<{ widget: MobileManagementPresencesWidget }>) {
-  const tone = {
-    present: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-    paused: 'border-amber-200 bg-amber-50 text-amber-800',
-    absent: 'border-slate-200 bg-slate-50 text-slate-700',
-    activeSites: 'border-primary/20 bg-primary/10 text-primary',
-  }[widget.id];
-
+function Kpi({ label, value }: Readonly<{ label: string; value: number }>) {
   return (
-    <article className={`rounded-lg border p-4 ${tone}`}>
-      <div className="text-3xl font-black">{widget.value}</div>
-      <div className="mt-2 text-sm font-bold text-slate-950">{widget.label}</div>
-      <div className="mt-1 text-xs font-semibold text-slate-500">{widget.helper}</div>
+    <div className="rounded-2xl bg-white/10 p-3 text-center">
+      <p className="text-xl font-black">{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white/55">{label}</p>
+    </div>
+  );
+}
+
+function FilterBar<T extends string>({
+  items,
+  onChange,
+  value,
+}: Readonly<{
+  items: { value: T; label: string }[];
+  onChange: (value: T) => void;
+  value: T;
+}>) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {items.map((item) => (
+        <button
+          className={`min-h-10 shrink-0 rounded-xl border px-3 text-xs font-black ${
+            value === item.value ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-200 bg-white text-slate-600'
+          }`}
+          key={item.value}
+          onClick={() => onChange(item.value)}
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PresenceResourceCard({ resource }: Readonly<{ resource: MobilePresenceListResource }>) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-panel">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-base font-black text-slate-950">{resource.name}</p>
+          <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{resource.role}</p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${statusTone(resource.status, resource.isLate)}`}>
+          {resource.isLate ? 'Retard' : statusLabel(resource.status)}
+        </span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{resource.contextLabel}</span>
+        {resource.detailsCount > 1 ? (
+          <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">{resource.detailsCount} positions</span>
+        ) : null}
+      </div>
+      <p className="mt-3 text-sm font-semibold text-slate-700">{resource.positionLabel}</p>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+        <TimeTile label="Arrivee" value={resource.arrivalAt ? formatTime(resource.arrivalAt) : '-'} />
+        <TimeTile label="Depart" value={resource.departureAt ? formatTime(resource.departureAt) : '-'} />
+        <TimeTile label="Temps" value={formatDuration(resource.durationSeconds)} />
+      </div>
     </article>
   );
 }
 
-function PresenceSiteCard({ site }: Readonly<{ site: MobileManagementPresenceSite }>) {
-  const alert = site.presentCount === 0;
-  const previewResources = site.resources.slice(0, 4);
-
+function TimeTile({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
-    <Link
-      className={`block rounded-lg border p-4 shadow-panel transition active:scale-[0.99] ${
-        alert ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'
-      }`}
-      href={`/mobile/sites/${encodeURIComponent(site.id)}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            {alert ? (
-              <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white">
-                Alerte
-              </span>
-            ) : null}
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-              {formatSiteStatus(site.status)}
-            </span>
-          </div>
-          <h3 className="mt-3 truncate text-base font-black text-slate-950">{site.name}</h3>
-          <p className="mt-1 truncate text-sm font-semibold text-slate-500">{site.projectName}</p>
-        </div>
-        <ChevronRightIcon className="mt-2 h-5 w-5 shrink-0 text-slate-400" />
-      </div>
-
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <MetricTile label="Présents" value={`${site.presentCount}/${site.totalResources}`} />
-        <MetricTile label="Pause" value={String(site.pausedCount)} />
-        <MetricTile label="Dernier" value={formatClockInTime(site.lastClockInAt)} />
-      </div>
-
-      <div className="mt-4 space-y-2">
-        {previewResources.length > 0 ? (
-          previewResources.map((resource) => (
-            <ResourceRow key={resource.userId} resource={resource} />
-          ))
-        ) : (
-          <p className="rounded-lg bg-white/70 p-3 text-sm font-semibold text-slate-500">
-            Aucune ressource active affectée.
-          </p>
-        )}
-        {site.resources.length > previewResources.length ? (
-          <p className="text-xs font-bold text-slate-400">
-            +{site.resources.length - previewResources.length} autre
-            {site.resources.length - previewResources.length > 1 ? 's' : ''} ressource
-          </p>
-        ) : null}
-      </div>
-    </Link>
-  );
-}
-
-function MetricTile({ label, value }: Readonly<{ label: string; value: string }>) {
-  return (
-    <div className="min-w-0 rounded-lg bg-white/80 p-2">
-      <div className="truncate text-base font-black text-slate-950">{value}</div>
-      <div className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">
-        {label}
-      </div>
+    <div className="rounded-xl bg-slate-50 p-2">
+      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{label}</p>
+      <p className="mt-1 text-xs font-black text-slate-900">{value}</p>
     </div>
   );
 }
 
-function ResourceRow({ resource }: Readonly<{ resource: MobileManagementPresenceResource }>) {
-  const tone = {
-    PRESENT: 'bg-emerald-100 text-emerald-800',
-    PAUSED: 'bg-amber-100 text-amber-800',
-    ABSENT: 'bg-slate-100 text-slate-600',
-  }[resource.status];
+function statusLabel(status: MobilePresenceListStatus) {
+  if (status === 'PRESENT') return 'Present';
+  if (status === 'PAUSED') return 'Pause';
+  if (status === 'LEFT') return 'Sorti';
+  if (status === 'ABSENT') return 'Absent';
+  return 'Anomalie';
+}
 
+function statusTone(status: MobilePresenceListStatus, isLate: boolean) {
+  if (isLate) return 'bg-orange-100 text-orange-700';
+  if (status === 'PRESENT' || status === 'PAUSED') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'ABSENT') return 'bg-red-100 text-red-700';
+  if (status === 'ANOMALY') return 'bg-amber-100 text-amber-700';
+  return 'bg-slate-100 text-slate-700';
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+}
+
+function formatDuration(value: number | null) {
+  if (value === null) return '-';
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  return `${hours}h${String(minutes).padStart(2, '0')}`;
+}
+
+function LoadingState() {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-white/80 p-3">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black text-slate-950">{resource.name}</p>
-        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
-          Dernier pointage : {formatClockInTime(resource.lastClockInAt)}
-        </p>
-      </div>
-      <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${tone}`}>
-        {formatResourceStatus(resource)}
-      </span>
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div className="h-28 animate-pulse rounded-2xl bg-slate-100" key={index} />
+      ))}
     </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <section className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-white text-slate-400">
-        <PresenceIcon className="h-6 w-6" />
-      </div>
-      <p className="mt-4 text-base font-black text-slate-950">Aucun chantier actif</p>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-        Aucun résultat ne correspond aux filtres sélectionnés.
-      </p>
-    </section>
-  );
-}
-
-function PresencesLoadingState() {
-  return (
-    <div className="space-y-5">
-      <section className="grid grid-cols-2 gap-3">
-        <div className="h-28 animate-pulse rounded-lg bg-slate-100" />
-        <div className="h-28 animate-pulse rounded-lg bg-slate-100" />
-        <div className="h-28 animate-pulse rounded-lg bg-slate-100" />
-        <div className="h-28 animate-pulse rounded-lg bg-slate-100" />
-      </section>
-      <section className="space-y-3">
-        <div className="h-36 animate-pulse rounded-lg bg-slate-100" />
-        <div className="h-36 animate-pulse rounded-lg bg-slate-100" />
-      </section>
-    </div>
-  );
-}
-
-function formatResourceStatus(resource: MobileManagementPresenceResource) {
-  if (resource.status === 'PRESENT') {
-    return resource.presentSince ? `Présent depuis ${formatDurationSince(resource.presentSince)}` : 'Présent';
-  }
-
-  if (resource.status === 'PAUSED') {
-    return 'En pause';
-  }
-
-  return 'Absent';
-}
-
-function formatDurationSince(value: string) {
-  const diffMs = Math.max(0, Date.now() - new Date(value).getTime());
-  const totalMinutes = Math.floor(diffMs / 60_000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (hours > 0) {
-    return `${hours}h${minutes.toString().padStart(2, '0')}`;
-  }
-
-  return `${minutes}min`;
-}
-
-function formatClockInTime(value: string | null) {
-  if (!value) {
-    return 'Aucun';
-  }
-
-  return new Intl.DateTimeFormat('fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
-}
-
-function formatSiteStatus(status: string) {
-  if (status === 'ACTIVE') {
-    return 'Actif';
-  }
-
-  if (status === 'ON_HOLD') {
-    return 'En pause';
-  }
-
-  if (status === 'COMPLETED') {
-    return 'Terminé';
-  }
-
-  return status.replaceAll('_', ' ').toLowerCase();
-}
-
-function baseIcon(className: string, children: ReactNode) {
-  return (
-    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
-      {children}
-    </svg>
-  );
-}
-
-function PresenceIcon({ className }: Readonly<{ className: string }>) {
-  return baseIcon(
-    className,
-    <>
-      <path
-        d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM16.5 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M3.5 19c.8-3.2 2.4-5 4.5-5s3.7 1.8 4.5 5M13.5 17.5c.6-2.2 1.7-3.4 3-3.4 1.6 0 2.8 1.4 3.5 4"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.8"
-      />
-    </>,
-  );
-}
-
-function ChevronRightIcon({ className }: Readonly<{ className: string }>) {
-  return baseIcon(
-    className,
-    <path d="m9 5 7 7-7 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />,
   );
 }
