@@ -677,20 +677,20 @@ function buildAggregatedLiveResource(contexts: LiveResourceContext[]): Aggregate
   const status = getAggregateLiveStatus(sortedContexts);
   const primaryContext = pickPrimaryContext(sortedContexts, status);
   const latestClockIn = getLatestClockIn(sortedContexts);
-  const firstArrival = getFirstArrival(sortedContexts);
+  const displayArrival = getDisplayArrival(sortedContexts, status);
 
   return {
     ...primaryContext,
     status,
     taskAction: primaryContext.taskAction,
-    arrivalAt: firstArrival ?? primaryContext.arrivalAt,
+    arrivalAt: displayArrival ?? primaryContext.arrivalAt,
     lastClockInAt: latestClockIn?.lastClockInAt ?? primaryContext.lastClockInAt,
     lastClockInType: latestClockIn?.lastClockInType ?? primaryContext.lastClockInType,
     isRemoteCheckout: sortedContexts.some((context) => context.isRemoteCheckout),
     isAutoClosed: sortedContexts.some((context) => context.isAutoClosed),
     isRegularized: sortedContexts.some((context) => context.isRegularized),
     anomalyReason: sortedContexts.find((context) => context.anomalyReason)?.anomalyReason ?? null,
-    isLate: sortedContexts.some((context) => context.isLate),
+    isLate: sortedContexts.some((context) => !isForgottenExitContext(context) && context.isLate),
     contexts: sortedContexts,
   };
 }
@@ -723,6 +723,21 @@ function getLatestClockIn(contexts: LiveResourceContext[]) {
     .sort((left, right) => new Date(right.lastClockInAt ?? 0).getTime() - new Date(left.lastClockInAt ?? 0).getTime())[0];
 }
 
+function getDisplayArrival(contexts: LiveResourceContext[], status: RhSitePresenceLiveStatus) {
+  const nonForgottenContexts = contexts.filter((context) => !isForgottenExitContext(context));
+  const statusContexts = nonForgottenContexts.filter((context) => context.status === status);
+
+  if (statusContexts.length > 0) {
+    return getFirstArrival(statusContexts);
+  }
+
+  if (status === 'EXPECTED_NOT_CLOCKED') {
+    return null;
+  }
+
+  return getFirstArrival(nonForgottenContexts) ?? getFirstArrival(contexts);
+}
+
 function getFirstArrival(contexts: LiveResourceContext[]) {
   const arrival = contexts
     .map((context) => context.arrivalAt)
@@ -730,6 +745,10 @@ function getFirstArrival(contexts: LiveResourceContext[]) {
     .sort((left, right) => new Date(left).getTime() - new Date(right).getTime())[0];
 
   return arrival ?? null;
+}
+
+function isForgottenExitContext(context: Pick<LiveResourceContext, 'anomalyReason'>) {
+  return context.anomalyReason === 'Sortie oubliee';
 }
 
 function getResourceContextSummary(contexts: LiveResourceContext[]) {
