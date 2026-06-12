@@ -378,7 +378,7 @@ export async function getOpenSessionForUser(prisma: PrismaClient, userId: string
     select: openSessionSelect,
   });
 
-  return findOpenSessionFromRecords(records);
+  return findOpenSessionByContextFromRecords(records);
 }
 
 export async function getActivePause(prisma: PrismaClient, siteId: string, userId: string) {
@@ -420,6 +420,35 @@ export function findOpenSessionFromRecords(records: OpenSessionRecord[]) {
   }
 
   return openSession;
+}
+
+function findOpenSessionByContextFromRecords(records: OpenSessionRecord[]) {
+  const openSessions = new Map<string, OpenSessionRecord>();
+
+  for (const record of records) {
+    const key = getOpenSessionContextKey(record);
+
+    if (record.type === ClockInType.ARRIVAL) {
+      openSessions.set(key, record);
+      continue;
+    }
+
+    if (record.type === ClockInType.DEPARTURE) {
+      openSessions.delete(key);
+    }
+  }
+
+  return [...openSessions.values()].sort(
+    (left, right) => left.timestampLocal.getTime() - right.timestampLocal.getTime(),
+  )[0] ?? null;
+}
+
+function getOpenSessionContextKey(record: OpenSessionRecord) {
+  if (record.siteId) return `site:${record.siteId}`;
+  if (record.freeMissionId) return `free-mission:${record.freeMissionId}`;
+  if (record.officeLocationId) return `office:${record.officeLocationId}`;
+  if (record.officeClockInLocation) return `office:${record.officeClockInLocation}`;
+  return 'unknown';
 }
 
 export function findActivePauseFromRecords(records: PauseRecord[]) {
