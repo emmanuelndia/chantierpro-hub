@@ -22,7 +22,11 @@ export type FreeMissionMutationInput = {
   assigneeIds?: unknown;
   date?: unknown;
   action?: unknown;
+  targetProgress?: unknown;
+  targetQuantity?: unknown;
+  targetUnit?: unknown;
   objectiveText?: unknown;
+  plannedDurationMinutes?: unknown;
 };
 
 export const freeMissionSelect = {
@@ -31,7 +35,11 @@ export const freeMissionSelect = {
   assigneeId: true,
   date: true,
   action: true,
+  targetProgress: true,
+  targetQuantity: true,
+  targetUnit: true,
   objectiveText: true,
+  plannedDurationMinutes: true,
   status: true,
   createdAt: true,
   updatedAt: true,
@@ -104,7 +112,12 @@ export function parseFreeMissionInput(body: unknown) {
   const assigneeId = sanitizeString(input.assigneeId) ?? assigneeIds[0];
   const date = sanitizeDate(input.date);
   const action = sanitizeString(input.action);
+  const targetQuantity = parseNullablePositiveNumber(input.targetQuantity);
+  const targetProgress =
+    targetQuantity !== null && targetQuantity > 0 ? null : parseNullableInt(input.targetProgress, 0, 100);
+  const targetUnit = targetQuantity !== null && targetQuantity > 0 ? sanitizeOptionalString(input.targetUnit) : null;
   const objectiveText = sanitizeOptionalString(input.objectiveText);
+  const plannedDurationMinutes = parseNullableInt(input.plannedDurationMinutes, 0, 24 * 60);
 
   if (!projectId || !assigneeId || !date || !action) return null;
 
@@ -113,7 +126,11 @@ export function parseFreeMissionInput(body: unknown) {
     assigneeId,
     date,
     action,
+    targetProgress,
+    targetQuantity,
+    targetUnit,
     objectiveText,
+    plannedDurationMinutes,
   };
 }
 
@@ -197,7 +214,11 @@ export async function createFreeMission(prisma: PrismaClient, user: AuthLikeUser
           assigneeId,
           date: input.date,
           action: input.action,
+          targetProgress: input.targetProgress,
+          targetQuantity: input.targetQuantity,
+          targetUnit: input.targetUnit,
           objectiveText: input.objectiveText,
+          plannedDurationMinutes: input.plannedDurationMinutes,
           createdById: user.id,
         },
         select: freeMissionSelect,
@@ -241,7 +262,11 @@ export async function createFreeMission(prisma: PrismaClient, user: AuthLikeUser
       assigneeId: input.assigneeId,
       date: input.date,
       action: input.action,
+      targetProgress: input.targetProgress,
+      targetQuantity: input.targetQuantity,
+      targetUnit: input.targetUnit,
       objectiveText: input.objectiveText,
+      plannedDurationMinutes: input.plannedDurationMinutes,
       createdById: user.id,
     },
     select: freeMissionSelect,
@@ -276,7 +301,11 @@ export async function updateFreeMission(prisma: PrismaClient, user: AuthLikeUser
       assigneeId: input.assigneeId,
       date: input.date,
       action: input.action,
+      targetProgress: input.targetProgress,
+      targetQuantity: input.targetQuantity,
+      targetUnit: input.targetUnit,
       objectiveText: input.objectiveText,
+      plannedDurationMinutes: input.plannedDurationMinutes,
     },
     select: freeMissionSelect,
   });
@@ -383,7 +412,11 @@ export function serializeFreeMission(row: FreeMissionRow) {
     assigneeRole: row.assignee.role,
     date: row.date.toISOString().slice(0, 10),
     action: row.action,
+    targetProgress: row.targetProgress,
+    targetQuantity: row.targetQuantity?.toNumber() ?? null,
+    targetUnit: row.targetUnit,
     objectiveText: row.objectiveText,
+    plannedDurationMinutes: row.plannedDurationMinutes,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -535,6 +568,20 @@ function sanitizeString(value: unknown) {
 function sanitizeOptionalString(value: unknown) {
   if (value === undefined || value === null) return null;
   return typeof value === 'string' ? value.trim() || null : null;
+}
+
+function parseNullablePositiveNumber(value: unknown) {
+  if (value === undefined || value === null || value === '') return null;
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue < 0) return null;
+  return numberValue;
+}
+
+function parseNullableInt(value: unknown, min: number, max: number) {
+  if (value === undefined || value === null || value === '') return null;
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue) || numberValue < min || numberValue > max) return null;
+  return numberValue;
 }
 
 function sanitizeDate(value: unknown) {

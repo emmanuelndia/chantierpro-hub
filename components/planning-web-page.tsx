@@ -1285,7 +1285,7 @@ function AssignmentDrawer({
             </Field>
           ) : (
             <div className="rounded-2xl border border-orange-100 bg-orange-50 p-3 text-xs font-semibold text-orange-800">
-              Mission sans chantier fixe : la ressource pointera avec sa position GPS reelle.
+              Zone sans chantier fixe : la ressource pointera avec sa position GPS reelle.
             </div>
           )}
           <Field label="Tâche à  réaliser">
@@ -1308,7 +1308,6 @@ function AssignmentDrawer({
               Sert au suivi de charge, de retard et de progression projet.
             </p>
           </Field>
-          {!isFreeMission ? (
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
             <Field label="Objectif quantitatif">
               <input
@@ -1339,12 +1338,11 @@ function AssignmentDrawer({
               />
             </Field>
           </div>
-          ) : null}
-          {!isFreeMission && hasQuantityObjective ? (
+          {hasQuantityObjective ? (
             <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3 text-xs font-semibold text-sky-800">
               La progression sera calculee depuis la quantite realisee. La progression cible % est ignoree pour cette tache.
             </div>
-          ) : !isFreeMission ? (
+          ) : (
             <Field label="Progression cible % (si pas de quantite)">
               <input
                 className={filterClassName}
@@ -1359,7 +1357,7 @@ function AssignmentDrawer({
               </p>
               {!progressValid ? <p className="mt-2 text-xs font-semibold text-red-600">La progression doit etre entre 0 et 100.</p> : null}
             </Field>
-          ) : null}
+          )}
           <Field label="Consigne / objectif texte (facultatif)">
             <textarea
               className={`${filterClassName} min-h-24`}

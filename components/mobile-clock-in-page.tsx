@@ -146,7 +146,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   }, [geolocation.accuracy, geolocation.capturedAt, geolocation.error, geolocation.latitude, geolocation.loading, geolocation.longitude, geolocation.source]);
 
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(requestedSiteId);
-  const [selectedFreeMissionId] = useState<string | null>(requestedFreeMissionId);
+  const [selectedFreeMissionId, setSelectedFreeMissionId] = useState<string | null>(requestedFreeMissionId);
   const [selectedOffice, setSelectedOffice] = useState(requestedOffice || (!requestedSiteId && !requestedFreeMissionId));
   const [selectedOfficeAssignmentId, setSelectedOfficeAssignmentId] = useState<string | null>(requestedOfficeAssignmentId);
   const [selectedOfficeLocationId, setSelectedOfficeLocationId] = useState<string | null>(null);
@@ -285,11 +285,26 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const selectedOfficeLocation =
     officeLocations.find((office) => office.id === selectedOfficeLocationId) ?? officeLocations[0] ?? null;
   const { assignments: todayAssignments, officeAssignments } = useTodayOfficeAssignments(true);
-  const hasFreeMissionToday = todayAssignments.some(
-    (assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId),
+  const freeMissionAssignments = useMemo(
+    () =>
+      todayAssignments.filter(
+        (assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId),
+      ),
+    [todayAssignments],
   );
-  const shouldSelectFreeMissionFromTasks = Boolean(!requestedSiteId && !requestedFreeMissionId && hasFreeMissionToday);
-
+  const hasFreeMissionToday = freeMissionAssignments.length > 0;
+  const selectedFreeMissionFromAssignments = useMemo(
+    () =>
+      selectedFreeMissionId
+        ? freeMissionAssignments.find((assignment) => assignment.freeMissionId === selectedFreeMissionId || assignment.id === selectedFreeMissionId) ?? null
+        : freeMissionAssignments.length === 1
+          ? freeMissionAssignments[0] ?? null
+          : null,
+    [freeMissionAssignments, selectedFreeMissionId],
+  );
+  const shouldSelectFreeMissionFromTasks = false;
+  const selectedFreeMission = selectedClockContext === 'ZONE' ? selectedFreeMissionFromAssignments : null;
+  const hasUnselectedZone = selectedClockContext === 'ZONE' && freeMissionAssignments.length > 1 && !selectedFreeMission;
   const nearbyQuery = useQuery({
     queryKey: ['mobile-sites-nearby', geoState.status === 'ready' ? geoState.latitude : null, geoState.status === 'ready' ? geoState.longitude : null],
     queryFn: async () => {
@@ -318,14 +333,6 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     staleTime: 30_000,
   });
 
-  const selectedFreeMissionFromAssignments = useMemo(
-    () =>
-      selectedFreeMissionId
-        ? todayAssignments.find((assignment) => assignment.freeMissionId === selectedFreeMissionId || assignment.id === selectedFreeMissionId) ?? null
-        : null,
-    [selectedFreeMissionId, todayAssignments],
-  );
-  const selectedFreeMission = selectedClockContext === 'ZONE' ? selectedFreeMissionFromAssignments : null;
   const selectedOfficeAssignment = useMemo(
     () => officeAssignments.find((assignment) => assignment.id === selectedOfficeAssignmentId) ?? null,
     [officeAssignments, selectedOfficeAssignmentId],
@@ -928,44 +935,65 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         </div>
       </section>
 
-      {selectedClockContext === 'ZONE' && selectedFreeMission ? (
+      {selectedClockContext === 'ZONE' ? (
         <section className="space-y-3 rounded-2xl border border-orange-100 bg-orange-50 p-4 shadow-panel">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Zone</p>
-              <h3 className="mt-2 text-lg font-black text-slate-950">{selectedFreeMission.action}</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-600">{selectedFreeMission.projectName}</p>
+              <h3 className="mt-2 text-lg font-black text-slate-950">
+                {selectedFreeMission ? selectedFreeMission.action : 'Choisir une zone'}
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                {selectedFreeMission ? selectedFreeMission.projectName : 'Pointage GPS sans chantier fixe'}
+              </p>
             </div>
             <NavigationIcon className="h-7 w-7 text-orange-700" />
           </div>
+          {freeMissionAssignments.length === 0 ? (
+            <p className="rounded-xl bg-white p-3 text-sm font-semibold leading-6 text-slate-600">
+              Aucune zone prevue aujourd&apos;hui.
+            </p>
+          ) : freeMissionAssignments.length > 1 ? (
+            <label className="space-y-2">
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Zone a pointer</span>
+              <select
+                className="min-h-12 w-full rounded-xl border border-orange-100 bg-white px-3 text-sm font-bold text-slate-950 outline-none"
+                onChange={(event) => setSelectedFreeMissionId(event.target.value || null)}
+                value={selectedFreeMission?.freeMissionId ?? selectedFreeMission?.id ?? ''}
+              >
+                <option value="">Selectionner une zone</option>
+                {freeMissionAssignments.map((assignment) => (
+                  <option key={assignment.id} value={assignment.freeMissionId ?? assignment.id}>
+                    {assignment.action} - {assignment.projectName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="rounded-xl bg-white p-3">
             <p className="text-sm font-black text-slate-950">Pointage GPS sans chantier fixe.</p>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
               Aucun chantier proche ne sera detecte automatiquement.
             </p>
           </div>
-          {selectedFreeMission.objectiveText ? (
+          {hasUnselectedZone ? (
+            <p className="rounded-xl border border-orange-200 bg-white p-3 text-xs font-bold text-orange-800">
+              Selectionnez la zone a pointer avant d&apos;enregistrer l&apos;entree.
+            </p>
+          ) : null}
+          {selectedFreeMission?.targetQuantity !== null && selectedFreeMission?.targetQuantity !== undefined && selectedFreeMission.targetQuantity > 0 ? (
+            <p className="text-sm font-black text-orange-900">
+              Objectif {formatQuantity(selectedFreeMission.targetQuantity)} {selectedFreeMission.targetUnit ?? ''}
+            </p>
+          ) : selectedFreeMission?.targetProgress !== null && selectedFreeMission?.targetProgress !== undefined ? (
+            <p className="text-sm font-black text-orange-900">Objectif {selectedFreeMission.targetProgress}%</p>
+          ) : null}
+          {selectedFreeMission?.plannedDurationMinutes ? (
+            <p className="text-xs font-bold text-orange-900">Duree prevue : {selectedFreeMission.plannedDurationMinutes} min</p>
+          ) : null}
+          {selectedFreeMission?.objectiveText ? (
             <p className="text-sm font-semibold text-orange-900">{selectedFreeMission.objectiveText}</p>
           ) : null}
-        </section>
-      ) : null}
-
-      {selectedClockContext === 'ZONE' && shouldSelectFreeMissionFromTasks ? (
-        <section className="space-y-4 rounded-2xl border border-orange-100 bg-orange-50 p-4 shadow-panel">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Zone a selectionner</p>
-            <h3 className="mt-2 text-lg font-black text-slate-950">Ouvrez Taches pour pointer</h3>
-            <p className="mt-2 text-sm font-semibold leading-6 text-orange-900">
-              Si vous etes au bureau, utilisez l&apos;onglet Bureau. Si vous partez en zone, choisissez la zone depuis Taches.
-            </p>
-          </div>
-          <button
-            className="min-h-12 w-full rounded-lg bg-slate-950 px-4 text-sm font-black text-white"
-            onClick={() => router.push('/mobile/tasks')}
-            type="button"
-          >
-            Ouvrir Taches
-          </button>
         </section>
       ) : null}
 
@@ -1778,6 +1806,13 @@ function formatTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function formatQuantity(value: number | null) {
+  if (value === null) return '';
+  return new Intl.NumberFormat('fr-FR', {
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 function formatClockContext(value: 'SITE' | 'FREE_MISSION' | 'OFFICE') {

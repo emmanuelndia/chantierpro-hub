@@ -446,7 +446,11 @@ model FreeMission {
   assigneeId     String
   date           DateTime          @db.Date
   action         String
+  targetProgress Int?
+  targetQuantity Decimal?          @db.Decimal(12, 2)
+  targetUnit     String?
   objectiveText  String?
+  plannedDurationMinutes Int?
   status         FreeMissionStatus @default(ASSIGNED)
   createdById    String
   createdAt      DateTime          @default(now())

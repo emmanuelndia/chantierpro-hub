@@ -168,6 +168,7 @@ export type SupervisorMyAssignment = {
   targetQuantity: number | null;
   targetUnit: string | null;
   objectiveText: string | null;
+  plannedDurationMinutes: number | null;
   actualProgress: number | null;
   actualQuantity: number | null;
   progressDelta: number | null;
