@@ -11,12 +11,13 @@ export const GET = withAuth(async ({ req, user }) => {
   const date = searchParams.get('date') ?? new Date().toISOString().slice(0, 10);
   const overview = await listNegotiationOverview(prisma, user, date);
   const rows = [
-    ['Date', 'Projet', 'Ressource', 'Immeuble', 'Ville', 'Commune', 'Statut', 'Remarque', 'Latitude', 'Longitude'],
+    ['Date', 'Projet', 'Ressource', 'Scope', 'Zone reelle', 'Ville', 'Commune', 'Statut', 'Remarque', 'Latitude', 'Longitude'],
     ...overview.visits.map((visit) => [
       date,
       visit.project?.name ?? '',
       visit.resourceName ?? '',
       visit.buildingName,
+      visit.actualZone ?? '',
       visit.city ?? '',
       visit.commune ?? '',
       visit.status,

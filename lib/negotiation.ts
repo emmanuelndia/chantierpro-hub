@@ -6,6 +6,7 @@ type ProjectOptionRow = { id: string; name: string; city?: string | null };
 type SessionVisitRow = {
   id: string;
   buildingName: string;
+  actualZone: string | null;
   status: NegotiationVisitStatus;
   remark: string;
   visitedAt: Date;
@@ -41,6 +42,7 @@ type NegotiationVisitRow = {
   buildingId: string | null;
   building?: { id: string; cluster: string | null; plaque: string | null } | null;
   visitedAt: Date;
+  actualZone: string | null;
   buildingName: string;
   city: string | null;
   commune: string | null;
@@ -171,6 +173,7 @@ export async function listNegotiationOverview(
   });
 
   const buildingCount = await prisma.negotiationBuilding.count({ where: { project: projectWhere } });
+  const projectScopeSummaries = await buildProjectScopeSummaries(prisma, projects.map((project) => project.id));
 
   return {
     date,
@@ -190,6 +193,7 @@ export async function listNegotiationOverview(
     sessions: sessions.map(serializeNegotiationSession),
     visits: visits.map(serializeNegotiationVisit),
     buildingCount,
+    projectScopeSummaries,
     visitStatuses: Object.values(NegotiationVisitStatus),
   };
 }
@@ -407,31 +411,60 @@ export async function createNegotiationVisit(prisma: PrismaClient, user: Request
     return Response.json({ code: 'SESSION_NOT_FOUND', message: 'Demarre une journee negociation avant de saisir une visite.' }, { status: 404 });
   }
 
-  const building = input.data.buildingId
-    ? await prisma.negotiationBuilding.findFirst({ where: { id: input.data.buildingId, projectId: session.projectId } })
-    : null;
+  const visit = await prisma.$transaction(async (tx) => {
+    const existingScope = input.data.buildingId
+      ? await tx.negotiationBuilding.findFirst({ where: { id: input.data.buildingId, projectId: session.projectId } })
+      : null;
+    const scope = existingScope ?? await tx.negotiationBuilding.create({
+      data: {
+        projectId: session.projectId,
+        name: input.data.buildingName || 'Scope terrain',
+        city: input.data.city ?? input.data.actualZone ?? 'Non renseigne',
+        commune: input.data.commune,
+        contactInfo: input.data.contactInfo,
+        latitude: input.data.latitude,
+        longitude: input.data.longitude,
+        negotiationStatus: input.data.status,
+        remark: input.data.remark,
+      },
+    });
 
-  const visit = await prisma.negotiationVisit.create({
-    data: {
-      sessionId: session.id,
-      projectId: session.projectId,
-      buildingId: building?.id ?? null,
-      buildingName: input.data.buildingName ? input.data.buildingName : (building?.name ?? 'Immeuble non renseigne'),
-      city: input.data.city ?? building?.city ?? null,
-      commune: input.data.commune ?? building?.commune ?? null,
-      contactInfo: input.data.contactInfo ?? building?.contactInfo ?? null,
-      latitude: input.data.latitude ?? building?.latitude ?? null,
-      longitude: input.data.longitude ?? building?.longitude ?? null,
-      accuracy: input.data.accuracy,
-      status: input.data.status,
-      remark: input.data.remark,
-      createdById: user.id,
-    },
-    include: {
-      project: { select: { id: true, name: true } },
-      session: { select: { id: true, userId: true, date: true, user: { select: { firstName: true, lastName: true } } } },
-      building: { select: { id: true, cluster: true, plaque: true } },
-    },
+    if (existingScope) {
+      await tx.negotiationBuilding.update({
+        where: { id: existingScope.id },
+        data: {
+          negotiationStatus: input.data.status,
+          remark: input.data.remark,
+          ...(input.data.contactInfo ? { contactInfo: input.data.contactInfo } : {}),
+          ...(input.data.latitude !== null && existingScope.latitude === null ? { latitude: input.data.latitude } : {}),
+          ...(input.data.longitude !== null && existingScope.longitude === null ? { longitude: input.data.longitude } : {}),
+        },
+      });
+    }
+
+    return tx.negotiationVisit.create({
+      data: {
+        sessionId: session.id,
+        projectId: session.projectId,
+        buildingId: scope.id,
+        actualZone: input.data.actualZone,
+        buildingName: input.data.buildingName ? input.data.buildingName : scope.name,
+        city: input.data.city ?? scope.city ?? null,
+        commune: input.data.commune ?? scope.commune ?? null,
+        contactInfo: input.data.contactInfo ?? scope.contactInfo ?? null,
+        latitude: input.data.latitude ?? scope.latitude ?? null,
+        longitude: input.data.longitude ?? scope.longitude ?? null,
+        accuracy: input.data.accuracy,
+        status: input.data.status,
+        remark: input.data.remark,
+        createdById: user.id,
+      },
+      include: {
+        project: { select: { id: true, name: true } },
+        session: { select: { id: true, userId: true, date: true, user: { select: { firstName: true, lastName: true } } } },
+        building: { select: { id: true, cluster: true, plaque: true } },
+      },
+    });
   });
 
   return Response.json({ visit: serializeNegotiationVisit(visit) });
@@ -548,6 +581,7 @@ function parseVisitInput(body: unknown) {
     data: {
       sessionId,
       buildingId: nullableString(data.buildingId),
+      actualZone: nullableString(data.actualZone),
       buildingName: asString(data.buildingName),
       city: nullableString(data.city),
       commune: nullableString(data.commune),
@@ -608,6 +642,7 @@ export function serializeNegotiationSession(session: NegotiationSessionRow) {
     visits: (session.visits ?? []).map((visit) => ({
       id: visit.id,
       buildingName: visit.buildingName,
+      actualZone: visit.actualZone,
       status: visit.status,
       remark: visit.remark,
       visitedAt: visit.visitedAt?.toISOString?.() ?? visit.visitedAt,
@@ -628,6 +663,7 @@ export function serializeNegotiationVisit(visit: NegotiationVisitRow) {
     buildingId: visit.buildingId,
     building: visit.building ?? null,
     visitedAt: visit.visitedAt?.toISOString?.() ?? visit.visitedAt,
+    actualZone: visit.actualZone,
     buildingName: visit.buildingName,
     city: visit.city,
     commune: visit.commune,
@@ -638,6 +674,65 @@ export function serializeNegotiationVisit(visit: NegotiationVisitRow) {
     status: visit.status,
     remark: visit.remark,
   };
+}
+
+async function buildProjectScopeSummaries(prisma: PrismaClient, projectIds: string[]) {
+  if (projectIds.length === 0) return [];
+
+  const scopes = await prisma.negotiationBuilding.findMany({
+    where: { projectId: { in: projectIds } },
+    select: { id: true, projectId: true, negotiationStatus: true },
+  });
+  const summaries = new Map<string, {
+    projectId: string;
+    totalScopes: number;
+    authorized: number;
+    refused: number;
+    revisit: number;
+    inProgress: number;
+    untreated: number;
+  }>();
+
+  for (const projectId of projectIds) {
+    summaries.set(projectId, {
+      projectId,
+      totalScopes: 0,
+      authorized: 0,
+      refused: 0,
+      revisit: 0,
+      inProgress: 0,
+      untreated: 0,
+    });
+  }
+
+  for (const scope of scopes) {
+    const summary = summaries.get(scope.projectId);
+    if (!summary) continue;
+    summary.totalScopes += 1;
+    const status = normalizeScopeStatus(scope.negotiationStatus);
+    if (status === 'authorized') summary.authorized += 1;
+    else if (status === 'refused') summary.refused += 1;
+    else if (status === 'revisit') summary.revisit += 1;
+    else if (status === 'inProgress') summary.inProgress += 1;
+    else summary.untreated += 1;
+  }
+
+  return [...summaries.values()].map((summary) => ({
+    ...summary,
+    processed: summary.authorized + summary.refused + summary.revisit + summary.inProgress,
+    treatmentRate: summary.totalScopes > 0 ? Math.round(((summary.authorized + summary.refused + summary.revisit + summary.inProgress) / summary.totalScopes) * 100) : 0,
+    authorizationRate: summary.totalScopes > 0 ? Math.round((summary.authorized / summary.totalScopes) * 100) : 0,
+  }));
+}
+
+function normalizeScopeStatus(value: string | null) {
+  if (!value) return 'untreated';
+  const normalized = value.toUpperCase();
+  if (normalized === NegotiationVisitStatus.OK) return 'authorized';
+  if (normalized === NegotiationVisitStatus.REFUS) return 'refused';
+  if (normalized === NegotiationVisitStatus.A_REVISITER) return 'revisit';
+  if (normalized === NegotiationVisitStatus.EN_COURS) return 'inProgress';
+  return 'untreated';
 }
 
 function serializeUserOption(user: { id: string; firstName: string; lastName: string; role: Role; username: string }) {

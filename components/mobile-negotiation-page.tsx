@@ -20,6 +20,18 @@ type MobileNegotiationDay = {
   visitStatuses: string[];
 };
 
+type NegotiationScope = {
+  id: string;
+  name: string;
+  city: string;
+  commune: string | null;
+  contactInfo: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  negotiationStatus: string | null;
+  remark: string | null;
+};
+
 type NegotiationSession = {
   id: string;
   projectId: string;
@@ -27,7 +39,7 @@ type NegotiationSession = {
   startTime: string;
   endTime: string | null;
   status: string;
-  visits: { id: string; buildingName: string; status: string; remark: string; visitedAt: string }[];
+  visits: { id: string; buildingName: string; actualZone: string | null; status: string; remark: string; visitedAt: string }[];
   visitCount: number;
 };
 
@@ -39,6 +51,9 @@ export function MobileNegotiationPage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
   const [comment, setComment] = useState('');
   const [visitForm, setVisitForm] = useState({
+    actualZone: '',
+    scopeSearch: '',
+    buildingId: '',
     buildingName: '',
     city: '',
     commune: '',
@@ -58,6 +73,11 @@ export function MobileNegotiationPage() {
     [day?.assignments, selectedAssignmentId],
   );
   const openSession = day?.openSession ?? null;
+  const scopeQuery = useQuery({
+    queryKey: ['mobile-negotiation-scopes', openSession?.projectId, visitForm.scopeSearch],
+    queryFn: () => fetchNegotiationScopes(openSession?.projectId ?? '', visitForm.scopeSearch),
+    enabled: Boolean(openSession?.projectId),
+  });
 
   const startMutation = useMutation({
     mutationFn: async () => {
@@ -116,12 +136,35 @@ export function MobileNegotiationPage() {
       });
     },
     onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Visite enregistree' });
-      setVisitForm({ buildingName: '', city: '', commune: '', contactInfo: '', status: 'EN_COURS', remark: '' });
+      pushToast({ type: 'success', title: 'Scope enregistre' });
+      setVisitForm((current) => ({
+        actualZone: current.actualZone,
+        scopeSearch: '',
+        buildingId: '',
+        buildingName: '',
+        city: '',
+        commune: '',
+        contactInfo: '',
+        status: 'EN_COURS',
+        remark: '',
+      }));
       await queryClient.invalidateQueries({ queryKey: ['mobile-negotiation'] });
     },
-    onError: (error) => pushToast({ type: 'error', title: 'Visite impossible', message: getErrorMessage(error) }),
+    onError: (error) => pushToast({ type: 'error', title: 'Scope impossible', message: getErrorMessage(error) }),
   });
+
+  function selectScope(scope: NegotiationScope) {
+    setVisitForm((current) => ({
+      ...current,
+      buildingId: scope.id,
+      scopeSearch: scope.name,
+      buildingName: scope.name,
+      city: scope.city,
+      commune: scope.commune ?? '',
+      contactInfo: scope.contactInfo ?? '',
+      remark: current.remark ? current.remark : scope.remark ?? '',
+    }));
+  }
 
   return (
     <div className="space-y-5">
@@ -180,9 +223,29 @@ export function MobileNegotiationPage() {
 
           {openSession ? (
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Nouvelle visite</p>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Scope visite</p>
               <div className="mt-4 space-y-3">
-                <Input label="Immeuble / client" value={visitForm.buildingName} onChange={(value) => setVisitForm((current) => ({ ...current, buildingName: value }))} />
+                <Input label="Zone reellement visitee" value={visitForm.actualZone} onChange={(value) => setVisitForm((current) => ({ ...current, actualZone: value }))} />
+                <label className="block text-sm font-black text-slate-700">
+                  Rechercher un scope existant
+                  <input
+                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-orange-500"
+                    onChange={(event) => setVisitForm((current) => ({ ...current, scopeSearch: event.target.value, buildingId: '' }))}
+                    placeholder="Nom, ville, commune, contact..."
+                    value={visitForm.scopeSearch}
+                  />
+                </label>
+                {(scopeQuery.data?.buildings ?? []).length > 0 ? (
+                  <div className="space-y-2 rounded-2xl bg-slate-50 p-2">
+                    {(scopeQuery.data?.buildings ?? []).slice(0, 5).map((scope) => (
+                      <button className="w-full rounded-xl bg-white px-3 py-2 text-left text-sm font-bold text-slate-800" key={scope.id} onClick={() => selectScope(scope)} type="button">
+                        {scope.name}
+                        <span className="block text-xs font-semibold text-slate-500">{[scope.city, scope.commune].filter(Boolean).join(' / ') || 'Zone non renseignee'}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <Input label="Scope / client" value={visitForm.buildingName} onChange={(value) => setVisitForm((current) => ({ ...current, buildingName: value, buildingId: '' }))} />
                 <div className="grid grid-cols-2 gap-3">
                   <Input label="Ville" value={visitForm.city} onChange={(value) => setVisitForm((current) => ({ ...current, city: value }))} />
                   <Input label="Commune" value={visitForm.commune} onChange={(value) => setVisitForm((current) => ({ ...current, commune: value }))} />
@@ -201,17 +264,17 @@ export function MobileNegotiationPage() {
                   <textarea className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-orange-500" onChange={(event) => setVisitForm((current) => ({ ...current, remark: event.target.value }))} value={visitForm.remark} />
                 </label>
                 <button className="w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-50" disabled={!visitForm.remark.trim() || visitMutation.isPending} onClick={() => visitMutation.mutate()} type="button">
-                  Enregistrer la visite avec GPS
+                  Enregistrer le scope avec GPS
                 </button>
               </div>
             </section>
           ) : null}
 
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Visites du jour</p>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Scopes du jour</p>
             <div className="mt-4 space-y-3">
               {(openSession?.visits ?? day.sessions.flatMap((session) => session.visits)).length === 0 ? (
-                <MobileEmpty label="Aucune visite enregistree." />
+                <MobileEmpty label="Aucun scope enregistre." />
               ) : (
                 (openSession?.visits ?? day.sessions.flatMap((session) => session.visits)).map((visit) => (
                   <article className="rounded-2xl bg-slate-50 p-4" key={visit.id}>
@@ -219,6 +282,7 @@ export function MobileNegotiationPage() {
                       <p className="font-black text-slate-950">{visit.buildingName}</p>
                       <Badge tone={visit.status === 'OK' ? 'success' : visit.status === 'REFUS' ? 'error' : 'warning'}>{visit.status.replaceAll('_', ' ')}</Badge>
                     </div>
+                    {visit.actualZone ? <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-orange-600">{visit.actualZone}</p> : null}
                     <p className="mt-2 text-sm font-semibold text-slate-600">{visit.remark}</p>
                   </article>
                 ))
@@ -250,6 +314,15 @@ async function fetchMobileNegotiationDay(date: string): Promise<MobileNegotiatio
     throw new Error('Impossible de charger la negociation.');
   }
   return response.json() as Promise<MobileNegotiationDay>;
+}
+
+async function fetchNegotiationScopes(projectId: string, q: string): Promise<{ buildings: NegotiationScope[] }> {
+  const params = new URLSearchParams({ projectId, q });
+  const response = await authFetch(`/api/negotiation/buildings?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error('Impossible de charger les scopes.');
+  }
+  return response.json() as Promise<{ buildings: NegotiationScope[] }>;
 }
 
 async function startSession(data: Record<string, unknown>) {

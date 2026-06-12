@@ -562,6 +562,7 @@ model NegotiationVisit {
   buildingId      String?
   projectId       String
   visitedAt       DateTime               @default(now())
+  actualZone      String?
   buildingName    String
   city            String?
   commune         String?

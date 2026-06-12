@@ -25,6 +25,18 @@ type NegotiationOverview = {
   sessions: NegotiationSession[];
   visits: NegotiationVisit[];
   buildingCount: number;
+  projectScopeSummaries: {
+    projectId: string;
+    totalScopes: number;
+    authorized: number;
+    refused: number;
+    revisit: number;
+    inProgress: number;
+    untreated: number;
+    processed: number;
+    treatmentRate: number;
+    authorizationRate: number;
+  }[];
   visitStatuses: string[];
 };
 
@@ -48,6 +60,7 @@ type NegotiationVisit = {
   project: { id: string; name: string } | null;
   resourceName: string | null;
   visitedAt: string;
+  actualZone: string | null;
   buildingName: string;
   city: string | null;
   commune: string | null;
@@ -99,7 +112,7 @@ export function NegotiationWebPage() {
     onSuccess: async (result) => {
       pushToast({
         type: 'success',
-        title: importMode === 'commit' ? `${result.validRows} immeuble(s) importes` : `${result.validRows} ligne(s) valides`,
+        title: importMode === 'commit' ? `${result.validRows} scope(s) importes` : `${result.validRows} ligne(s) valides`,
         ...(result.invalidRows > 0 ? { message: `${result.invalidRows} ligne(s) ignoree(s).` } : {}),
       });
       await queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
@@ -133,7 +146,7 @@ export function NegotiationWebPage() {
           <div>
             <h1 className="text-3xl font-black text-slate-950">Suivi negociation</h1>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-              Planifie les journees terrain, importe les immeubles et suis les visites avec GPS, statut et remarques.
+              Planifie les journees terrain, importe les scopes et suis les resultats avec GPS, statut et remarques.
             </p>
           </div>
           <label className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
@@ -152,8 +165,27 @@ export function NegotiationWebPage() {
           <section className="grid gap-4 md:grid-cols-4">
             <Metric label="Affectations" value={overview.assignments.length} />
             <Metric label="Sessions" value={overview.sessions.length} />
-            <Metric label="Visites" value={overview.visits.length} />
-            <Metric label="Immeubles base" value={overview.buildingCount} />
+            <Metric label="Scopes visites" value={overview.visits.length} />
+            <Metric label="Scopes base" value={overview.buildingCount} />
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-3">
+            {overview.projectScopeSummaries.map((summary) => {
+              const project = overview.projects.find((item) => item.id === summary.projectId);
+              return (
+                <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel" key={summary.projectId}>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">{project?.name ?? 'Projet'}</p>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-sm font-bold text-slate-700">
+                    <ScopeMetric label="Total scopes" value={summary.totalScopes} />
+                    <ScopeMetric label="Traites" value={`${summary.treatmentRate}%`} />
+                    <ScopeMetric label="Autorisations" value={summary.authorized} />
+                    <ScopeMetric label="Refus" value={summary.refused} />
+                    <ScopeMetric label="A revisiter" value={summary.revisit} />
+                    <ScopeMetric label="Non traites" value={summary.untreated} />
+                  </div>
+                </article>
+              );
+            })}
           </section>
 
           <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
@@ -200,7 +232,7 @@ export function NegotiationWebPage() {
             </div>
 
             <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-              <h2 className="text-lg font-black text-slate-950">Importer immeubles HP</h2>
+              <h2 className="text-lg font-black text-slate-950">Importer scopes HP</h2>
               <p className="mt-2 text-sm font-semibold text-slate-500">
                 Projet cible : {selectedProject?.name ?? 'selectionne un projet'}.
               </p>
@@ -230,8 +262,9 @@ export function NegotiationWebPage() {
                 <thead className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   <tr>
                     <th className="px-3 py-3">Ressource</th>
-                    <th className="px-3 py-3">Immeuble</th>
+                    <th className="px-3 py-3">Scope</th>
                     <th className="px-3 py-3">Zone</th>
+                    <th className="px-3 py-3">Zone reelle</th>
                     <th className="px-3 py-3">Statut</th>
                     <th className="px-3 py-3">Remarque</th>
                     <th className="px-3 py-3">GPS</th>
@@ -243,6 +276,7 @@ export function NegotiationWebPage() {
                       <td className="px-3 py-3 font-bold text-slate-900">{visit.resourceName ?? '-'}</td>
                       <td className="px-3 py-3">{visit.buildingName}</td>
                       <td className="px-3 py-3">{[visit.city, visit.commune].filter(Boolean).join(' / ') || '-'}</td>
+                      <td className="px-3 py-3 font-semibold text-orange-700">{visit.actualZone ?? '-'}</td>
                       <td className="px-3 py-3"><Badge tone={visit.status === 'OK' ? 'success' : visit.status === 'REFUS' ? 'error' : 'warning'}>{formatVisitStatus(visit.status)}</Badge></td>
                       <td className="max-w-md px-3 py-3 text-slate-600">{visit.remark}</td>
                       <td className="px-3 py-3">{visit.latitude && visit.longitude ? <a className="font-black text-orange-600" href={mapsHref(visit.latitude, visit.longitude)} target="_blank">Voir carte</a> : '-'}</td>
@@ -267,6 +301,15 @@ function Metric({ label, value }: Readonly<{ label: string; value: number }>) {
     <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
       <p className="text-3xl font-black text-slate-950">{value}</p>
       <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+function ScopeMetric({ label, value }: Readonly<{ label: string; value: number | string }>) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-3">
+      <p className="text-xl font-black text-slate-950">{value}</p>
+      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
     </div>
   );
 }
