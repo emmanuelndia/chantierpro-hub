@@ -16,6 +16,7 @@ import {
   parseClockInInput,
   parseJsonBody,
   serializeClockInHistory,
+  serializeOpenSessionError,
 } from '@/lib/clock-in';
 
 export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
@@ -52,18 +53,6 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     );
   }
 
-  if (site.status !== 'ACTIVE') {
-    return jsonClockInError('SITE_INACTIVE', 400, 'Ce chantier est inactif.');
-  }
-
-  if (!site.requiresClockIn) {
-    return jsonClockInError(
-      'PERMISSION_DENIED',
-      400,
-      'Ce lieu ne demande pas de pointage GPS.',
-    );
-  }
-
   const body = await parseJsonBody<unknown>(req);
   const input = parseClockInInput(body);
 
@@ -78,6 +67,20 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
   }
 
   const openSession = await getOpenSessionForUser(prisma, user.id);
+  const closingCurrentSiteSession =
+    input.type !== ClockInType.ARRIVAL && openSession?.siteId === site.id;
+
+  if (site.status !== 'ACTIVE' && !closingCurrentSiteSession) {
+    return jsonClockInError('SITE_INACTIVE', 400, 'Ce chantier est inactif.');
+  }
+
+  if (!site.requiresClockIn && !closingCurrentSiteSession) {
+    return jsonClockInError(
+      'PERMISSION_DENIED',
+      400,
+      'Ce lieu ne demande pas de pointage GPS.',
+    );
+  }
 
   if (input.type === 'ARRIVAL' && openSession) {
     if (openSession.siteId !== site.id) {
@@ -87,11 +90,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
         409,
         `Session ouverte sur ${openContextName} depuis ${formatTime(openSession.timestampLocal)}. Pointez votre sortie avant de changer de chantier.`,
         {
-          openSession: {
-            siteId: openSession.siteId,
-            siteName: openContextName,
-            arrivalAt: openSession.timestampLocal.toISOString(),
-          },
+          openSession: serializeOpenSessionError(openSession),
         },
       );
     }
@@ -100,6 +99,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
       'SESSION_ALREADY_OPEN',
       400,
       'Une session est deja ouverte sur ce chantier.',
+      { openSession: serializeOpenSessionError(openSession) },
     );
   }
 

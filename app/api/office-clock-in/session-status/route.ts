@@ -25,6 +25,7 @@ export const GET = withAuth(async ({ user }) => {
       userId: true,
       type: true,
       status: true,
+      clockInDate: true,
       timestampLocal: true,
       site: { select: { name: true } },
       freeMission: { select: { action: true } },

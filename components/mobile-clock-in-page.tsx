@@ -519,6 +519,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     selectedSite !== null &&
     selectedDistance > selectedSite.radiusKm;
   const activeContextLabel = contextLabels[selectedClockContext];
+  const staleOpenSession = activeSession?.isStaleOpenSession ? activeSession : null;
 
   useEffect(() => {
     if (!requestedIntent && sessionStatus?.sessionOpen) {
@@ -540,6 +541,21 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     },
     onError: (error) => {
       setErrorMessage(error instanceof Error ? error.message : 'Pointage impossible.');
+    },
+  });
+
+  const closeStaleSessionMutation = useMutation({
+    mutationFn: closeStaleOpenSession,
+    onSuccess: async (result) => {
+      setSubmission(result);
+      setErrorMessage(null);
+      setComment('');
+      setStep('comment');
+      await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-today'] });
+      await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-history'] });
+    },
+    onError: (error) => {
+      setErrorMessage(error instanceof Error ? error.message : 'Fermeture de session impossible.');
     },
   });
 
@@ -578,6 +594,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     geoState.status === 'ready' &&
     !outsideRadius &&
     (selectedFreeMission || selectedOffice ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
+    !(staleOpenSession && currentType === 'ARRIVAL') &&
     !clockInMutation.isPending;
 
   useEffect(() => {
@@ -737,6 +754,64 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     };
   }
 
+  async function closeStaleOpenSession(): Promise<Submission> {
+    if (!staleOpenSession || geoState.status !== 'ready') {
+      throw new Error('Ancienne session ou position GPS indisponible.');
+    }
+
+    if (!navigator.onLine) {
+      throw new Error('La fermeture de session ancienne demande une connexion reseau.');
+    }
+
+    const timestampLocal = toLocalIsoWithOffset(new Date());
+    const payload = {
+      type: 'DEPARTURE',
+      latitude: geoState.latitude,
+      longitude: geoState.longitude,
+      accuracy: geoState.accuracy,
+      timestampLocal,
+      gpsCapturedAt: geoState.capturedAt,
+      gpsSource: geoState.source,
+      comment: 'Fermeture d une session ancienne depuis le mobile.',
+    };
+    const endpoint =
+      staleOpenSession.contextType === 'OFFICE'
+        ? '/api/office-clock-in'
+        : staleOpenSession.contextType === 'FREE_MISSION' && staleOpenSession.freeMissionId
+          ? `/api/free-missions/${staleOpenSession.freeMissionId}/clock-in`
+          : staleOpenSession.siteId
+            ? `/api/sites/${staleOpenSession.siteId}/clock-in`
+            : null;
+
+    if (!endpoint) {
+      throw new Error('Contexte de session ancienne incomplet.');
+    }
+
+    const response = await authFetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readApiMessage(response, 'Fermeture de session refusee.'));
+    }
+
+    const data = (await response.json()) as { record: ClockInRecordItem };
+
+    return {
+      clientId: createOfflineClockInId(),
+      offline: false,
+      record: data.record,
+      type: 'DEPARTURE',
+      siteId: staleOpenSession.siteId,
+      freeMissionId: staleOpenSession.freeMissionId,
+      siteName: staleOpenSession.contextName,
+      timestampLocal: data.record.timestampLocal,
+      durationSeconds: staleOpenSession.durationSeconds,
+    };
+  }
+
   async function refreshPendingCount() {
     setPendingCount(await getMobileClockInPendingCount());
   }
@@ -787,6 +862,33 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm font-semibold text-orange-800">
           Synchronisation en attente : {pendingCount}
         </div>
+      ) : null}
+
+      {staleOpenSession ? (
+        <section className="space-y-4 rounded-2xl border-2 border-orange-200 bg-orange-50 p-4 shadow-panel">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Session encore ouverte</p>
+              <h2 className="mt-2 text-xl font-black text-slate-950">{staleOpenSession.contextName}</h2>
+              <p className="mt-1 text-sm font-semibold text-orange-900">
+                Entree le {formatDate(staleOpenSession.arrivalAt)} a {formatTime(staleOpenSession.arrivalAt)}
+              </p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-orange-700">
+              {formatClockContext(staleOpenSession.contextType)}
+            </span>
+          </div>
+          <p className="rounded-xl bg-white p-3 text-sm font-semibold leading-6 text-slate-700">
+            Vous devez fermer cette ancienne session avant de pointer une nouvelle entree.
+          </p>
+          <ActionButton
+            busy={closeStaleSessionMutation.isPending}
+            disabled={geoState.status !== 'ready' || closeStaleSessionMutation.isPending}
+            label="FERMER CETTE SESSION"
+            onClick={() => closeStaleSessionMutation.mutate()}
+            tone="danger"
+          />
+        </section>
       ) : null}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-panel">
@@ -1083,7 +1185,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         />
       ) : null}
 
-      {selectedSite || selectedFreeMission || selectedOffice ? (
+      {!staleOpenSession && (selectedSite || selectedFreeMission || selectedOffice) ? (
         <section className="space-y-3">
           {!selectedSiteSessionLoaded ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center text-sm font-bold text-slate-600">
@@ -1676,6 +1778,12 @@ function formatTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function formatClockContext(value: 'SITE' | 'FREE_MISSION' | 'OFFICE') {
+  if (value === 'OFFICE') return 'Bureau';
+  if (value === 'FREE_MISSION') return 'Zone';
+  return 'Chantier';
 }
 
 function isAfterLateThreshold(value: number | string | Date) {

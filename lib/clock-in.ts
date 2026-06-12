@@ -90,6 +90,7 @@ const openSessionSelect = {
   userId: true,
   type: true,
   status: true,
+  clockInDate: true,
   timestampLocal: true,
   site: {
     select: {
@@ -326,6 +327,16 @@ export async function getAccessibleClockInSite(
             },
           },
         },
+        {
+          clockInRecords: {
+            some: {
+              userId,
+              status: ClockInStatus.VALID,
+              isAutoClosed: false,
+              type: ClockInType.ARRIVAL,
+            },
+          },
+        },
       ],
     },
     select: {
@@ -518,15 +529,40 @@ export function serializeActiveSession(record: OpenSessionRecord | null): Active
     return null;
   }
 
+  const contextName = record.site?.name ?? record.freeMission?.action ?? record.officeLocation?.name ?? 'Bureau';
+  const arrivalDate = record.clockInDate.toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+
   return {
     siteId: record.siteId,
-    siteName: record.site?.name ?? record.freeMission?.action ?? record.officeLocation?.name ?? 'Bureau',
+    siteName: contextName,
     freeMissionId: record.freeMissionId,
+    officeLocationId: record.officeLocationId,
     planningAssignmentId: record.planningAssignmentId,
     planningAssignmentAction: record.planningAssignment?.action ?? null,
     contextType: record.officeClockInLocation ? 'OFFICE' : record.freeMissionId ? 'FREE_MISSION' : 'SITE',
+    contextName,
+    arrivalDate,
     arrivalAt: record.timestampLocal.toISOString(),
     durationSeconds: durationSince(record.timestampLocal),
+    isStaleOpenSession: arrivalDate !== today,
+  };
+}
+
+export function serializeOpenSessionError(record: OpenSessionRecord | null) {
+  const activeSession = serializeActiveSession(record);
+  if (!activeSession) {
+    return null;
+  }
+
+  return {
+    contextType: activeSession.contextType,
+    siteId: activeSession.siteId,
+    freeMissionId: activeSession.freeMissionId,
+    officeLocationId: activeSession.officeLocationId,
+    arrivalAt: activeSession.arrivalAt,
+    name: activeSession.contextName,
+    isStaleOpenSession: activeSession.isStaleOpenSession,
   };
 }
 

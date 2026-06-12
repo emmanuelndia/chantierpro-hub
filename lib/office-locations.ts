@@ -114,6 +114,13 @@ export async function getActiveOfficeLocation(prisma: PrismaClient, id: string) 
   });
 }
 
+export async function getOfficeLocationById(prisma: PrismaClient, id: string) {
+  return prisma.officeLocation.findFirst({
+    where: { id },
+    select: officeLocationSelect,
+  });
+}
+
 function serializeOfficeLocation(item: SerializableOfficeLocation): OfficeLocationItem {
   return {
     id: item.id,

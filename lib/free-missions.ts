@@ -7,6 +7,7 @@ import {
   jsonClockInError,
   parseClockInInput,
   parseJsonBody,
+  serializeOpenSessionError,
   serializeSessionStatus,
 } from '@/lib/clock-in';
 
@@ -39,6 +40,7 @@ export const freeMissionSelect = {
       id: true,
       name: true,
       projectManagerId: true,
+      status: true,
     },
   },
   assignee: {
@@ -316,8 +318,21 @@ export async function clockInFreeMission(prisma: PrismaClient, user: AuthLikeUse
   }
 
   const openSession = await getOpenSessionForUser(prisma, user.id);
+  const closingCurrentMissionSession =
+    input.type !== ClockInType.ARRIVAL && openSession?.freeMissionId === mission.id;
+
+  if (
+    !closingCurrentMissionSession &&
+    (mission.project.status === ProjectStatus.ARCHIVED ||
+      mission.project.status === ProjectStatus.COMPLETED)
+  ) {
+    return jsonClockInError('PERMISSION_DENIED', 400, 'Le projet de cette zone est inactif.');
+  }
+
   if (input.type === ClockInType.ARRIVAL && openSession) {
-    return jsonClockInError('SESSION_ALREADY_OPEN', 409, 'Une session de pointage est deja ouverte.');
+    return jsonClockInError('SESSION_ALREADY_OPEN', 409, 'Une session de pointage est deja ouverte.', {
+      openSession: serializeOpenSessionError(openSession),
+    });
   }
 
   if (input.type !== ClockInType.ARRIVAL && openSession?.freeMissionId !== mission.id) {
@@ -428,12 +443,21 @@ function getAccessibleFreeMissionForClockIn(prisma: PrismaClient, missionId: str
     where: {
       id: missionId,
       assigneeId: userId,
-      date: today,
       deletedAt: null,
       status: { not: FreeMissionStatus.CANCELLED },
-      project: {
-        status: { notIn: [ProjectStatus.ARCHIVED, ProjectStatus.COMPLETED] },
-      },
+      OR: [
+        { date: today },
+        {
+          clockInRecords: {
+            some: {
+              userId,
+              status: ClockInStatus.VALID,
+              isAutoClosed: false,
+              type: ClockInType.ARRIVAL,
+            },
+          },
+        },
+      ],
     },
     select: freeMissionSelect,
   });

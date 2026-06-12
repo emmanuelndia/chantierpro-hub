@@ -449,10 +449,21 @@ export async function getSitePresencesLive(
       where: {
         status: ClockInStatus.VALID,
         site: siteWhere,
-        timestampLocal: {
-          gte: today,
-          lt: tomorrow,
-        },
+        OR: [
+          {
+            timestampLocal: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          {
+            timestampLocal: {
+              lt: today,
+            },
+            type: ClockInType.ARRIVAL,
+            isAutoClosed: false,
+          },
+        ],
         type: {
           in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
         },
@@ -489,7 +500,19 @@ export async function getSitePresencesLive(
     }) : Promise.resolve([]),
     includeTerrain ? prisma.freeMission.findMany({
       where: {
-        date: today,
+        OR: [
+          { date: today },
+          {
+            clockInRecords: {
+              some: {
+                status: ClockInStatus.VALID,
+                type: ClockInType.ARRIVAL,
+                isAutoClosed: false,
+                timestampLocal: { lt: today },
+              },
+            },
+          },
+        ],
         deletedAt: null,
         project: projectAccessWhere(user),
         ...(query.projectId ? { projectId: query.projectId } : {}),
@@ -539,10 +562,21 @@ export async function getSitePresencesLive(
         clockInRecords: {
           where: {
             status: ClockInStatus.VALID,
-            timestampLocal: {
-              gte: today,
-              lt: tomorrow,
-            },
+            OR: [
+              {
+                timestampLocal: {
+                  gte: today,
+                  lt: tomorrow,
+                },
+              },
+              {
+                timestampLocal: {
+                  lt: today,
+                },
+                type: ClockInType.ARRIVAL,
+                isAutoClosed: false,
+              },
+            ],
             type: {
               in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
             },
@@ -579,10 +613,21 @@ export async function getSitePresencesLive(
       where: {
         status: ClockInStatus.VALID,
         officeClockInLocation: 'OFFICE',
-        timestampLocal: {
-          gte: today,
-          lt: tomorrow,
-        },
+        OR: [
+          {
+            timestampLocal: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          {
+            timestampLocal: {
+              lt: today,
+            },
+            type: ClockInType.ARRIVAL,
+            isAutoClosed: false,
+          },
+        ],
         type: {
           in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
         },
@@ -2399,6 +2444,11 @@ function buildLiveResource(
   const latest = records.at(-1) ?? null;
   const arrival = [...records].reverse().find((record) => record.type === ClockInType.ARRIVAL) ?? null;
   const departure = [...records].reverse().find((record) => record.type === ClockInType.DEPARTURE) ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+  const hasStaleOpenSession =
+    Boolean(arrival) &&
+    !departure &&
+    arrival!.timestampLocal.toISOString().slice(0, 10) !== today;
   const hasRemoteReview = records.some((record, index) => {
     if (!record.isRemoteCheckout || record.type !== ClockInType.DEPARTURE) return false;
     const previousArrival = records
@@ -2407,7 +2457,7 @@ function buildLiveResource(
       .find((candidate) => candidate.type === ClockInType.ARRIVAL);
     return previousArrival ? record.timestampLocal.getTime() - previousArrival.timestampLocal.getTime() > 6 * 60 * 60 * 1000 : false;
   });
-  const hasAnomaly = records.some((record) => record.isAutoClosed) || hasRemoteReview;
+  const hasAnomaly = records.some((record) => record.isAutoClosed) || hasRemoteReview || hasStaleOpenSession;
   const status = hasAnomaly ? 'ANOMALY' : getLiveStatusFromLatestRecord(latest);
 
   return {

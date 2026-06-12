@@ -33,11 +33,15 @@ export type ActiveClockInSession = {
   siteId: string | null;
   siteName: string;
   freeMissionId: string | null;
+  officeLocationId: string | null;
   planningAssignmentId: string | null;
   planningAssignmentAction: string | null;
   contextType: 'SITE' | 'FREE_MISSION' | 'OFFICE';
+  contextName: string;
+  arrivalDate: string;
   arrivalAt: string;
   durationSeconds: number;
+  isStaleOpenSession: boolean;
 };
 
 export type TodayClockInView = {

@@ -140,3 +140,7 @@ Dans Ressource RH devant chaque ressource faudra mettre le bouton modifier Perme
 
 
 Certaines ressources rencontrent encore des problèmes de sorties pointage : il y'a marqué non pointé à l'accueil mais quand il pointe que ce soit zone ou chantier ou même bureau on lui dit qu'il a une session déjà ouverte et peu importe comment on vérifie il n'a pas pointé même dans présence chez le rh ou l'admin on le voit absent mais quand il pointe on lui dit session déjà ouverte
+
+
+Du coup dans pointer option zone on doit plus être rédirigé sur taches non ?
+Pour les tâches zone on doit pouvoir renseigner les objectifs quantitatifs non ? et aussi la durée prévue bref la même chose que quand on a mis type chantier ?

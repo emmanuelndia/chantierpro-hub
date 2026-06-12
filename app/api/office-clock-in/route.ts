@@ -8,10 +8,11 @@ import {
   jsonClockInError,
   parseClockInInput,
   parseJsonBody,
+  serializeOpenSessionError,
 } from '@/lib/clock-in';
 import { withAuth } from '@/lib/auth/with-auth';
 import { haversineDistanceKm } from '@/lib/haversine';
-import { getActiveOfficeLocation } from '@/lib/office-locations';
+import { getActiveOfficeLocation, getOfficeLocationById } from '@/lib/office-locations';
 
 export const POST = withAuth(async ({ req, user }) => {
   const body = await parseJsonBody<unknown>(req);
@@ -33,7 +34,7 @@ export const POST = withAuth(async ({ req, user }) => {
     input.type === ClockInType.ARRIVAL
       ? await getActiveOfficeLocation(prisma, officeLocationId!)
       : openSession?.officeLocationId
-        ? await getActiveOfficeLocation(prisma, openSession.officeLocationId)
+        ? await getOfficeLocationById(prisma, openSession.officeLocationId)
         : null;
 
   if (!officeLocation) {
@@ -41,7 +42,9 @@ export const POST = withAuth(async ({ req, user }) => {
   }
 
   if (input.type === ClockInType.ARRIVAL && openSession) {
-    return jsonClockInError('SESSION_ALREADY_OPEN', 409, 'Une session de pointage est deja ouverte.');
+    return jsonClockInError('SESSION_ALREADY_OPEN', 409, 'Une session de pointage est deja ouverte.', {
+      openSession: serializeOpenSessionError(openSession),
+    });
   }
 
   if (input.type !== ClockInType.ARRIVAL) {
