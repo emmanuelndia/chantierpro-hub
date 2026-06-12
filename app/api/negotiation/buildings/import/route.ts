@@ -110,7 +110,7 @@ async function parseHpBuildingsWorkbook(file: File): Promise<ImportRow[]> {
       color: nullable(read(row, headerMap, 'COULEUR')),
       operatorPresence: nullable(read(row, headerMap, 'PRESENCE OPERATEUR')),
       negotiationStatus: nullable(read(row, headerMap, 'STATUT NEGOCIATION')),
-      remark: nullable(read(row, headerMap, 'STATUT NEGOCIATION')),
+      remark: nullable(read(row, headerMap, 'REMARQUE')) ?? nullable(read(row, headerMap, 'STATUT NEGOCIATION')),
     });
   }
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, Upload } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
@@ -78,10 +78,7 @@ export function NegotiationWebPage() {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [date, setDate] = useState(todayKey);
-  const [projectId, setProjectId] = useState('');
-  const [resourceIds, setResourceIds] = useState<string[]>([]);
-  const [plannedZone, setPlannedZone] = useState('');
-  const [instruction, setInstruction] = useState('');
+  const [importProjectId, setImportProjectId] = useState('');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'preview' | 'commit'>('preview');
   const [filters, setFilters] = useState({
@@ -98,27 +95,29 @@ export function NegotiationWebPage() {
     refetchInterval: 60_000,
   });
   const overview = overviewQuery.data;
-  const selectedProject = useMemo(() => overview?.projects.find((project) => project.id === projectId), [overview?.projects, projectId]);
-  const filteredProjectSummary = useMemo(
-    () => overview?.projectScopeSummaries.find((summary) => summary.projectId === (filters.projectId || projectId)) ?? null,
-    [filters.projectId, overview?.projectScopeSummaries, projectId],
+  const selectedImportProject = useMemo(() => overview?.projects.find((project) => project.id === importProjectId), [overview?.projects, importProjectId]);
+  const projectSummaries = useMemo(
+    () => (filters.projectId ? overview?.projectScopeSummaries.filter((summary) => summary.projectId === filters.projectId) : overview?.projectScopeSummaries) ?? [],
+    [filters.projectId, overview?.projectScopeSummaries],
   );
-
-  const assignmentMutation = useMutation({
-    mutationFn: createNegotiationAssignment,
-    onSuccess: async (result) => {
-      pushToast({
-        type: 'success',
-        title: `${result.createdCount} affectation(s) creee(s)`,
-        ...(result.skippedCount > 0 ? { message: `${result.skippedCount} deja existante(s) ignoree(s).` } : {}),
-      });
-      setResourceIds([]);
-      setPlannedZone('');
-      setInstruction('');
-      await queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
-    },
-    onError: (error) => pushToast({ type: 'error', title: 'Planification impossible', message: getErrorMessage(error) }),
-  });
+  const scopeTotals = useMemo(() => {
+    const totalScopes = projectSummaries.reduce((sum, summary) => sum + summary.totalScopes, 0);
+    const processed = projectSummaries.reduce((sum, summary) => sum + summary.processed, 0);
+    const authorized = projectSummaries.reduce((sum, summary) => sum + summary.authorized, 0);
+    const refused = projectSummaries.reduce((sum, summary) => sum + summary.refused, 0);
+    const revisit = projectSummaries.reduce((sum, summary) => sum + summary.revisit, 0);
+    const untreated = projectSummaries.reduce((sum, summary) => sum + summary.untreated, 0);
+    return {
+      totalScopes,
+      processed,
+      authorized,
+      refused,
+      revisit,
+      untreated,
+      treatmentRate: totalScopes > 0 ? Math.round((processed / totalScopes) * 100) : 0,
+      authorizationRate: totalScopes > 0 ? Math.round((authorized / totalScopes) * 100) : 0,
+    };
+  }, [projectSummaries]);
 
   const importMutation = useMutation({
     mutationFn: importNegotiationBuildings,
@@ -133,26 +132,16 @@ export function NegotiationWebPage() {
     onError: (error) => pushToast({ type: 'error', title: 'Import impossible', message: getErrorMessage(error) }),
   });
 
-  function submitAssignment() {
-    assignmentMutation.mutate({
-      date,
-      projectId,
-      assigneeIds: resourceIds,
-      plannedZone,
-      instruction,
-    });
-  }
-
   function setFilter(name: keyof typeof filters, value: string) {
     setFilters((current) => ({ ...current, [name]: value }));
   }
 
   function submitImport() {
-    if (!projectId || !importFile) {
+    if (!importProjectId || !importFile) {
       pushToast({ type: 'error', title: 'Import incomplet', message: 'Choisis un projet et un fichier Excel.' });
       return;
     }
-    importMutation.mutate({ projectId, file: importFile, mode: importMode });
+    importMutation.mutate({ projectId: importProjectId, file: importFile, mode: importMode });
   }
 
   return (
@@ -163,7 +152,7 @@ export function NegotiationWebPage() {
           <div>
             <h1 className="text-3xl font-black text-slate-950">Suivi negociation</h1>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-              Planifie les zones de pointage, suis les sessions terrain et consolide les resultats des scopes par projet.
+              Suis les scopes de negociation par projet, importe les bases a traiter et consolide les resultats terrain.
             </p>
           </div>
           <label className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
@@ -180,9 +169,10 @@ export function NegotiationWebPage() {
       {overview ? (
         <>
           <section className="rounded-[2rem] border border-orange-100 bg-orange-50 p-5">
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-700">Regle metier nego</p>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-700">Organisation</p>
             <p className="mt-2 text-sm font-bold leading-6 text-orange-950">
-              Le pointage des ressources negociation se fait ici, par zone de journee. Les scopes saisis ensuite sont des resultats terrain, pas des pointages RH.
+              Les zones de journee se planifient maintenant dans Planning avec le type Zone. Les pointages des negociateurs remontent dans Presences comme du terrain.
+              Cette page sert au suivi metier des scopes : autorisations, refus, zones reelles et remarques terrain.
             </p>
           </section>
 
@@ -230,99 +220,81 @@ export function NegotiationWebPage() {
             </div>
           </section>
 
-          <section className="grid gap-4 md:grid-cols-4">
-            <Metric label="Zones planifiees" value={overview.assignments.length} />
-            <Metric label="Pointages zone" value={overview.sessions.length} />
-            <Metric label="Scopes visites" value={overview.visits.length} />
-            <Metric label="Scopes base" value={overview.buildingCount} />
+          <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <Metric label="Total scopes" value={scopeTotals.totalScopes} />
+            <Metric label="Traites" value={`${scopeTotals.treatmentRate}%`} />
+            <Metric label="Autorisations" value={scopeTotals.authorized} />
+            <Metric label="Refus" value={scopeTotals.refused} />
+            <Metric label="A revisiter" value={scopeTotals.revisit} />
+            <Metric label="Non traites" value={scopeTotals.untreated} />
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-3">
-            {(filteredProjectSummary ? [filteredProjectSummary] : overview.projectScopeSummaries).map((summary) => {
-              const project = overview.projects.find((item) => item.id === summary.projectId);
-              return (
-                <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel" key={summary.projectId}>
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">{project?.name ?? 'Projet'}</p>
-                  <div className="mt-3 grid grid-cols-2 gap-3 text-sm font-bold text-slate-700">
-                    <ScopeMetric label="Total scopes" value={summary.totalScopes} />
-                    <ScopeMetric label="Traites" value={`${summary.treatmentRate}%`} />
-                    <ScopeMetric label="Autorisations" value={summary.authorized} />
-                    <ScopeMetric label="Refus" value={summary.refused} />
-                    <ScopeMetric label="A revisiter" value={summary.revisit} />
-                    <ScopeMetric label="Non traites" value={summary.untreated} />
-                  </div>
-                </article>
-              );
-            })}
-          </section>
-
-          <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
             <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-              <h2 className="text-lg font-black text-slate-950">Planifier un pointage zone</h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Cette planification cree la zone de journee que la ressource pointera sur mobile.
+              <h2 className="text-lg font-black text-slate-950">Progression par projet</h2>
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    <tr>
+                      <th className="px-3 py-3">Projet</th>
+                      <th className="px-3 py-3">Total</th>
+                      <th className="px-3 py-3">Traites</th>
+                      <th className="px-3 py-3">Autorisations</th>
+                      <th className="px-3 py-3">Refus</th>
+                      <th className="px-3 py-3">A revisiter</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {projectSummaries.map((summary) => {
+                      const project = overview.projects.find((item) => item.id === summary.projectId);
+                      return (
+                        <tr key={summary.projectId}>
+                          <td className="max-w-sm px-3 py-3 font-black text-slate-950">{project?.name ?? 'Projet'}</td>
+                          <td className="px-3 py-3">{summary.totalScopes}</td>
+                          <td className="px-3 py-3">{summary.processed} ({summary.treatmentRate}%)</td>
+                          <td className="px-3 py-3 text-emerald-700">{summary.authorized}</td>
+                          <td className="px-3 py-3 text-red-700">{summary.refused}</td>
+                          <td className="px-3 py-3 text-amber-700">{summary.revisit}</td>
+                        </tr>
+                      );
+                    })}
+                    {projectSummaries.length === 0 ? (
+                      <tr>
+                        <td className="px-3 py-6 text-center text-sm font-bold text-slate-500" colSpan={6}>Aucun scope pour ces filtres.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+              <h2 className="text-lg font-black text-slate-950">Importer la base scopes</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-500">
+                Importe la liste des scopes a visiter ou negocier sur un projet donne.
               </p>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <Select label="Projet" value={projectId} onChange={setProjectId}>
+              <div className="mt-4 grid gap-3">
+                <Select label="Projet cible" value={importProjectId} onChange={setImportProjectId}>
                   <option value="">Choisir un projet</option>
                   {overview.projects.map((project) => (
                     <option key={project.id} value={project.id}>{project.name}</option>
                   ))}
                 </Select>
-                <label className="text-sm font-bold text-slate-700">
-                  Zone prevue
-                  <input className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500" onChange={(event) => setPlannedZone(event.target.value)} placeholder="Ex: Yopougon Selmer" value={plannedZone} />
-                </label>
+                {selectedImportProject ? <p className="text-xs font-bold text-slate-500">Projet selectionne : {selectedImportProject.name}</p> : null}
               </div>
-              <div className="mt-4">
-                <p className="text-sm font-bold text-slate-700">Ressources nego</p>
-                <div className="mt-2 grid gap-2 md:grid-cols-2">
-                  {overview.resources.map((resource) => (
-                    <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700" key={resource.id}>
-                      <input
-                        checked={resourceIds.includes(resource.id)}
-                        onChange={(event) =>
-                          setResourceIds((current) =>
-                            event.target.checked ? [...current, resource.id] : current.filter((id) => id !== resource.id),
-                          )
-                        }
-                        type="checkbox"
-                      />
-                      {resource.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <label className="mt-4 block text-sm font-bold text-slate-700">
-                Consigne
-                <textarea className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500" onChange={(event) => setInstruction(event.target.value)} value={instruction} />
-              </label>
-              <button className="mt-4 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-50" disabled={!projectId || resourceIds.length === 0 || assignmentMutation.isPending} onClick={submitAssignment} type="button">
-                Planifier {resourceIds.length > 0 ? `${resourceIds.length} ressource(s)` : ''}
+              <button className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50" onClick={() => void downloadScopeTemplate(pushToast)} type="button">
+                <FileSpreadsheet className="h-4 w-4" />
+                Télécharger le modèle
               </button>
-            </div>
-
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-              <h2 className="text-lg font-black text-slate-950">Importer scopes HP</h2>
-              <p className="mt-2 text-sm font-semibold text-slate-500">
-                Projet cible : {selectedProject?.name ?? 'selectionne un projet'}.
-              </p>
               <input className="mt-4 block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" onChange={(event) => setImportFile(event.target.files?.[0] ?? null)} type="file" accept=".xlsx" />
               <select className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" onChange={(event) => setImportMode(event.target.value as 'preview' | 'commit')} value={importMode}>
                 <option value="preview">Previsualiser</option>
                 <option value="commit">Importer vraiment</option>
               </select>
-              <button className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-orange-600 px-5 py-3 text-sm font-black text-white disabled:opacity-50" disabled={!projectId || !importFile || importMutation.isPending} onClick={submitImport} type="button">
+              <button className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-orange-600 px-5 py-3 text-sm font-black text-white disabled:opacity-50" disabled={!importProjectId || !importFile || importMutation.isPending} onClick={submitImport} type="button">
                 <Upload className="h-4 w-4" />
                 {importMode === 'commit' ? 'Importer' : 'Previsualiser'}
               </button>
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-            <h2 className="text-lg font-black text-slate-950">Pointages zone du jour</h2>
-            <div className="mt-4 grid gap-3">
-              {overview.sessions.length === 0 ? <Empty label="Aucun pointage zone pour cette date." /> : overview.sessions.map((session) => <SessionCard key={session.id} session={session} />)}
             </div>
           </section>
 
@@ -367,20 +339,11 @@ export function NegotiationWebPage() {
   );
 }
 
-function Metric({ label, value }: Readonly<{ label: string; value: number }>) {
+function Metric({ label, value }: Readonly<{ label: string; value: number | string }>) {
   return (
     <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
       <p className="text-3xl font-black text-slate-950">{value}</p>
       <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-slate-500">{label}</p>
-    </div>
-  );
-}
-
-function ScopeMetric({ label, value }: Readonly<{ label: string; value: number | string }>) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-3">
-      <p className="text-xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
     </div>
   );
 }
@@ -393,39 +356,6 @@ function Select({ label, value, onChange, children }: Readonly<{ label: string; 
         {children}
       </select>
     </label>
-  );
-}
-
-function SessionCard({ session }: Readonly<{ session: NegotiationSession }>) {
-  const actualZones = [...new Set(session.visits.map((visit) => visit.actualZone).filter((zone): zone is string => Boolean(zone)))];
-  return (
-    <article className="rounded-2xl border border-slate-200 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-black text-slate-950">{session.user?.name ?? 'Ressource'}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
-            {session.project?.name ?? 'Projet'} - zone prevue : {session.assignment?.plannedZone ?? 'non precisee'}
-          </p>
-        </div>
-        <Badge tone={session.status === 'OPEN' ? 'success' : 'neutral'}>{session.status === 'OPEN' ? 'Ouverte' : 'Fermee'}</Badge>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-slate-500">
-        <span>Entree {formatTime(session.startTime)}</span>
-        {session.endTime ? <span>Sortie {formatTime(session.endTime)}</span> : null}
-        <span>{session.visitCount} scope(s)</span>
-        {session.startLatitude && session.startLongitude ? <a className="text-orange-600" href={mapsHref(session.startLatitude, session.startLongitude)} target="_blank">Point entree</a> : null}
-        {session.endLatitude && session.endLongitude ? <a className="text-orange-600" href={mapsHref(session.endLatitude, session.endLongitude)} target="_blank">Point sortie</a> : null}
-      </div>
-      {actualZones.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {actualZones.map((zone) => (
-            <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-orange-700" key={zone}>
-              Zone reelle : {zone}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </article>
   );
 }
 
@@ -448,18 +378,6 @@ async function fetchNegotiationOverview(
     throw new Error('Impossible de charger le suivi negociation.');
   }
   return response.json() as Promise<NegotiationOverview>;
-}
-
-async function createNegotiationAssignment(data: { date: string; projectId: string; assigneeIds: string[]; plannedZone: string; instruction: string }) {
-  const response = await authFetch('/api/negotiation/assignments', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    throw new Error(await readError(response));
-  }
-  return response.json() as Promise<{ createdCount: number; skippedCount: number }>;
 }
 
 async function importNegotiationBuildings(data: { projectId: string; file: File; mode: 'preview' | 'commit' }) {
@@ -489,6 +407,21 @@ async function downloadNegotiationExport(date: string, pushToast: ReturnType<typ
   URL.revokeObjectURL(url);
 }
 
+async function downloadScopeTemplate(pushToast: ReturnType<typeof useToast>['pushToast']) {
+  const response = await authFetch('/api/negotiation/buildings/import/template');
+  if (!response.ok) {
+    pushToast({ type: 'error', title: 'Modèle indisponible', message: await readError(response) });
+    return;
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'modele-import-scopes-negociation.xlsx';
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 async function readError(response: Response) {
   const payload: unknown = await response.json().catch(() => null);
   return payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string'
@@ -502,10 +435,6 @@ function getErrorMessage(error: unknown) {
 
 function mapsHref(latitude: number, longitude: number) {
   return `https://www.google.com/maps?q=${latitude},${longitude}`;
-}
-
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
 function formatVisitStatus(status: string) {

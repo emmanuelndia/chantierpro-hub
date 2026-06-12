@@ -77,6 +77,14 @@ type CreateSummaryResponse = {
   skippedCount?: number;
 };
 
+type NegotiationZonePlanningRequest = {
+  date: string;
+  projectId: string;
+  assigneeIds: string[];
+  plannedZone: string | null;
+  instruction: string | null;
+};
+
 const todayKey = formatDateKey(new Date());
 const filterClassName =
   'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-500';
@@ -235,6 +243,20 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     onError: (error) => pushMutationError(error, 'Zone impossible'),
   });
 
+  const negotiationZoneMutation = useMutation({
+    mutationFn: createNegotiationZoneAssignments,
+    onSuccess: async (result, payload) => {
+      pushToast({ type: 'success', title: formatCreateSuccessTitle(result, 'Zone nego enregistree') });
+      if (payload.date !== selectedDate) {
+        setSelectedDate(payload.date);
+      }
+      closeDrawer();
+      await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+      await queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
+    },
+    onError: (error) => pushMutationError(error, 'Zone nego impossible'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: deleteAssignment,
     onSuccess: async () => {
@@ -310,6 +332,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     updateMutation.isPending ||
     deleteMutation.isPending ||
     freeMissionMutation.isPending ||
+    negotiationZoneMutation.isPending ||
     duplicateMutation.isPending;
   const assignmentConflicts =
     assignmentConflictsQuery.data?.items.filter((item) => item.id !== form.id && item.siteId !== form.siteId) ?? [];
@@ -377,6 +400,17 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     const targetUnit = form.targetUnit.trim() || null;
 
     if (form.workLocationType === PlanningWorkLocationType.FREE_MISSION) {
+      if (viewer.role === 'NEGOTIATION_MANAGER' && drawerMode === 'create') {
+        negotiationZoneMutation.mutate({
+          date: form.date,
+          projectId: form.projectId,
+          assigneeIds: form.supervisorIds,
+          plannedZone: form.action.trim() || null,
+          instruction: form.objectiveText.trim() || null,
+        });
+        return;
+      }
+
       const data: FreeMissionWebRequest = {
         projectId: form.projectId,
         assigneeId: form.supervisorId,
@@ -1794,6 +1828,18 @@ async function createFreeMission(data: FreeMissionWebRequest) {
   });
   if (!response.ok) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de creer la mission libre.'));
+  }
+  return (await response.json()) as CreateSummaryResponse;
+}
+
+async function createNegotiationZoneAssignments(data: NegotiationZonePlanningRequest) {
+  const response = await authFetch('/api/negotiation/assignments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Impossible de creer la zone negociation.'));
   }
   return (await response.json()) as CreateSummaryResponse;
 }

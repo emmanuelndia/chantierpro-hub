@@ -384,7 +384,7 @@ export async function getSitePresencesLive(
         ...(query.siteId ? { id: query.siteId } : {}),
       };
 
-  const [sites, assignments, records, freeMissions, officeRecords] = await Promise.all([
+  const [sites, assignments, records, freeMissions, officeRecords, negotiationAssignments, negotiationSessions] = await Promise.all([
     includeTerrain ? prisma.site.findMany({
       where: siteWhere,
       orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
@@ -674,6 +674,82 @@ export async function getSitePresencesLive(
         },
       },
     }) : Promise.resolve([]),
+    includeTerrain ? prisma.negotiationAssignment.findMany({
+      where: {
+        date: today,
+        deletedAt: null,
+        project: {
+          ...projectAccessWhere(user),
+          ...(query.projectManagerId ? { projectManagerId: query.projectManagerId } : {}),
+        },
+        ...(query.projectId ? { projectId: query.projectId } : {}),
+        ...(query.resourceId ? { assigneeId: query.resourceId } : {}),
+        ...(query.assignedById ? { createdById: query.assignedById } : {}),
+        ...(query.role || managedResourceRoles
+          ? { assignee: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
+          : {}),
+      },
+      orderBy: [{ project: { name: 'asc' } }, { plannedZone: 'asc' }, { assignee: { firstName: 'asc' } }],
+      select: {
+        id: true,
+        projectId: true,
+        plannedZone: true,
+        instruction: true,
+        createdById: true,
+        project: {
+          select: {
+            name: true,
+            projectManagerId: true,
+            projectManager: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
+        createdBy: { select: { id: true, firstName: true, lastName: true } },
+        assigneeId: true,
+        assignee: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+      },
+    }) : Promise.resolve([]),
+    includeTerrain ? prisma.negotiationSession.findMany({
+      where: {
+        OR: [
+          { date: today },
+          { startTime: { lt: today }, status: 'OPEN' },
+        ],
+        project: {
+          ...projectAccessWhere(user),
+          ...(query.projectManagerId ? { projectManagerId: query.projectManagerId } : {}),
+        },
+        ...(query.projectId ? { projectId: query.projectId } : {}),
+        ...(query.resourceId ? { userId: query.resourceId } : {}),
+        ...(query.role || managedResourceRoles
+          ? { user: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
+          : {}),
+      },
+      orderBy: [{ project: { name: 'asc' } }, { user: { firstName: 'asc' } }, { startTime: 'asc' }],
+      select: {
+        id: true,
+        assignmentId: true,
+        projectId: true,
+        userId: true,
+        startTime: true,
+        startLatitude: true,
+        startLongitude: true,
+        startAccuracy: true,
+        endTime: true,
+        endLatitude: true,
+        endLongitude: true,
+        endAccuracy: true,
+        status: true,
+        project: {
+          select: {
+            name: true,
+            projectManagerId: true,
+            projectManager: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
+        assignment: { select: { id: true, plannedZone: true, instruction: true, createdById: true, createdBy: { select: { id: true, firstName: true, lastName: true } } } },
+        user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+      },
+    }) : Promise.resolve([]),
   ]);
 
   type LivePresenceRow = RhSitePresenceLiveResponse['sites'][number] & {
@@ -722,6 +798,50 @@ export async function getSitePresencesLive(
       lastActivityAt: null as string | null,
       resources: [] as RhSitePresenceLiveResource[],
     });
+  }
+  for (const assignment of negotiationAssignments) {
+    const rowId = `negotiation:${assignment.id}`;
+    siteRows.set(rowId, {
+      siteId: rowId,
+      siteName: assignment.plannedZone ? `Zone nego - ${assignment.plannedZone}` : 'Zone nego',
+      siteAddress: 'Negociation',
+      presenceContext: 'TERRAIN',
+      projectId: assignment.projectId,
+      projectName: assignment.project.name,
+      projectManagerId: assignment.project.projectManagerId,
+      projectManagerName: formatPersonName(assignment.project.projectManager),
+      expectedCount: 0,
+      presentCount: 0,
+      pausedCount: 0,
+      notClockedCount: 0,
+      leftCount: 0,
+      anomalyCount: 0,
+      lastActivityAt: null as string | null,
+      resources: [] as RhSitePresenceLiveResource[],
+    });
+  }
+  for (const session of negotiationSessions) {
+    const rowId = session.assignmentId ? `negotiation:${session.assignmentId}` : `negotiation-session:${session.id}`;
+    if (!siteRows.has(rowId)) {
+      siteRows.set(rowId, {
+        siteId: rowId,
+        siteName: session.assignment?.plannedZone ? `Zone nego - ${session.assignment.plannedZone}` : 'Zone nego',
+        siteAddress: 'Negociation',
+        presenceContext: 'TERRAIN',
+        projectId: session.projectId,
+        projectName: session.project.name,
+        projectManagerId: session.project.projectManagerId,
+        projectManagerName: formatPersonName(session.project.projectManager),
+        expectedCount: 0,
+        presentCount: 0,
+        pausedCount: 0,
+        notClockedCount: 0,
+        leftCount: 0,
+        anomalyCount: 0,
+        lastActivityAt: null as string | null,
+        resources: [] as RhSitePresenceLiveResource[],
+      });
+    }
   }
   for (const record of officeRecords) {
     const rowId = `office:${record.officeLocationId ?? 'default'}`;
@@ -777,6 +897,41 @@ export async function getSitePresencesLive(
     const key = liveResourceKey(rowId, record.userId);
     recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), record]);
   }
+  for (const session of negotiationSessions) {
+    const rowId = session.assignmentId ? `negotiation:${session.assignmentId}` : `negotiation-session:${session.id}`;
+    const sessionRecords: LiveRecordWithUser[] = [
+      {
+        type: ClockInType.ARRIVAL,
+        timestampLocal: session.startTime,
+        distanceToSite: new Prisma.Decimal(0),
+        latitude: session.startLatitude,
+        longitude: session.startLongitude,
+        accuracy: session.startAccuracy,
+        isRemoteCheckout: false,
+        isAutoClosed: false,
+        isRegularized: false,
+        isLate: isLateArrival(session.startTime),
+        user: session.user,
+      },
+    ];
+    if (session.endTime) {
+      sessionRecords.push({
+        type: ClockInType.DEPARTURE,
+        timestampLocal: session.endTime,
+        distanceToSite: new Prisma.Decimal(0),
+        latitude: session.endLatitude,
+        longitude: session.endLongitude,
+        accuracy: session.endAccuracy,
+        isRemoteCheckout: false,
+        isAutoClosed: false,
+        isRegularized: false,
+        isLate: false,
+        user: session.user,
+      });
+    }
+    const key = liveResourceKey(rowId, session.userId);
+    recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), ...sessionRecords]);
+  }
 
   const assignmentBySiteUser = new Map<
     string,
@@ -804,6 +959,20 @@ export async function getSitePresencesLive(
       createdBy: mission.createdBy,
     };
     assignmentBySiteUser.set(key, existing ? { ...existing, action: `${existing.action} / ${mission.action}` } : assignment);
+  }
+  for (const assignment of negotiationAssignments) {
+    const rowId = `negotiation:${assignment.id}`;
+    const key = liveResourceKey(rowId, assignment.assigneeId);
+    const existing = assignmentBySiteUser.get(key);
+    const action = assignment.plannedZone ? `Negociation - ${assignment.plannedZone}` : 'Negociation';
+    const nextAssignment = {
+      action,
+      supervisorId: assignment.assigneeId,
+      supervisor: assignment.assignee,
+      createdById: assignment.createdById,
+      createdBy: assignment.createdBy,
+    };
+    assignmentBySiteUser.set(key, existing ? { ...existing, action: `${existing.action} / ${action}` } : nextAssignment);
   }
 
   const allKeys = new Set([...recordsBySiteUser.keys(), ...assignmentBySiteUser.keys()]);
