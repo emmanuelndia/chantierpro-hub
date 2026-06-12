@@ -43,6 +43,7 @@ type NegotiationOverview = {
 type NegotiationSession = {
   id: string;
   project: { id: string; name: string } | null;
+  assignment: { id: string; plannedZone: string | null; instruction: string | null } | null;
   user: { id: string; name: string; role: string; username: string } | null;
   startTime: string;
   endTime: string | null;
@@ -53,6 +54,7 @@ type NegotiationSession = {
   status: string;
   visitCount: number;
   comment: string | null;
+  visits: { actualZone: string | null; buildingName: string; status: string }[];
 };
 
 type NegotiationVisit = {
@@ -82,14 +84,25 @@ export function NegotiationWebPage() {
   const [instruction, setInstruction] = useState('');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'preview' | 'commit'>('preview');
+  const [filters, setFilters] = useState({
+    projectId: '',
+    resourceId: '',
+    status: '',
+    actualZone: '',
+    q: '',
+  });
 
   const overviewQuery = useQuery({
-    queryKey: ['negotiation-overview', date],
-    queryFn: () => fetchNegotiationOverview(date),
+    queryKey: ['negotiation-overview', date, filters],
+    queryFn: () => fetchNegotiationOverview(date, filters),
     refetchInterval: 60_000,
   });
   const overview = overviewQuery.data;
   const selectedProject = useMemo(() => overview?.projects.find((project) => project.id === projectId), [overview?.projects, projectId]);
+  const filteredProjectSummary = useMemo(
+    () => overview?.projectScopeSummaries.find((summary) => summary.projectId === (filters.projectId || projectId)) ?? null,
+    [filters.projectId, overview?.projectScopeSummaries, projectId],
+  );
 
   const assignmentMutation = useMutation({
     mutationFn: createNegotiationAssignment,
@@ -130,6 +143,10 @@ export function NegotiationWebPage() {
     });
   }
 
+  function setFilter(name: keyof typeof filters, value: string) {
+    setFilters((current) => ({ ...current, [name]: value }));
+  }
+
   function submitImport() {
     if (!projectId || !importFile) {
       pushToast({ type: 'error', title: 'Import incomplet', message: 'Choisis un projet et un fichier Excel.' });
@@ -146,7 +163,7 @@ export function NegotiationWebPage() {
           <div>
             <h1 className="text-3xl font-black text-slate-950">Suivi negociation</h1>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-              Planifie les journees terrain, importe les scopes et suis les resultats avec GPS, statut et remarques.
+              Planifie les zones de pointage, suis les sessions terrain et consolide les resultats des scopes par projet.
             </p>
           </div>
           <label className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
@@ -162,15 +179,66 @@ export function NegotiationWebPage() {
 
       {overview ? (
         <>
+          <section className="rounded-[2rem] border border-orange-100 bg-orange-50 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-700">Regle metier nego</p>
+            <p className="mt-2 text-sm font-bold leading-6 text-orange-950">
+              Le pointage des ressources negociation se fait ici, par zone de journee. Les scopes saisis ensuite sont des resultats terrain, pas des pointages RH.
+            </p>
+          </section>
+
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Filtres pilotage</p>
+                <h2 className="mt-1 text-xl font-black text-slate-950">Lire les zones, sessions et scopes</h2>
+              </div>
+              <button
+                className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                onClick={() => setFilters({ projectId: '', resourceId: '', status: '', actualZone: '', q: '' })}
+                type="button"
+              >
+                Reinitialiser
+              </button>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <Select label="Projet" value={filters.projectId} onChange={(value) => setFilter('projectId', value)}>
+                <option value="">Tous les projets</option>
+                {overview.projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </Select>
+              <Select label="Ressource" value={filters.resourceId} onChange={(value) => setFilter('resourceId', value)}>
+                <option value="">Toutes les ressources</option>
+                {overview.resources.map((resource) => (
+                  <option key={resource.id} value={resource.id}>{resource.name}</option>
+                ))}
+              </Select>
+              <Select label="Statut scope" value={filters.status} onChange={(value) => setFilter('status', value)}>
+                <option value="">Tous les statuts</option>
+                {overview.visitStatuses.map((status) => (
+                  <option key={status} value={status}>{formatVisitStatus(status)}</option>
+                ))}
+              </Select>
+              <label className="text-sm font-bold text-slate-700">
+                Zone reelle
+                <input className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500" onChange={(event) => setFilter('actualZone', event.target.value)} placeholder="Ex: Bingerville" value={filters.actualZone} />
+              </label>
+              <label className="text-sm font-bold text-slate-700">
+                Recherche
+                <input className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500" onChange={(event) => setFilter('q', event.target.value)} placeholder="Scope, commune, remarque..." value={filters.q} />
+              </label>
+            </div>
+          </section>
+
           <section className="grid gap-4 md:grid-cols-4">
-            <Metric label="Affectations" value={overview.assignments.length} />
-            <Metric label="Sessions" value={overview.sessions.length} />
+            <Metric label="Zones planifiees" value={overview.assignments.length} />
+            <Metric label="Pointages zone" value={overview.sessions.length} />
             <Metric label="Scopes visites" value={overview.visits.length} />
             <Metric label="Scopes base" value={overview.buildingCount} />
           </section>
 
           <section className="grid gap-4 lg:grid-cols-3">
-            {overview.projectScopeSummaries.map((summary) => {
+            {(filteredProjectSummary ? [filteredProjectSummary] : overview.projectScopeSummaries).map((summary) => {
               const project = overview.projects.find((item) => item.id === summary.projectId);
               return (
                 <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel" key={summary.projectId}>
@@ -190,7 +258,10 @@ export function NegotiationWebPage() {
 
           <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-              <h2 className="text-lg font-black text-slate-950">Planifier une journee nego</h2>
+              <h2 className="text-lg font-black text-slate-950">Planifier un pointage zone</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Cette planification cree la zone de journee que la ressource pointera sur mobile.
+              </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <Select label="Projet" value={projectId} onChange={setProjectId}>
                   <option value="">Choisir un projet</option>
@@ -249,14 +320,14 @@ export function NegotiationWebPage() {
           </section>
 
           <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-            <h2 className="text-lg font-black text-slate-950">Sessions du jour</h2>
+            <h2 className="text-lg font-black text-slate-950">Pointages zone du jour</h2>
             <div className="mt-4 grid gap-3">
-              {overview.sessions.length === 0 ? <Empty label="Aucune session nego pour cette date." /> : overview.sessions.map((session) => <SessionCard key={session.id} session={session} />)}
+              {overview.sessions.length === 0 ? <Empty label="Aucun pointage zone pour cette date." /> : overview.sessions.map((session) => <SessionCard key={session.id} session={session} />)}
             </div>
           </section>
 
           <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-            <h2 className="text-lg font-black text-slate-950">Visites immeubles</h2>
+            <h2 className="text-lg font-black text-slate-950">Resultats scopes terrain</h2>
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="text-xs uppercase tracking-[0.18em] text-slate-500">
@@ -326,21 +397,34 @@ function Select({ label, value, onChange, children }: Readonly<{ label: string; 
 }
 
 function SessionCard({ session }: Readonly<{ session: NegotiationSession }>) {
+  const actualZones = [...new Set(session.visits.map((visit) => visit.actualZone).filter((zone): zone is string => Boolean(zone)))];
   return (
     <article className="rounded-2xl border border-slate-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-black text-slate-950">{session.user?.name ?? 'Ressource'}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{session.project?.name ?? 'Projet'} - {session.visitCount} visite(s)</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            {session.project?.name ?? 'Projet'} - zone prevue : {session.assignment?.plannedZone ?? 'non precisee'}
+          </p>
         </div>
         <Badge tone={session.status === 'OPEN' ? 'success' : 'neutral'}>{session.status === 'OPEN' ? 'Ouverte' : 'Fermee'}</Badge>
       </div>
       <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-slate-500">
         <span>Entree {formatTime(session.startTime)}</span>
         {session.endTime ? <span>Sortie {formatTime(session.endTime)}</span> : null}
+        <span>{session.visitCount} scope(s)</span>
         {session.startLatitude && session.startLongitude ? <a className="text-orange-600" href={mapsHref(session.startLatitude, session.startLongitude)} target="_blank">Point entree</a> : null}
         {session.endLatitude && session.endLongitude ? <a className="text-orange-600" href={mapsHref(session.endLatitude, session.endLongitude)} target="_blank">Point sortie</a> : null}
       </div>
+      {actualZones.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {actualZones.map((zone) => (
+            <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-orange-700" key={zone}>
+              Zone reelle : {zone}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -349,8 +433,17 @@ function Empty({ label }: Readonly<{ label: string }>) {
   return <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm font-bold text-slate-500">{label}</div>;
 }
 
-async function fetchNegotiationOverview(date: string): Promise<NegotiationOverview> {
-  const response = await authFetch(`/api/negotiation/overview?date=${encodeURIComponent(date)}`);
+async function fetchNegotiationOverview(
+  date: string,
+  filters: { projectId: string; resourceId: string; status: string; actualZone: string; q: string },
+): Promise<NegotiationOverview> {
+  const params = new URLSearchParams({ date });
+  if (filters.projectId) params.set('projectId', filters.projectId);
+  if (filters.resourceId) params.set('resourceId', filters.resourceId);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.actualZone) params.set('actualZone', filters.actualZone);
+  if (filters.q) params.set('q', filters.q);
+  const response = await authFetch(`/api/negotiation/overview?${params.toString()}`);
   if (!response.ok) {
     throw new Error('Impossible de charger le suivi negociation.');
   }

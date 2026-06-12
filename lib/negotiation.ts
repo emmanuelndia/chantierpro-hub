@@ -93,7 +93,7 @@ export async function listNegotiationOverview(
   prisma: PrismaClient,
   user: RequestAuthUser,
   date: string,
-  filters: { projectId?: string; resourceId?: string; status?: string; q?: string } = {},
+  filters: { projectId?: string; resourceId?: string; status?: string; q?: string; actualZone?: string } = {},
 ) {
   const dateValue = parseDateOnly(date);
   const projectWhere = negotiationProjectWhere(user);
@@ -151,6 +151,7 @@ export async function listNegotiationOverview(
     where: {
       session: { date: dateValue },
       ...(filters.status ? { status: filters.status as NegotiationVisitStatus } : {}),
+      ...(filters.actualZone ? { actualZone: { contains: filters.actualZone, mode: 'insensitive' } } : {}),
       project: projectFilter,
       ...(filters.q
         ? {
@@ -405,7 +406,7 @@ export async function createNegotiationVisit(prisma: PrismaClient, user: Request
 
   const session = await prisma.negotiationSession.findFirst({
     where: { id: input.data.sessionId, userId: user.id, status: NegotiationSessionStatus.OPEN },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, assignment: { select: { plannedZone: true } } },
   });
   if (!session) {
     return Response.json({ code: 'SESSION_NOT_FOUND', message: 'Demarre une journee negociation avant de saisir une visite.' }, { status: 404 });
@@ -419,7 +420,7 @@ export async function createNegotiationVisit(prisma: PrismaClient, user: Request
       data: {
         projectId: session.projectId,
         name: input.data.buildingName || 'Scope terrain',
-        city: input.data.city ?? input.data.actualZone ?? 'Non renseigne',
+        city: input.data.city ?? input.data.actualZone ?? session.assignment?.plannedZone ?? 'Non renseigne',
         commune: input.data.commune,
         contactInfo: input.data.contactInfo,
         latitude: input.data.latitude,
@@ -447,7 +448,7 @@ export async function createNegotiationVisit(prisma: PrismaClient, user: Request
         sessionId: session.id,
         projectId: session.projectId,
         buildingId: scope.id,
-        actualZone: input.data.actualZone,
+        actualZone: input.data.actualZone ?? session.assignment?.plannedZone ?? null,
         buildingName: input.data.buildingName ? input.data.buildingName : scope.name,
         city: input.data.city ?? scope.city ?? null,
         commune: input.data.commune ?? scope.commune ?? null,

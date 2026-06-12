@@ -93,7 +93,7 @@ export function MobileNegotiationPage() {
       });
     },
     onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Journee nego demarree' });
+      pushToast({ type: 'success', title: 'Pointage zone demarre' });
       setComment('');
       await queryClient.invalidateQueries({ queryKey: ['mobile-negotiation'] });
     },
@@ -114,7 +114,7 @@ export function MobileNegotiationPage() {
       });
     },
     onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Journee nego terminee' });
+      pushToast({ type: 'success', title: 'Pointage zone termine' });
       setComment('');
       await queryClient.invalidateQueries({ queryKey: ['mobile-negotiation'] });
     },
@@ -170,9 +170,9 @@ export function MobileNegotiationPage() {
     <div className="space-y-5">
       <section className="rounded-3xl bg-slate-950 p-5 text-white shadow-xl">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Negociation terrain</p>
-        <h1 className="mt-2 text-2xl font-black">Journee et visites</h1>
+        <h1 className="mt-2 text-2xl font-black">Pointage zone et scopes</h1>
         <p className="mt-2 text-sm font-semibold leading-6 text-white/70">
-          Pointe ta journee nego puis enregistre chaque immeuble/client visite avec GPS et remarque.
+          Pointe ta zone de journee, puis renseigne les scopes traites avec leur resultat terrain.
         </p>
       </section>
 
@@ -185,7 +185,7 @@ export function MobileNegotiationPage() {
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Mission du jour</p>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Zone prevue du jour</p>
                 <h2 className="mt-2 text-xl font-black text-slate-950">
                   {selectedAssignment?.project.name ?? 'Aucune affectation'}
                 </h2>
@@ -212,11 +212,11 @@ export function MobileNegotiationPage() {
 
             {!openSession ? (
               <button className="mt-4 w-full rounded-2xl bg-orange-600 px-5 py-3 text-sm font-black text-white disabled:opacity-50" disabled={!selectedAssignment || startMutation.isPending} onClick={() => startMutation.mutate()} type="button">
-                Demarrer la journee nego
+                Pointer entree zone
               </button>
             ) : (
               <button className="mt-4 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-50" disabled={closeMutation.isPending} onClick={() => closeMutation.mutate()} type="button">
-                Terminer la journee nego
+                Pointer sortie zone
               </button>
             )}
           </section>
@@ -226,6 +226,15 @@ export function MobileNegotiationPage() {
               <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Scope visite</p>
               <div className="mt-4 space-y-3">
                 <Input label="Zone reellement visitee" value={visitForm.actualZone} onChange={(value) => setVisitForm((current) => ({ ...current, actualZone: value }))} />
+                {!visitForm.actualZone && selectedAssignment?.plannedZone ? (
+                  <button
+                    className="rounded-2xl bg-orange-50 px-4 py-3 text-left text-sm font-black text-orange-800"
+                    onClick={() => setVisitForm((current) => ({ ...current, actualZone: selectedAssignment.plannedZone ?? '' }))}
+                    type="button"
+                  >
+                    Utiliser la zone prevue : {selectedAssignment.plannedZone}
+                  </button>
+                ) : null}
                 <label className="block text-sm font-black text-slate-700">
                   Rechercher un scope existant
                   <input
