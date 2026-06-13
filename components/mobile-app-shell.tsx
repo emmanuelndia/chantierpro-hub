@@ -7,6 +7,7 @@ import { BottomTabBar } from '@/components/bottom-tab-bar';
 import { MobileOfflineAutoSync } from '@/components/mobile-offline-auto-sync';
 import { MobileOfflinePreparer } from '@/components/mobile-offline-preparer';
 import { MobileOfflineStatus } from '@/components/mobile-offline-status';
+import { MobileInstallPrompt } from '@/components/mobile-install-prompt';
 import { MustChangePasswordBanner } from '@/components/must-change-password-banner';
 import { OfflineBanner } from '@/components/offline-banner';
 import { authFetch } from '@/lib/auth/client-session';
@@ -140,6 +141,9 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
         />
 
         <main className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-4">
+          <div className="mb-4">
+            <MobileInstallPrompt compact />
+          </div>
           {children}
         </main>
 

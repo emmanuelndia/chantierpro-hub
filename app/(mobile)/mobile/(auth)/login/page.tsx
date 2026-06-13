@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/auth-provider';
+import { MobileInstallPrompt } from '@/components/mobile-install-prompt';
 import { MobileLaunchScreen } from '@/components/mobile-launch-screen';
 import type { AuthErrorCode, LoginResponse } from '@/types/auth';
 
@@ -355,6 +356,9 @@ function MobileLoginContent() {
           ) : null}
 
           <footer className="mt-7 border-t border-slate-200 pt-5 text-center text-xs text-slate-400">
+            <div className="mb-5 text-left">
+              <MobileInstallPrompt compact />
+            </div>
             Version 2.0 - ChantierPro mobile
           </footer>
         </div>
