@@ -25,7 +25,7 @@ export const POST = withAuth(async ({ req, user }) => {
     return jsonRhError('NOT_FOUND', 404, 'Session ouverte introuvable.');
   }
 
-  const existingDeparture = await prisma.clockInRecord.findFirst({
+  const nextRecord = await prisma.clockInRecord.findFirst({
     where: {
       userId: arrival.userId,
       siteId: arrival.siteId,
@@ -34,17 +34,22 @@ export const POST = withAuth(async ({ req, user }) => {
       officeClockInLocation: arrival.officeClockInLocation,
       planningAssignmentId: arrival.planningAssignmentId,
       status: ClockInStatus.VALID,
-      type: ClockInType.DEPARTURE,
+      type: { in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE] },
       timestampLocal: { gt: arrival.timestampLocal },
     },
-    select: { id: true },
+    orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    select: { id: true, type: true, timestampLocal: true },
   });
 
-  if (existingDeparture) {
+  if (nextRecord?.type === ClockInType.DEPARTURE) {
     return jsonRhError('BAD_REQUEST', 400, 'Cette session possede deja une sortie.');
   }
 
-  const closedAt = new Date();
+  const now = new Date();
+  const closedAt =
+    nextRecord?.type === ClockInType.ARRIVAL
+      ? new Date(Math.min(now.getTime(), nextRecord.timestampLocal.getTime() - 60_000))
+      : now;
   if (closedAt.getTime() <= arrival.timestampLocal.getTime()) {
     return jsonRhError('BAD_REQUEST', 400, "La sortie doit etre posterieure a l'entree.");
   }
