@@ -2597,6 +2597,7 @@ function buildLiveResource(
   },
   taskAction: string | null,
   records: {
+    id?: string;
     type: ClockInType;
     timestampLocal: Date;
     distanceToSite: Prisma.Decimal;
@@ -2643,6 +2644,7 @@ function buildLiveResource(
     presenceContext,
     status,
     taskAction,
+    arrivalRecordId: arrival?.id ?? null,
     arrivalAt: arrival?.timestampLocal.toISOString() ?? null,
     lastClockInAt: latest?.timestampLocal.toISOString() ?? null,
     lastClockInType: latest?.type ?? null,

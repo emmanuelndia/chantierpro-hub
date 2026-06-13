@@ -33,3 +33,6 @@ Reste à faire :
 - Nettoyage des exports rh 
 - Vérification et ajustement de tous les petits problèmes observés sur tous les écrans web et mobile
 - Prise des requêtes auprès des chefs de projets, des retours terrains et les ajuster
+
+
+L'administrateur doit pouvoir fermer la session oubliée des ressources et on va marqué sortie fermé par l'administrateur pour faciliter la tâche aux ressources c'est mieux non ?

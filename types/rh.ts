@@ -153,6 +153,7 @@ export type RhSitePresenceLiveResource = {
   presenceContext: 'TERRAIN' | 'OFFICE';
   status: RhSitePresenceLiveStatus;
   taskAction: string | null;
+  arrivalRecordId: string | null;
   arrivalAt: string | null;
   lastClockInAt: string | null;
   lastClockInType: string | null;
