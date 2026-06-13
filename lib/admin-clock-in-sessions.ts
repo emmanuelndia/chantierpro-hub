@@ -100,7 +100,7 @@ export async function listAdminClockInSessions(
   prisma: PrismaClient,
   query: AdminClockInSessionQuery,
 ): Promise<AdminClockInSessionsResponse> {
-  const records = await prisma.clockInRecord.findMany({
+  const baseRecords = await prisma.clockInRecord.findMany({
     where: {
       status: ClockInStatus.VALID,
       type: { in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END] },
@@ -118,9 +118,11 @@ export async function listAdminClockInSessions(
     ],
     select: clockInSessionRecordSelect,
   });
+  const records = await completeStaleArrivalRecords(prisma, baseRecords, query.to);
 
   const sessions = buildAdminSessions(records, query.to)
     .filter((session) => session.arrivalRecord.recordedAt <= query.to.toISOString())
+    .filter((session) => sessionOverlapsQuery(session, query))
     .filter((session) => !query.context || session.context === query.context)
     .filter((session) => !query.status || session.status === query.status)
     .sort(compareAdminSessions);
@@ -235,6 +237,69 @@ export async function closeClockInSessionAsAdmin(
   return { ok: true as const, recordId: departure.id };
 }
 
+async function completeStaleArrivalRecords(
+  prisma: PrismaClient,
+  records: ClockInSessionRecord[],
+  to: Date,
+) {
+  const staleArrivals = records.filter(
+    (record) =>
+      record.type === ClockInType.ARRIVAL &&
+      record.timestampLocal < to &&
+      !records.some(
+        (candidate) =>
+          candidate.id !== record.id &&
+          candidate.userId === record.userId &&
+          candidate.timestampLocal > record.timestampLocal &&
+          candidate.timestampLocal <= to &&
+          sameClockInContext(candidate, record),
+      ),
+  );
+
+  if (staleArrivals.length === 0) {
+    return records;
+  }
+
+  const supplementalRecords = await prisma.clockInRecord.findMany({
+    where: {
+      status: ClockInStatus.VALID,
+      type: { in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END] },
+      OR: staleArrivals.map((arrival) => ({
+        userId: arrival.userId,
+        siteId: arrival.siteId,
+        freeMissionId: arrival.freeMissionId,
+        planningAssignmentId: arrival.planningAssignmentId,
+        officeLocationId: arrival.officeLocationId,
+        officeClockInLocation: arrival.officeClockInLocation,
+        timestampLocal: {
+          gt: arrival.timestampLocal,
+          lte: to,
+        },
+      })),
+    },
+    orderBy: [
+      { userId: 'asc' },
+      { timestampLocal: 'asc' },
+      { createdAt: 'asc' },
+      { id: 'asc' },
+    ],
+    select: clockInSessionRecordSelect,
+  });
+
+  const byId = new Map<string, ClockInSessionRecord>();
+  for (const record of [...records, ...supplementalRecords]) {
+    byId.set(record.id, record);
+  }
+
+  return [...byId.values()].sort(
+    (left, right) =>
+      left.userId.localeCompare(right.userId) ||
+      left.timestampLocal.getTime() - right.timestampLocal.getTime() ||
+      left.createdAt.getTime() - right.createdAt.getTime() ||
+      left.id.localeCompare(right.id),
+  );
+}
+
 function buildAdminSessions(records: ClockInSessionRecord[], referenceDate: Date): AdminClockInSessionItem[] {
   const sessions: AdminClockInSessionItem[] = [];
   const states = new Map<string, SessionState>();
@@ -271,6 +336,22 @@ function buildAdminSessions(records: ClockInSessionRecord[], referenceDate: Date
   }
 
   return sessions;
+}
+
+function sessionOverlapsQuery(session: AdminClockInSessionItem, query: AdminClockInSessionQuery) {
+  const arrivalTime = new Date(session.arrivalRecord.recordedAt).getTime();
+  const departureTime = session.departureRecord ? new Date(session.departureRecord.recordedAt).getTime() : null;
+  return arrivalTime <= query.to.getTime() && (departureTime === null || departureTime >= query.from.getTime());
+}
+
+function sameClockInContext(left: ClockInSessionRecord, right: ClockInSessionRecord) {
+  return (
+    left.siteId === right.siteId &&
+    left.freeMissionId === right.freeMissionId &&
+    left.planningAssignmentId === right.planningAssignmentId &&
+    left.officeLocationId === right.officeLocationId &&
+    left.officeClockInLocation === right.officeClockInLocation
+  );
 }
 
 function toAdminSession(
