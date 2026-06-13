@@ -129,6 +129,13 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Administration', 'Notifications'],
   },
   {
+    href: '/admin/clock-in-sessions',
+    label: 'Sessions de pointage',
+    icon: 'rh',
+    roles: ['ADMIN'],
+    breadcrumb: ['Administration', 'Sessions de pointage'],
+  },
+  {
     href: '/admin/office-locations',
     label: 'Bureaux',
     icon: 'rh',

@@ -108,6 +108,8 @@ export const WEB_ROUTE_ROLE_MAP: Record<string, Role[]> = {
   '/web/manager': ['GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
   '/admin/users': ['ADMIN'],
   '/admin/utilisateurs': ['ADMIN'],
+  '/admin/notifications': ['ADMIN'],
+  '/admin/clock-in-sessions': ['ADMIN'],
   '/admin/office-locations': ['ADMIN'],
   '/admin/logs': ['ADMIN'],
   '/settings/profil': [

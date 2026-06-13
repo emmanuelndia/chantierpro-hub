@@ -140,32 +140,6 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
       });
     },
   });
-  const closeForgottenSessionMutation = useMutation({
-    mutationFn: async (arrivalRecordId: string) => {
-      const response = await authFetch('/api/rh/presences/close-forgotten', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ arrivalRecordId }),
-      });
-      if (!response.ok) {
-        const errorBody = (await safeJson(response)) as { message?: string } | null;
-        throw new Error(errorBody?.message ?? 'Fermeture de session impossible.');
-      }
-      return response.json() as Promise<{ recordId: string }>;
-    },
-    onSuccess: async () => {
-      pushToast({ type: 'success', title: 'Sortie fermee par administrateur' });
-      await liveQuery.refetch();
-    },
-    onError: (error) => {
-      pushToast({
-        type: 'error',
-        title: 'Fermeture impossible',
-        message: error instanceof Error ? error.message : 'La session oubliee na pas pu etre fermee.',
-      });
-    },
-  });
-
   const data = liveQuery.data;
   const filteredSites = useMemo(() => data?.sites ?? [], [data?.sites]);
   const projectOptions = useMemo(
@@ -414,10 +388,8 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
           <div className="divide-y divide-slate-100">
             {resources.map((resource) => (
               <ResourcePresenceItem
-                canCloseForgottenSession={viewer.role === 'ADMIN'}
-                closePending={closeForgottenSessionMutation.isPending}
+                canOpenAdminSessions={viewer.role === 'ADMIN'}
                 key={resource.userId}
-                onCloseForgottenSession={(arrivalRecordId) => closeForgottenSessionMutation.mutate(arrivalRecordId)}
                 resource={resource}
               />
             ))}
@@ -429,16 +401,13 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 }
 
 function ResourcePresenceItem({
-  canCloseForgottenSession,
-  closePending,
-  onCloseForgottenSession,
+  canOpenAdminSessions,
   resource,
 }: Readonly<{
-  canCloseForgottenSession: boolean;
-  closePending: boolean;
-  onCloseForgottenSession: (arrivalRecordId: string) => void;
+  canOpenAdminSessions: boolean;
   resource: AggregatedLiveResource;
 }>) {
+  const closePending = false;
   const contextSummary = getResourceContextSummary(resource.contexts);
   const isUnplannedClockIn = resource.contexts.some(
     (context) =>
@@ -550,15 +519,16 @@ function ResourcePresenceItem({
                   ) : null}
                 </div>
               ) : null}
-              {canCloseForgottenSession && context.anomalyReason === 'Sortie oubliee' && context.arrivalRecordId ? (
-                <button
-                  className="mt-3 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={closePending}
-                  onClick={() => onCloseForgottenSession(context.arrivalRecordId!)}
-                  type="button"
+              {canOpenAdminSessions && context.anomalyReason === 'Sortie oubliee' && context.arrivalRecordId ? (
+                <a
+                  className="mt-3 inline-flex rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                  href={`/admin/clock-in-sessions?status=FORGOTTEN_EXIT&userId=${encodeURIComponent(context.userId)}`}
                 >
+                  Ouvrir les sessions de pointage
+                  <span className="sr-only">
                   {closePending ? 'Fermeture...' : 'Fermer la sortie oubliée'}
-                </button>
+                  </span>
+                </a>
               ) : null}
             </div>
           ))}

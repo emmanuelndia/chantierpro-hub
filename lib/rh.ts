@@ -358,7 +358,6 @@ export async function getSitePresencesLive(
   const includeTerrain = query.context !== 'OFFICE';
   const includeOffice =
     query.context !== 'TERRAIN' &&
-    canAccessRh(user.role) &&
     !query.projectId &&
     !query.projectManagerId &&
     !query.siteId &&
