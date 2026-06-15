@@ -364,6 +364,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     selectedClockContext === 'ZONE' && Boolean(selectedFreeMissionFromAssignments)
       ? selectedFreeMissionFromAssignments
       : null;
+  const selectedFreeMissionKey = selectedFreeMission?.freeMissionId ?? selectedFreeMission?.id ?? null;
   const isNegotiationZoneSelected =
     selectedClockContext === 'ZONE' &&
     isNegotiationClockInUser &&
@@ -604,15 +605,17 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const zoneActualNameReady = !zoneActualNameRequired || zoneActualName.trim().length > 0;
 
   useEffect(() => {
-    if (!selectedFreeMission || selectedClockContext !== 'ZONE') {
+    if (!selectedFreeMissionKey || selectedClockContext !== 'ZONE') {
       setZoneActualName('');
       setZoneSpecificPlace('');
       setZoneClockInComment('');
       return;
     }
 
-    setZoneActualName((current) => current.trim() || selectedFreeMission.action || selectedFreeMission.siteName || '');
-  }, [selectedClockContext, selectedFreeMission]);
+    setZoneActualName('');
+    setZoneSpecificPlace('');
+    setZoneClockInComment('');
+  }, [selectedClockContext, selectedFreeMissionKey]);
 
   useEffect(() => {
     if (!requestedIntent && sessionStatus?.sessionOpen) {
