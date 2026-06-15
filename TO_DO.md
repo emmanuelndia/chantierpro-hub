@@ -38,5 +38,5 @@ Reste à faire :
 L'administrateur doit pouvoir fermer la session oubliée des ressources et on va marqué sortie fermé par l'administrateur pour faciliter la tâche aux ressources c'est mieux non ?
 
 Au niveau de négociation, je vais te donner un excel des données de scopes tu vas adapter le modèle de excel à uploader, 
-Ensuite je veux qu'a travers les zones qui seront marqué dans le excel tu extrait et crée les zones puis tu crées les scopes par zones, 
-Et ainsi au niveau du planning on va changer chantier par zone et ça va afficher les zones de scopes dans un projet et ainsi la ressource va voir dans négociation la liste de scope qu'il a dans sa zone et il pourra pointer dans Pointer > Zone et dans Négociation il pourra renseigner les infos par scope ainsi de suite
+Ensuite je veux qu'a travers les zones qui seront marqué dans la colonne commune/quartier du excel tu extrait et crée les zones puis tu crées les scopes par zones, 
+Et ainsi au niveau du planning uniquement pour roles négo on va changer chantier par zone et ça va afficher les zones de scopes dans un projet et ainsi la ressource va voir dans négociation la liste de scope qu'il a dans sa zone et il pourra pointer dans Pointer > Zone et dans Négociation il pourra renseigner les infos par scope ainsi de suite

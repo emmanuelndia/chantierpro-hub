@@ -3,23 +3,26 @@ import { withAuth } from '@/lib/auth/with-auth';
 import { canManageNegotiation } from '@/lib/negotiation';
 
 const HEADERS = [
-  'CLUSTER',
-  'VILLE',
-  'COMMUNE',
-  'PLAQUE',
-  'HABITATION',
-  'NOM IMMEUBLE',
-  'INFORMATIONS INTERLOCUTEURS',
-  'NIVEAU DE ELS',
-  'EL',
-  'EL REEL',
-  'LONGITUDE',
-  'LATITUDE',
-  'CALQUE',
-  'COULEUR',
-  'PRESENCE OPERATEUR',
-  'STATUT NEGOCIATION',
-  'REMARQUE',
+  'Région',
+  'Ville',
+  'Commune/Quartier',
+  'Nom de l’immeuble',
+  'Adresse',
+  'Longitude',
+  'Latitude',
+  'Nom du propriétaire',
+  'Téléphone 1',
+  'Téléphone 2',
+  'Email',
+  'Type de propriété (Résidentiel / Commercial / Mixte)',
+  'Fournisseur internet actuel',
+  'Offre promotionnelle de 50Mbps (3 ou 6 mois)',
+  'Statut accord (À contacter / En cours / Signé)',
+  'Date de signature par le proprietaire',
+  'Faisabilité technique (Oui/Non)',
+  'Statut installation (Non démarré/En cours/Terminé)',
+  'Statut activation (Non/Partiel/Complet) Internet',
+  'Commentaires',
 ];
 
 export const GET = withAuth(async ({ user }) => {
@@ -29,26 +32,29 @@ export const GET = withAuth(async ({ user }) => {
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'ChantierPro';
-  const worksheet = workbook.addWorksheet('HUB');
+  const worksheet = workbook.addWorksheet('Suivi Propriétaires Immeubles');
   worksheet.addRow(HEADERS);
   worksheet.addRow([
-    'Cluster A',
+    'ABIDJAN',
+    'ABIDJAN',
     'Yopougon',
-    'Selmer',
-    'P-001',
-    'Immeuble',
     'Residence Exemple',
-    'M. Konan - 0700000000',
-    'R+2',
-    12,
-    0,
+    'Rue exemple',
     -4.0652,
     5.3364,
+    'M. Konan',
+    '0700000000',
+    '',
+    'contact@example.com',
+    'Résidentiel',
     '',
     '',
+    'En cours',
+    '',
+    'Oui',
+    'Non démarré',
     'Non',
-    'EN_COURS',
-    'Premier passage a effectuer',
+    'Premier passage à effectuer',
   ]);
 
   worksheet.getRow(1).font = { bold: true };

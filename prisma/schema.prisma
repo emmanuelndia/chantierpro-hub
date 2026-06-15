@@ -249,6 +249,7 @@ model Project {
   createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
   sites            Site[]
   freeMissions     FreeMission[]
+  negotiationZones NegotiationZone[]
   negotiationBuildings NegotiationBuilding[]
   negotiationAssignments NegotiationAssignment[]
   negotiationSessions NegotiationSession[]
@@ -470,9 +471,28 @@ model FreeMission {
   @@index([deletedAt])
 }
 
+model NegotiationZone {
+  id             String   @id @default(cuid())
+  projectId      String
+  name           String
+  normalizedName String
+  city           String?
+  region         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scopes         NegotiationBuilding[]
+  assignments    NegotiationAssignment[]
+
+  @@unique([projectId, normalizedName])
+  @@index([projectId])
+  @@index([normalizedName])
+}
+
 model NegotiationBuilding {
   id               String   @id @default(cuid())
   projectId        String
+  zoneId           String?
   cluster          String?
   city             String
   commune          String?
@@ -494,9 +514,11 @@ model NegotiationBuilding {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  zone             NegotiationZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
   visits           NegotiationVisit[]
 
   @@index([projectId])
+  @@index([zoneId])
   @@index([city])
   @@index([commune])
   @@index([negotiationStatus])
@@ -505,6 +527,7 @@ model NegotiationBuilding {
 model NegotiationAssignment {
   id          String                      @id @default(cuid())
   projectId   String
+  zoneId      String?
   assigneeId  String
   date        DateTime                    @db.Date
   plannedZone String?
@@ -515,11 +538,13 @@ model NegotiationAssignment {
   updatedAt   DateTime                    @updatedAt
   deletedAt   DateTime?
   project     Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  zone        NegotiationZone?            @relation(fields: [zoneId], references: [id], onDelete: SetNull)
   assignee    User                        @relation("NegotiationAssignmentAssignee", fields: [assigneeId], references: [id])
   createdBy   User                        @relation("NegotiationAssignmentCreator", fields: [createdById], references: [id])
   sessions    NegotiationSession[]
 
   @@index([projectId])
+  @@index([zoneId])
   @@index([assigneeId])
   @@index([date])
   @@index([createdById])

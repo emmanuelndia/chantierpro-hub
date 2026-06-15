@@ -11,17 +11,22 @@ type MobileNegotiationDay = {
   assignments: {
     id: string;
     project: { id: string; name: string; city: string };
+    zoneId: string | null;
+    zone: { id: string; name: string; city: string | null; region: string | null } | null;
     plannedZone: string | null;
     instruction: string | null;
     status: string;
   }[];
   openSession: NegotiationSession | null;
   sessions: NegotiationSession[];
+  assignedScopes: NegotiationScope[];
   visitStatuses: string[];
 };
 
 type NegotiationScope = {
   id: string;
+  zoneId?: string | null;
+  zone?: { id: string; name: string; city: string | null; region: string | null } | null;
   name: string;
   city: string;
   commune: string | null;
@@ -52,6 +57,7 @@ export function MobileNegotiationPage() {
   const [comment, setComment] = useState('');
   const [visitForm, setVisitForm] = useState({
     actualZone: '',
+    zoneId: '',
     scopeSearch: '',
     buildingId: '',
     buildingName: '',
@@ -73,9 +79,10 @@ export function MobileNegotiationPage() {
     [day?.assignments, selectedAssignmentId],
   );
   const openSession = day?.openSession ?? null;
+  const activeZoneId = visitForm.zoneId ? visitForm.zoneId : selectedAssignment?.zoneId ?? '';
   const scopeQuery = useQuery({
-    queryKey: ['mobile-negotiation-scopes', openSession?.projectId, visitForm.scopeSearch],
-    queryFn: () => fetchNegotiationScopes(openSession?.projectId ?? '', visitForm.scopeSearch),
+    queryKey: ['mobile-negotiation-scopes', openSession?.projectId, visitForm.scopeSearch, activeZoneId],
+    queryFn: () => fetchNegotiationScopes(openSession?.projectId ?? '', visitForm.scopeSearch, activeZoneId),
     enabled: Boolean(openSession?.projectId),
   });
 
@@ -130,6 +137,10 @@ export function MobileNegotiationPage() {
       await createVisit({
         sessionId: openSession.id,
         ...visitForm,
+        zoneId: visitForm.zoneId ? visitForm.zoneId : selectedAssignment?.zoneId ?? '',
+        actualZone: visitForm.actualZone
+          ? visitForm.actualZone
+          : selectedAssignment?.zone?.name ?? selectedAssignment?.plannedZone ?? '',
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy,
@@ -139,6 +150,7 @@ export function MobileNegotiationPage() {
       pushToast({ type: 'success', title: 'Scope enregistre' });
       setVisitForm((current) => ({
         actualZone: current.actualZone,
+        zoneId: current.zoneId,
         scopeSearch: '',
         buildingId: '',
         buildingName: '',
@@ -157,6 +169,7 @@ export function MobileNegotiationPage() {
     setVisitForm((current) => ({
       ...current,
       buildingId: scope.id,
+      zoneId: scope.zoneId ?? scope.zone?.id ?? current.zoneId,
       scopeSearch: scope.name,
       buildingName: scope.name,
       city: scope.city,
@@ -190,7 +203,7 @@ export function MobileNegotiationPage() {
                   {selectedAssignment?.project.name ?? 'Aucune affectation'}
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
-                  {selectedAssignment?.plannedZone ?? 'Zone non precisee'}
+                  {selectedAssignment?.zone?.name ?? selectedAssignment?.plannedZone ?? 'Zone non precisee'}
                 </p>
               </div>
               <Badge tone={openSession ? 'success' : 'neutral'}>{openSession ? 'Ouverte' : 'Non demarree'}</Badge>
@@ -199,7 +212,7 @@ export function MobileNegotiationPage() {
             {day.assignments.length > 1 ? (
               <select className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold" onChange={(event) => setSelectedAssignmentId(event.target.value)} value={selectedAssignment?.id ?? ''}>
                 {day.assignments.map((assignment) => (
-                  <option key={assignment.id} value={assignment.id}>{assignment.project.name} - {assignment.plannedZone ?? 'zone libre'}</option>
+                  <option key={assignment.id} value={assignment.id}>{assignment.project.name} - {assignment.zone?.name ?? assignment.plannedZone ?? 'zone libre'}</option>
                 ))}
               </select>
             ) : null}
@@ -226,13 +239,13 @@ export function MobileNegotiationPage() {
               <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Scope visite</p>
               <div className="mt-4 space-y-3">
                 <Input label="Zone reellement visitee" value={visitForm.actualZone} onChange={(value) => setVisitForm((current) => ({ ...current, actualZone: value }))} />
-                {!visitForm.actualZone && selectedAssignment?.plannedZone ? (
+                {!visitForm.actualZone && (selectedAssignment?.zone?.name ?? selectedAssignment?.plannedZone) ? (
                   <button
                     className="rounded-2xl bg-orange-50 px-4 py-3 text-left text-sm font-black text-orange-800"
-                    onClick={() => setVisitForm((current) => ({ ...current, actualZone: selectedAssignment.plannedZone ?? '' }))}
+                    onClick={() => setVisitForm((current) => ({ ...current, actualZone: selectedAssignment?.zone?.name ?? selectedAssignment?.plannedZone ?? '', zoneId: selectedAssignment?.zoneId ?? current.zoneId }))}
                     type="button"
                   >
-                    Utiliser la zone prevue : {selectedAssignment.plannedZone}
+                    Utiliser la zone prevue : {selectedAssignment?.zone?.name ?? selectedAssignment?.plannedZone}
                   </button>
                 ) : null}
                 <label className="block text-sm font-black text-slate-700">
@@ -280,7 +293,44 @@ export function MobileNegotiationPage() {
           ) : null}
 
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Scopes du jour</p>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Scopes assignés</p>
+            <div className="mt-4 space-y-3">
+              {day.assignedScopes.length === 0 ? (
+                <MobileEmpty label="Aucun scope dans la zone assignée." />
+              ) : (
+                day.assignedScopes.map((scope) => (
+                  <button
+                    className="w-full rounded-2xl bg-slate-50 p-4 text-left"
+                    key={scope.id}
+                    onClick={() => {
+                      selectScope(scope);
+                      setVisitForm((current) => ({
+                        ...current,
+                        actualZone: scope.zone?.name ?? scope.commune ?? current.actualZone,
+                        zoneId: scope.zoneId ?? scope.zone?.id ?? current.zoneId,
+                      }));
+                    }}
+                    type="button"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-black text-slate-950">{scope.name}</p>
+                      <Badge tone={scope.negotiationStatus === 'OK' ? 'success' : scope.negotiationStatus === 'REFUS' ? 'error' : 'neutral'}>
+                        {scope.negotiationStatus?.replaceAll('_', ' ') ?? 'Non traité'}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-orange-600">
+                      {scope.zone?.name ?? scope.commune ?? 'Zone non renseignée'}
+                    </p>
+                    {scope.contactInfo ? <p className="mt-2 text-sm font-semibold text-slate-600">{scope.contactInfo}</p> : null}
+                    {scope.remark ? <p className="mt-2 text-xs font-semibold text-slate-500">{scope.remark}</p> : null}
+                  </button>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Visites enregistrées</p>
             <div className="mt-4 space-y-3">
               {(openSession?.visits ?? day.sessions.flatMap((session) => session.visits)).length === 0 ? (
                 <MobileEmpty label="Aucun scope enregistre." />
@@ -325,8 +375,9 @@ async function fetchMobileNegotiationDay(date: string): Promise<MobileNegotiatio
   return response.json() as Promise<MobileNegotiationDay>;
 }
 
-async function fetchNegotiationScopes(projectId: string, q: string): Promise<{ buildings: NegotiationScope[] }> {
+async function fetchNegotiationScopes(projectId: string, q: string, zoneId: string): Promise<{ buildings: NegotiationScope[] }> {
   const params = new URLSearchParams({ projectId, q });
+  if (zoneId) params.set('zoneId', zoneId);
   const response = await authFetch(`/api/negotiation/buildings?${params.toString()}`);
   if (!response.ok) {
     throw new Error('Impossible de charger les scopes.');

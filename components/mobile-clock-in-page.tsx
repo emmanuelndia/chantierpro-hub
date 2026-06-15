@@ -89,13 +89,15 @@ type NearbySitesResponse = {
 };
 
 type MobileNegotiationDay = {
-  assignments: {
-    id: string;
-    project: { id: string; name: string; city: string };
-    plannedZone: string | null;
-    instruction: string | null;
-    status: string;
-  }[];
+    assignments: {
+      id: string;
+      project: { id: string; name: string; city: string };
+      zoneId: string | null;
+      zone: { id: string; name: string; city: string | null; region: string | null } | null;
+      plannedZone: string | null;
+      instruction: string | null;
+      status: string;
+    }[];
   openSession: {
     id: string;
     projectId: string;
@@ -103,7 +105,7 @@ type MobileNegotiationDay = {
     startTime: string;
     endTime: string | null;
     status: string;
-    assignment: { id: string; plannedZone: string | null; instruction: string | null } | null;
+    assignment: { id: string; plannedZone: string | null; instruction: string | null; zone?: { id: string; name: string } | null } | null;
     visitCount: number;
   } | null;
 };
@@ -778,7 +780,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           throw new Error(await readApiMessage(response, 'Sortie zone negociation refusee.'));
         }
 
-        const data = (await response.json()) as { session: { endTime: string | null; startTime: string; assignment: { plannedZone: string | null } | null; project: { name: string } | null } };
+        const data = (await response.json()) as { session: { endTime: string | null; startTime: string; assignment: { plannedZone: string | null; zone?: { name: string } | null } | null; project: { name: string } | null } };
 
         return {
           clientId,
@@ -787,7 +789,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           type: actionType,
           siteId: null,
           freeMissionId: null,
-          siteName: data.session.assignment?.plannedZone ?? data.session.project?.name ?? 'Zone negociation',
+          siteName: data.session.assignment?.zone?.name ?? data.session.assignment?.plannedZone ?? data.session.project?.name ?? 'Zone negociation',
           timestampLocal: data.session.endTime ?? timestampLocal,
           durationSeconds: elapsedSeconds(data.session.startTime, Date.parse(data.session.endTime ?? timestampLocal), 0),
         };
@@ -815,7 +817,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         throw new Error(await readApiMessage(response, 'Entree zone negociation refusee.'));
       }
 
-      const data = (await response.json()) as { session: { startTime: string; assignment: { plannedZone: string | null } | null; project: { name: string } | null } };
+      const data = (await response.json()) as { session: { startTime: string; assignment: { plannedZone: string | null; zone?: { name: string } | null } | null; project: { name: string } | null } };
 
       return {
         clientId,
@@ -824,7 +826,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         type: actionType,
         siteId: null,
         freeMissionId: null,
-        siteName: data.session.assignment?.plannedZone ?? data.session.project?.name ?? 'Zone negociation',
+        siteName: data.session.assignment?.zone?.name ?? data.session.assignment?.plannedZone ?? data.session.project?.name ?? 'Zone negociation',
         timestampLocal: data.session.startTime,
         durationSeconds: null,
       };
@@ -1092,7 +1094,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               </p>
               <h3 className="mt-2 text-lg font-black text-slate-950">
                 {isNegotiationClockInUser
-                  ? openNegotiationSession?.assignment?.plannedZone ?? selectedNegotiationAssignment?.plannedZone ?? 'Choisir une zone nego'
+                  ? openNegotiationSession?.assignment?.zone?.name ?? openNegotiationSession?.assignment?.plannedZone ?? selectedNegotiationAssignment?.zone?.name ?? selectedNegotiationAssignment?.plannedZone ?? 'Choisir une zone nego'
                   : selectedFreeMission ? selectedFreeMission.action : 'Choisir une zone'}
               </h3>
               <p className="mt-1 text-sm font-semibold text-slate-600">
@@ -1120,7 +1122,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
                     <option value="">Selectionner une zone nego</option>
                     {negotiationAssignments.map((assignment) => (
                       <option key={assignment.id} value={assignment.id}>
-                        {assignment.plannedZone ?? 'Zone libre'} - {assignment.project.name}
+                        {assignment.zone?.name ?? assignment.plannedZone ?? 'Zone libre'} - {assignment.project.name}
                       </option>
                     ))}
                   </select>

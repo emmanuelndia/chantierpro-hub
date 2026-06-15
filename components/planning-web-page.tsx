@@ -24,7 +24,7 @@ import type {
   PlanningWebMutationResponse,
   PlanningWebUpdateRequest,
 } from '@/types/planning-web';
-import type { AvailableSite, UnassignedSupervisor } from '@/types/mobile-planning';
+import type { AvailableNegotiationZone, AvailableSite, UnassignedSupervisor } from '@/types/mobile-planning';
 import type { PlanningTaskTemplateItem, PlanningTaskTemplatesResponse } from '@/types/planning-templates';
 
 type PlanningWebPageProps = Readonly<{
@@ -47,6 +47,7 @@ type AssignmentFormState = {
   supervisorId: string;
   supervisorIds: string[];
   projectId: string;
+  zoneId: string;
   siteId: string;
   date: string;
   action: string;
@@ -81,6 +82,7 @@ type NegotiationZonePlanningRequest = {
   date: string;
   projectId: string;
   assigneeIds: string[];
+  zoneId: string | null;
   plannedZone: string | null;
   instruction: string | null;
 };
@@ -298,6 +300,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     [data],
   );
   const sites = useMemo(() => data?.availableSites ?? [], [data?.availableSites]);
+  const negotiationZones = useMemo(() => data?.availableNegotiationZones ?? [], [data?.availableNegotiationZones]);
   const resources = useMemo(() => data?.unassignedSupervisors ?? [], [data?.unassignedSupervisors]);
   const centralizedItems = useMemo(() => centralizedQuery.data?.items ?? [], [centralizedQuery.data?.items]);
   const centralizedOptions = useMemo(() => getCentralizedOptions(centralizedItems), [centralizedItems]);
@@ -373,6 +376,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       supervisorId: assignment.supervisorId,
       supervisorIds: [assignment.supervisorId],
       projectId: assignment.projectId ?? sites.find((site) => site.id === assignment.siteId)?.project.id ?? '',
+      zoneId: '',
       siteId: assignment.siteId ?? '',
       date: selectedDate,
       action: assignment.action,
@@ -405,7 +409,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           date: form.date,
           projectId: form.projectId,
           assigneeIds: form.supervisorIds,
-          plannedZone: form.action.trim() || null,
+          zoneId: form.zoneId || null,
+          plannedZone: (negotiationZones.find((zone) => zone.id === form.zoneId)?.name ?? form.action.trim()) || null,
           instruction: form.objectiveText.trim() || null,
         });
         return;
@@ -799,8 +804,10 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         <AssignmentDrawer
           canEditIdentity={drawerMode === 'create'}
           form={form}
+          isNegotiationManager={viewer.role === 'NEGOTIATION_MANAGER'}
           isSubmitting={createMutation.isPending || updateMutation.isPending}
           mode={drawerMode}
+          negotiationZones={negotiationZones}
           projects={projects}
           resources={resources}
           sites={sites}
@@ -1168,6 +1175,8 @@ function AssignmentDrawer({
   form,
   projects,
   sites,
+  negotiationZones,
+  isNegotiationManager,
   resources,
   conflicts,
   templates,
@@ -1182,6 +1191,8 @@ function AssignmentDrawer({
   form: AssignmentFormState;
   projects: { id: string; name: string }[];
   sites: AvailableSite[];
+  negotiationZones: AvailableNegotiationZone[];
+  isNegotiationManager: boolean;
   resources: UnassignedSupervisor[];
   conflicts: CentralizedPlanningAssignment[];
   templates: PlanningTaskTemplateItem[];
@@ -1195,6 +1206,7 @@ function AssignmentDrawer({
   const [templateName, setTemplateName] = useState('');
   const projectOptions = toProjectSelectOptions(projects);
   const siteOptions = toSiteSelectOptions(sites.filter((site) => !form.projectId || site.project.id === form.projectId));
+  const negotiationZoneOptions = toNegotiationZoneSelectOptions(negotiationZones.filter((zone) => !form.projectId || zone.projectId === form.projectId));
   const resourceOptions = toResourceSelectOptions(resources);
   const templateOptions = templates.map((template) => ({
     value: template.id,
@@ -1205,11 +1217,14 @@ function AssignmentDrawer({
   const quantityNumber = form.targetQuantity === '' ? null : Number(form.targetQuantity);
   const hasQuantityObjective = quantityNumber !== null && quantityNumber > 0;
   const isFreeMission = form.workLocationType === PlanningWorkLocationType.FREE_MISSION;
+  const isNegotiationZone = isFreeMission && isNegotiationManager;
   const progressValid = progressNumber === null || (Number.isInteger(progressNumber) && progressNumber >= 0 && progressNumber <= 100);
   const quantityValid = quantityNumber === null || (Number.isFinite(quantityNumber) && quantityNumber >= 0);
   const canSubmit = Boolean(form.action.trim() && form.date) && progressValid && quantityValid;
   const selectedResourceCount = mode === 'create' ? form.supervisorIds.length : form.supervisorId ? 1 : 0;
-  const createIdentityValid = mode === 'edit' || Boolean(selectedResourceCount > 0 && (isFreeMission ? form.projectId : form.siteId));
+  const createIdentityValid =
+    mode === 'edit' ||
+    Boolean(selectedResourceCount > 0 && (isNegotiationZone ? form.zoneId : isFreeMission ? form.projectId : form.siteId));
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/50">
@@ -1254,6 +1269,7 @@ function AssignmentDrawer({
                 onChange({
                   ...form,
                   workLocationType,
+                  zoneId: workLocationType === PlanningWorkLocationType.FREE_MISSION ? form.zoneId : '',
                   siteId: workLocationType === PlanningWorkLocationType.FREE_MISSION ? '' : form.siteId,
                 });
               }}
@@ -1311,7 +1327,7 @@ function AssignmentDrawer({
             <SearchableSelect
               disabled={!canEditIdentity}
               emptyLabel="Aucun projet trouvé."
-              onChange={(value) => onChange({ ...form, projectId: value, siteId: '' })}
+              onChange={(value) => onChange({ ...form, projectId: value, zoneId: '', siteId: '' })}
               options={projectOptions}
               placeholder="Tous les projets"
               value={form.projectId}
@@ -1330,6 +1346,28 @@ function AssignmentDrawer({
                 placeholder="Rechercher un chantier"
                 value={form.siteId}
               />
+            </Field>
+          ) : isNegotiationZone ? (
+            <Field label="Zone">
+              <SearchableSelect
+                disabled={!canEditIdentity || !form.projectId}
+                emptyLabel={form.projectId ? 'Aucune zone trouvée. Importe les scopes du projet pour créer les zones.' : 'Choisis un projet.'}
+                onChange={(value) => {
+                  const zone = negotiationZones.find((item) => item.id === value);
+                  onChange({
+                    ...form,
+                    zoneId: value,
+                    projectId: zone?.projectId ?? form.projectId,
+                    action: form.action ? form.action : zone?.name ?? '',
+                  });
+                }}
+                options={negotiationZoneOptions}
+                placeholder="Rechercher une zone"
+                value={form.zoneId}
+              />
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                La ressource pointera cette zone puis verra les scopes de la zone dans Négociation.
+              </p>
             </Field>
           ) : (
             <div className="rounded-2xl border border-orange-100 bg-orange-50 p-3 text-xs font-semibold text-orange-800">
@@ -2036,6 +2074,15 @@ function toSiteSelectOptions(sites: AvailableSite[]): SearchableSelectOption[] {
   }));
 }
 
+function toNegotiationZoneSelectOptions(zones: AvailableNegotiationZone[]): SearchableSelectOption[] {
+  return zones.map((zone) => ({
+    value: zone.id,
+    label: zone.name,
+    description: `${zone.scopeCount} scope(s) - ${zone.project.name}`,
+    keywords: `${zone.city ?? ''} ${zone.region ?? ''} ${zone.project.name}`,
+  }));
+}
+
 function toResourceSelectOptions(resources: UnassignedSupervisor[]): SearchableSelectOption[] {
   return resources.map((resource) => ({
     value: resource.id,
@@ -2050,6 +2097,7 @@ function createEmptyForm(date: string): AssignmentFormState {
     supervisorId: '',
     supervisorIds: [],
     projectId: '',
+    zoneId: '',
     siteId: '',
     date,
     action: '',
@@ -2073,6 +2121,7 @@ function applyTemplateToForm(form: AssignmentFormState, template: PlanningTaskTe
     objectiveText: template.objectiveText ?? '',
     plannedDurationMinutes: template.plannedDurationMinutes === null ? '' : String(template.plannedDurationMinutes),
     workLocationType: template.workLocationType,
+    zoneId: template.workLocationType === PlanningWorkLocationType.FREE_MISSION ? form.zoneId : '',
     siteId: template.workLocationType === PlanningWorkLocationType.FREE_MISSION ? '' : form.siteId,
   };
 }

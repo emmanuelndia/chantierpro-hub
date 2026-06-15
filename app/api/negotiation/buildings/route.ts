@@ -6,12 +6,13 @@ export const GET = withAuth(async ({ req, user }) => {
   const searchParams = new URL(req.url).searchParams;
   const projectId = searchParams.get('projectId') ?? '';
   const q = searchParams.get('q') ?? '';
+  const zoneId = searchParams.get('zoneId') ?? '';
 
   if (!projectId) {
     return Response.json({ code: 'BAD_REQUEST', message: 'Projet obligatoire.' }, { status: 400 });
   }
 
-  return searchNegotiationBuildings(prisma, user, projectId, q);
+  return searchNegotiationBuildings(prisma, user, projectId, q, zoneId || undefined);
 });
 
 export const POST = withAuth(async ({ req, user }) => {
@@ -22,6 +23,7 @@ export const POST = withAuth(async ({ req, user }) => {
   const body = (await req.json().catch((): unknown => null)) as unknown;
   const data = body && typeof body === 'object' ? body as Record<string, unknown> : {};
   const projectId = text(data.projectId);
+  const zoneId = nullableText(data.zoneId);
   const name = text(data.name);
   const city = text(data.city) || 'Non renseigne';
 
@@ -36,13 +38,20 @@ export const POST = withAuth(async ({ req, user }) => {
   if (!project) {
     return Response.json({ code: 'PROJECT_NOT_FOUND', message: 'Projet introuvable ou inactif.' }, { status: 404 });
   }
+  const zone = zoneId
+    ? await prisma.negotiationZone.findFirst({ where: { id: zoneId, projectId }, select: { id: true, name: true } })
+    : null;
+  if (zoneId && !zone) {
+    return Response.json({ code: 'ZONE_NOT_FOUND', message: 'Zone introuvable pour ce projet.' }, { status: 404 });
+  }
 
   const scope = await prisma.negotiationBuilding.create({
     data: {
       projectId,
+      zoneId: zone?.id ?? null,
       name,
       city,
-      commune: nullableText(data.commune),
+      commune: nullableText(data.commune) ?? zone?.name ?? null,
       plaque: nullableText(data.plaque),
       cluster: nullableText(data.cluster),
       habitation: nullableText(data.habitation),

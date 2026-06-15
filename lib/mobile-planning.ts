@@ -140,7 +140,7 @@ export async function getPlanningDay(
 
   const siteWhere = operationalPlanningSiteWhere(user, parsedDate);
   const assignmentScopeWhere = planningAssignmentScopeWhere(user);
-  const [assignments, freeMissionResponse, sites, projects, scopedSupervisorIds] = await Promise.all([
+  const [assignments, freeMissionResponse, sites, projects, negotiationZones, scopedSupervisorIds] = await Promise.all([
     prisma.planningAssignment.findMany({
       where: {
         date: parsedDate,
@@ -170,6 +170,18 @@ export async function getPlanningDay(
         name: true,
       },
     }),
+    user.role === Role.NEGOTIATION_MANAGER
+      ? prisma.negotiationZone.findMany({
+          where: {
+            project: operationalPlanningProjectWhere(user, parsedDate),
+          },
+          orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }],
+          include: {
+            project: { select: { id: true, name: true } },
+            _count: { select: { scopes: true } },
+          },
+        })
+      : Promise.resolve([]),
     getScopedSupervisorIds(prisma, user, parsedDate),
   ]);
 
@@ -263,6 +275,15 @@ export async function getPlanningDay(
         id: site.project.id,
         name: site.project.name,
       },
+    })),
+    availableNegotiationZones: negotiationZones.map((zone) => ({
+      id: zone.id,
+      projectId: zone.projectId,
+      name: zone.name,
+      city: zone.city,
+      region: zone.region,
+      scopeCount: zone._count.scopes,
+      project: zone.project,
     })),
     hasAssignments: assignments.length + freeMissionResponse.missions.length > 0,
     canDuplicateFromYesterday: assignments.length + freeMissionResponse.missions.length === 0 && yesterdayTaskCount > 0,

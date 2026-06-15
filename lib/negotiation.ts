@@ -3,6 +3,7 @@ import type { RequestAuthUser } from '@/lib/auth/request-user';
 
 type UserOptionRow = { id: string; firstName: string; lastName: string; role: Role; username: string };
 type ProjectOptionRow = { id: string; name: string; city?: string | null };
+type NegotiationZoneRow = { id: string; projectId: string; name: string; normalizedName: string; city: string | null; region: string | null };
 type SessionVisitRow = {
   id: string;
   buildingName: string;
@@ -30,7 +31,7 @@ type NegotiationSessionRow = {
   endAccuracy: unknown;
   comment: string | null;
   status: NegotiationSessionStatus;
-  assignment?: { id: string; plannedZone: string | null; instruction: string | null } | null;
+  assignment?: { id: string; plannedZone: string | null; instruction: string | null; zone?: NegotiationZoneRow | null } | null;
   visits?: SessionVisitRow[];
 };
 type NegotiationVisitRow = {
@@ -111,6 +112,10 @@ export async function listNegotiationOverview(
     orderBy: { name: 'asc' },
     select: { id: true, name: true, city: true, status: true },
   });
+  const zones = await prisma.negotiationZone.findMany({
+    where: { project: projectWhere },
+    orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }],
+  });
 
   const assignments = await prisma.negotiationAssignment.findMany({
     where: {
@@ -141,7 +146,7 @@ export async function listNegotiationOverview(
     include: {
       project: { select: { id: true, name: true, city: true } },
       user: { select: { id: true, firstName: true, lastName: true, role: true, username: true } },
-      assignment: { select: { id: true, plannedZone: true, instruction: true } },
+      assignment: { select: { id: true, plannedZone: true, instruction: true, zone: true } },
       visits: true,
     },
     orderBy: [{ startTime: 'desc' }],
@@ -179,6 +184,7 @@ export async function listNegotiationOverview(
   return {
     date,
     projects,
+    zones: zones.map(serializeNegotiationZone),
     resources: resources.map(serializeUserOption),
     assignments: assignments.map((assignment) => ({
       id: assignment.id,
@@ -213,6 +219,16 @@ export async function createNegotiationAssignment(prisma: PrismaClient, user: Re
   if (!project) {
     return Response.json({ code: 'PROJECT_NOT_FOUND', message: 'Projet negociation introuvable ou inactif.' }, { status: 404 });
   }
+  const zone = input.data.zoneId
+    ? await prisma.negotiationZone.findFirst({
+        where: { id: input.data.zoneId, projectId: input.data.projectId },
+        select: { id: true, name: true },
+      })
+    : null;
+
+  if (input.data.zoneId && !zone) {
+    return Response.json({ code: 'ZONE_NOT_FOUND', message: 'Zone negociation introuvable pour ce projet.' }, { status: 404 });
+  }
 
   const assignees = await prisma.user.findMany({
     where: { id: { in: input.data.assigneeIds }, role: { in: [...NEGOTIATION_FIELD_ROLES] }, isActive: true },
@@ -240,9 +256,10 @@ export async function createNegotiationAssignment(prisma: PrismaClient, user: Re
     await prisma.negotiationAssignment.createMany({
       data: creatableIds.map((assigneeId) => ({
         projectId: input.data.projectId,
+        zoneId: zone?.id ?? null,
         assigneeId,
         date,
-        plannedZone: input.data.plannedZone,
+        plannedZone: zone?.name ?? input.data.plannedZone,
         instruction: input.data.instruction,
         createdById: user.id,
       })),
@@ -263,14 +280,14 @@ export async function getMobileNegotiationDay(prisma: PrismaClient, user: Reques
   const dateValue = parseDateOnly(date);
   const assignments = await prisma.negotiationAssignment.findMany({
     where: { date: dateValue, assigneeId: user.id, deletedAt: null },
-    include: { project: { select: { id: true, name: true, city: true } } },
+    include: { project: { select: { id: true, name: true, city: true } }, zone: true },
     orderBy: { createdAt: 'asc' },
   });
   const openSession = await prisma.negotiationSession.findFirst({
     where: { userId: user.id, date: dateValue, status: NegotiationSessionStatus.OPEN },
     include: {
       project: { select: { id: true, name: true } },
-      assignment: { select: { id: true, plannedZone: true, instruction: true } },
+      assignment: { select: { id: true, plannedZone: true, instruction: true, zone: true } },
       visits: { orderBy: { visitedAt: 'desc' } },
     },
     orderBy: { startTime: 'desc' },
@@ -280,18 +297,29 @@ export async function getMobileNegotiationDay(prisma: PrismaClient, user: Reques
     include: { visits: { orderBy: { visitedAt: 'desc' } }, project: { select: { id: true, name: true } } },
     orderBy: { startTime: 'desc' },
   });
+  const assignedZoneIds = assignments.map((assignment) => assignment.zoneId).filter((zoneId): zoneId is string => Boolean(zoneId));
+  const assignedScopes = assignedZoneIds.length > 0
+    ? await prisma.negotiationBuilding.findMany({
+        where: { projectId: { in: assignments.map((assignment) => assignment.projectId) }, zoneId: { in: assignedZoneIds } },
+        include: { zone: true },
+        orderBy: [{ zone: { name: 'asc' } }, { name: 'asc' }],
+      })
+    : [];
 
   return {
     date,
     assignments: assignments.map((assignment) => ({
       id: assignment.id,
       project: assignment.project,
+      zone: assignment.zone ? serializeNegotiationZone(assignment.zone) : null,
+      zoneId: assignment.zoneId,
       plannedZone: assignment.plannedZone,
       instruction: assignment.instruction,
       status: assignment.status,
     })),
     openSession: openSession ? serializeNegotiationSession(openSession) : null,
     sessions: todaySessions.map(serializeNegotiationSession),
+    assignedScopes: assignedScopes.map(serializeNegotiationBuilding),
     visitStatuses: Object.values(NegotiationVisitStatus),
   };
 }
@@ -344,7 +372,7 @@ export async function startNegotiationSession(prisma: PrismaClient, user: Reques
       comment: input.data.comment,
       status: NegotiationSessionStatus.OPEN,
     },
-    include: { project: { select: { id: true, name: true } }, assignment: { select: { id: true, plannedZone: true, instruction: true } }, visits: true },
+    include: { project: { select: { id: true, name: true } }, assignment: { select: { id: true, plannedZone: true, instruction: true, zone: true } }, visits: true },
   });
 
   if (assignment?.id) {
@@ -381,7 +409,7 @@ export async function closeNegotiationSession(prisma: PrismaClient, user: Reques
       comment: input.data.comment,
       status: NegotiationSessionStatus.CLOSED,
     },
-    include: { project: { select: { id: true, name: true } }, assignment: { select: { id: true, plannedZone: true, instruction: true } }, visits: true },
+    include: { project: { select: { id: true, name: true } }, assignment: { select: { id: true, plannedZone: true, instruction: true, zone: true } }, visits: true },
   });
 
   if (session.assignmentId) {
@@ -406,22 +434,27 @@ export async function createNegotiationVisit(prisma: PrismaClient, user: Request
 
   const session = await prisma.negotiationSession.findFirst({
     where: { id: input.data.sessionId, userId: user.id, status: NegotiationSessionStatus.OPEN },
-    select: { id: true, projectId: true, assignment: { select: { plannedZone: true } } },
+    select: { id: true, projectId: true, assignment: { select: { plannedZone: true, zone: true } } },
   });
   if (!session) {
     return Response.json({ code: 'SESSION_NOT_FOUND', message: 'Demarre une journee negociation avant de saisir une visite.' }, { status: 404 });
   }
 
   const visit = await prisma.$transaction(async (tx) => {
+    const selectedZone = input.data.zoneId
+      ? await tx.negotiationZone.findFirst({ where: { id: input.data.zoneId, projectId: session.projectId } })
+      : null;
+    const fallbackZoneName = selectedZone?.name ?? input.data.actualZone ?? session.assignment?.zone?.name ?? session.assignment?.plannedZone ?? null;
     const existingScope = input.data.buildingId
       ? await tx.negotiationBuilding.findFirst({ where: { id: input.data.buildingId, projectId: session.projectId } })
       : null;
     const scope = existingScope ?? await tx.negotiationBuilding.create({
       data: {
         projectId: session.projectId,
+        zoneId: selectedZone?.id ?? null,
         name: input.data.buildingName || 'Scope terrain',
-        city: input.data.city ?? input.data.actualZone ?? session.assignment?.plannedZone ?? 'Non renseigne',
-        commune: input.data.commune,
+        city: input.data.city ?? fallbackZoneName ?? 'Non renseigne',
+        commune: input.data.commune ?? fallbackZoneName,
         contactInfo: input.data.contactInfo,
         latitude: input.data.latitude,
         longitude: input.data.longitude,
@@ -436,6 +469,7 @@ export async function createNegotiationVisit(prisma: PrismaClient, user: Request
         data: {
           negotiationStatus: input.data.status,
           remark: input.data.remark,
+          ...(selectedZone && existingScope.zoneId === null ? { zoneId: selectedZone.id } : {}),
           ...(input.data.contactInfo ? { contactInfo: input.data.contactInfo } : {}),
           ...(input.data.latitude !== null && existingScope.latitude === null ? { latitude: input.data.latitude } : {}),
           ...(input.data.longitude !== null && existingScope.longitude === null ? { longitude: input.data.longitude } : {}),
@@ -448,7 +482,7 @@ export async function createNegotiationVisit(prisma: PrismaClient, user: Request
         sessionId: session.id,
         projectId: session.projectId,
         buildingId: scope.id,
-        actualZone: input.data.actualZone ?? session.assignment?.plannedZone ?? null,
+        actualZone: fallbackZoneName,
         buildingName: input.data.buildingName ? input.data.buildingName : scope.name,
         city: input.data.city ?? scope.city ?? null,
         commune: input.data.commune ?? scope.commune ?? null,
@@ -471,7 +505,7 @@ export async function createNegotiationVisit(prisma: PrismaClient, user: Request
   return Response.json({ visit: serializeNegotiationVisit(visit) });
 }
 
-export async function searchNegotiationBuildings(prisma: PrismaClient, user: RequestAuthUser, projectId: string, q: string) {
+export async function searchNegotiationBuildings(prisma: PrismaClient, user: RequestAuthUser, projectId: string, q: string, zoneId?: string) {
   const project = await prisma.project.findFirst({ where: { id: projectId, ...negotiationProjectWhere(user) }, select: { id: true } });
   if (!project) {
     return Response.json({ code: 'PROJECT_NOT_FOUND' }, { status: 404 });
@@ -480,6 +514,7 @@ export async function searchNegotiationBuildings(prisma: PrismaClient, user: Req
   const buildings = await prisma.negotiationBuilding.findMany({
     where: {
       projectId,
+      ...(zoneId ? { zoneId } : {}),
       ...(q
         ? {
             OR: [
@@ -497,6 +532,24 @@ export async function searchNegotiationBuildings(prisma: PrismaClient, user: Req
   });
 
   return Response.json({ buildings: buildings.map(serializeNegotiationBuilding) });
+}
+
+export async function listNegotiationZones(prisma: PrismaClient, user: RequestAuthUser, projectId?: string) {
+  const projectWhere = negotiationProjectWhere(user);
+  const zones = await prisma.negotiationZone.findMany({
+    where: {
+      ...(projectId ? { projectId } : {}),
+      project: projectWhere,
+    },
+    orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }],
+    include: { _count: { select: { scopes: true } }, project: { select: { id: true, name: true } } },
+  });
+
+  return zones.map((zone) => ({
+    ...serializeNegotiationZone(zone),
+    project: zone.project,
+    scopeCount: zone._count.scopes,
+  }));
 }
 
 function parseAssignmentInput(body: unknown) {
@@ -517,6 +570,7 @@ function parseAssignmentInput(body: unknown) {
       projectId,
       assigneeIds,
       date,
+      zoneId: nullableString(data.zoneId),
       plannedZone: nullableString(data.plannedZone),
       instruction: nullableString(data.instruction),
     },
@@ -582,6 +636,7 @@ function parseVisitInput(body: unknown) {
     data: {
       sessionId,
       buildingId: nullableString(data.buildingId),
+      zoneId: nullableString(data.zoneId),
       actualZone: nullableString(data.actualZone),
       buildingName: asString(data.buildingName),
       city: nullableString(data.city),
@@ -599,6 +654,7 @@ function parseVisitInput(body: unknown) {
 export function serializeNegotiationBuilding(building: {
   id: string;
   projectId: string;
+  zoneId?: string | null;
   cluster: string | null;
   city: string;
   commune: string | null;
@@ -613,11 +669,24 @@ export function serializeNegotiationBuilding(building: {
   operatorPresence: string | null;
   negotiationStatus: string | null;
   remark: string | null;
+  zone?: NegotiationZoneRow | null;
 }) {
   return {
     ...building,
+    zone: building.zone ? serializeNegotiationZone(building.zone) : undefined,
     longitude: decimalToNumber(building.longitude),
     latitude: decimalToNumber(building.latitude),
+  };
+}
+
+export function serializeNegotiationZone(zone: NegotiationZoneRow) {
+  return {
+    id: zone.id,
+    projectId: zone.projectId,
+    name: zone.name,
+    normalizedName: zone.normalizedName,
+    city: zone.city,
+    region: zone.region,
   };
 }
 
@@ -652,6 +721,15 @@ export function serializeNegotiationSession(session: NegotiationSessionRow) {
     })),
     visitCount: session.visits?.length ?? 0,
   };
+}
+
+export function normalizeNegotiationZoneName(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
 }
 
 export function serializeNegotiationVisit(visit: NegotiationVisitRow) {

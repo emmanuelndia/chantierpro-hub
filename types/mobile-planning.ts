@@ -91,6 +91,19 @@ export type AvailableProject = {
   name: string;
 };
 
+export type AvailableNegotiationZone = {
+  id: string;
+  projectId: string;
+  name: string;
+  city: string | null;
+  region: string | null;
+  scopeCount: number;
+  project: {
+    id: string;
+    name: string;
+  };
+};
+
 export type PlanningDayResponse = {
   date: string;
   assignments: PlanningAssignment[];
@@ -98,6 +111,7 @@ export type PlanningDayResponse = {
   unassignedSupervisors: UnassignedSupervisor[];
   availableProjects: AvailableProject[];
   availableSites: AvailableSite[];
+  availableNegotiationZones: AvailableNegotiationZone[];
   hasAssignments: boolean;
   canDuplicateFromYesterday: boolean;
 };

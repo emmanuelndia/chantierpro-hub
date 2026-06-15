@@ -1030,7 +1030,15 @@ function ScopeImportModal({
 }>) {
   const { pushToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<{ totalRows: number; validRows: number; invalidRows: number } | null>(null);
+  const [preview, setPreview] = useState<{
+    totalRows: number;
+    validRows: number;
+    invalidRows: number;
+    detectedZones: number;
+    createdZones: number;
+    createdScopes: number;
+    updatedScopes: number;
+  } | null>(null);
 
   const importMutation = useMutation({
     mutationFn: async (mode: 'preview' | 'commit') => {
@@ -1044,14 +1052,22 @@ function ScopeImportModal({
         const errorBody = (await safeJson(response)) as { message?: string } | null;
         throw new Error(errorBody?.message ?? 'Import scopes impossible.');
       }
-      return (await response.json()) as { totalRows: number; validRows: number; invalidRows: number };
+      return (await response.json()) as {
+        totalRows: number;
+        validRows: number;
+        invalidRows: number;
+        detectedZones: number;
+        createdZones: number;
+        createdScopes: number;
+        updatedScopes: number;
+      };
     },
     onSuccess: (data, mode) => {
       setPreview(data);
       pushToast({
         type: data.invalidRows > 0 ? 'warning' : 'success',
         title: mode === 'commit' ? 'Scopes importes' : 'Prévisualisation prête',
-        message: `${data.validRows} ligne(s) valide(s), ${data.invalidRows} ligne(s) ignoree(s).`,
+        message: `${data.validRows} scope(s) valide(s), ${data.detectedZones} zone(s), ${data.invalidRows} ligne(s) ignoree(s).`,
       });
       if (mode === 'commit') {
         onImported();
@@ -1127,10 +1143,18 @@ function ScopeImportModal({
         </div>
 
         {preview ? (
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <div className="mt-6 grid gap-3 md:grid-cols-4">
             <MetricCard label="Total lignes" value={preview.totalRows} />
             <MetricCard label="Valides" value={preview.validRows} />
+            <MetricCard label="Zones détectées" value={preview.detectedZones} />
             <MetricCard label="Ignorées" value={preview.invalidRows} />
+            {preview.createdZones || preview.createdScopes || preview.updatedScopes ? (
+              <>
+                <MetricCard label="Zones créées" value={preview.createdZones} />
+                <MetricCard label="Scopes créés" value={preview.createdScopes} />
+                <MetricCard label="Scopes mis à jour" value={preview.updatedScopes} />
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>
