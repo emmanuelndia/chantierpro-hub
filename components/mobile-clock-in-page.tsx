@@ -339,15 +339,12 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     [negotiationAssignments, selectedNegotiationAssignmentId],
   );
   const openNegotiationSession = negotiationDayQuery.data?.openSession ?? null;
-  const isNegotiationZoneSelected = selectedClockContext === 'ZONE' && isNegotiationClockInUser;
   const freeMissionAssignments = useMemo(
     () =>
-      isNegotiationClockInUser
-        ? []
-        : todayAssignments.filter(
-            (assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId),
-          ),
-    [isNegotiationClockInUser, todayAssignments],
+      todayAssignments.filter(
+        (assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId),
+      ),
+    [todayAssignments],
   );
   const hasFreeMissionToday = freeMissionAssignments.length > 0;
   const selectedFreeMissionFromAssignments = useMemo(
@@ -360,7 +357,15 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     [freeMissionAssignments, selectedFreeMissionId],
   );
   const shouldSelectFreeMissionFromTasks = false;
-  const selectedFreeMission = selectedClockContext === 'ZONE' && !isNegotiationClockInUser ? selectedFreeMissionFromAssignments : null;
+  const selectedFreeMission =
+    selectedClockContext === 'ZONE' && Boolean(selectedFreeMissionFromAssignments)
+      ? selectedFreeMissionFromAssignments
+      : null;
+  const isNegotiationZoneSelected =
+    selectedClockContext === 'ZONE' &&
+    isNegotiationClockInUser &&
+    !selectedFreeMission &&
+    (Boolean(selectedNegotiationAssignment) || Boolean(openNegotiationSession) || negotiationAssignments.length > 0);
   const hasUnselectedZone = selectedClockContext === 'ZONE' && freeMissionAssignments.length > 1 && !selectedFreeMission;
   const nearbyQuery = useQuery({
     queryKey: ['mobile-sites-nearby', geoState.status === 'ready' ? geoState.latitude : null, geoState.status === 'ready' ? geoState.longitude : null],
