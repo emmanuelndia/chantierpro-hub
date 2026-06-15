@@ -574,6 +574,7 @@ export async function getSitePresencesLive(
             isAutoClosed: true,
             isRegularized: true,
             isLate: true,
+            comment: true,
             user: {
               select: {
                 id: true,
