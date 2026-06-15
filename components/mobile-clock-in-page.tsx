@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlanningWorkLocationType, type ClockInType, type Role } from '@prisma/client';
 import { authFetch } from '@/lib/auth/client-session';
@@ -143,6 +143,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const requestedOfficeAssignmentId = searchParams.get('assignmentId');
   const requestedIntent = parseIntent(searchParams.get('intent'));
   const networkState = useMobileNetworkState();
+  const activeSessionContextInitializedRef = useRef(false);
   
   // Utiliser le nouveau hook de géolocalisation
   const geolocation = useGeolocation({
@@ -422,7 +423,18 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   }, [activeSession, requestedIntent]);
 
   useEffect(() => {
-    if (!selectedSiteId && activeSession?.siteId) {
+    if (!activeSession) {
+      activeSessionContextInitializedRef.current = false;
+      return;
+    }
+
+    if (activeSessionContextInitializedRef.current) {
+      return;
+    }
+
+    activeSessionContextInitializedRef.current = true;
+
+    if (!selectedSiteId && activeSession.siteId) {
       setSelectedSiteId(activeSession.siteId);
     }
     if (!selectedOffice && activeSession?.contextType === 'OFFICE') {
@@ -435,7 +447,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     } else if (activeSession?.contextType === 'SITE') {
       setSelectedClockContext('SITE');
     }
-  }, [activeSession?.contextType, activeSession?.siteId, selectedOffice, selectedSiteId]);
+  }, [activeSession, selectedOffice, selectedSiteId]);
 
   useEffect(() => {
     if (selectedClockContext === 'OFFICE') {
