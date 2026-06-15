@@ -8,6 +8,7 @@ import { authFetch } from '@/lib/auth/client-session';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type {
+  AvailableProject,
   AvailableSite,
   CreateAssignmentRequest,
   DuplicateAssignmentsRequest,
@@ -162,7 +163,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
   }
 
   function openCreateForm(supervisorId?: string) {
-    if (!hasAvailableSites || (!supervisorId && !hasAssignableResources)) {
+    if ((!hasAvailableSites && !(data?.availableProjects.length ?? 0)) || (!supervisorId && !hasAssignableResources)) {
       return;
     }
 
@@ -174,7 +175,8 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
   }
 
   function handleCreateAssignment() {
-    if (!formData.supervisorId || !formData.siteId || !formData.action.trim()) {
+    const isZoneTask = formData.workLocationType === PlanningWorkLocationType.FREE_MISSION;
+    if (!formData.supervisorId || !formData.action.trim() || (isZoneTask ? !formData.projectId : !formData.siteId)) {
       return;
     }
     createAssignmentMutation.mutate(formData);
@@ -306,7 +308,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
         </>
       ) : null}
 
-      {data?.availableSites.length === 0 && !planningQuery.isLoading ? (
+      {data?.availableSites.length === 0 && data?.availableProjects.length === 0 && !planningQuery.isLoading ? (
         <EmptyState
           title={user.role === 'GENERAL_SUPERVISOR' ? 'Aucun chantier confié' : 'Aucun chantier actif disponible'}
           description={
@@ -323,6 +325,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
           formData={formData}
           setFormData={setFormData}
           availableSupervisors={data.unassignedSupervisors}
+          availableProjects={data.availableProjects}
           availableSites={data.availableSites}
           onSubmit={handleCreateAssignment}
           onCancel={() => {
@@ -774,6 +777,7 @@ function AssignmentBottomSheet({
   formData,
   setFormData,
   availableSupervisors,
+  availableProjects,
   availableSites,
   onSubmit,
   onCancel,
@@ -783,6 +787,7 @@ function AssignmentBottomSheet({
   formData: CreateAssignmentRequest;
   setFormData: Dispatch<SetStateAction<CreateAssignmentRequest>>;
   availableSupervisors: UnassignedSupervisor[];
+  availableProjects: AvailableProject[];
   availableSites: AvailableSite[];
   onSubmit: () => void;
   onCancel: () => void;
@@ -790,14 +795,24 @@ function AssignmentBottomSheet({
 }>) {
   const [siteSearch, setSiteSearch] = useState('');
   const [resourceSearch, setResourceSearch] = useState('');
+  const isZoneTask = formData.workLocationType === PlanningWorkLocationType.FREE_MISSION;
+  const requiresSite = !isZoneTask;
   const hasAvailableSites = availableSites.length > 0;
+  const hasAvailableProjects = availableProjects.length > 0;
   const hasAvailableSupervisors = availableSupervisors.length > 0;
-  const canSubmit = Boolean(formData.supervisorId && formData.siteId && formData.action.trim() && hasAvailableSites && hasAvailableSupervisors);
+  const canSubmit = Boolean(
+    formData.supervisorId &&
+      formData.action.trim() &&
+      hasAvailableSupervisors &&
+      (isZoneTask ? formData.projectId && hasAvailableProjects : formData.siteId && hasAvailableSites),
+  );
   const hasQuantityObjective = formData.targetQuantity !== null && formData.targetQuantity !== undefined && formData.targetQuantity > 0;
   const supervisorOptions = toMobileSupervisorOptions(availableSupervisors);
-  const siteOptions = toMobileSiteOptions(availableSites);
+  const projectOptions = toMobileProjectOptions(availableProjects);
   const normalizedResourceSearch = resourceSearch.trim().toLowerCase();
   const normalizedSiteSearch = siteSearch.trim().toLowerCase();
+  const sitesForProject = formData.projectId ? availableSites.filter((site) => site.project.id === formData.projectId) : availableSites;
+  const siteOptions = toMobileSiteOptions(sitesForProject);
   const filteredSupervisors = normalizedResourceSearch
     ? availableSupervisors.filter((supervisor) =>
         `${supervisor.firstName} ${supervisor.name} ${supervisor.email} ${supervisor.availabilityLabel}`
@@ -811,10 +826,10 @@ function AssignmentBottomSheet({
       ? [selectedSupervisor, ...filteredSupervisors]
       : filteredSupervisors;
   const filteredSites = normalizedSiteSearch
-    ? availableSites.filter((site) =>
+    ? sitesForProject.filter((site) =>
         `${site.project.name} ${site.name} ${site.address}`.toLowerCase().includes(normalizedSiteSearch),
       )
-    : availableSites;
+    : sitesForProject;
   const selectedSite = availableSites.find((site) => site.id === formData.siteId);
   const displayedSites =
     selectedSite && !filteredSites.some((site) => site.id === selectedSite.id)
@@ -831,19 +846,50 @@ function AssignmentBottomSheet({
           </IconButton>
         </div>
 
-        {!hasAvailableSites ? (
+        {requiresSite && !hasAvailableSites ? (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
             Aucun chantier actif disponible.
           </div>
         ) : null}
 
-        {hasAvailableSites && !hasAvailableSupervisors ? (
+        {isZoneTask && !hasAvailableProjects ? (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+            Aucun projet actif disponible pour creer une zone.
+          </div>
+        ) : null}
+
+        {(hasAvailableSites || hasAvailableProjects) && !hasAvailableSupervisors ? (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
             Aucune ressource terrain active disponible.
           </div>
         ) : null}
 
         <div className="mt-4 space-y-4">
+          <label className="block text-sm font-semibold text-slate-700">
+            Type de tache
+            <select
+              value={formData.workLocationType ?? PlanningWorkLocationType.ON_SITE}
+              onChange={(event) => {
+                const workLocationType = event.currentTarget.value as PlanningWorkLocationType;
+                setFormData((prev) => ({
+                  ...prev,
+                  workLocationType,
+                  siteId: workLocationType === PlanningWorkLocationType.FREE_MISSION ? '' : (prev.siteId ?? ''),
+                }));
+              }}
+              className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+            >
+              {creatableWorkLocationTypes.map((type) => (
+                <option key={type} value={type}>
+                  {workLocationTypeLabel[type]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Chantier demande un chantier. Zone se rattache seulement a un projet.
+            </p>
+          </label>
+
           <label className="block text-sm font-semibold text-slate-700">
             Ressource terrain
             <SearchableSelect
@@ -857,14 +903,38 @@ function AssignmentBottomSheet({
           </label>
 
           <label className="block text-sm font-semibold text-slate-700">
+            Projet
+            <SearchableSelect
+              className="mt-2"
+              emptyLabel="Aucun projet ne correspond a la recherche."
+              onChange={(projectId) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  projectId,
+                  siteId:
+                    prev.siteId && availableSites.some((site) => site.id === prev.siteId && site.project.id === projectId)
+                      ? prev.siteId
+                      : '',
+                }))
+              }
+              options={projectOptions}
+              placeholder="Selectionner un projet"
+              value={formData.projectId ?? ''}
+            />
+          </label>
+
+          <label className={requiresSite ? 'block text-sm font-semibold text-slate-700' : 'hidden'}>
             Chantier
             <SearchableSelect
               className="mt-2"
               emptyLabel="Aucun chantier ne correspond à la recherche."
-              onChange={(siteId) => setFormData((prev) => ({ ...prev, siteId }))}
+              onChange={(siteId) => {
+                const site = availableSites.find((item) => item.id === siteId);
+                setFormData((prev) => ({ ...prev, siteId, projectId: site?.project.id ?? prev.projectId ?? '' }));
+              }}
               options={siteOptions}
               placeholder="Sélectionner un chantier"
-              value={formData.siteId}
+              value={formData.siteId ?? ''}
             />
           </label>
 
@@ -917,7 +987,7 @@ function AssignmentBottomSheet({
               />
             ) : null}
             <select
-              value={formData.siteId}
+              value={formData.siteId ?? ''}
               onChange={(event) => {
                 const siteId = event.currentTarget.value;
                 setFormData((prev) => ({ ...prev, siteId }));
@@ -1015,7 +1085,7 @@ function AssignmentBottomSheet({
             </label>
           )}
 
-          <label className="block text-sm font-semibold text-slate-700">
+          <label className="hidden">
             Type de tâche
             <select
               value={formData.workLocationType ?? PlanningWorkLocationType.ON_SITE}
@@ -1169,6 +1239,7 @@ function createEmptyForm(date: string): CreateAssignmentRequest {
   return {
     supervisorId: '',
     siteId: '',
+    projectId: '',
     action: '',
     targetProgress: null,
     targetQuantity: null,
@@ -1194,6 +1265,13 @@ function toMobileSiteOptions(sites: AvailableSite[]): SearchableSelectOption[] {
     label: site.name,
     description: site.project.name,
     keywords: `${site.address} ${site.project.name}`,
+  }));
+}
+
+function toMobileProjectOptions(projects: AvailableProject[]): SearchableSelectOption[] {
+  return projects.map((project) => ({
+    value: project.id,
+    label: project.name,
   }));
 }
 

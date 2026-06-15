@@ -32,7 +32,7 @@ import {
   isBusinessManagerRole,
 } from '@/lib/field-roles';
 import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
-import { listFreeMissions, listMyFreeMissions } from '@/lib/free-missions';
+import { freeMissionSelect, listFreeMissions, listMyFreeMissions, serializeFreeMission } from '@/lib/free-missions';
 
 type AuthLikeUser = {
   id: string;
@@ -340,6 +340,10 @@ async function createSinglePlanningAssignment(
   input: CreateAssignmentRequest,
   options: { skipDuplicates?: boolean } = {},
 ) {
+  if (input.workLocationType === PlanningWorkLocationType.FREE_MISSION) {
+    return createSingleFreeMissionPlanningAssignment(prisma, user, input, options);
+  }
+
   const normalized = await validateAssignmentInput(prisma, user, input);
   if (normalized instanceof Response) return normalized;
 
@@ -409,6 +413,53 @@ async function createSinglePlanningAssignment(
   }
 
   return { assignment: serializePlanningAssignment(assignment, []) };
+}
+
+async function createSingleFreeMissionPlanningAssignment(
+  prisma: PrismaClient,
+  user: AuthLikeUser,
+  input: CreateAssignmentRequest,
+  options: { skipDuplicates?: boolean } = {},
+) {
+  const normalized = await validateFreeMissionAssignmentInput(prisma, user, input);
+  if (normalized instanceof Response) return normalized;
+
+  const existing = await prisma.freeMission.findFirst({
+    where: {
+      projectId: normalized.projectId,
+      assigneeId: normalized.supervisorId,
+      date: normalized.date,
+      action: normalized.action,
+      deletedAt: null,
+      status: { not: FreeMissionStatus.CANCELLED },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    if (options.skipDuplicates) {
+      return { skipped: true as const };
+    }
+    return planningError('TASK_DUPLICATE', 'Cette zone existe deja pour cette ressource.', 409);
+  }
+
+  const mission = await prisma.freeMission.create({
+    data: {
+      projectId: normalized.projectId,
+      assigneeId: normalized.supervisorId,
+      date: normalized.date,
+      action: normalized.action,
+      targetProgress: normalized.targetProgress,
+      targetQuantity: normalized.targetQuantity,
+      targetUnit: normalized.targetUnit,
+      objectiveText: normalized.objectiveText,
+      plannedDurationMinutes: normalized.plannedDurationMinutes,
+      createdById: user.id,
+    },
+    select: freeMissionSelect,
+  });
+
+  return { assignment: serializeFreeMissionAsPlanningAssignment(serializeFreeMission(mission)) };
 }
 
 export async function updatePlanningAssignment(
@@ -932,6 +983,66 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
     objectiveText,
     plannedDurationMinutes,
     workLocationType,
+  };
+}
+
+async function validateFreeMissionAssignmentInput(prisma: PrismaClient, user: AuthLikeUser, input: CreateAssignmentRequest) {
+  const date = parsePlanningDate(input.date);
+  if (!date) {
+    return planningError('INVALID_DATE', 'Date invalide.', 400);
+  }
+
+  const rangeError = validateDateWindow(date);
+  if (rangeError) return rangeError;
+
+  const supervisorId = normalizeId(input.supervisorId);
+  const projectId = normalizeId(input.projectId);
+  const action = normalizeOptionalAction(input.action);
+  const targetProgress = normalizeTargetProgress(input.targetProgress);
+  const targetQuantity = normalizeQuantity(input.targetQuantity);
+  const targetUnit = normalizeUnit(input.targetUnit);
+  const objectiveText = normalizeOptionalText(input.objectiveText);
+  const plannedDurationMinutes = normalizePlannedDurationMinutes(input.plannedDurationMinutes);
+
+  if (!supervisorId || !projectId || !action) {
+    return planningError('INVALID_REQUEST', 'Ressource terrain, projet et action sont requis pour une zone.', 400);
+  }
+
+  if (targetProgress instanceof Response) return targetProgress;
+  if (targetQuantity instanceof Response) return targetQuantity;
+  if (plannedDurationMinutes instanceof Response) return plannedDurationMinutes;
+
+  const [project, supervisorIds] = await Promise.all([
+    prisma.project.findFirst({
+      where: {
+        id: projectId,
+        ...operationalPlanningProjectWhere(user, date),
+      },
+      select: { id: true },
+    }),
+    getScopedSupervisorIds(prisma, user, date),
+  ]);
+
+  if (!project) {
+    return planningError('PROJECT_NOT_FOUND', 'Projet actif introuvable ou non accessible.', 404);
+  }
+
+  if (!supervisorIds.includes(supervisorId)) {
+    return planningError('SUPERVISOR_NOT_FOUND', 'Ressource terrain introuvable.', 404);
+  }
+
+  const normalizedTargetProgress = targetQuantity !== null && targetQuantity > 0 ? null : targetProgress;
+
+  return {
+    date,
+    supervisorId,
+    projectId,
+    action,
+    targetProgress: normalizedTargetProgress,
+    targetQuantity,
+    targetUnit,
+    objectiveText,
+    plannedDurationMinutes,
   };
 }
 

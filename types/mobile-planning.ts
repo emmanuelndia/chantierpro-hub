@@ -119,7 +119,8 @@ export type PlanningDayResponse = {
 export type CreateAssignmentRequest = {
   supervisorId?: string;
   supervisorIds?: string[];
-  siteId: string;
+  siteId?: string | null;
+  projectId?: string | null;
   action: string;
   targetProgress?: number | null;
   targetQuantity?: number | null;
