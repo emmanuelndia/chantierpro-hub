@@ -230,7 +230,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <LiveKpi label="Presentes" tone="success" value={displaySummary.present} />
-        <LiveKpi label="Attendues" value={displaySummary.expected} />
+        <LiveKpi label="Assignes" value={displaySummary.expected} />
         <LiveKpi label="Absentes" tone="warning" value={displaySummary.absent} />
         <LiveKpi label="Retards" tone={displaySummary.late > 0 ? 'warning' : 'neutral'} value={displaySummary.late} />
       </section>
@@ -388,7 +388,6 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
           <div className="divide-y divide-slate-100">
             {resources.map((resource) => (
               <ResourcePresenceItem
-                canOpenAdminSessions={viewer.role === 'ADMIN'}
                 key={resource.userId}
                 resource={resource}
               />
@@ -401,13 +400,10 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
 }
 
 function ResourcePresenceItem({
-  canOpenAdminSessions,
   resource,
 }: Readonly<{
-  canOpenAdminSessions: boolean;
   resource: AggregatedLiveResource;
 }>) {
-  const closePending = false;
   const contextSummary = getResourceContextSummary(resource.contexts);
   const isUnplannedClockIn = resource.contexts.some(
     (context) =>
@@ -415,13 +411,8 @@ function ResourcePresenceItem({
       !context.taskAction &&
       context.status !== 'EXPECTED_NOT_CLOCKED',
   );
-  const anomalyLabel = resource.anomalyReason ?? (resource.status === 'ANOMALY' ? 'Pointage a verifier' : null);
   const flags = [
     isUnplannedClockIn ? 'Non prevu' : null,
-    anomalyLabel,
-    !anomalyLabel && resource.isRemoteCheckout ? 'Sortie a distance' : null,
-    !anomalyLabel && resource.isAutoClosed ? 'Auto-cloturee' : null,
-    resource.isRegularized ? 'Regularisee' : null,
     resource.isLate ? 'Retard' : null,
   ].filter(Boolean);
   const statusLabel = getLiveResourceStatusLabel(resource);
@@ -445,11 +436,6 @@ function ResourcePresenceItem({
             {resource.isLate ? (
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">
                 Retard
-              </span>
-            ) : null}
-            {resource.anomalyReason ? (
-              <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-red-700">
-                {resource.anomalyReason}
               </span>
             ) : null}
             <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
@@ -488,16 +474,6 @@ function ResourcePresenceItem({
                   Arrivee apres 08:30
                 </p>
               ) : null}
-              {context.anomalyReason ? (
-                <p className="mt-2 inline-flex rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-red-700">
-                  {context.anomalyReason}
-                </p>
-              ) : null}
-              {context.isRegularized && context.isRemoteCheckout && context.lastClockInType === 'DEPARTURE' ? (
-                <p className="mt-2 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">
-                  Sortie fermee par administrateur
-                </p>
-              ) : null}
               <div className="mt-2 grid gap-2 lg:grid-cols-2">
                 <p><span className="font-semibold text-slate-950">Projet :</span> {context.projectName || '-'}</p>
                 <p><span className="font-semibold text-slate-950">Position :</span> {context.siteAddress}</p>
@@ -518,17 +494,6 @@ function ResourcePresenceItem({
                     <GpsPointLink label={`Position sortie ${formatTime(context.departureGps.recordedAt)}`} point={context.departureGps} />
                   ) : null}
                 </div>
-              ) : null}
-              {canOpenAdminSessions && context.anomalyReason === 'Sortie oubliee' && context.arrivalRecordId ? (
-                <a
-                  className="mt-3 inline-flex rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
-                  href={`/admin/clock-in-sessions?status=FORGOTTEN_EXIT&userId=${encodeURIComponent(context.userId)}`}
-                >
-                  Ouvrir les sessions de pointage
-                  <span className="sr-only">
-                  {closePending ? 'Fermeture...' : 'Fermer la sortie oubliée'}
-                  </span>
-                </a>
               ) : null}
             </div>
           ))}
@@ -635,7 +600,7 @@ function liveStatusLabel(status: RhSitePresenceLiveStatus) {
 
 function getLiveResourceStatusLabel(resource: Pick<RhSitePresenceLiveResource, 'status' | 'anomalyReason'>) {
   if (resource.status !== 'ANOMALY') return liveStatusLabel(resource.status);
-  return resource.anomalyReason ?? 'Pointage a verifier';
+  return 'Anomalie';
 }
 
 function liveStatusTone(status: RhSitePresenceLiveStatus) {

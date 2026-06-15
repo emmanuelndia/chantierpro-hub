@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
@@ -29,6 +30,7 @@ const statuses: { value: AdminClockInSessionStatus; label: string }[] = [
 
 export function AdminClockInSessionsPage() {
   const { pushToast } = useToast();
+  const searchParams = useSearchParams();
   const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(() => {
     const value = new Date(`${today}T00:00:00.000Z`);
@@ -39,6 +41,7 @@ export function AdminClockInSessionsPage() {
   const [userId, setUserId] = useState('');
   const [context, setContext] = useState('');
   const [status, setStatus] = useState('');
+  const [arrivalRecordId, setArrivalRecordId] = useState(() => searchParams.get('arrivalRecordId') ?? '');
 
   const requestPath = useMemo(() => {
     const searchParams = new URLSearchParams();
@@ -47,8 +50,9 @@ export function AdminClockInSessionsPage() {
     if (userId) searchParams.set('userId', userId);
     if (context) searchParams.set('context', context);
     if (status) searchParams.set('status', status);
+    if (arrivalRecordId) searchParams.set('arrivalRecordId', arrivalRecordId);
     return `/api/admin/clock-in-sessions?${searchParams.toString()}`;
-  }, [context, from, status, to, userId]);
+  }, [arrivalRecordId, context, from, status, to, userId]);
 
   const sessionsQuery = useQuery({
     queryKey: ['admin-clock-in-sessions', requestPath],
@@ -167,6 +171,18 @@ export function AdminClockInSessionsPage() {
             </select>
           </Field>
         </div>
+        {arrivalRecordId ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-orange-100 bg-orange-50 p-3 text-sm font-semibold text-orange-900">
+            <span>Session ciblee directement.</span>
+            <button
+              className="rounded-full bg-white px-3 py-1 text-xs font-black text-orange-700 transition hover:bg-orange-100"
+              onClick={() => setArrivalRecordId('')}
+              type="button"
+            >
+              Retirer le filtre direct
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-panel">

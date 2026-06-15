@@ -448,21 +448,10 @@ export async function getSitePresencesLive(
       where: {
         status: ClockInStatus.VALID,
         site: siteWhere,
-        OR: [
-          {
-            timestampLocal: {
-              gte: today,
-              lt: tomorrow,
-            },
-          },
-          {
-            timestampLocal: {
-              lt: today,
-            },
-            type: ClockInType.ARRIVAL,
-            isAutoClosed: false,
-          },
-        ],
+        timestampLocal: {
+          gte: today,
+          lt: tomorrow,
+        },
         type: {
           in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
         },
@@ -505,9 +494,10 @@ export async function getSitePresencesLive(
             clockInRecords: {
               some: {
                 status: ClockInStatus.VALID,
-                type: ClockInType.ARRIVAL,
-                isAutoClosed: false,
-                timestampLocal: { lt: today },
+                timestampLocal: {
+                  gte: today,
+                  lt: tomorrow,
+                },
               },
             },
           },
@@ -561,21 +551,10 @@ export async function getSitePresencesLive(
         clockInRecords: {
           where: {
             status: ClockInStatus.VALID,
-            OR: [
-              {
-                timestampLocal: {
-                  gte: today,
-                  lt: tomorrow,
-                },
-              },
-              {
-                timestampLocal: {
-                  lt: today,
-                },
-                type: ClockInType.ARRIVAL,
-                isAutoClosed: false,
-              },
-            ],
+            timestampLocal: {
+              gte: today,
+              lt: tomorrow,
+            },
             type: {
               in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
             },
@@ -612,21 +591,10 @@ export async function getSitePresencesLive(
       where: {
         status: ClockInStatus.VALID,
         officeClockInLocation: 'OFFICE',
-        OR: [
-          {
-            timestampLocal: {
-              gte: today,
-              lt: tomorrow,
-            },
-          },
-          {
-            timestampLocal: {
-              lt: today,
-            },
-            type: ClockInType.ARRIVAL,
-            isAutoClosed: false,
-          },
-        ],
+        timestampLocal: {
+          gte: today,
+          lt: tomorrow,
+        },
         type: {
           in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
         },
@@ -709,10 +677,7 @@ export async function getSitePresencesLive(
     }) : Promise.resolve([]),
     includeTerrain ? prisma.negotiationSession.findMany({
       where: {
-        OR: [
-          { date: today },
-          { startTime: { lt: today }, status: 'OPEN' },
-        ],
+        date: today,
         project: {
           ...projectAccessWhere(user),
           ...(query.projectManagerId ? { projectManagerId: query.projectManagerId } : {}),
@@ -2684,7 +2649,7 @@ function getLiveAnomalyReason({
   hasStaleOpenSession: boolean;
 }) {
   if (hasStaleOpenSession) return 'Sortie oubliee';
-  if (records.some((record) => record.isAutoClosed)) return 'Sortie oubliee';
+  if (records.some((record) => record.isAutoClosed || record.isRegularized)) return 'Sortie deja regularisee';
   return null;
 }
 

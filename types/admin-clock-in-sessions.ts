@@ -50,6 +50,7 @@ export type AdminClockInSessionItem = {
 
 export type AdminClockInSessionsResponse = {
   generatedAt: string;
+  arrivalRecordId?: string | null;
   items: AdminClockInSessionItem[];
   summary: {
     total: number;

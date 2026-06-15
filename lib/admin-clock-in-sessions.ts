@@ -79,6 +79,7 @@ export type AdminClockInSessionQuery = {
   userId: string | null;
   context: 'SITE' | 'FREE_MISSION' | 'OFFICE' | null;
   status: AdminClockInSessionStatus | null;
+  arrivalRecordId: string | null;
 };
 
 export function parseAdminClockInSessionQuery(searchParams: URLSearchParams): AdminClockInSessionQuery {
@@ -93,6 +94,7 @@ export function parseAdminClockInSessionQuery(searchParams: URLSearchParams): Ad
     userId: sanitizeString(searchParams.get('userId')),
     context: parseContext(searchParams.get('context')),
     status: parseStatus(searchParams.get('status')),
+    arrivalRecordId: sanitizeString(searchParams.get('arrivalRecordId')),
   };
 }
 
@@ -100,6 +102,18 @@ export async function listAdminClockInSessions(
   prisma: PrismaClient,
   query: AdminClockInSessionQuery,
 ): Promise<AdminClockInSessionsResponse> {
+  if (query.arrivalRecordId) {
+    const directSession = await findAdminSessionByArrivalRecordId(prisma, query.arrivalRecordId, query.to);
+    const sessions = directSession
+      ? [directSession]
+          .filter((session) => !query.userId || session.user.id === query.userId)
+          .filter((session) => !query.context || session.context === query.context)
+          .filter((session) => !query.status || session.status === query.status)
+      : [];
+
+    return buildAdminClockInSessionsResponse(sessions, query.arrivalRecordId);
+  }
+
   const baseRecords = await prisma.clockInRecord.findMany({
     where: {
       status: ClockInStatus.VALID,
@@ -127,8 +141,16 @@ export async function listAdminClockInSessions(
     .filter((session) => !query.status || session.status === query.status)
     .sort(compareAdminSessions);
 
+  return buildAdminClockInSessionsResponse(sessions, null);
+}
+
+function buildAdminClockInSessionsResponse(
+  sessions: AdminClockInSessionItem[],
+  arrivalRecordId: string | null,
+): AdminClockInSessionsResponse {
   return {
     generatedAt: new Date().toISOString(),
+    arrivalRecordId,
     items: sessions,
     summary: {
       total: sessions.length,
@@ -139,6 +161,47 @@ export async function listAdminClockInSessions(
       anomalies: sessions.filter((session) => session.status === 'ANOMALY').length,
     },
   };
+}
+
+async function findAdminSessionByArrivalRecordId(
+  prisma: PrismaClient,
+  arrivalRecordId: string,
+  referenceDate: Date,
+) {
+  const arrival = await prisma.clockInRecord.findFirst({
+    where: {
+      id: arrivalRecordId,
+      type: ClockInType.ARRIVAL,
+      status: ClockInStatus.VALID,
+    },
+    select: clockInSessionRecordSelect,
+  });
+
+  if (!arrival) {
+    return null;
+  }
+
+  const records = await prisma.clockInRecord.findMany({
+    where: {
+      status: ClockInStatus.VALID,
+      userId: arrival.userId,
+      siteId: arrival.siteId,
+      freeMissionId: arrival.freeMissionId,
+      planningAssignmentId: arrival.planningAssignmentId,
+      officeLocationId: arrival.officeLocationId,
+      officeClockInLocation: arrival.officeClockInLocation,
+      type: { in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END] },
+      timestampLocal: { gte: arrival.timestampLocal },
+    },
+    orderBy: [
+      { timestampLocal: 'asc' },
+      { createdAt: 'asc' },
+      { id: 'asc' },
+    ],
+    select: clockInSessionRecordSelect,
+  });
+
+  return buildAdminSessions(records, referenceDate).find((session) => session.sessionId === arrivalRecordId) ?? null;
 }
 
 export async function closeClockInSessionAsAdmin(
