@@ -30,6 +30,7 @@ const fieldRoles: readonly Role[] = [
   'GENERAL_SUPERVISOR',
   'BE_RESOURCE',
   'NEGOTIATION_RESOURCE',
+  'NEGOTIATION_MANAGER',
   'DRIVER',
   'PROJECT_MANAGER',
 ];

@@ -11,6 +11,7 @@ const mobileCameraRoles: readonly Role[] = [
   Role.GENERAL_SUPERVISOR,
   Role.BE_RESOURCE,
   Role.NEGOTIATION_RESOURCE,
+  Role.NEGOTIATION_MANAGER,
   Role.DRIVER,
   Role.PROJECT_MANAGER,
 ];
