@@ -185,6 +185,9 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const [step, setStep] = useState<Step>('clock-in');
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [comment, setComment] = useState('');
+  const [zoneActualName, setZoneActualName] = useState('');
+  const [zoneSpecificPlace, setZoneSpecificPlace] = useState('');
+  const [zoneClockInComment, setZoneClockInComment] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [now, setNow] = useState(() => Date.now());
@@ -597,6 +600,19 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const activeContextLabel = contextLabels[selectedClockContext];
   const staleOpenSession = activeSession?.isStaleOpenSession ? activeSession : null;
   const selectedContextReady = Boolean(selectedSite ?? selectedFreeMission ?? selectedOffice) || (isNegotiationZoneSelected && Boolean(selectedNegotiationAssignment ?? openNegotiationSession));
+  const zoneActualNameRequired = Boolean(selectedFreeMission && currentType === 'ARRIVAL');
+  const zoneActualNameReady = !zoneActualNameRequired || zoneActualName.trim().length > 0;
+
+  useEffect(() => {
+    if (!selectedFreeMission || selectedClockContext !== 'ZONE') {
+      setZoneActualName('');
+      setZoneSpecificPlace('');
+      setZoneClockInComment('');
+      return;
+    }
+
+    setZoneActualName((current) => current.trim() || selectedFreeMission.action || selectedFreeMission.siteName || '');
+  }, [selectedClockContext, selectedFreeMission]);
 
   useEffect(() => {
     if (!requestedIntent && sessionStatus?.sessionOpen) {
@@ -676,6 +692,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
 
   const canSubmit =
     selectedContextReady &&
+    zoneActualNameReady &&
     geoState.status === 'ready' &&
     !outsideRadius &&
     (selectedFreeMission || selectedOffice || isNegotiationZoneSelected ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
@@ -842,11 +859,26 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         throw new Error('Le pointage mission libre demande une connexion reseau pour cette version.');
       }
 
+      if (actionType === 'ARRIVAL' && !zoneActualName.trim()) {
+        throw new Error('Renseignez la zone reelle avant de pointer.');
+      }
+
       const missionId = selectedFreeMission.freeMissionId ?? selectedFreeMission.id;
+      const zoneComment =
+        actionType === 'ARRIVAL'
+          ? buildZoneClockInComment({
+              actualZone: zoneActualName,
+              specificPlace: zoneSpecificPlace,
+              comment: zoneClockInComment,
+            })
+          : null;
       const response = await authFetch(`/api/free-missions/${missionId}/clock-in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          comment: zoneComment,
+        }),
       });
 
       if (!response.ok) {
@@ -1177,6 +1209,44 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               Aucun chantier proche ne sera detecte automatiquement.
             </p>
           </div>
+          {selectedFreeMission && currentType === 'ARRIVAL' ? (
+            <div className="space-y-3 rounded-xl bg-white p-3">
+              <label className="block space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">
+                  Zone reelle / commune
+                </span>
+                <input
+                  className="min-h-12 w-full rounded-xl border border-orange-100 bg-white px-3 text-sm font-bold text-slate-950 outline-none focus:border-orange-400"
+                  onChange={(event) => setZoneActualName(event.target.value)}
+                  placeholder="Ex: Yopougon, Bingerville..."
+                  value={zoneActualName}
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Lieu ou quartier precis
+                </span>
+                <input
+                  className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-950 outline-none focus:border-orange-300"
+                  onChange={(event) => setZoneSpecificPlace(event.target.value)}
+                  placeholder="Facultatif"
+                  value={zoneSpecificPlace}
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Commentaire</span>
+                <textarea
+                  className="min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none focus:border-orange-300"
+                  onChange={(event) => setZoneClockInComment(event.target.value)}
+                  placeholder="Facultatif"
+                  value={zoneClockInComment}
+                />
+              </label>
+              {!zoneActualNameReady ? (
+                <p className="text-xs font-bold text-red-700">Renseignez la zone reelle avant de pointer.</p>
+              ) : null}
+            </div>
+          ) : null}
           {hasUnselectedZone ? (
             <p className="rounded-xl border border-orange-200 bg-white p-3 text-xs font-bold text-orange-800">
               Selectionnez la zone a pointer avant d&apos;enregistrer l&apos;entree.
@@ -2020,6 +2090,30 @@ function formatClockContext(value: 'SITE' | 'FREE_MISSION' | 'OFFICE') {
   if (value === 'OFFICE') return 'Bureau';
   if (value === 'FREE_MISSION') return 'Zone';
   return 'Chantier';
+}
+
+function buildZoneClockInComment({
+  actualZone,
+  specificPlace,
+  comment,
+}: {
+  actualZone: string;
+  specificPlace: string;
+  comment: string;
+}) {
+  const lines = [`Zone reelle : ${actualZone.trim()}`];
+  const trimmedPlace = specificPlace.trim();
+  const trimmedComment = comment.trim();
+
+  if (trimmedPlace) {
+    lines.push(`Lieu/quartier : ${trimmedPlace}`);
+  }
+
+  if (trimmedComment) {
+    lines.push(`Commentaire : ${trimmedComment}`);
+  }
+
+  return lines.join('\n');
 }
 
 function isAfterLateThreshold(value: number | string | Date) {

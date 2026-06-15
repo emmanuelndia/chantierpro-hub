@@ -980,7 +980,7 @@ export async function getSitePresencesLive(
         label: formatPersonName(assignment.createdBy),
       });
     }
-    if (resource.status === 'PRESENT') site.presentCount += 1;
+    if (hasLivePresenceDuringSelectedDay(resource)) site.presentCount += 1;
     if (resource.status === 'PAUSED') site.pausedCount += 1;
     if (resource.status === 'EXPECTED_NOT_CLOCKED') site.notClockedCount += 1;
     if (resource.status === 'LEFT') site.leftCount += 1;
@@ -2572,6 +2572,7 @@ function buildLiveResource(
     isAutoClosed: boolean;
     isRegularized: boolean;
     isLate: boolean;
+    comment?: string | null;
   }[],
   presenceContext: 'TERRAIN' | 'OFFICE',
   referenceDate: Date,
@@ -2599,6 +2600,7 @@ function buildLiveResource(
     records,
     hasStaleOpenSession,
   });
+  const zoneDetails = extractZoneClockInDetails(arrival?.comment ?? latest?.comment ?? null);
 
   return {
     userId: user.id,
@@ -2620,6 +2622,33 @@ function buildLiveResource(
     isRegularized: records.some((record) => record.isRegularized),
     anomalyReason,
     isLate: Boolean(arrival?.timestampLocal.toISOString().slice(0, 10) === today && isLateArrival(arrival.timestampLocal)),
+    zoneActualName: zoneDetails.actualZone,
+    zoneSpecificPlace: zoneDetails.specificPlace,
+    zoneComment: zoneDetails.comment,
+  };
+}
+
+function extractZoneClockInDetails(comment: string | null | undefined) {
+  const empty = {
+    actualZone: null as string | null,
+    specificPlace: null as string | null,
+    comment: null as string | null,
+  };
+
+  if (!comment) return empty;
+
+  const lines = comment.split(/\r?\n/);
+  const readValue = (prefix: string) => {
+    const line = lines.find((item) => item.toLowerCase().startsWith(prefix.toLowerCase()));
+    const value = line?.slice(prefix.length).trim();
+    if (!value) return null;
+    return value;
+  };
+
+  return {
+    actualZone: readValue('Zone reelle :'),
+    specificPlace: readValue('Lieu/quartier :'),
+    comment: readValue('Commentaire :'),
   };
 }
 
@@ -2693,6 +2722,10 @@ function matchesLiveResourceFilters(resource: RhSitePresenceLiveResource, query:
   }
 
   return true;
+}
+
+function hasLivePresenceDuringSelectedDay(resource: Pick<RhSitePresenceLiveResource, 'arrivalAt' | 'status'>) {
+  return Boolean(resource.arrivalAt) && resource.status !== 'EXPECTED_NOT_CLOCKED';
 }
 
 function compareLiveResource(left: RhSitePresenceLiveResource, right: RhSitePresenceLiveResource) {

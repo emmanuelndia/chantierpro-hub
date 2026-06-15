@@ -165,6 +165,9 @@ export type RhSitePresenceLiveResource = {
   isRegularized: boolean;
   anomalyReason: string | null;
   isLate: boolean;
+  zoneActualName?: string | null;
+  zoneSpecificPlace?: string | null;
+  zoneComment?: string | null;
 };
 
 export type RhPresenceGpsPoint = {

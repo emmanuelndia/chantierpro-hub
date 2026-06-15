@@ -643,10 +643,17 @@ function flattenLiveResources(sites: RhSitePresenceLiveResponse['sites']): LiveR
       ...resource,
       siteId: site.siteId,
       siteName: site.siteName,
-      siteAddress: site.siteAddress,
+      siteAddress: getLiveResourcePositionLabel(resource, site.siteAddress),
       projectName: site.projectName,
     })),
   );
+}
+
+function getLiveResourcePositionLabel(resource: RhSitePresenceLiveResource, fallback: string) {
+  if (!resource.zoneActualName) return fallback;
+  return resource.zoneSpecificPlace
+    ? `Zone - ${resource.zoneActualName} (${resource.zoneSpecificPlace})`
+    : `Zone - ${resource.zoneActualName}`;
 }
 
 function aggregateLiveResources(contexts: LiveResourceContext[]): AggregatedLiveResource[] {
@@ -762,7 +769,7 @@ function buildDisplaySummary(resources: AggregatedLiveResource[]) {
   return resources.reduce(
     (summary, resource) => {
       if (resource.contexts.some(isExpectedContext)) summary.expected += 1;
-      if (resource.status === 'PRESENT') summary.present += 1;
+      if (hasPresenceDuringSelectedDay(resource)) summary.present += 1;
       if (resource.status === 'PAUSED') summary.paused += 1;
       if (resource.status === 'EXPECTED_NOT_CLOCKED') summary.absent += 1;
       if (resource.status === 'LEFT') summary.left += 1;
@@ -780,6 +787,10 @@ function buildDisplaySummary(resources: AggregatedLiveResource[]) {
       late: 0,
     },
   );
+}
+
+function hasPresenceDuringSelectedDay(resource: Pick<AggregatedLiveResource, 'arrivalAt' | 'status'>) {
+  return Boolean(resource.arrivalAt) && resource.status !== 'EXPECTED_NOT_CLOCKED';
 }
 
 function isExpectedContext(context: LiveResourceContext) {
