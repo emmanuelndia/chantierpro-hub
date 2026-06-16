@@ -15,6 +15,7 @@ import type { MobileReportsHistoryResponse } from '@/types/mobile-history-report
 import type { TodaySiteItem } from '@/types/projects';  
 
 const OFFLINE_ROUTE_URLS = [
+  '/app-start',
   '/mobile/home',
   '/mobile/clock-in',
   '/mobile/photo',

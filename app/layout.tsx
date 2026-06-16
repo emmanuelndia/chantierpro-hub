@@ -8,7 +8,6 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'ChantierPro Hub',
   description: 'Infrastructure web et mobile PWA pour la gestion de chantiers BTP.',
-  manifest: '/manifest.json',
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',

@@ -5,6 +5,7 @@ const OFFLINE_CACHE_VERSION = 'v6';
 const OFFLINE_FALLBACK_URL = '/mobile/offline';
 const OFFLINE_TERRAIN_SHELL_URL = '/mobile/offline-shell';
 const ESSENTIAL_MOBILE_ROUTES = [
+  '/app-start',
   '/mobile/home',
   '/mobile/clock-in',
   '/mobile/photo',
@@ -77,7 +78,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (request.mode === 'navigate' && (url.pathname.startsWith('/mobile/') || url.pathname === '/rapport-session')) {
+  if (request.mode === 'navigate' && (url.pathname === '/app-start' || url.pathname.startsWith('/mobile/') || url.pathname === '/rapport-session')) {
     event.respondWith(networkFirstMobilePage(request));
   }
 });
@@ -167,6 +168,7 @@ async function networkFirstMobilePage(request) {
 
 function isOfflineTerrainRoute(pathname) {
   return (
+    pathname === '/app-start' ||
     pathname === '/mobile/home' ||
     pathname === '/mobile/clock-in' ||
     pathname === '/mobile/photo' ||
