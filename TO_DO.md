@@ -14,7 +14,15 @@ Travail déjà fait :
 - Ajout de la possibilité de pointage dans les différents bureaux pour tous les rôles
 - Ajout de l'écran pointer pour tous les rôles
 - Résoudre les problèmes d'affichage sur le mobile et le web
-- Réadaptation des versions mobiles pour le PM
+- Réadaptation des versions mobiles pour le PM*
+
+
+
+
+
+
+
+
 
 
 Planning      
