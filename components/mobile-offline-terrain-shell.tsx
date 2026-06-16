@@ -13,18 +13,26 @@ import { MobileSessionReportPage } from '@/components/mobile-session-report-page
 import { MobileSyncPage } from '@/components/mobile-sync-page';
 import { getMobileOfflineCache } from '@/lib/mobile-offline-db';
 import type { WebSessionUser } from '@/lib/auth/web-session';
+import type { MobileOfflinePreparationResult } from '@/lib/mobile-offline-prepare';
 
 type OfflineShellState =
   | { status: 'loading'; user: null }
-  | { status: 'missing'; user: null }
+  | { status: 'missing'; user: null; preparation: MobileOfflinePreparationResult | null }
   | { status: 'ready'; user: WebSessionUser };
 
 export function MobileOfflineTerrainShell() {
   const [state, setState] = useState<OfflineShellState>({ status: 'loading', user: null });
 
   useEffect(() => {
-    void getMobileOfflineCache<WebSessionUser>('offline-user').then((cached) => {
-      setState(cached ? { status: 'ready', user: cached.payload } : { status: 'missing', user: null });
+    void Promise.all([
+      getMobileOfflineCache<WebSessionUser>('offline-user'),
+      getMobileOfflineCache<MobileOfflinePreparationResult>('offline-preparation-meta'),
+    ]).then(([cachedUser, cachedPreparation]) => {
+      setState(
+        cachedUser
+          ? { status: 'ready', user: cachedUser.payload }
+          : { status: 'missing', user: null, preparation: cachedPreparation?.payload ?? null },
+      );
     });
   }, []);
 
@@ -42,8 +50,15 @@ export function MobileOfflineTerrainShell() {
         <section className="max-w-sm rounded-lg border border-orange-200 bg-orange-50 p-5 text-center">
           <h1 className="text-xl font-black text-slate-950">Session offline indisponible</h1>
           <p className="mt-3 text-sm font-semibold leading-6 text-orange-900">
-            Connectez-vous une fois avec internet avant d&apos;utiliser le mode hors ligne sur cet appareil.
+            {state.preparation
+              ? "La session locale n'a pas ete enregistree correctement. Reconnectez-vous et relancez la synchronisation offline."
+              : "Connectez-vous une fois avec internet avant d'utiliser le mode hors ligne sur cet appareil."}
           </p>
+          {state.preparation ? (
+            <p className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-orange-700">
+              Derniere preparation {formatPreparedAt(state.preparation.preparedAt)}
+            </p>
+          ) : null}
         </section>
       </div>
     );
@@ -91,4 +106,13 @@ function renderOfflineRoute(pathname: string, user: WebSessionUser) {
   }
 
   return <MobileFieldHomePage user={user} />;
+}
+
+function formatPreparedAt(value: string) {
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
 }

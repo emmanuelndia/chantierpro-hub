@@ -12,7 +12,8 @@ import type { MobilePhotoSitesResponse } from '@/types/mobile-photo';
 import type { PlanningDayResponse, SupervisorMyAssignmentsResponse } from '@/types/mobile-planning';
 import type { MobileHistoryResponse } from '@/types/mobile-history';
 import type { MobileReportsHistoryResponse } from '@/types/mobile-history-reports';
-import type { TodaySiteItem } from '@/types/projects';  
+import type { TodaySiteItem } from '@/types/projects';
+import type { WebSessionUser } from '@/lib/auth/web-session';
 
 const OFFLINE_ROUTE_URLS = [
   '/app-start',
@@ -32,6 +33,7 @@ const MOBILE_PAGE_CACHE_NAME = 'chantierpro-mobile-pages-v6';
 
 const DAY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const WEEK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const OFFLINE_USER_CACHE_KEY = 'offline-user';
 
 type TodaySitesResponse = {
   date: string;
@@ -63,7 +65,7 @@ export async function prepareMobileOfflineMode() {
   }
 
   await warmMobileRoutes(errors);
-  const missingRoutes = await getMissingPreparedRoutes();
+  await cacheOfflineUser(dataPrepared, errors);
 
   await cacheJson<TodaySitesResponse>('/api/users/me/sites/today', 'sites-today', DAY_CACHE_TTL_MS, dataPrepared, errors);
   await cacheJson<MobilePhotoSitesResponse>('/api/mobile/photo/sites', 'mobile-photo-sites', DAY_CACHE_TTL_MS, dataPrepared, errors);
@@ -113,13 +115,7 @@ export async function prepareMobileOfflineMode() {
     missingData,
     dataPrepared,
     errors,
-    status:
-      errors.length === 0 &&
-      missingRoutes.length === 0 &&
-      missingData.length === 0 &&
-      isServiceWorkerReady(serviceWorker)
-        ? 'ready'
-        : 'incomplete',
+    status: computePreparationStatus(errors, serviceWorkerMissingRoutes, missingData, serviceWorker),
   };
 
   await setMobileOfflineCache('offline-preparation-meta', result, null);
@@ -129,15 +125,7 @@ export async function prepareMobileOfflineMode() {
 
 async function getMissingPreparedData(todayKey: string) {
   const { getMobileOfflineCache } = await import('@/lib/mobile-offline-db');
-  const requiredKeys = [
-    'offline-user',
-    'sites-today',
-    'mobile-photo-sites',
-    `mobile-planning-my-assignments-${todayKey}`,
-    'clock-in-history-7d',
-    'clock-in-today',
-    'mobile-history-week',
-  ];
+  const requiredKeys = getRequiredOfflineDataKeys(todayKey);
   const caches = await Promise.all(requiredKeys.map(async (key) => ({ key, item: await getMobileOfflineCache(key) })));
   return caches.filter(({ item }) => !item).map(({ key }) => key);
 }
@@ -158,20 +146,76 @@ export async function getMobileOfflinePreparationState() {
 
   const serviceWorker = await getMobileOfflineServiceWorkerDiagnostics();
   const serviceWorkerMissingRoutes = getMissingServiceWorkerRoutes(serviceWorker);
+  const missingData = await getMissingPreparedData(todayKey);
   const preparation = {
     ...payload,
     serviceWorker,
     missingRoutes: serviceWorkerMissingRoutes,
+    missingData,
   };
 
-  if (payload.cacheVersion !== OFFLINE_CACHE_VERSION || !isServiceWorkerReady(serviceWorker)) {
+  if (payload.cacheVersion !== OFFLINE_CACHE_VERSION) {
     return { status: 'incomplete' as const, preparation };
   }
 
+  const status = computePreparationStatus(preparation.errors, preparation.missingRoutes, preparation.missingData, serviceWorker);
+
   return {
-    status: preparation.status ?? (preparation.errors.length === 0 ? 'ready' : 'incomplete'),
-    preparation,
+    status,
+    preparation: {
+      ...preparation,
+      status,
+    },
   };
+}
+
+function getRequiredOfflineDataKeys(todayKey: string) {
+  return [
+    OFFLINE_USER_CACHE_KEY,
+    'sites-today',
+    'mobile-photo-sites',
+    `mobile-planning-my-assignments-${todayKey}`,
+    'clock-in-history-7d',
+    'clock-in-today',
+    'mobile-history-week',
+  ] satisfies string[];
+}
+
+async function cacheOfflineUser(dataPrepared: string[], errors: string[]) {
+  try {
+    const response = await authFetch('/api/auth/me');
+    if (!response.ok) {
+      errors.push(`${OFFLINE_USER_CACHE_KEY}: session indisponible`);
+      return;
+    }
+
+    const payload = (await response.json()) as { user?: WebSessionUser | null };
+    if (!payload.user) {
+      errors.push(`${OFFLINE_USER_CACHE_KEY}: utilisateur manquant`);
+      return;
+    }
+
+    await setMobileOfflineCache(OFFLINE_USER_CACHE_KEY, payload.user, null);
+    dataPrepared.push(OFFLINE_USER_CACHE_KEY);
+  } catch (error) {
+    errors.push(
+      `${OFFLINE_USER_CACHE_KEY}: ${error instanceof Error ? error.message : 'mise en cache impossible'}`,
+    );
+  }
+}
+
+function computePreparationStatus(
+  errors: string[],
+  missingRoutes: string[],
+  missingData: string[],
+  serviceWorker: MobileOfflineServiceWorkerDiagnostics,
+): 'ready' | 'incomplete' {
+  return errors.length === 0 &&
+    missingRoutes.length === 0 &&
+    missingData.length === 0 &&
+    isServiceWorkerReady(serviceWorker)
+    ? 'ready'
+    : 'incomplete';
 }
 
 async function warmMobileRoutes(errors: string[]) {
@@ -199,18 +243,6 @@ async function warmMobileRoutes(errors: string[]) {
     }),
   );
 
-}
-
-async function getMissingPreparedRoutes() {
-  const pageCache = await caches.open(MOBILE_PAGE_CACHE_NAME);
-  const matches = await Promise.all(
-    OFFLINE_ROUTE_URLS.map(async (url) => ({
-      url,
-      response: await pageCache.match(url, { ignoreSearch: true }),
-    })),
-  );
-
-  return matches.filter((match) => !match.response).map((match) => match.url);
 }
 
 function getMissingServiceWorkerRoutes(diagnostics: MobileOfflineServiceWorkerDiagnostics) {
