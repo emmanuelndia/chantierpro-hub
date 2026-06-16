@@ -269,13 +269,20 @@ export function MobileOfficeAssignmentsSection({
               </div>
             </div>
             {isFreeMission ? (
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 <Link
                   className="rounded-lg bg-slate-950 px-3 py-2 text-center text-xs font-black text-white"
                   href={`/mobile/clock-in?freeMissionId=${encodeURIComponent(assignment.freeMissionId ?? assignment.id)}`}
                 >
                   Pointer
                 </Link>
+                <button
+                  className={`rounded-lg px-3 py-2 text-xs font-black text-white ${status.buttonClassName}`}
+                  onClick={() => openProgressModal(assignment)}
+                  type="button"
+                >
+                  Avancement
+                </button>
                 <Link
                   className="rounded-lg bg-indigo-600 px-3 py-2 text-center text-xs font-black text-white"
                   href={`/mobile/photo?freeMissionId=${encodeURIComponent(assignment.freeMissionId ?? assignment.id)}`}

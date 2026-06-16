@@ -29,6 +29,23 @@ export type FreeMissionMutationInput = {
   plannedDurationMinutes?: unknown;
 };
 
+const freeMissionProgressUpdateSelect = {
+  id: true,
+  progress: true,
+  actualQuantity: true,
+  comment: true,
+  blocked: true,
+  completed: true,
+  createdAt: true,
+  createdBy: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+    },
+  },
+} satisfies Prisma.TaskProgressUpdateSelect;
+
 export const freeMissionSelect = {
   id: true,
   projectId: true,
@@ -88,6 +105,11 @@ export const freeMissionSelect = {
       isAutoClosed: true,
       isRegularized: true,
     },
+  },
+  progressUpdates: {
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 20,
+    select: freeMissionProgressUpdateSelect,
   },
 } satisfies Prisma.FreeMissionSelect;
 
@@ -406,6 +428,9 @@ export function serializeFreeMission(row: FreeMissionRow) {
   const latest = row.clockInRecords.at(-1) ?? null;
   const arrival = row.clockInRecords.find((record) => record.type === ClockInType.ARRIVAL && record.status === ClockInStatus.VALID) ?? null;
   const departure = [...row.clockInRecords].reverse().find((record) => record.type === ClockInType.DEPARTURE && record.status === ClockInStatus.VALID) ?? null;
+  const latestProgressUpdate = row.progressUpdates[0] ? serializeFreeMissionProgressUpdate(row.progressUpdates[0]) : null;
+  const targetQuantity = row.targetQuantity?.toNumber() ?? null;
+  const objective = buildFreeMissionObjectiveState(row.targetProgress, targetQuantity, latestProgressUpdate);
 
   return {
     id: row.id,
@@ -421,11 +446,17 @@ export function serializeFreeMission(row: FreeMissionRow) {
     date: row.date.toISOString().slice(0, 10),
     action: row.action,
     targetProgress: row.targetProgress,
-    targetQuantity: row.targetQuantity?.toNumber() ?? null,
+    targetQuantity,
     targetUnit: row.targetUnit,
     objectiveText: row.objectiveText,
     plannedDurationMinutes: row.plannedDurationMinutes,
     status: row.status,
+    actualQuantity: objective.actualQuantity,
+    actualProgress: objective.actualProgress,
+    progressDelta: objective.progressDelta,
+    remainingQuantity: objective.remainingQuantity,
+    objectiveStatus: objective.objectiveStatus,
+    latestProgressUpdate,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     latestClockInAt: latest?.timestampLocal.toISOString() ?? null,
@@ -437,6 +468,59 @@ export function serializeFreeMission(row: FreeMissionRow) {
       role: row.createdBy.role,
     },
   };
+}
+
+function serializeFreeMissionProgressUpdate(
+  update: Prisma.TaskProgressUpdateGetPayload<{ select: typeof freeMissionProgressUpdateSelect }>,
+) {
+  return {
+    id: update.id,
+    progress: update.progress,
+    actualQuantity: update.actualQuantity?.toNumber() ?? null,
+    comment: update.comment,
+    blocked: update.blocked,
+    completed: update.completed,
+    createdAt: update.createdAt.toISOString(),
+    createdBy: {
+      id: update.createdBy.id,
+      firstName: update.createdBy.firstName,
+      lastName: update.createdBy.lastName,
+    },
+  };
+}
+
+function buildFreeMissionObjectiveState(
+  targetProgress: number | null,
+  targetQuantity: number | null,
+  latestProgressUpdate: ReturnType<typeof serializeFreeMissionProgressUpdate> | null,
+) {
+  const actualQuantity = latestProgressUpdate?.actualQuantity ?? null;
+  const actualProgress =
+    targetQuantity !== null && targetQuantity > 0 && actualQuantity !== null
+      ? Math.min(100, Math.round((actualQuantity / targetQuantity) * 100))
+      : latestProgressUpdate?.progress ?? null;
+  const progressTarget = targetQuantity !== null && targetQuantity > 0 ? 100 : targetProgress;
+  const hasQuantityObjective = targetQuantity !== null && targetQuantity > 0;
+  const progressDelta = progressTarget !== null && actualProgress !== null ? actualProgress - progressTarget : null;
+  const remainingQuantity =
+    hasQuantityObjective && actualQuantity !== null ? Math.max(0, targetQuantity - actualQuantity) : null;
+  const objectiveStatus = latestProgressUpdate?.blocked
+    ? 'BLOCKED'
+    : (!hasQuantityObjective && latestProgressUpdate?.completed) ||
+        (hasQuantityObjective && actualQuantity !== null && actualQuantity >= targetQuantity) ||
+        (!hasQuantityObjective && targetProgress !== null && actualProgress !== null && actualProgress >= targetProgress)
+      ? 'ACHIEVED'
+      : actualProgress !== null || actualQuantity !== null || latestProgressUpdate
+        ? 'PARTIAL'
+        : 'NOT_STARTED';
+
+  return {
+    actualQuantity,
+    actualProgress,
+    progressDelta,
+    remainingQuantity,
+    objectiveStatus,
+  } as const;
 }
 
 export function buildGpsPointage(

@@ -563,13 +563,21 @@ export async function getSupervisorMyAssignments(
 
 export async function getTaskProgressUpdates(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
   const assignment = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
-  if (!assignment) {
+  if (assignment) {
+    return {
+      assignment: serializeSupervisorAssignment(assignment),
+      updates: assignment.progressUpdates.map(serializeTaskProgressUpdate),
+    };
+  }
+
+  const mission = await getAccessibleSupervisorFreeMission(prisma, user, assignmentId);
+  if (!mission) {
     return planningError('NOT_FOUND', 'Assignation introuvable.', 404);
   }
 
   return {
-    assignment: serializeSupervisorAssignment(assignment),
-    updates: assignment.progressUpdates.map(serializeTaskProgressUpdate),
+    assignment: serializeFreeMissionAsSupervisorAssignment(serializeFreeMission(mission)),
+    updates: mission.progressUpdates.map(serializeTaskProgressUpdate),
   };
 }
 
@@ -580,7 +588,8 @@ export async function createTaskProgressUpdate(
   input: CreateTaskProgressUpdateRequest,
 ): Promise<TaskProgressUpdateResponse | Response> {
   const assignment = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
-  if (!assignment) {
+  const mission = assignment ? null : await getAccessibleSupervisorFreeMission(prisma, user, assignmentId);
+  if (!assignment && !mission) {
     return planningError('NOT_FOUND', 'Assignation introuvable.', 404);
   }
 
@@ -590,9 +599,13 @@ export async function createTaskProgressUpdate(
   const progressInput = normalizeActualProgress(input.progress);
   if (progressInput instanceof Response) return progressInput;
 
-  const targetQuantity = decimalToNumber(assignment.targetQuantity);
+  const targetQuantity = decimalToNumber(assignment ? assignment.targetQuantity : mission?.targetQuantity);
   const hasQuantityTarget = targetQuantity !== null && targetQuantity > 0;
-  const progress = calculateActualProgress(assignment.targetQuantity, actualQuantity, hasQuantityTarget ? null : progressInput);
+  const progress = calculateActualProgress(
+    assignment ? assignment.targetQuantity : mission?.targetQuantity ?? null,
+    actualQuantity,
+    hasQuantityTarget ? null : progressInput,
+  );
 
   const comment = normalizeOptionalText(input.comment);
   const blocked = Boolean(input.blocked);
@@ -609,7 +622,7 @@ export async function createTaskProgressUpdate(
 
   const update = await prisma.taskProgressUpdate.create({
     data: {
-      assignmentId,
+      ...(assignment ? { assignmentId } : { freeMissionId: assignmentId }),
       progress,
       actualQuantity,
       comment,
@@ -620,28 +633,52 @@ export async function createTaskProgressUpdate(
     select: taskProgressUpdateSelect,
   });
 
-  if (completed && assignment.status !== PlanningAssignmentStatus.COMPLETED) {
-    await prisma.planningAssignment.update({
+  if (assignment) {
+    if (completed && assignment.status !== PlanningAssignmentStatus.COMPLETED) {
+      await prisma.planningAssignment.update({
+        where: { id: assignmentId },
+        data: { status: PlanningAssignmentStatus.COMPLETED },
+      });
+    } else if (!completed && assignment.status === PlanningAssignmentStatus.COMPLETED) {
+      await prisma.planningAssignment.update({
+        where: { id: assignmentId },
+        data: { status: PlanningAssignmentStatus.IN_PROGRESS },
+      });
+    } else if (!completed && assignment.status === PlanningAssignmentStatus.ASSIGNED && (progress !== null || actualQuantity !== null || blocked || comment)) {
+      await prisma.planningAssignment.update({
+        where: { id: assignmentId },
+        data: { status: PlanningAssignmentStatus.IN_PROGRESS },
+      });
+    }
+
+    const refreshed = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
+
+    return {
+      update: serializeTaskProgressUpdate(update),
+      assignment: refreshed ? serializeSupervisorAssignment(refreshed) : serializeSupervisorAssignment(assignment),
+    };
+  }
+
+  const nextMissionStatus = completed
+    ? FreeMissionStatus.COMPLETED
+    : progress !== null || actualQuantity !== null || blocked || comment
+      ? FreeMissionStatus.IN_PROGRESS
+      : mission?.status ?? FreeMissionStatus.ASSIGNED;
+
+  if (mission && nextMissionStatus !== mission.status) {
+    await prisma.freeMission.update({
       where: { id: assignmentId },
-      data: { status: PlanningAssignmentStatus.COMPLETED },
-    });
-  } else if (!completed && assignment.status === PlanningAssignmentStatus.COMPLETED) {
-    await prisma.planningAssignment.update({
-      where: { id: assignmentId },
-      data: { status: PlanningAssignmentStatus.IN_PROGRESS },
-    });
-  } else if (!completed && assignment.status === PlanningAssignmentStatus.ASSIGNED && (progress !== null || actualQuantity !== null || blocked || comment)) {
-    await prisma.planningAssignment.update({
-      where: { id: assignmentId },
-      data: { status: PlanningAssignmentStatus.IN_PROGRESS },
+      data: { status: nextMissionStatus },
     });
   }
 
-  const refreshed = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
+  const refreshedMission = await getAccessibleSupervisorFreeMission(prisma, user, assignmentId);
 
   return {
     update: serializeTaskProgressUpdate(update),
-    assignment: refreshed ? serializeSupervisorAssignment(refreshed) : serializeSupervisorAssignment(assignment),
+    assignment: refreshedMission
+      ? serializeFreeMissionAsSupervisorAssignment(serializeFreeMission(refreshedMission))
+      : serializeFreeMissionAsSupervisorAssignment(serializeFreeMission(mission!)),
   };
 }
 
@@ -921,6 +958,18 @@ function getAccessibleSupervisorAssignment(prisma: PrismaClient, user: AuthLikeU
       deletedAt: null,
     },
     select: supervisorAssignmentSelect,
+  });
+}
+
+function getAccessibleSupervisorFreeMission(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
+  return prisma.freeMission.findFirst({
+    where: {
+      id: assignmentId,
+      assigneeId: user.id,
+      deletedAt: null,
+      status: { not: FreeMissionStatus.CANCELLED },
+    },
+    select: freeMissionSelect,
   });
 }
 
@@ -1477,6 +1526,23 @@ function serializeSupervisorAssignment(assignment: SupervisorAssignmentRow) {
 }
 
 function serializeFreeMissionAsSupervisorAssignment(mission: Awaited<ReturnType<typeof listMyFreeMissions>>[number]) {
+  const latestProgressUpdate = mission.latestProgressUpdate ?? null;
+  const targetQuantity = mission.targetQuantity;
+  const objective =
+    mission.actualProgress !== undefined &&
+    mission.actualQuantity !== undefined &&
+    mission.progressDelta !== undefined &&
+    mission.remainingQuantity !== undefined &&
+    mission.objectiveStatus !== undefined
+      ? {
+          actualQuantity: mission.actualQuantity,
+          actualProgress: mission.actualProgress,
+          progressDelta: mission.progressDelta,
+          remainingQuantity: mission.remainingQuantity,
+          objectiveStatus: mission.objectiveStatus,
+        }
+      : buildObjectiveState(mission.targetProgress, targetQuantity, latestProgressUpdate);
+
   return {
     id: mission.id,
     kind: 'FREE_MISSION' as const,
@@ -1490,21 +1556,16 @@ function serializeFreeMissionAsSupervisorAssignment(mission: Awaited<ReturnType<
     siteType: 'FREE_MISSION' as const,
     action: mission.action,
     targetProgress: mission.targetProgress,
-    targetQuantity: mission.targetQuantity,
+    targetQuantity,
     targetUnit: mission.targetUnit,
     objectiveText: mission.objectiveText,
     plannedDurationMinutes: mission.plannedDurationMinutes,
-    actualQuantity: null,
-    actualProgress: mission.status === FreeMissionStatus.COMPLETED ? 100 : null,
-    progressDelta: null,
-    remainingQuantity: null,
-    objectiveStatus:
-      mission.status === FreeMissionStatus.COMPLETED
-        ? ('ACHIEVED' as const)
-        : mission.status === FreeMissionStatus.IN_PROGRESS
-          ? ('PARTIAL' as const)
-          : ('NOT_STARTED' as const),
-    latestProgressUpdate: null,
+    actualQuantity: objective.actualQuantity,
+    actualProgress: objective.actualProgress,
+    progressDelta: objective.progressDelta,
+    remainingQuantity: objective.remainingQuantity,
+    objectiveStatus: objective.objectiveStatus,
+    latestProgressUpdate,
     status:
       mission.status === FreeMissionStatus.COMPLETED
         ? PlanningAssignmentStatus.COMPLETED
@@ -1517,6 +1578,23 @@ function serializeFreeMissionAsSupervisorAssignment(mission: Awaited<ReturnType<
 }
 
 function serializeFreeMissionAsPlanningAssignment(mission: Awaited<ReturnType<typeof listFreeMissions>>['missions'][number]): PlanningAssignment {
+  const latestProgressUpdate = mission.latestProgressUpdate ?? null;
+  const targetQuantity = mission.targetQuantity;
+  const objective =
+    mission.actualProgress !== undefined &&
+    mission.actualQuantity !== undefined &&
+    mission.progressDelta !== undefined &&
+    mission.remainingQuantity !== undefined &&
+    mission.objectiveStatus !== undefined
+      ? {
+          actualQuantity: mission.actualQuantity,
+          actualProgress: mission.actualProgress,
+          progressDelta: mission.progressDelta,
+          remainingQuantity: mission.remainingQuantity,
+          objectiveStatus: mission.objectiveStatus,
+        }
+      : buildObjectiveState(mission.targetProgress, targetQuantity, latestProgressUpdate);
+
   return {
     id: mission.id,
     kind: 'FREE_MISSION',
@@ -1532,21 +1610,16 @@ function serializeFreeMissionAsPlanningAssignment(mission: Awaited<ReturnType<ty
     siteType: 'FREE_MISSION',
     action: mission.action,
     targetProgress: mission.targetProgress,
-    targetQuantity: mission.targetQuantity,
+    targetQuantity,
     targetUnit: mission.targetUnit,
     objectiveText: mission.objectiveText,
     plannedDurationMinutes: mission.plannedDurationMinutes,
-    actualQuantity: null,
-    actualProgress: mission.status === FreeMissionStatus.COMPLETED ? 100 : null,
-    progressDelta: null,
-    remainingQuantity: null,
-    objectiveStatus:
-      mission.status === FreeMissionStatus.COMPLETED
-        ? 'ACHIEVED'
-        : mission.status === FreeMissionStatus.IN_PROGRESS
-          ? 'PARTIAL'
-          : 'NOT_STARTED',
-    latestProgressUpdate: null,
+    actualQuantity: objective.actualQuantity,
+    actualProgress: objective.actualProgress,
+    progressDelta: objective.progressDelta,
+    remainingQuantity: objective.remainingQuantity,
+    objectiveStatus: objective.objectiveStatus,
+    latestProgressUpdate,
     assignedAt: `${mission.date}T00:00:00.000Z`,
     status:
       mission.status === FreeMissionStatus.COMPLETED
