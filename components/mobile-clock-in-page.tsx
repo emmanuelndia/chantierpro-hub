@@ -367,11 +367,15 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       ? selectedFreeMissionFromAssignments
       : null;
   const selectedFreeMissionKey = selectedFreeMission?.freeMissionId ?? selectedFreeMission?.id ?? null;
-  const isNegotiationZoneSelected =
-    selectedClockContext === 'ZONE' &&
+  const hasClassicZoneAssignments =
+    hasFreeMissionToday || Boolean(requestedFreeMissionId) || todayQuery.data?.activeSession?.contextType === 'FREE_MISSION';
+  const useNegotiationZoneFlow =
     isNegotiationClockInUser &&
     !selectedFreeMission &&
+    !hasClassicZoneAssignments &&
     (Boolean(selectedNegotiationAssignment) || Boolean(openNegotiationSession) || negotiationAssignments.length > 0);
+  const isNegotiationZoneSelected =
+    selectedClockContext === 'ZONE' && useNegotiationZoneFlow;
   const hasUnselectedZone = selectedClockContext === 'ZONE' && freeMissionAssignments.length > 1 && !selectedFreeMission;
   const nearbyQuery = useQuery({
     queryKey: ['mobile-sites-nearby', geoState.status === 'ready' ? geoState.latitude : null, geoState.status === 'ready' ? geoState.longitude : null],
@@ -407,9 +411,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   );
   const singleOfficeAssignment = officeAssignments.length === 1 ? officeAssignments[0] ?? null : null;
   const activeSession = todayQuery.data?.activeSession ?? null;
-  const hasZoneOption = isNegotiationClockInUser
-    ? negotiationAssignments.length > 0 || Boolean(openNegotiationSession)
-    : hasFreeMissionToday || Boolean(requestedFreeMissionId) || activeSession?.contextType === 'FREE_MISSION';
+  const hasZoneOption = canUseTerrainClockIn || useNegotiationZoneFlow || hasClassicZoneAssignments;
   const quickSite = nearbyQuery.data?.sites[0] ?? null;
 
   useEffect(() => {
@@ -1143,22 +1145,22 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">
-                {isNegotiationClockInUser ? 'Zone negociation' : 'Zone'}
+                {useNegotiationZoneFlow ? 'Zone negociation' : 'Zone'}
               </p>
               <h3 className="mt-2 text-lg font-black text-slate-950">
-                {isNegotiationClockInUser
+                {useNegotiationZoneFlow
                   ? openNegotiationSession?.assignment?.zone?.name ?? openNegotiationSession?.assignment?.plannedZone ?? selectedNegotiationAssignment?.zone?.name ?? selectedNegotiationAssignment?.plannedZone ?? 'Choisir une zone nego'
                   : selectedFreeMission ? selectedFreeMission.action : 'Choisir une zone'}
               </h3>
               <p className="mt-1 text-sm font-semibold text-slate-600">
-                {isNegotiationClockInUser
+                {useNegotiationZoneFlow
                   ? openNegotiationSession?.project?.name ?? selectedNegotiationAssignment?.project.name ?? 'Pointage zone pour la negociation'
                   : selectedFreeMission ? selectedFreeMission.projectName : 'Pointage GPS sans chantier fixe'}
               </p>
             </div>
             <NavigationIcon className="h-7 w-7 text-orange-700" />
           </div>
-          {isNegotiationClockInUser ? (
+          {useNegotiationZoneFlow ? (
             <>
               {negotiationAssignments.length === 0 && !openNegotiationSession ? (
                 <p className="rounded-xl bg-white p-3 text-sm font-semibold leading-6 text-slate-600">

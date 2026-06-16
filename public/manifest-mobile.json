@@ -1,0 +1,25 @@
+{
+  "name": "ChantierPro Mobile",
+  "short_name": "ChantierPro",
+  "description": "Application mobile ChantierPro pour le pointage, les photos et le terrain.",
+  "start_url": "/mobile/home",
+  "scope": "/mobile/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F9FC",
+  "theme_color": "#ea580c",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
