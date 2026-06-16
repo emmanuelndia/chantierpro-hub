@@ -17,7 +17,7 @@ Travail déjà fait :
 - Réadaptation des versions mobiles pour le PM
 
 
-Planning
+Planning      
 
 - Ajouter une durée prévue pour les tâches 
 - Pouvoir dupliquer des tâches sur une date donnée

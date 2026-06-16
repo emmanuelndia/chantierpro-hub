@@ -327,8 +327,11 @@ function addGenericFieldErrors(row: SiteImportNormalizedRow, errors: SiteImportF
   if (row.surface.trim() && Number.isNaN(Number(row.surface))) {
     errors.push({ field: 'surface', message: 'Surface estimee numerique invalide.' });
   }
-  if (!row.date_debut.trim() || Number.isNaN(new Date(row.date_debut).getTime())) {
+  if (!isValidImportDateValue(row.date_debut)) {
     errors.push({ field: 'date_debut', message: 'Date de debut requise au format AAAA-MM-JJ.' });
+  }
+  if (row.date_fin.trim() && !isValidImportDateValue(row.date_fin)) {
+    errors.push({ field: 'date_fin', message: 'Date de fin invalide. Utilisez le format AAAA-MM-JJ.' });
   }
   if (row.statut.trim() && !Object.values(SiteStatus).includes(row.statut.trim() as SiteStatus)) {
     errors.push({ field: 'statut', message: 'Statut invalide.' });
@@ -455,8 +458,81 @@ function normalizeDateValue(value: string) {
   if (!trimmed) {
     return '';
   }
+
+  const isoDate = coerceImportDateToIso(trimmed);
+  return isoDate ?? trimmed;
+}
+
+function isValidImportDateValue(value: string) {
+  return Boolean(coerceImportDateToIso(value));
+}
+
+function coerceImportDateToIso(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return isSafeDateParts(trimmed) ? trimmed : null;
+  }
+
+  const slashMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
+  if (slashMatch) {
+    const day = Number(slashMatch[1] ?? '');
+    const month = Number(slashMatch[2] ?? '');
+    const year = Number(slashMatch[3] ?? '');
+    return buildIsoDate(year, month, day);
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    const serial = Number(trimmed);
+    if (Number.isFinite(serial) && serial >= 1 && serial <= 100000) {
+      return excelSerialToIsoDate(serial);
+    }
+    return null;
+  }
+
   const parsed = new Date(trimmed);
-  return Number.isNaN(parsed.getTime()) ? trimmed : parsed.toISOString().slice(0, 10);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  const year = parsed.getUTCFullYear();
+  const month = parsed.getUTCMonth() + 1;
+  const day = parsed.getUTCDate();
+  return buildIsoDate(year, month, day);
+}
+
+function excelSerialToIsoDate(serial: number) {
+  const wholeDays = Math.floor(serial);
+  const excelEpochUtc = Date.UTC(1899, 11, 30);
+  const parsed = new Date(excelEpochUtc + wholeDays * 24 * 60 * 60 * 1000);
+  return buildIsoDate(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1, parsed.getUTCDate());
+}
+
+function isSafeDateParts(isoDate: string) {
+  const [yearValue = Number.NaN, monthValue = Number.NaN, dayValue = Number.NaN] = isoDate.split('-').map(Number);
+  return Boolean(buildIsoDate(yearValue, monthValue, dayValue));
+}
+
+function buildIsoDate(year: number, month: number, day: number) {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+
+  if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 }
 
 function normalizeHeader(value: string) {
