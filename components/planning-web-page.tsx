@@ -49,6 +49,7 @@ type PlanningAssignmentGroup = {
 
 type AssignmentFormState = {
   id?: string;
+  initialWorkLocationType?: PlanningWorkLocationType;
   supervisorId: string;
   supervisorIds: string[];
   projectId: string;
@@ -91,6 +92,10 @@ type NegotiationZonePlanningRequest = {
   plannedZone: string | null;
   instruction: string | null;
 };
+
+type ConvertToZoneRequest =
+  | { sourceAssignmentId: string; date: string; type: 'FREE_MISSION'; data: FreeMissionWebRequest }
+  | { sourceAssignmentId: string; date: string; type: 'NEGOTIATION_ZONE'; data: NegotiationZonePlanningRequest };
 
 const todayKey = formatDateKey(new Date());
 const filterClassName =
@@ -265,6 +270,22 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     onError: (error) => pushMutationError(error, 'Zone nego impossible'),
   });
 
+  const convertToZoneMutation = useMutation({
+    mutationFn: convertAssignmentToZone,
+    onSuccess: async (result, payload) => {
+      pushToast({ type: 'success', title: formatCreateSuccessTitle(result, 'Zone enregistree') });
+      if (payload.date !== selectedDate) {
+        setSelectedDate(payload.date);
+      }
+      closeDrawer();
+      await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+      if (payload.type === 'NEGOTIATION_ZONE') {
+        await queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
+      }
+    },
+    onError: (error) => pushMutationError(error, 'Conversion zone impossible'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: deleteAssignment,
     onSuccess: async () => {
@@ -361,6 +382,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     deleteMutation.isPending ||
     freeMissionMutation.isPending ||
     negotiationZoneMutation.isPending ||
+    convertToZoneMutation.isPending ||
     duplicateMutation.isPending;
   const assignmentConflicts =
     assignmentConflictsQuery.data?.items.filter((item) => item.id !== form.id && item.siteId !== form.siteId) ?? [];
@@ -398,6 +420,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   function openEdit(assignment: PlanningWebAssignment) {
     setForm({
       id: assignment.id,
+      initialWorkLocationType: assignment.workLocationType,
       supervisorId: assignment.supervisorId,
       supervisorIds: [assignment.supervisorId],
       projectId: assignment.projectId ?? sites.find((site) => site.id === assignment.siteId)?.project.id ?? '',
@@ -429,6 +452,39 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     const targetUnit = form.targetUnit.trim() || null;
 
     if (form.workLocationType === PlanningWorkLocationType.FREE_MISSION) {
+      if (drawerMode === 'edit' && form.id && form.initialWorkLocationType !== PlanningWorkLocationType.FREE_MISSION) {
+        if (viewer.role === 'NEGOTIATION_MANAGER') {
+          convertToZoneMutation.mutate({
+            sourceAssignmentId: form.id,
+            date: form.date,
+            type: 'NEGOTIATION_ZONE',
+            data: {
+              date: form.date,
+              projectId: form.projectId,
+              assigneeIds: [form.supervisorId],
+              zoneId: form.zoneId || null,
+              plannedZone: (negotiationZones.find((zone) => zone.id === form.zoneId)?.name ?? form.action.trim()) || null,
+              instruction: form.objectiveText.trim() || null,
+            },
+          });
+          return;
+        }
+
+        const data: FreeMissionWebRequest = {
+          projectId: form.projectId,
+          assigneeId: form.supervisorId,
+          date: form.date,
+          action: form.action,
+          targetProgress: normalizedTargetProgress,
+          targetQuantity,
+          targetUnit,
+          objectiveText: form.objectiveText.trim() || null,
+          plannedDurationMinutes,
+        };
+        convertToZoneMutation.mutate({ sourceAssignmentId: form.id, date: form.date, type: 'FREE_MISSION', data });
+        return;
+      }
+
       if (viewer.role === 'NEGOTIATION_MANAGER' && drawerMode === 'create') {
         negotiationZoneMutation.mutate({
           date: form.date,
@@ -1261,12 +1317,14 @@ function AssignmentDrawer({
   const hasQuantityObjective = quantityNumber !== null && quantityNumber > 0;
   const isFreeMission = form.workLocationType === PlanningWorkLocationType.FREE_MISSION;
   const isNegotiationZone = isFreeMission && isNegotiationManager;
+  const isZoneConversion = mode === 'edit' && form.initialWorkLocationType !== PlanningWorkLocationType.FREE_MISSION && isFreeMission;
+  const canEditZoneIdentity = mode === 'create' || isZoneConversion;
   const progressValid = progressNumber === null || (Number.isInteger(progressNumber) && progressNumber >= 0 && progressNumber <= 100);
   const quantityValid = quantityNumber === null || (Number.isFinite(quantityNumber) && quantityNumber >= 0);
   const canSubmit = Boolean(form.action.trim() && form.date) && progressValid && quantityValid;
   const selectedResourceCount = mode === 'create' ? form.supervisorIds.length : form.supervisorId ? 1 : 0;
   const createIdentityValid =
-    mode === 'edit' ||
+    (mode === 'edit' && !isZoneConversion) ||
     Boolean(selectedResourceCount > 0 && (isNegotiationZone ? form.zoneId : isFreeMission ? form.projectId : form.siteId));
 
   return (
@@ -1307,6 +1365,7 @@ function AssignmentDrawer({
           <Field label="Type de tâche">
             <select
               className={filterClassName}
+              disabled={mode === 'edit' && form.initialWorkLocationType === PlanningWorkLocationType.FREE_MISSION}
               onChange={(event) => {
                 const workLocationType = event.target.value as PlanningWorkLocationType;
                 onChange({
@@ -1325,7 +1384,9 @@ function AssignmentDrawer({
               ))}
             </select>
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              Choisis d&apos;abord le type. Une tâche bureau organise le travail, mais la présence reste enregistrée avec le pointage bureau.
+              {mode === 'edit' && form.initialWorkLocationType === PlanningWorkLocationType.FREE_MISSION
+                ? 'Une zone existante reste une zone. Retire-la puis recrée une tâche chantier si nécessaire.'
+                : 'Choisis d&apos;abord le type. Une tâche bureau organise le travail, mais la présence reste enregistrée avec le pointage bureau.'}
             </p>
           </Field>
           <Field label={mode === 'create' ? 'Ressources' : 'Ressource'}>
@@ -1368,7 +1429,7 @@ function AssignmentDrawer({
           </Field>
           <Field label="Projet">
             <SearchableSelect
-              disabled={!canEditIdentity}
+              disabled={!canEditIdentity && !isZoneConversion}
               emptyLabel="Aucun projet trouvé."
               onChange={(value) => onChange({ ...form, projectId: value, zoneId: '', siteId: '' })}
               options={projectOptions}
@@ -1393,7 +1454,7 @@ function AssignmentDrawer({
           ) : isNegotiationZone ? (
             <Field label="Zone">
               <SearchableSelect
-                disabled={!canEditIdentity || !form.projectId}
+                disabled={!canEditZoneIdentity || !form.projectId}
                 emptyLabel={form.projectId ? 'Aucune zone trouvée. Importe les scopes du projet pour créer les zones.' : 'Choisis un projet.'}
                 onChange={(value) => {
                   const zone = negotiationZones.find((item) => item.id === value);
@@ -2136,6 +2197,16 @@ async function updateFreeMission(id: string, data: FreeMissionWebRequest) {
     throw new Error(await getApiErrorMessage(response, 'Impossible de modifier la mission libre.'));
   }
   return (await response.json()) as CreateSummaryResponse;
+}
+
+async function convertAssignmentToZone(request: ConvertToZoneRequest) {
+  const result =
+    request.type === 'NEGOTIATION_ZONE'
+      ? await createNegotiationZoneAssignments(request.data)
+      : await createFreeMission(request.data);
+
+  await deleteAssignment(request.sourceAssignmentId);
+  return result;
 }
 
 async function duplicatePlanning(data: { sourceDate: string; targetDate: string }) {
