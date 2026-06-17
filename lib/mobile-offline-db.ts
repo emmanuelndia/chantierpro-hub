@@ -74,6 +74,7 @@ export type PendingMobilePhoto = {
   filename: string;
   siteId?: string | null;
   freeMissionId?: string | null;
+  negotiationAssignmentId?: string | null;
   planningAssignmentId?: string | null;
   description?: string;
   tags?: PhotoTag[];
@@ -259,6 +260,9 @@ export function buildPhotoFormData(photo: PendingMobilePhoto) {
   }
   if (photo.freeMissionId) {
     formData.set('freeMissionId', photo.freeMissionId);
+  }
+  if (photo.negotiationAssignmentId) {
+    formData.set('negotiationAssignmentId', photo.negotiationAssignmentId);
   }
   formData.set('category', 'PROGRESS');
   formData.set('description', photo.description ?? '');

@@ -367,7 +367,6 @@ function AssignmentCard({
     targetUnit: assignment.targetUnit,
     objectiveText: assignment.objectiveText,
     status: assignment.status,
-    workLocationType: assignment.workLocationType,
   });
   const initials = getInitials(assignment.supervisorFirstName, assignment.supervisorName);
   const clockStatus = clockInStatusConfig[assignment.clockInStatus];
@@ -492,11 +491,12 @@ function AssignmentCard({
           <label className="block text-sm font-semibold text-slate-700">
             Type de tâche
             <select
-              value={editData.workLocationType ?? PlanningWorkLocationType.ON_SITE}
+              value={assignment.workLocationType}
               onChange={(event) => {
                 const workLocationType = event.currentTarget.value as PlanningWorkLocationType;
                 setEditData((prev) => ({ ...prev, workLocationType }));
               }}
+              disabled
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
             >
               {creatableWorkLocationTypes.map((type) => (

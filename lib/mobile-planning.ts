@@ -22,6 +22,7 @@ import type {
   TaskProgressUpdateItem,
   TaskProgressUpdateResponse,
   UpdateAssignmentRequest,
+  SupervisorMyAssignment,
   SupervisorMyAssignmentsResponse,
 } from '@/types/mobile-planning';
 import { createInternalPhotoUrl } from '@/lib/photos';
@@ -625,7 +626,7 @@ export async function getSupervisorMyAssignments(
     return planningError('INVALID_DATE', 'Date invalide.', 400);
   }
 
-  const [assignments, freeMissions] = await Promise.all([
+  const [assignments, freeMissions, negotiationAssignments] = await Promise.all([
     prisma.planningAssignment.findMany({
     where: {
       date: parsedDate,
@@ -636,11 +637,31 @@ export async function getSupervisorMyAssignments(
     select: supervisorAssignmentSelect,
     }),
     listMyFreeMissions(prisma, user, formatPlanningDate(parsedDate)),
+    prisma.negotiationAssignment.findMany({
+      where: {
+        date: parsedDate,
+        assigneeId: user.id,
+        deletedAt: null,
+        status: { not: NegotiationAssignmentStatus.CANCELLED },
+      },
+      orderBy: [{ project: { name: 'asc' } }, { zone: { name: 'asc' } }, { id: 'asc' }],
+      include: {
+        project: { select: { id: true, name: true } },
+        zone: true,
+        assignee: { select: { id: true, firstName: true, lastName: true } },
+        createdBy: { select: { id: true, firstName: true, lastName: true, role: true } },
+        sessions: { where: { date: parsedDate }, select: { status: true } },
+      },
+    }),
   ]);
 
   return {
     date: formatPlanningDate(parsedDate),
-    assignments: [...assignments.map(serializeSupervisorAssignment), ...freeMissions.map(serializeFreeMissionAsSupervisorAssignment)],
+    assignments: [
+      ...assignments.map(serializeSupervisorAssignment),
+      ...freeMissions.map(serializeFreeMissionAsSupervisorAssignment),
+      ...negotiationAssignments.map(serializeNegotiationAssignmentAsSupervisorAssignment),
+    ],
   };
 }
 
@@ -1738,6 +1759,65 @@ function serializeFreeMissionAsSupervisorAssignment(mission: Awaited<ReturnType<
         : mission.status === FreeMissionStatus.IN_PROGRESS
           ? PlanningAssignmentStatus.IN_PROGRESS
           : PlanningAssignmentStatus.ASSIGNED,
+    workLocationType: PlanningWorkLocationType.FREE_MISSION,
+    photos: [],
+  };
+}
+
+function serializeNegotiationAssignmentAsSupervisorAssignment(assignment: {
+  id: string;
+  projectId: string;
+  zoneId: string | null;
+  assigneeId: string;
+  date: Date;
+  plannedZone: string | null;
+  instruction: string | null;
+  status: NegotiationAssignmentStatus;
+  project: { id: string; name: string };
+  zone: { id: string; name: string } | null;
+  sessions: { status: unknown }[];
+}): SupervisorMyAssignment {
+  const zoneName = assignment.zone?.name ?? assignment.plannedZone ?? 'Zone nego';
+
+  return {
+    id: assignment.id,
+    kind: 'NEGOTIATION_ASSIGNMENT',
+    date: formatPlanningDate(assignment.date),
+    siteId: null,
+    freeMissionId: null,
+    negotiationAssignmentId: assignment.id,
+    projectId: assignment.projectId,
+    projectName: assignment.project.name,
+    zoneId: assignment.zoneId,
+    zoneName,
+    siteName: zoneName,
+    siteAddress: assignment.project.name,
+    siteType: 'FREE_MISSION',
+    action: assignment.instruction ?? `Negociation - ${zoneName}`,
+    targetProgress: null,
+    targetQuantity: null,
+    targetUnit: null,
+    objectiveText: assignment.instruction,
+    plannedDurationMinutes: null,
+    actualQuantity: null,
+    actualProgress: null,
+    progressDelta: null,
+    remainingQuantity: null,
+    objectiveStatus:
+      assignment.status === NegotiationAssignmentStatus.COMPLETED
+        ? 'ACHIEVED'
+        : assignment.status === NegotiationAssignmentStatus.IN_PROGRESS
+          ? 'PARTIAL'
+          : 'NOT_STARTED',
+    latestProgressUpdate: null,
+    status:
+      assignment.status === NegotiationAssignmentStatus.COMPLETED
+        ? PlanningAssignmentStatus.COMPLETED
+        : assignment.status === NegotiationAssignmentStatus.IN_PROGRESS
+          ? PlanningAssignmentStatus.IN_PROGRESS
+          : assignment.status === NegotiationAssignmentStatus.CANCELLED
+            ? PlanningAssignmentStatus.CANCELLED
+            : PlanningAssignmentStatus.ASSIGNED,
     workLocationType: PlanningWorkLocationType.FREE_MISSION,
     photos: [],
   };

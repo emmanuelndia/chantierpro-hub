@@ -3,6 +3,7 @@ import type { PhotoCategory, PhotoTag, Role } from '@prisma/client';
 export type CreatePhotoInput = {
   siteId: string | null;
   freeMissionId?: string | null;
+  negotiationAssignmentId?: string | null;
   planningAssignmentId: string | null;
   category: PhotoCategory;
   tags: PhotoTag[];
@@ -23,6 +24,7 @@ export type PhotoItem = {
   id: string;
   siteId: string | null;
   freeMissionId?: string | null;
+  negotiationAssignmentId?: string | null;
   siteName: string | null;
   uploadedById: string;
   planningAssignmentId: string | null;

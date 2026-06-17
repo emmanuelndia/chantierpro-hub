@@ -74,6 +74,7 @@ export const photoSelect = {
   id: true,
   siteId: true,
   freeMissionId: true,
+  negotiationAssignmentId: true,
   uploadedById: true,
   planningAssignmentId: true,
   category: true,
@@ -265,6 +266,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
   const file = formData.get('file');
   const siteId = sanitizeString(formData.get('siteId'));
   const freeMissionId = sanitizeString(formData.get('freeMissionId'));
+  const negotiationAssignmentId = sanitizeString(formData.get('negotiationAssignmentId'));
   const planningAssignmentId = sanitizeString(formData.get('planningAssignmentId'));
   const category = parsePhotoCategory(formData.get('category'));
   const tags = parsePhotoTags(formData.get('tags'));
@@ -281,8 +283,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
 
   if (
     !(file instanceof File) ||
-    (!siteId && !freeMissionId) ||
-    (siteId && freeMissionId) ||
+    [siteId, freeMissionId, negotiationAssignmentId].filter(Boolean).length !== 1 ||
     !category ||
     !tags ||
     description === null ||
@@ -306,6 +307,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
     input: {
       siteId,
       freeMissionId,
+      negotiationAssignmentId,
       planningAssignmentId,
       category,
       tags,
@@ -622,6 +624,79 @@ export async function createPhoto(
       data: {
         siteId: null,
         freeMissionId: freeMission.id,
+        uploadedById: payload.user.id,
+        planningAssignmentId: null,
+        category: payload.input.category,
+        tags: payload.input.tags,
+        description: payload.input.description,
+        filename: prepared.filename,
+        storageKey,
+        url: stored.url,
+        fileSize: prepared.fileSize,
+        format: prepared.format,
+        latitude: payload.input.latitude === null ? null : new Prisma.Decimal(payload.input.latitude),
+        longitude: payload.input.longitude === null ? null : new Prisma.Decimal(payload.input.longitude),
+        timestampLocal,
+        takenAt: timestampLocal,
+      },
+      select: photoSelect,
+    });
+
+    return {
+      code: null,
+      photo: serializePhoto(created),
+    };
+  }
+
+  if (payload.input.negotiationAssignmentId) {
+    if (!FIELD_USER_ROLES.includes(payload.user.role)) {
+      return { code: 'FORBIDDEN' as const, photo: null };
+    }
+
+    const assignment = await prisma.negotiationAssignment.findFirst({
+      where: {
+        id: payload.input.negotiationAssignmentId,
+        assigneeId: payload.user.id,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        date: true,
+      },
+    });
+
+    if (!assignment || formatDateKey(assignment.date) !== formatDateKey(timestampLocal)) {
+      return { code: 'FORBIDDEN' as const, photo: null };
+    }
+
+    const prepared = await preparePhotoUpload(payload.file);
+    const storageKey = generatePhotoStorageKey({
+      siteId: `negotiation-assignment-${assignment.id}`,
+      userId: payload.user.id,
+      filename: prepared.filename,
+      timestamp: timestampLocal,
+    });
+
+    let stored: Awaited<ReturnType<typeof uploadPrivatePhotoObject>>;
+    try {
+      stored = await uploadPrivatePhotoObject({
+        storageKey,
+        body: prepared.buffer,
+        contentType: prepared.contentType,
+      });
+    } catch (error) {
+      console.error('Private negotiation assignment photo upload failed:', {
+        providerError: error instanceof Error ? error.message : String(error),
+        storageKeyPrefix: storageKey.split('/').slice(0, 2).join('/'),
+      });
+      return { code: 'UPLOAD_FAILED' as const, photo: null };
+    }
+
+    const created = await prisma.photo.create({
+      data: {
+        siteId: null,
+        freeMissionId: null,
+        negotiationAssignmentId: assignment.id,
         uploadedById: payload.user.id,
         planningAssignmentId: null,
         category: payload.input.category,
@@ -1266,6 +1341,7 @@ export function serializePhoto(
     id: photo.id,
     siteId: photo.siteId,
     freeMissionId: photo.freeMissionId,
+    negotiationAssignmentId: photo.negotiationAssignmentId,
     siteName: null,
     uploadedById: photo.uploadedById,
     planningAssignmentId: photo.planningAssignmentId,

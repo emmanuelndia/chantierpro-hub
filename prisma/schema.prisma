@@ -576,6 +576,7 @@ model NegotiationAssignment {
   assignee    User                        @relation("NegotiationAssignmentAssignee", fields: [assigneeId], references: [id])
   createdBy   User                        @relation("NegotiationAssignmentCreator", fields: [createdById], references: [id])
   sessions    NegotiationSession[]
+  photos      Photo[]
 
   @@index([projectId])
   @@index([zoneId])
@@ -775,6 +776,7 @@ model Photo {
   siteId      String?
   freeMissionId String?
   negotiationVisitId String?
+  negotiationAssignmentId String?
   uploadedById String
   planningAssignmentId String?
   category    PhotoCategory
@@ -796,6 +798,7 @@ model Photo {
   site        Site?              @relation(fields: [siteId], references: [id], onDelete: Cascade)
   freeMission FreeMission?       @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
   negotiationVisit NegotiationVisit? @relation(fields: [negotiationVisitId], references: [id], onDelete: Cascade)
+  negotiationAssignment NegotiationAssignment? @relation(fields: [negotiationAssignmentId], references: [id], onDelete: Cascade)
   uploadedBy  User               @relation("PhotoUploader", fields: [uploadedById], references: [id])
   planningAssignment PlanningAssignment? @relation(fields: [planningAssignmentId], references: [id], onDelete: SetNull)
   deletedBy   User?              @relation("PhotoDeleter", fields: [deletedById], references: [id])
@@ -804,6 +807,7 @@ model Photo {
   @@index([siteId])
   @@index([freeMissionId])
   @@index([negotiationVisitId])
+  @@index([negotiationAssignmentId])
   @@index([uploadedById])
   @@index([planningAssignmentId])
   @@index([deletedById])

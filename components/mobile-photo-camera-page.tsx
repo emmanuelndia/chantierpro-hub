@@ -51,6 +51,7 @@ type CapturedPhoto = {
   longitude: number | null;
   site: MobilePhotoSiteOption;
   freeMissionId?: string | null;
+  negotiationAssignmentId?: string | null;
   planningAssignment: SupervisorMyAssignment | null;
   description: string;
   tags: PhotoTag[];
@@ -69,6 +70,7 @@ export function MobilePhotoCameraPage() {
   const searchParams = useSearchParams();
   const requestedSiteId = searchParams.get('siteId');
   const requestedFreeMissionId = searchParams.get('freeMissionId');
+  const requestedNegotiationAssignmentId = searchParams.get('negotiationAssignmentId');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraState, setCameraState] = useState<CameraState>('loading');
@@ -78,7 +80,7 @@ export function MobilePhotoCameraPage() {
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [gpsState, setGpsState] = useState<GpsState>({ status: 'loading' });
   const [selectedSiteId, setSelectedSiteId] = useState(requestedSiteId ?? '');
-  const [photoMode, setPhotoMode] = useState<PhotoMode>(requestedFreeMissionId ? 'task' : 'site');
+  const [photoMode, setPhotoMode] = useState<PhotoMode>(requestedFreeMissionId || requestedNegotiationAssignmentId ? 'task' : 'site');
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
   const [siteSheetOpen, setSiteSheetOpen] = useState(false);
   const [photoInfoSheetOpen, setPhotoInfoSheetOpen] = useState(false);
@@ -157,29 +159,45 @@ export function MobilePhotoCameraPage() {
       await setMobileOfflineCache(`mobile-planning-my-assignments-${todayKey}`, payload, 24 * 60 * 60 * 1000);
       return payload;
     },
-    enabled: photoMode === 'task' || Boolean(requestedFreeMissionId),
+    enabled: true,
     staleTime: 30_000,
   });
   const assignments = useMemo(() => assignmentsQuery.data?.assignments ?? [], [assignmentsQuery.data?.assignments]);
-  const selectedFreeMission = useMemo(
-    () =>
-      requestedFreeMissionId
-        ? assignments.find((assignment) => assignment.freeMissionId === requestedFreeMissionId || assignment.id === requestedFreeMissionId) ?? null
-        : null,
-    [assignments, requestedFreeMissionId],
+  const requestedTaskAssignment = useMemo(
+    () => {
+      if (requestedFreeMissionId) {
+        return assignments.find((assignment) => assignment.freeMissionId === requestedFreeMissionId || assignment.id === requestedFreeMissionId) ?? null;
+      }
+
+      if (requestedNegotiationAssignmentId) {
+        return (
+          assignments.find(
+            (assignment) => assignment.negotiationAssignmentId === requestedNegotiationAssignmentId || assignment.id === requestedNegotiationAssignmentId,
+          ) ?? null
+        );
+      }
+
+      return null;
+    },
+    [assignments, requestedFreeMissionId, requestedNegotiationAssignmentId],
   );
   const selectedSite = useMemo(
     () => sites.find((site) => site.id === selectedSiteId) ?? sites.find((site) => site.hasOpenSession) ?? sites[0] ?? null,
     [selectedSiteId, sites],
   );
-  const siteAssignments = useMemo(
-    () => assignments.filter((assignment) => assignment.siteId === selectedSite?.id && assignment.workLocationType !== 'OFFICE'),
+  const taskAssignments = useMemo(
+    () =>
+      assignments.filter(
+        (assignment) => assignment.workLocationType !== 'OFFICE' && (assignment.siteId === selectedSite?.id || assignment.siteId === null),
+      ),
     [assignments, selectedSite?.id],
   );
   const selectedAssignment = useMemo(
-    () => siteAssignments.find((assignment) => assignment.id === selectedAssignmentId) ?? null,
-    [selectedAssignmentId, siteAssignments],
+    () => taskAssignments.find((assignment) => assignment.id === selectedAssignmentId) ?? requestedTaskAssignment,
+    [requestedTaskAssignment, selectedAssignmentId, taskAssignments],
   );
+  const hasRequestedTask = Boolean(requestedFreeMissionId ?? requestedNegotiationAssignmentId);
+  const photoContextName = photoMode === 'task' && selectedAssignment ? selectedAssignment.siteName : (selectedSite?.name ?? 'Choisir un chantier');
 
   useEffect(() => {
     if (!selectedSiteId && selectedSite) {
@@ -188,10 +206,23 @@ export function MobilePhotoCameraPage() {
   }, [selectedSite, selectedSiteId]);
 
   useEffect(() => {
-    if (photoMode === 'task' && selectedAssignmentId && !siteAssignments.some((assignment) => assignment.id === selectedAssignmentId)) {
+    if (!hasRequestedTask && !selectedSite && taskAssignments.length > 0 && photoMode === 'site') {
+      setPhotoMode('task');
+      setSelectedAssignmentId((current) => current ? current : (taskAssignments[0]?.id ?? ''));
+    }
+  }, [hasRequestedTask, photoMode, selectedSite, taskAssignments]);
+
+  useEffect(() => {
+    if (photoMode === 'task' && !selectedAssignmentId && !requestedTaskAssignment && taskAssignments.length > 0) {
+      setSelectedAssignmentId(taskAssignments[0]?.id ?? '');
+    }
+  }, [photoMode, requestedTaskAssignment, selectedAssignmentId, taskAssignments]);
+
+  useEffect(() => {
+    if (photoMode === 'task' && selectedAssignmentId && !taskAssignments.some((assignment) => assignment.id === selectedAssignmentId)) {
       setSelectedAssignmentId('');
     }
-  }, [photoMode, selectedAssignmentId, siteAssignments]);
+  }, [photoMode, selectedAssignmentId, taskAssignments]);
 
   useEffect(() => {
     if (capturedPhoto) {
@@ -397,7 +428,19 @@ export function MobilePhotoCameraPage() {
   }
 
   async function capturePhoto() {
-    if (!videoRef.current || (!selectedSite && !selectedFreeMission)) {
+    const contextAssignment = photoMode === 'task' ? selectedAssignment : null;
+    const photoSite =
+      contextAssignment && !contextAssignment.siteId
+        ? ({
+            id: '',
+            name: contextAssignment.siteName,
+            address: contextAssignment.siteAddress.trim() ? contextAssignment.siteAddress : (contextAssignment.projectName ?? ''),
+            projectName: contextAssignment.projectName ?? '',
+            hasOpenSession: false,
+          } satisfies MobilePhotoSiteOption)
+        : selectedSite;
+
+    if (!videoRef.current || !photoSite || (photoMode === 'task' && !contextAssignment)) {
       return;
     }
 
@@ -445,17 +488,10 @@ export function MobilePhotoCameraPage() {
         timestampLocal: new Date().toISOString(),
         latitude: gpsState.status === 'ready' ? gpsState.latitude : null,
         longitude: gpsState.status === 'ready' ? gpsState.longitude : null,
-        site:
-          selectedSite ??
-          ({
-            id: '',
-            name: selectedFreeMission?.siteName ?? 'Mission libre',
-            address: selectedFreeMission?.projectName ?? '',
-            projectName: selectedFreeMission?.projectName ?? '',
-            hasOpenSession: false,
-          } satisfies MobilePhotoSiteOption),
-        freeMissionId: selectedFreeMission?.freeMissionId ?? null,
-        planningAssignment: photoMode === 'task' ? selectedAssignment : null,
+        site: photoSite,
+        freeMissionId: contextAssignment?.freeMissionId ?? null,
+        negotiationAssignmentId: contextAssignment?.negotiationAssignmentId ?? null,
+        planningAssignment: contextAssignment,
         description: description.trim(),
         tags: selectedTags,
       });
@@ -592,11 +628,18 @@ export function MobilePhotoCameraPage() {
         <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-slate-950/80 to-transparent p-4 pt-5">
           <button
             className="w-full rounded-lg bg-white/15 px-4 py-2.5 text-left backdrop-blur"
-            onClick={() => setSiteSheetOpen(true)}
+            onClick={() => {
+              if (!selectedSite && taskAssignments.length > 0) {
+                setPhotoInfoSheetOpen(true);
+                return;
+              }
+
+              setSiteSheetOpen(true);
+            }}
             type="button"
           >
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/70">Photo pour</p>
-            <p className="mt-1 truncate text-lg font-black">{selectedSite?.name ?? 'Choisir un chantier'}</p>
+            <p className="mt-1 truncate text-lg font-black">{photoContextName}</p>
           </button>
           {pendingCount > 0 ? (
             <p className="mt-3 rounded-lg bg-orange-500/90 px-3 py-2 text-xs font-bold">
@@ -646,7 +689,7 @@ export function MobilePhotoCameraPage() {
           <button
             aria-label="Declencher la photo"
             className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-white/20 disabled:opacity-40"
-            disabled={cameraState !== 'ready' || !selectedSite || (photoMode === 'task' && !selectedAssignment)}
+            disabled={cameraState !== 'ready' || (photoMode === 'site' ? !selectedSite : !selectedAssignment)}
             onClick={() => {
               void capturePhoto();
             }}
@@ -671,7 +714,7 @@ export function MobilePhotoCameraPage() {
 
         {photoInfoSheetOpen ? (
           <PhotoInfoBottomSheet
-            assignments={siteAssignments}
+            assignments={taskAssignments}
             assignmentsError={assignmentsQuery.isError}
             assignmentsLoading={assignmentsQuery.isLoading}
             description={description}
@@ -996,7 +1039,7 @@ function TaskSelector({
         <option value="">Choisir la tâche</option>
         {assignments.map((assignment) => (
           <option key={assignment.id} value={assignment.id}>
-            {assignment.siteType === 'INTERVENTION_ZONE' ? 'Zone - ' : ''}{assignment.siteName} - {assignment.action}
+            {assignment.siteType === 'INTERVENTION_ZONE' || assignment.zoneId ? 'Zone - ' : ''}{assignment.siteName} - {assignment.action}
           </option>
         ))}
       </select>
@@ -1058,7 +1101,8 @@ function toPendingPhoto(photo: CapturedPhoto): PendingMobilePhoto {
     filename: `photo-${photo.timestampLocal.replace(/[:.]/g, '-')}.jpg`,
     siteId: photo.site.id || null,
     freeMissionId: photo.freeMissionId ?? null,
-    planningAssignmentId: photo.planningAssignment?.id ?? null,
+    negotiationAssignmentId: photo.negotiationAssignmentId ?? null,
+    planningAssignmentId: photo.planningAssignment?.kind === 'PLANNING_ASSIGNMENT' || photo.planningAssignment?.siteId ? photo.planningAssignment.id : null,
     description: photo.description,
     tags: photo.tags,
     timestampLocal: photo.timestampLocal,
