@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { canUploadPhotos, jsonPhotoError } from '@/lib/photos';
 import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 import type { MobilePhotoSiteOption } from '@/types/mobile-photo';
 
 const mobilePhotoSiteRoles: readonly Role[] = [
@@ -68,7 +69,7 @@ export const GET = withAuth(async ({ user }) => {
   const items: MobilePhotoSiteOption[] = sites.flatMap((site) => {
     const hasOpen = hasOpenSession(site.clockInRecords);
 
-    if (FIELD_USER_ROLES.includes(user.role) && site.planningAssignments.length === 0 && !hasOpen) {
+    if (user.role !== Role.GENERAL_SUPERVISOR && FIELD_USER_ROLES.includes(user.role) && site.planningAssignments.length === 0 && !hasOpen) {
       return [];
     }
 
@@ -85,30 +86,18 @@ export const GET = withAuth(async ({ user }) => {
 });
 
 function getSiteWhere(user: { id: string; role: Role }, today: Date) {
-  if (FIELD_USER_ROLES.includes(user.role)) {
+  if (user.role === Role.GENERAL_SUPERVISOR) {
     return {
       OR: [
-        {
-          status: SiteStatus.ACTIVE,
-          planningAssignments: {
-            some: {
-              supervisorId: user.id,
-              date: today,
-              deletedAt: null,
-              workLocationType: PlanningWorkLocationType.ON_SITE,
-            },
-          },
-        },
-        {
-          clockInRecords: {
-            some: {
-              userId: user.id,
-              clockInDate: today,
-              status: ClockInStatus.VALID,
-            },
-          },
-        },
+        generalSupervisorPlanningSiteWhere(user, today),
+        ...getFieldPhotoSiteAccessWhere(user.id, today),
       ],
+    };
+  }
+
+  if (FIELD_USER_ROLES.includes(user.role)) {
+    return {
+      OR: getFieldPhotoSiteAccessWhere(user.id, today),
     };
   }
 
@@ -124,6 +113,31 @@ function getSiteWhere(user: { id: string; role: Role }, today: Date) {
   return {
     status: SiteStatus.ACTIVE,
   };
+}
+
+function getFieldPhotoSiteAccessWhere(userId: string, today: Date) {
+  return [
+    {
+      status: SiteStatus.ACTIVE,
+      planningAssignments: {
+        some: {
+          supervisorId: userId,
+          date: today,
+          deletedAt: null,
+          workLocationType: PlanningWorkLocationType.ON_SITE,
+        },
+      },
+    },
+    {
+      clockInRecords: {
+        some: {
+          userId,
+          clockInDate: today,
+          status: ClockInStatus.VALID,
+        },
+      },
+    },
+  ];
 }
 
 function hasOpenSession(records: { type: ClockInType }[]) {

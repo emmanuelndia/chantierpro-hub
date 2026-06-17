@@ -464,11 +464,16 @@ export async function getAccessibleSiteForPhoto(
     });
   }
 
+  const fieldAccessWhere = buildFieldPhotoSiteAccessWhere(user, options.date);
+
   if (user.role === Role.GENERAL_SUPERVISOR) {
     return prisma.site.findFirst({
       where: {
         id: siteId,
-        ...generalSupervisorPlanningSiteWhere(user, options.date ?? new Date()),
+        OR: [
+          generalSupervisorPlanningSiteWhere(user, options.date ?? new Date()),
+          fieldAccessWhere,
+        ],
       },
       select: {
         id: true,
@@ -483,36 +488,10 @@ export async function getAccessibleSiteForPhoto(
     });
   }
 
-  const assignmentDate = options.date ? formatDateKey(options.date) : null;
-
   return prisma.site.findFirst({
     where: {
       id: siteId,
-      OR: [
-        {
-          planningAssignments: {
-            some: {
-              supervisorId: user.id,
-              deletedAt: null,
-              ...(assignmentDate ? { date: new Date(`${assignmentDate}T00:00:00.000Z`) } : {}),
-            },
-          },
-        },
-        {
-          clockInRecords: {
-            some: {
-              userId: user.id,
-            },
-          },
-        },
-        {
-          photos: {
-            some: {
-              uploadedById: user.id,
-            },
-          },
-        },
-      ],
+      ...fieldAccessWhere,
     },
     select: {
       id: true,
@@ -525,6 +504,38 @@ export async function getAccessibleSiteForPhoto(
       },
     },
   });
+}
+
+function buildFieldPhotoSiteAccessWhere(user: AuthLikeUser, date?: Date): Prisma.SiteWhereInput {
+  const assignmentDate = date ? formatDateKey(date) : null;
+
+  return {
+    OR: [
+      {
+        planningAssignments: {
+          some: {
+            supervisorId: user.id,
+            deletedAt: null,
+            ...(assignmentDate ? { date: new Date(`${assignmentDate}T00:00:00.000Z`) } : {}),
+          },
+        },
+      },
+      {
+        clockInRecords: {
+          some: {
+            userId: user.id,
+          },
+        },
+      },
+      {
+        photos: {
+          some: {
+            uploadedById: user.id,
+          },
+        },
+      },
+    ],
+  };
 }
 
 export async function preparePhotoUpload(file: File) {
