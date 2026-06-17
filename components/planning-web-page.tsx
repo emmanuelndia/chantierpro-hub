@@ -226,6 +226,12 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       if (payload.date !== selectedDate) {
         setSelectedDate(payload.date);
       }
+      setFilters((current) => ({
+        ...current,
+        projectId: '',
+        siteId: '',
+        resourceId: '',
+      }));
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -250,6 +256,12 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       if (variables.data.date !== selectedDate) {
         setSelectedDate(variables.data.date);
       }
+      setFilters((current) => ({
+        ...current,
+        projectId: variables.data.projectId,
+        siteId: '',
+        resourceId: variables.data.assigneeId,
+      }));
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
@@ -263,6 +275,12 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       if (payload.date !== selectedDate) {
         setSelectedDate(payload.date);
       }
+      setFilters((current) => ({
+        ...current,
+        projectId: payload.projectId,
+        siteId: '',
+        resourceId: payload.assigneeIds[0] ?? current.resourceId,
+      }));
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
       await queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
@@ -277,6 +295,15 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       if (payload.date !== selectedDate) {
         setSelectedDate(payload.date);
       }
+      setFilters((current) => ({
+        ...current,
+        projectId: payload.data.projectId,
+        siteId: '',
+        resourceId:
+          payload.type === 'NEGOTIATION_ZONE'
+            ? (payload.data.assigneeIds[0] ?? current.resourceId)
+            : payload.data.assigneeId,
+      }));
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
       if (payload.type === 'NEGOTIATION_ZONE') {
