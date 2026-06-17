@@ -1005,62 +1005,19 @@ function DayPlanningCards({
             </div>
           </div>
 
-          <div className="grid gap-3 p-4 xl:grid-cols-2">
+          <div className="divide-y divide-slate-100">
             {group.assignments.map((assignment) => {
               const site = sites.find((item) => item.id === assignment.siteId);
               return (
-                <div
-                  className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+                <CompactPlanningTaskRow
+                  assignment={assignment}
+                  canMutate={canMutate}
                   key={assignment.id}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{site?.project.name ?? '-'}</p>
-                      <h4 className="mt-1 text-base font-semibold text-slate-950">{assignment.siteName}</h4>
-                      <p className="mt-1 line-clamp-1 text-xs text-slate-500">{assignment.siteAddress}</p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                      <Badge tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : assignment.workLocationType === 'FREE_MISSION' ? 'warning' : 'info'}>
-                        {workLocationTypeLabel[assignment.workLocationType]}
-                      </Badge>
-                      {assignment.siteType === 'FREE_MISSION' ? <Badge tone="warning">Sans chantier fixe</Badge> : null}
-                      {site?.siteType === 'INTERVENTION_ZONE' ? <Badge tone="success">Zone d&apos;intervention</Badge> : null}
-                      <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 p-3">
-                    <PlanningTaskField label="Tâche">
-                      <p className="text-sm font-medium text-slate-800">{assignment.action}</p>
-                      {assignment.objectiveText ? <p className="mt-1 text-xs text-slate-500">Consigne : {assignment.objectiveText}</p> : null}
-                    </PlanningTaskField>
-                  </div>
-
-                  <ObjectiveProgressCard assignment={assignment} />
-
-                  <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                    <p className="text-xs text-slate-500">
-                      Créé par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
-                    </p>
-                    {canMutate ? (
-                      <TableActionsMenu
-                        actions={[
-                          {
-                            label: 'Modifier',
-                            icon: <Pencil className="h-4 w-4" />,
-                            onClick: () => onEdit(assignment),
-                          },
-                          {
-                            label: 'Supprimer',
-                            icon: <Trash2 className="h-4 w-4" />,
-                            tone: 'danger',
-                            onClick: () => onDelete(assignment),
-                          },
-                        ]}
-                      />
-                    ) : null}
-                  </div>
-                </div>
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  projectName={site?.project.name ?? assignment.projectName ?? '-'}
+                  showInterventionZone={site?.siteType === 'INTERVENTION_ZONE'}
+                />
               );
             })}
           </div>
@@ -1071,11 +1028,79 @@ function DayPlanningCards({
   );
 }
 
-function PlanningTaskField({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
+function CompactPlanningTaskRow({
+  assignment,
+  canMutate,
+  onDelete,
+  onEdit,
+  projectName,
+  showInterventionZone,
+}: Readonly<{
+  assignment: PlanningWebAssignment;
+  canMutate: boolean;
+  onDelete: (assignment: PlanningWebAssignment) => void;
+  onEdit: (assignment: PlanningWebAssignment) => void;
+  projectName: string;
+  showInterventionZone: boolean;
+}>) {
+  const config = objectiveStatusConfig[assignment.objectiveStatus];
+  const progressValue = Math.max(0, Math.min(100, assignment.actualProgress ?? assignment.targetProgress ?? 0));
+  const progressLabel = assignment.targetQuantity && assignment.targetQuantity > 0
+    ? `${formatQuantity(assignment.actualQuantity ?? 0)} / ${formatQuantity(assignment.targetQuantity)} ${assignment.targetUnit ?? ''}`.trim()
+    : assignment.actualProgress !== null || assignment.targetProgress !== null
+      ? `${progressValue}%`
+      : 'Aucun avancement';
+
   return (
-    <div>
-      <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-      {children}
+    <div className="grid gap-3 px-5 py-3 transition hover:bg-slate-50 lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.85fr)_auto] lg:items-center">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : assignment.workLocationType === 'FREE_MISSION' ? 'warning' : 'info'}>
+            {workLocationTypeLabel[assignment.workLocationType]}
+          </Badge>
+          {assignment.siteType === 'FREE_MISSION' ? <Badge tone="warning">Sans chantier fixe</Badge> : null}
+          {showInterventionZone ? <Badge tone="success">Zone d&apos;intervention</Badge> : null}
+          <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
+        </div>
+        <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-slate-950">{assignment.action}</p>
+        <p className="mt-1 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{projectName}</p>
+        <p className="mt-0.5 truncate text-xs text-slate-500">{assignment.siteName} · {assignment.siteAddress}</p>
+        {assignment.objectiveText ? <p className="mt-1 line-clamp-1 text-xs text-slate-500">Consigne : {assignment.objectiveText}</p> : null}
+      </div>
+
+      <div className="rounded-2xl bg-slate-50 px-3 py-2">
+        <div className="flex items-center justify-between gap-3">
+          <Badge tone={config.tone}>{config.label}</Badge>
+          <span className="truncate text-xs font-bold text-slate-700">{progressLabel}</span>
+        </div>
+        <ProgressValue value={progressValue} />
+        {assignment.latestProgressUpdate?.comment ? (
+          <p className="mt-1 line-clamp-1 text-xs text-slate-500">{assignment.latestProgressUpdate.comment}</p>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 lg:justify-end">
+        <p className="truncate text-xs text-slate-400 lg:max-w-28">
+          {assignment.createdBy.firstName} {assignment.createdBy.lastName}
+        </p>
+        {canMutate ? (
+          <TableActionsMenu
+            actions={[
+              {
+                label: 'Modifier',
+                icon: <Pencil className="h-4 w-4" />,
+                onClick: () => onEdit(assignment),
+              },
+              {
+                label: 'Supprimer',
+                icon: <Trash2 className="h-4 w-4" />,
+                tone: 'danger',
+                onClick: () => onDelete(assignment),
+              },
+            ]}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1772,128 +1797,6 @@ function CentralizedStatusBadge({ item }: Readonly<{ item: CentralizedPlanningAs
   }
 
   return <Badge tone={statusTone(item.status)}>{planningStatusLabel[item.status]}</Badge>;
-}
-
-function ObjectiveProgressCard({
-  assignment,
-}: Readonly<{
-  assignment: Pick<
-    PlanningWebAssignment,
-    | 'targetProgress'
-    | 'targetQuantity'
-    | 'targetUnit'
-    | 'actualQuantity'
-    | 'remainingQuantity'
-    | 'actualProgress'
-    | 'progressDelta'
-    | 'objectiveStatus'
-    | 'latestProgressUpdate'
-  >;
-}>) {
-  const config = objectiveStatusConfig[assignment.objectiveStatus];
-  const hasQuantityObjective = assignment.targetQuantity !== null && assignment.targetQuantity > 0;
-  const actualProgress = assignment.actualProgress ?? assignment.targetProgress;
-  const unit = assignment.targetUnit ? ` ${assignment.targetUnit}` : '';
-  const actualLabel = formatQuantity(assignment.actualQuantity) ?? '0';
-  const targetLabel = formatQuantity(assignment.targetQuantity);
-  const remainingLabel =
-    assignment.remainingQuantity === null
-      ? null
-      : assignment.remainingQuantity > 0
-        ? `${formatQuantity(assignment.remainingQuantity)}${unit} restants`
-        : 'Objectif atteint';
-
-  return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Badge tone={config.tone}>{config.label}</Badge>
-        {actualProgress !== null ? <span className="text-sm font-bold text-slate-900">{actualProgress}%</span> : null}
-      </div>
-
-      <div className="mt-3">
-        <ProgressValue value={actualProgress} />
-      </div>
-
-      {hasQuantityObjective ? (
-        <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
-          <div>
-            <p className="font-semibold uppercase tracking-[0.12em] text-slate-400">Objectif</p>
-            <p className="mt-1 font-semibold text-slate-800">
-              {targetLabel}
-              {unit}
-            </p>
-          </div>
-          <div>
-            <p className="font-semibold uppercase tracking-[0.12em] text-slate-400">Réalisé</p>
-            <p className="mt-1 font-semibold text-slate-800">
-              {actualLabel} / {targetLabel}
-              {unit}
-            </p>
-          </div>
-          <div>
-            <p className="font-semibold uppercase tracking-[0.12em] text-slate-400">Reste</p>
-            <p className="mt-1 font-semibold text-slate-800">{remainingLabel ?? '-'}</p>
-          </div>
-        </div>
-      ) : (
-        <ObjectiveSummary assignment={assignment} />
-      )}
-
-      {assignment.progressDelta !== null ? (
-        <p className="mt-2 text-xs font-semibold text-slate-500">
-          Ecart {assignment.progressDelta >= 0 ? '+' : ''}
-          {assignment.progressDelta}%
-        </p>
-      ) : null}
-      {assignment.latestProgressUpdate?.comment ? (
-        <p className="mt-2 line-clamp-2 text-xs text-slate-500">{assignment.latestProgressUpdate.comment}</p>
-      ) : null}
-    </div>
-  );
-}
-
-function ObjectiveSummary({
-  assignment,
-}: Readonly<{
-  assignment: Pick<
-    PlanningWebAssignment,
-    | 'targetQuantity'
-    | 'targetUnit'
-    | 'actualQuantity'
-    | 'remainingQuantity'
-    | 'actualProgress'
-    | 'progressDelta'
-    | 'objectiveStatus'
-    | 'latestProgressUpdate'
-  >;
-}>) {
-  const config = objectiveStatusConfig[assignment.objectiveStatus];
-  const hasQuantityObjective = assignment.targetQuantity !== null && assignment.targetQuantity > 0;
-
-  return (
-    <div className="mt-2 space-y-1">
-      <Badge tone={config.tone}>{config.label}</Badge>
-      {hasQuantityObjective ? (
-        <p className="text-xs font-semibold text-slate-600">
-          Realise {formatQuantity(assignment.actualQuantity) ?? '0'} / {formatQuantity(assignment.targetQuantity)} {assignment.targetUnit ?? ''}
-          {assignment.remainingQuantity !== null
-            ? assignment.remainingQuantity > 0
-              ? ` - reste ${formatQuantity(assignment.remainingQuantity)} ${assignment.targetUnit ?? ''}`
-              : ' - objectif atteint'
-            : ''}
-        </p>
-      ) : null}
-      {assignment.actualProgress !== null ? (
-        <p className="text-xs font-semibold text-slate-600">
-          Réel {assignment.actualProgress}%
-          {assignment.progressDelta !== null ? ` (${assignment.progressDelta >= 0 ? '+' : ''}${assignment.progressDelta}%)` : ''}
-        </p>
-      ) : null}
-      {assignment.latestProgressUpdate?.comment ? (
-        <p className="line-clamp-2 text-xs text-slate-500">{assignment.latestProgressUpdate.comment}</p>
-      ) : null}
-    </div>
-  );
 }
 
 function LoadingState() {
