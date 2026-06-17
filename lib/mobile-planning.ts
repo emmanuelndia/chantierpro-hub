@@ -2,6 +2,7 @@ import {
   ClockInStatus,
   ClockInType,
   FreeMissionStatus,
+  NegotiationAssignmentStatus,
   PlanningAssignmentStatus,
   PlanningWorkLocationType,
   Prisma,
@@ -140,7 +141,7 @@ export async function getPlanningDay(
 
   const siteWhere = operationalPlanningSiteWhere(user, parsedDate);
   const assignmentScopeWhere = planningAssignmentScopeWhere(user);
-  const [assignments, freeMissionResponse, sites, projects, negotiationZones, scopedSupervisorIds] = await Promise.all([
+  const [assignments, freeMissionResponse, negotiationAssignments, sites, projects, negotiationZones, scopedSupervisorIds] = await Promise.all([
     prisma.planningAssignment.findMany({
       where: {
         date: parsedDate,
@@ -157,6 +158,32 @@ export async function getPlanningDay(
       select: planningAssignmentSelect,
     }),
     listFreeMissions(prisma, user, formatPlanningDate(parsedDate)),
+    user.role === Role.NEGOTIATION_MANAGER
+      ? prisma.negotiationAssignment.findMany({
+          where: {
+            date: parsedDate,
+            deletedAt: null,
+            project: operationalPlanningProjectWhere(user, parsedDate),
+          },
+          orderBy: [
+            { project: { name: 'asc' } },
+            { zone: { name: 'asc' } },
+            { assignee: { firstName: 'asc' } },
+            { assignee: { lastName: 'asc' } },
+            { id: 'asc' },
+          ],
+          include: {
+            project: { select: { id: true, name: true } },
+            zone: true,
+            assignee: { select: { id: true, firstName: true, lastName: true } },
+            createdBy: { select: { id: true, firstName: true, lastName: true, role: true } },
+            sessions: {
+              where: { date: parsedDate },
+              select: { status: true },
+            },
+          },
+        })
+      : Promise.resolve([]),
     prisma.site.findMany({
       where: siteWhere,
       orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
@@ -248,6 +275,7 @@ export async function getPlanningDay(
     assignments: [
       ...assignments.map((assignment) => serializePlanningAssignment(assignment, clockIns)),
       ...freeMissionResponse.missions.map(serializeFreeMissionAsPlanningAssignment),
+      ...negotiationAssignments.map(serializeNegotiationAssignmentAsPlanningAssignment),
     ],
     clockInStatuses: buildClockInStatuses(assignments, clockIns),
     unassignedSupervisors: supervisors.map((supervisor) => ({
@@ -285,8 +313,8 @@ export async function getPlanningDay(
       scopeCount: zone._count.scopes,
       project: zone.project,
     })),
-    hasAssignments: assignments.length + freeMissionResponse.missions.length > 0,
-    canDuplicateFromYesterday: assignments.length + freeMissionResponse.missions.length === 0 && yesterdayTaskCount > 0,
+    hasAssignments: assignments.length + freeMissionResponse.missions.length + negotiationAssignments.length > 0,
+    canDuplicateFromYesterday: assignments.length + freeMissionResponse.missions.length + negotiationAssignments.length === 0 && yesterdayTaskCount > 0,
   };
 }
 
@@ -341,6 +369,10 @@ async function createSinglePlanningAssignment(
   options: { skipDuplicates?: boolean } = {},
 ) {
   if (input.workLocationType === PlanningWorkLocationType.FREE_MISSION) {
+    if (user.role === Role.NEGOTIATION_MANAGER) {
+      return createSingleNegotiationPlanningAssignment(prisma, user, input, options);
+    }
+
     return createSingleFreeMissionPlanningAssignment(prisma, user, input, options);
   }
 
@@ -460,6 +492,57 @@ async function createSingleFreeMissionPlanningAssignment(
   });
 
   return { assignment: serializeFreeMissionAsPlanningAssignment(serializeFreeMission(mission)) };
+}
+
+async function createSingleNegotiationPlanningAssignment(
+  prisma: PrismaClient,
+  user: AuthLikeUser,
+  input: CreateAssignmentRequest,
+  options: { skipDuplicates?: boolean } = {},
+) {
+  const normalized = await validateNegotiationAssignmentInput(prisma, user, input);
+  if (normalized instanceof Response) return normalized;
+
+  const existing = await prisma.negotiationAssignment.findFirst({
+    where: {
+      projectId: normalized.projectId,
+      zoneId: normalized.zoneId,
+      assigneeId: normalized.supervisorId,
+      date: normalized.date,
+      deletedAt: null,
+      status: { not: NegotiationAssignmentStatus.CANCELLED },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    if (options.skipDuplicates) {
+      return { skipped: true as const };
+    }
+    return planningError('TASK_DUPLICATE', 'Cette zone nego existe deja pour cette ressource.', 409);
+  }
+
+  const assignment = await prisma.negotiationAssignment.create({
+    data: {
+      projectId: normalized.projectId,
+      zoneId: normalized.zoneId,
+      assigneeId: normalized.supervisorId,
+      date: normalized.date,
+      plannedZone: normalized.zoneName,
+      instruction: normalized.action,
+      status: NegotiationAssignmentStatus.PLANNED,
+      createdById: user.id,
+    },
+    include: {
+      project: { select: { id: true, name: true } },
+      zone: true,
+      assignee: { select: { id: true, firstName: true, lastName: true } },
+      createdBy: { select: { id: true, firstName: true, lastName: true, role: true } },
+      sessions: { where: { date: normalized.date }, select: { status: true } },
+    },
+  });
+
+  return { assignment: serializeNegotiationAssignmentAsPlanningAssignment(assignment) };
 }
 
 export async function updatePlanningAssignment(
@@ -1095,6 +1178,64 @@ async function validateFreeMissionAssignmentInput(prisma: PrismaClient, user: Au
   };
 }
 
+async function validateNegotiationAssignmentInput(prisma: PrismaClient, user: AuthLikeUser, input: CreateAssignmentRequest) {
+  const date = parsePlanningDate(input.date);
+  if (!date) {
+    return planningError('INVALID_DATE', 'Date invalide.', 400);
+  }
+
+  const rangeError = validateDateWindow(date);
+  if (rangeError) return rangeError;
+
+  const supervisorId = normalizeId(input.supervisorId);
+  const projectId = normalizeId(input.projectId);
+  const zoneId = normalizeId(input.zoneId);
+  const action = normalizeOptionalAction(input.action);
+
+  if (!supervisorId || !projectId || !zoneId) {
+    return planningError('INVALID_REQUEST', 'Ressource, projet et zone sont requis pour une tache nego.', 400);
+  }
+
+  const [project, zone, supervisorIds] = await Promise.all([
+    prisma.project.findFirst({
+      where: {
+        id: projectId,
+        ...operationalPlanningProjectWhere(user, date),
+      },
+      select: { id: true },
+    }),
+    prisma.negotiationZone.findFirst({
+      where: {
+        id: zoneId,
+        projectId,
+      },
+      select: { id: true, name: true },
+    }),
+    getScopedSupervisorIds(prisma, user, date),
+  ]);
+
+  if (!project) {
+    return planningError('PROJECT_NOT_FOUND', 'Projet actif introuvable ou non accessible.', 404);
+  }
+
+  if (!zone) {
+    return planningError('ZONE_NOT_FOUND', 'Zone introuvable pour ce projet.', 404);
+  }
+
+  if (!supervisorIds.includes(supervisorId)) {
+    return planningError('SUPERVISOR_NOT_FOUND', 'Ressource negociation introuvable.', 404);
+  }
+
+  return {
+    date,
+    supervisorId,
+    projectId,
+    zoneId,
+    zoneName: zone.name,
+    action: action ?? `Negociation - ${zone.name}`,
+  };
+}
+
 async function getScopedSupervisorIds(prisma: PrismaClient, user: AuthLikeUser, _date: Date) {
   const roles = isBusinessManagerRole(user.role) ? getBusinessManagedResourceRoles(user.role) : CLASSIC_FIELD_USER_ROLES;
   const supervisors = await prisma.user.findMany({
@@ -1119,7 +1260,7 @@ async function getAssignedSupervisorIdsForDay(
     return new Map<string, string>();
   }
 
-  const [assignments, freeMissions] = await Promise.all([
+  const [assignments, freeMissions, negotiationAssignments] = await Promise.all([
     prisma.planningAssignment.findMany({
       where: {
         date,
@@ -1155,6 +1296,25 @@ async function getAssignedSupervisorIdsForDay(
         },
       },
     }),
+    prisma.negotiationAssignment.findMany({
+      where: {
+        date,
+        deletedAt: null,
+        status: { not: NegotiationAssignmentStatus.CANCELLED },
+        assigneeId: {
+          in: supervisorIds,
+        },
+      },
+      select: {
+        assigneeId: true,
+        plannedZone: true,
+        zone: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    }),
   ]);
 
   const sitesBySupervisor = new Map<string, Set<string>>();
@@ -1169,6 +1329,12 @@ async function getAssignedSupervisorIdsForDay(
     const siteNames = sitesBySupervisor.get(mission.assigneeId) ?? new Set<string>();
     siteNames.add(`Mission libre - ${mission.project.name}`);
     sitesBySupervisor.set(mission.assigneeId, siteNames);
+  }
+
+  for (const assignment of negotiationAssignments) {
+    const siteNames = sitesBySupervisor.get(assignment.assigneeId) ?? new Set<string>();
+    siteNames.add(`Nego - ${assignment.zone?.name ?? assignment.plannedZone ?? 'Zone'}`);
+    sitesBySupervisor.set(assignment.assigneeId, siteNames);
   }
 
   return new Map(
@@ -1630,6 +1796,78 @@ function serializeFreeMissionAsPlanningAssignment(mission: Awaited<ReturnType<ty
     workLocationType: PlanningWorkLocationType.FREE_MISSION,
     clockInStatus: mission.status === FreeMissionStatus.IN_PROGRESS ? 'CLOCKED_IN' : 'CLOCKED_OUT',
     createdBy: mission.createdBy,
+  };
+}
+
+function serializeNegotiationAssignmentAsPlanningAssignment(assignment: {
+  id: string;
+  projectId: string;
+  zoneId: string | null;
+  assigneeId: string;
+  date: Date;
+  plannedZone: string | null;
+  instruction: string | null;
+  status: NegotiationAssignmentStatus;
+  createdAt: Date;
+  project: { id: string; name: string };
+  zone: { id: string; name: string } | null;
+  assignee: { id: string; firstName: string; lastName: string };
+  createdBy: { id: string; firstName: string; lastName: string; role: Role };
+  sessions: { status: unknown }[];
+}): PlanningAssignment {
+  const zoneName = assignment.zone?.name ?? assignment.plannedZone ?? 'Zone nego';
+  const hasOpenSession = assignment.sessions.some((session) => String(session.status) === 'OPEN');
+
+  return {
+    id: assignment.id,
+    kind: 'NEGOTIATION_ASSIGNMENT',
+    supervisorId: assignment.assigneeId,
+    supervisorName: assignment.assignee.lastName,
+    supervisorFirstName: assignment.assignee.firstName,
+    siteId: null,
+    freeMissionId: null,
+    negotiationAssignmentId: assignment.id,
+    projectId: assignment.projectId,
+    projectName: assignment.project.name,
+    zoneId: assignment.zoneId,
+    zoneName,
+    siteName: zoneName,
+    siteAddress: assignment.project.name,
+    siteType: 'FREE_MISSION',
+    action: assignment.instruction ?? `Negociation - ${zoneName}`,
+    targetProgress: null,
+    targetQuantity: null,
+    targetUnit: null,
+    objectiveText: assignment.instruction,
+    plannedDurationMinutes: null,
+    actualQuantity: null,
+    actualProgress: null,
+    progressDelta: null,
+    remainingQuantity: null,
+    objectiveStatus:
+      assignment.status === NegotiationAssignmentStatus.COMPLETED
+        ? 'ACHIEVED'
+        : assignment.status === NegotiationAssignmentStatus.IN_PROGRESS
+          ? 'PARTIAL'
+          : 'NOT_STARTED',
+    latestProgressUpdate: null,
+    assignedAt: assignment.createdAt.toISOString(),
+    status:
+      assignment.status === NegotiationAssignmentStatus.COMPLETED
+        ? PlanningAssignmentStatus.COMPLETED
+        : assignment.status === NegotiationAssignmentStatus.IN_PROGRESS
+          ? PlanningAssignmentStatus.IN_PROGRESS
+          : assignment.status === NegotiationAssignmentStatus.CANCELLED
+            ? PlanningAssignmentStatus.CANCELLED
+            : PlanningAssignmentStatus.ASSIGNED,
+    workLocationType: PlanningWorkLocationType.FREE_MISSION,
+    clockInStatus:
+      assignment.status === NegotiationAssignmentStatus.COMPLETED
+        ? 'CLOCKED_OUT'
+        : hasOpenSession || assignment.status === NegotiationAssignmentStatus.IN_PROGRESS
+          ? 'CLOCKED_IN'
+          : 'CLOCKED_OUT',
+    createdBy: assignment.createdBy,
   };
 }
 

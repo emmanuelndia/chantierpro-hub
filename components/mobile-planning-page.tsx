@@ -9,6 +9,7 @@ import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offli
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type {
   AvailableProject,
+  AvailableNegotiationZone,
   AvailableSite,
   CreateAssignmentRequest,
   DuplicateAssignmentsRequest,
@@ -140,7 +141,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
   const selectedDateObject = parseDateKey(selectedDate);
   const hasAvailableSites = (data?.availableSites.length ?? 0) > 0;
   const hasAssignableResources = (data?.unassignedSupervisors.length ?? 0) > 0;
-  const canOpenCreateForm = hasAvailableSites && hasAssignableResources;
+  const canOpenCreateForm = (hasAvailableSites || (data?.availableProjects.length ?? 0) > 0) && hasAssignableResources;
   const mutationError =
     getMutationError(createAssignmentMutation.error) ??
     getMutationError(updateAssignmentMutation.error) ??
@@ -176,7 +177,8 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
 
   function handleCreateAssignment() {
     const isZoneTask = formData.workLocationType === PlanningWorkLocationType.FREE_MISSION;
-    if (!formData.supervisorId || !formData.action.trim() || (isZoneTask ? !formData.projectId : !formData.siteId)) {
+    const isNegotiationZoneTask = isZoneTask && user.role === 'NEGOTIATION_MANAGER';
+    if (!formData.supervisorId || !formData.action.trim() || (isNegotiationZoneTask ? !formData.projectId || !formData.zoneId : isZoneTask ? !formData.projectId : !formData.siteId)) {
       return;
     }
     createAssignmentMutation.mutate(formData);
@@ -327,6 +329,8 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
           availableSupervisors={data.unassignedSupervisors}
           availableProjects={data.availableProjects}
           availableSites={data.availableSites}
+          availableNegotiationZones={data.availableNegotiationZones}
+          userRole={user.role}
           onSubmit={handleCreateAssignment}
           onCancel={() => {
             setShowAddAssignment(false);
@@ -779,6 +783,8 @@ function AssignmentBottomSheet({
   availableSupervisors,
   availableProjects,
   availableSites,
+  availableNegotiationZones,
+  userRole,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -789,6 +795,8 @@ function AssignmentBottomSheet({
   availableSupervisors: UnassignedSupervisor[];
   availableProjects: AvailableProject[];
   availableSites: AvailableSite[];
+  availableNegotiationZones: AvailableNegotiationZone[];
+  userRole: string;
   onSubmit: () => void;
   onCancel: () => void;
   isSubmitting: boolean;
@@ -796,6 +804,7 @@ function AssignmentBottomSheet({
   const [siteSearch, setSiteSearch] = useState('');
   const [resourceSearch, setResourceSearch] = useState('');
   const isZoneTask = formData.workLocationType === PlanningWorkLocationType.FREE_MISSION;
+  const isNegotiationZoneTask = isZoneTask && userRole === 'NEGOTIATION_MANAGER';
   const requiresSite = !isZoneTask;
   const hasAvailableSites = availableSites.length > 0;
   const hasAvailableProjects = availableProjects.length > 0;
@@ -804,7 +813,11 @@ function AssignmentBottomSheet({
     formData.supervisorId &&
       formData.action.trim() &&
       hasAvailableSupervisors &&
-      (isZoneTask ? formData.projectId && hasAvailableProjects : formData.siteId && hasAvailableSites),
+      (isNegotiationZoneTask
+        ? formData.projectId && formData.zoneId && hasAvailableProjects
+        : isZoneTask
+          ? formData.projectId && hasAvailableProjects
+          : formData.siteId && hasAvailableSites),
   );
   const hasQuantityObjective = formData.targetQuantity !== null && formData.targetQuantity !== undefined && formData.targetQuantity > 0;
   const supervisorOptions = toMobileSupervisorOptions(availableSupervisors);
@@ -813,6 +826,10 @@ function AssignmentBottomSheet({
   const normalizedSiteSearch = siteSearch.trim().toLowerCase();
   const sitesForProject = formData.projectId ? availableSites.filter((site) => site.project.id === formData.projectId) : availableSites;
   const siteOptions = toMobileSiteOptions(sitesForProject);
+  const zonesForProject = formData.projectId
+    ? availableNegotiationZones.filter((zone) => zone.projectId === formData.projectId)
+    : availableNegotiationZones;
+  const zoneOptions = toMobileNegotiationZoneOptions(zonesForProject);
   const filteredSupervisors = normalizedResourceSearch
     ? availableSupervisors.filter((supervisor) =>
         `${supervisor.firstName} ${supervisor.name} ${supervisor.email} ${supervisor.availabilityLabel}`
@@ -875,6 +892,7 @@ function AssignmentBottomSheet({
                   ...prev,
                   workLocationType,
                   siteId: workLocationType === PlanningWorkLocationType.FREE_MISSION ? '' : (prev.siteId ?? ''),
+                  zoneId: workLocationType === PlanningWorkLocationType.FREE_MISSION ? (prev.zoneId ?? '') : '',
                 }));
               }}
               className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
@@ -911,6 +929,10 @@ function AssignmentBottomSheet({
                 setFormData((prev) => ({
                   ...prev,
                   projectId,
+                  zoneId:
+                    prev.zoneId && availableNegotiationZones.some((zone) => zone.id === prev.zoneId && zone.projectId === projectId)
+                      ? prev.zoneId
+                      : '',
                   siteId:
                     prev.siteId && availableSites.some((site) => site.id === prev.siteId && site.project.id === projectId)
                       ? prev.siteId
@@ -922,6 +944,28 @@ function AssignmentBottomSheet({
               value={formData.projectId ?? ''}
             />
           </label>
+
+          {isNegotiationZoneTask ? (
+            <label className="block text-sm font-semibold text-slate-700">
+              Zone
+              <SearchableSelect
+                className="mt-2"
+                emptyLabel={formData.projectId ? 'Aucune zone ne correspond a ce projet.' : 'Selectionne un projet avant la zone.'}
+                onChange={(zoneId) => {
+                  const zone = availableNegotiationZones.find((item) => item.id === zoneId);
+                  setFormData((prev) => ({
+                    ...prev,
+                    zoneId,
+                    projectId: zone?.projectId ?? prev.projectId ?? '',
+                    action: prev.action.trim() ? prev.action : zone ? `Negociation - ${zone.name}` : prev.action,
+                  }));
+                }}
+                options={zoneOptions}
+                placeholder="Selectionner une zone"
+                value={formData.zoneId ?? ''}
+              />
+            </label>
+          ) : null}
 
           <label className={requiresSite ? 'block text-sm font-semibold text-slate-700' : 'hidden'}>
             Chantier
@@ -1240,6 +1284,7 @@ function createEmptyForm(date: string): CreateAssignmentRequest {
     supervisorId: '',
     siteId: '',
     projectId: '',
+    zoneId: '',
     action: '',
     targetProgress: null,
     targetQuantity: null,
@@ -1272,6 +1317,15 @@ function toMobileProjectOptions(projects: AvailableProject[]): SearchableSelectO
   return projects.map((project) => ({
     value: project.id,
     label: project.name,
+  }));
+}
+
+function toMobileNegotiationZoneOptions(zones: AvailableNegotiationZone[]): SearchableSelectOption[] {
+  return zones.map((zone) => ({
+    value: zone.id,
+    label: zone.name,
+    description: [zone.project.name, zone.city, `${zone.scopeCount} scope(s)`].filter(Boolean).join(' - '),
+    keywords: `${zone.project.name} ${zone.city ?? ''} ${zone.region ?? ''}`,
   }));
 }
 

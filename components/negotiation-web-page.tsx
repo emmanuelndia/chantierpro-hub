@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { useToast } from '@/components/toast-provider';
@@ -11,6 +11,13 @@ import { authFetch } from '@/lib/auth/client-session';
 type NegotiationOverview = {
   date: string;
   projects: { id: string; name: string; city: string; status: string }[];
+  zones: {
+    id: string;
+    projectId: string;
+    name: string;
+    city: string | null;
+    region: string | null;
+  }[];
   resources: { id: string; name: string; role: string; username: string }[];
   assignments: {
     id: string;
@@ -76,7 +83,14 @@ const todayKey = new Date().toISOString().slice(0, 10);
 
 export function NegotiationWebPage() {
   const { pushToast } = useToast();
+  const queryClient = useQueryClient();
   const [date, setDate] = useState(todayKey);
+  const [zoneForm, setZoneForm] = useState({
+    projectId: '',
+    name: '',
+    city: '',
+    region: '',
+  });
   const [filters, setFilters] = useState({
     projectId: '',
     resourceId: '',
@@ -91,6 +105,17 @@ export function NegotiationWebPage() {
     refetchInterval: 60_000,
   });
   const overview = overviewQuery.data;
+  const createZoneMutation = useMutation({
+    mutationFn: createNegotiationZone,
+    onSuccess: async () => {
+      setZoneForm({ projectId: '', name: '', city: '', region: '' });
+      await queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
+      pushToast({ type: 'success', title: 'Zone creee', message: 'La zone est disponible pour les taches nego.' });
+    },
+    onError: (error) => {
+      pushToast({ type: 'error', title: 'Creation impossible', message: error instanceof Error ? error.message : 'Operation refusee.' });
+    },
+  });
   const projectSummaries = useMemo(
     () => (filters.projectId ? overview?.projectScopeSummaries.filter((summary) => summary.projectId === filters.projectId) : overview?.projectScopeSummaries) ?? [],
     [filters.projectId, overview?.projectScopeSummaries],
@@ -116,6 +141,15 @@ export function NegotiationWebPage() {
 
   function setFilter(name: keyof typeof filters, value: string) {
     setFilters((current) => ({ ...current, [name]: value }));
+  }
+
+  function submitZone() {
+    if (!zoneForm.projectId || !zoneForm.name.trim()) {
+      pushToast({ type: 'error', title: 'Zone incomplete', message: 'Selectionne un projet et saisis le nom de la zone.' });
+      return;
+    }
+
+    createZoneMutation.mutate(zoneForm);
   }
 
   return (
@@ -148,6 +182,44 @@ export function NegotiationWebPage() {
               Les zones de journee se planifient maintenant dans Planning avec le type Zone. Les pointages des negociateurs remontent dans Presences comme du terrain.
               Cette page sert au suivi metier des scopes : autorisations, refus, zones reelles et remarques terrain.
             </p>
+          </section>
+
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Zones projet</p>
+                <h2 className="mt-1 text-xl font-black text-slate-950">Creer une zone negociation</h2>
+              </div>
+              <Badge tone="info">{overview.zones.length} zone(s)</Badge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1fr_auto]">
+              <Select label="Projet" value={zoneForm.projectId} onChange={(projectId) => setZoneForm((current) => ({ ...current, projectId }))}>
+                <option value="">Selectionner</option>
+                {overview.projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </Select>
+              <label className="text-sm font-bold text-slate-700">
+                Nom zone
+                <input className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500" onChange={(event) => setZoneForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ex: Cocody Nord" value={zoneForm.name} />
+              </label>
+              <label className="text-sm font-bold text-slate-700">
+                Commune
+                <input className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500" onChange={(event) => setZoneForm((current) => ({ ...current, city: event.target.value }))} placeholder="Facultatif" value={zoneForm.city} />
+              </label>
+              <label className="text-sm font-bold text-slate-700">
+                Region
+                <input className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-orange-500" onChange={(event) => setZoneForm((current) => ({ ...current, region: event.target.value }))} placeholder="Facultatif" value={zoneForm.region} />
+              </label>
+              <button
+                className="min-h-12 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-60"
+                disabled={createZoneMutation.isPending}
+                onClick={submitZone}
+                type="button"
+              >
+                {createZoneMutation.isPending ? 'Creation...' : 'Creer'}
+              </button>
+            </div>
           </section>
 
           <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
@@ -324,6 +396,25 @@ async function fetchNegotiationOverview(
     throw new Error('Impossible de charger le suivi negociation.');
   }
   return response.json() as Promise<NegotiationOverview>;
+}
+
+async function createNegotiationZone(data: { projectId: string; name: string; city: string; region: string }) {
+  const response = await authFetch('/api/negotiation/zones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      projectId: data.projectId,
+      name: data.name,
+      city: data.city || null,
+      region: data.region || null,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+
+  return response.json() as Promise<{ zone: NegotiationOverview['zones'][number] }>;
 }
 
 async function downloadNegotiationExport(date: string, pushToast: ReturnType<typeof useToast>['pushToast']) {

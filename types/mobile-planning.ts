@@ -20,14 +20,17 @@ export type TaskProgressUpdateItem = {
 
 export type PlanningAssignment = {
   id: string;
-  kind?: 'PLANNING_ASSIGNMENT' | 'FREE_MISSION';
+  kind?: 'PLANNING_ASSIGNMENT' | 'FREE_MISSION' | 'NEGOTIATION_ASSIGNMENT';
   supervisorId: string;
   supervisorName: string;
   supervisorFirstName: string;
   siteId: string | null;
   freeMissionId?: string | null;
+  negotiationAssignmentId?: string | null;
   projectId?: string | null;
   projectName?: string | null;
+  zoneId?: string | null;
+  zoneName?: string | null;
   siteName: string;
   siteAddress: string;
   siteType: SiteType | 'FREE_MISSION';
@@ -121,6 +124,7 @@ export type CreateAssignmentRequest = {
   supervisorIds?: string[];
   siteId?: string | null;
   projectId?: string | null;
+  zoneId?: string | null;
   action: string;
   targetProgress?: number | null;
   targetQuantity?: number | null;
@@ -169,12 +173,15 @@ export type SupervisorTaskPhoto = {
 
 export type SupervisorMyAssignment = {
   id: string;
-  kind?: 'PLANNING_ASSIGNMENT' | 'FREE_MISSION';
+  kind?: 'PLANNING_ASSIGNMENT' | 'FREE_MISSION' | 'NEGOTIATION_ASSIGNMENT';
   date: string;
   siteId: string | null;
   freeMissionId?: string | null;
+  negotiationAssignmentId?: string | null;
   projectId?: string | null;
   projectName?: string | null;
+  zoneId?: string | null;
+  zoneName?: string | null;
   siteName: string;
   siteAddress: string;
   siteType: SiteType | 'FREE_MISSION';
