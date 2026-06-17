@@ -1010,7 +1010,7 @@ function DayPlanningCards({
             </div>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 bg-slate-50/40">
             {group.assignments.map((assignment) => {
               const site = sites.find((item) => item.id === assignment.siteId);
               return (
@@ -1057,28 +1057,35 @@ function CompactPlanningTaskRow({
       : 'Aucun avancement';
 
   return (
-    <div className="grid gap-3 px-5 py-3 transition hover:bg-slate-50 lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.85fr)_auto] lg:items-center">
+    <div className="relative grid gap-3 bg-white px-5 py-3 pl-6 transition hover:bg-slate-50 lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.8fr)_auto] lg:items-center">
+      <span className={`absolute bottom-3 left-0 top-3 w-1 rounded-r-full ${planningRowAccentClassName(assignment)}`} />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : assignment.workLocationType === 'FREE_MISSION' ? 'warning' : 'info'}>
+          <Badge className="px-2.5 py-0.5 text-[10px]" tone={assignment.workLocationType === 'OFFICE' ? 'neutral' : assignment.workLocationType === 'FREE_MISSION' ? 'warning' : 'info'}>
             {workLocationTypeLabel[assignment.workLocationType]}
           </Badge>
-          {assignment.siteType === 'FREE_MISSION' ? <Badge tone="warning">Sans chantier fixe</Badge> : null}
-          {showInterventionZone ? <Badge tone="success">Zone d&apos;intervention</Badge> : null}
-          <Badge tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
+          {assignment.siteType === 'FREE_MISSION' ? <Badge className="px-2.5 py-0.5 text-[10px]" tone="warning">Sans chantier fixe</Badge> : null}
+          {showInterventionZone ? <Badge className="px-2.5 py-0.5 text-[10px]" tone="success">Zone d&apos;intervention</Badge> : null}
+          <Badge className="px-2.5 py-0.5 text-[10px]" tone={statusTone(assignment.status)}>{planningStatusLabel[assignment.status]}</Badge>
         </div>
-        <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-slate-950">{assignment.action}</p>
-        <p className="mt-1 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{projectName}</p>
-        <p className="mt-0.5 truncate text-xs text-slate-500">{assignment.siteName} · {assignment.siteAddress}</p>
+        <p className="mt-2 line-clamp-2 text-sm font-bold leading-5 text-slate-950">{assignment.action}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+          <span className="font-bold uppercase tracking-[0.12em] text-slate-400">{projectName}</span>
+          <span className="hidden text-slate-300 sm:inline">/</span>
+          <span className="truncate font-semibold">{assignment.siteName}</span>
+          {assignment.siteAddress ? <span className="truncate text-slate-400">{assignment.siteAddress}</span> : null}
+        </div>
         {assignment.objectiveText ? <p className="mt-1 line-clamp-1 text-xs text-slate-500">Consigne : {assignment.objectiveText}</p> : null}
       </div>
 
-      <div className="rounded-2xl bg-slate-50 px-3 py-2">
+      <div className={`rounded-2xl border px-3 py-2 ${objectivePanelClassName(config.tone)}`}>
         <div className="flex items-center justify-between gap-3">
-          <Badge tone={config.tone}>{config.label}</Badge>
           <span className="truncate text-xs font-bold text-slate-700">{progressLabel}</span>
+          <Badge className="px-2.5 py-0.5 text-[10px]" tone={config.tone}>{config.label}</Badge>
         </div>
-        <ProgressValue value={progressValue} />
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/80">
+          <div className={`h-full rounded-full ${objectiveBarClassName(config.tone)}`} style={{ width: `${progressValue}%` }} />
+        </div>
         {assignment.latestProgressUpdate?.comment ? (
           <p className="mt-1 line-clamp-1 text-xs text-slate-500">{assignment.latestProgressUpdate.comment}</p>
         ) : null}
@@ -1086,7 +1093,7 @@ function CompactPlanningTaskRow({
 
       <div className="flex items-center justify-between gap-3 lg:justify-end">
         <p className="truncate text-xs text-slate-400 lg:max-w-28">
-          {assignment.createdBy.firstName} {assignment.createdBy.lastName}
+          Créé par {assignment.createdBy.firstName} {assignment.createdBy.lastName}
         </p>
         {canMutate ? (
           <TableActionsMenu
@@ -1744,19 +1751,6 @@ function MetricCard({ label, value }: Readonly<{ label: string; value: number | 
   );
 }
 
-function ProgressValue({ value }: Readonly<{ value: number | null }>) {
-  if (value === null) return <span className="text-slate-400">n/a</span>;
-
-  return (
-    <div className="w-full min-w-32">
-      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full bg-orange-500" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
-      </div>
-      <p className="mt-1 text-xs font-semibold text-slate-600">{value}%</p>
-    </div>
-  );
-}
-
 function CentralizedProgressSummary({ assignment }: Readonly<{ assignment: CentralizedPlanningAssignment }>) {
   const hasQuantityObjective = assignment.targetQuantity !== null && assignment.targetQuantity > 0;
   const progressValue = Math.max(0, Math.min(100, assignment.actualProgress ?? 0));
@@ -2397,6 +2391,28 @@ function statusTone(status: PlanningAssignmentStatus) {
   if (status === PlanningAssignmentStatus.IN_PROGRESS) return 'info';
   if (status === PlanningAssignmentStatus.CANCELLED) return 'error';
   return 'warning';
+}
+
+function planningRowAccentClassName(assignment: PlanningWebAssignment) {
+  if (assignment.objectiveStatus === 'BLOCKED') return 'bg-red-500';
+  if (assignment.status === PlanningAssignmentStatus.COMPLETED || assignment.objectiveStatus === 'ACHIEVED') return 'bg-emerald-500';
+  if (assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION) return 'bg-orange-500';
+  if (assignment.workLocationType === PlanningWorkLocationType.OFFICE) return 'bg-slate-400';
+  return 'bg-blue-500';
+}
+
+function objectivePanelClassName(tone: (typeof objectiveStatusConfig)[keyof typeof objectiveStatusConfig]['tone']) {
+  if (tone === 'success') return 'border-emerald-100 bg-emerald-50/80';
+  if (tone === 'warning') return 'border-orange-100 bg-orange-50/80';
+  if (tone === 'error') return 'border-red-100 bg-red-50/80';
+  return 'border-slate-100 bg-slate-50/80';
+}
+
+function objectiveBarClassName(tone: (typeof objectiveStatusConfig)[keyof typeof objectiveStatusConfig]['tone']) {
+  if (tone === 'success') return 'bg-emerald-500';
+  if (tone === 'warning') return 'bg-orange-500';
+  if (tone === 'error') return 'bg-red-500';
+  return 'bg-slate-400';
 }
 
 function formatDateKey(date: Date) {

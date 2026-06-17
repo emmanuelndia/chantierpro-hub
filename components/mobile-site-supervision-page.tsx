@@ -349,7 +349,7 @@ function presenceTone(status: MobileSitePresenceItem['status']) {
     return 'bg-orange-100 text-orange-700';
   }
 
-  return 'bg-slate-100 text-slate-500';
+  return 'bg-red-100 text-red-700';
 }
 
 function formatSiteStatus(status: string) {

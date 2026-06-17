@@ -320,14 +320,10 @@ function PresenceBadge({
 }: Readonly<{
   presence: RhResourcesResponse['items'][number]['todayPresence'];
 }>) {
-  const tone =
-    presence.status === 'PRESENT' || presence.status === 'PAUSED'
-      ? 'success'
-      : presence.status === 'ABSENT' || presence.isLate
-        ? 'warning'
-        : presence.status === 'ANOMALY'
-          ? 'error'
-          : 'neutral';
+  let tone: 'neutral' | 'success' | 'warning' | 'error' = 'neutral';
+  if (presence.status === 'PRESENT') tone = 'success';
+  if (presence.status === 'PAUSED' || presence.isLate) tone = 'warning';
+  if (presence.status === 'ABSENT' || presence.status === 'ANOMALY') tone = 'error';
 
   return (
     <div className="space-y-1">

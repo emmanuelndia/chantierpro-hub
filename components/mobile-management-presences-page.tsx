@@ -223,7 +223,8 @@ function statusLabel(status: MobilePresenceListStatus) {
 
 function statusTone(status: MobilePresenceListStatus, isLate: boolean) {
   if (isLate) return 'bg-orange-100 text-orange-700';
-  if (status === 'PRESENT' || status === 'PAUSED') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'PRESENT') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'PAUSED') return 'bg-orange-100 text-orange-700';
   if (status === 'ABSENT') return 'bg-red-100 text-red-700';
   if (status === 'ANOMALY') return 'bg-amber-100 text-amber-700';
   return 'bg-slate-100 text-slate-700';

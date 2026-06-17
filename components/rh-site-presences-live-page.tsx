@@ -231,7 +231,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <LiveKpi label="Presentes" tone="success" value={displaySummary.present} />
         <LiveKpi label="Assignes" value={displaySummary.expected} />
-        <LiveKpi label="Absentes" tone="warning" value={displaySummary.absent} />
+        <LiveKpi label="Absentes" tone="danger" value={displaySummary.absent} />
         <LiveKpi label="Retards" tone={displaySummary.late > 0 ? 'warning' : 'neutral'} value={displaySummary.late} />
       </section>
 
@@ -373,7 +373,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
           <div className="flex flex-wrap gap-2">
             <SiteCounter label="Presents" tone="success" value={displaySummary.present} />
             <SiteCounter label="Pause" tone="warning" value={displaySummary.paused} />
-            <SiteCounter label="Absents" tone="warning" value={displaySummary.absent} />
+            <SiteCounter label="Absents" tone="danger" value={displaySummary.absent} />
             <SiteCounter label="Sorties" value={displaySummary.left} />
             <SiteCounter label="Retards" tone="warning" value={displaySummary.late} />
           </div>
@@ -605,7 +605,8 @@ function getLiveResourceStatusLabel(resource: Pick<RhSitePresenceLiveResource, '
 
 function liveStatusTone(status: RhSitePresenceLiveStatus) {
   if (status === 'PRESENT') return 'success';
-  if (status === 'PAUSED' || status === 'EXPECTED_NOT_CLOCKED') return 'warning';
+  if (status === 'PAUSED') return 'warning';
+  if (status === 'EXPECTED_NOT_CLOCKED') return 'error';
   if (status === 'ANOMALY') return 'error';
   return 'neutral';
 }
