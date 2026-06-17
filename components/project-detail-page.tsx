@@ -51,6 +51,19 @@ type NegotiationScopesResponse = {
   buildings: NegotiationScopeItem[];
 };
 
+type NegotiationZoneItem = {
+  id: string;
+  projectId: string;
+  name: string;
+  city: string | null;
+  region: string | null;
+  scopeCount: number;
+};
+
+type NegotiationZonesResponse = {
+  zones: NegotiationZoneItem[];
+};
+
 type SiteFormValues = {
   projectId: string;
   name: string;
@@ -110,6 +123,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
   const [siteImportOpen, setSiteImportOpen] = useState(false);
   const [scopeDrawerOpen, setScopeDrawerOpen] = useState(false);
   const [scopeImportOpen, setScopeImportOpen] = useState(false);
+  const [zoneDrawerOpen, setZoneDrawerOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<ProjectSiteItem | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
@@ -166,6 +180,18 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
         throw new Error('Scopes indisponibles.');
       }
       return (await response.json()) as NegotiationScopesResponse;
+    },
+    enabled: isNegotiationProjectMode,
+  });
+
+  const zonesQuery = useQuery({
+    queryKey: ['negotiation-project-zones', projectId],
+    queryFn: async () => {
+      const response = await authFetch(`/api/negotiation/zones?projectId=${encodeURIComponent(projectId)}`);
+      if (!response.ok) {
+        throw new Error('Zones indisponibles.');
+      }
+      return (await response.json()) as NegotiationZonesResponse;
     },
     enabled: isNegotiationProjectMode,
   });
@@ -313,6 +339,16 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            {isNegotiationProjectMode ? (
+              <button
+                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                hidden={!canManageSites}
+                onClick={() => setZoneDrawerOpen(true)}
+                type="button"
+              >
+                Créer zone
+              </button>
+            ) : null}
             <button
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => {
@@ -370,7 +406,39 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
       </section>
 
       {activeTab === 'sites' && isNegotiationProjectMode ? (
-        <section className="grid gap-4 xl:grid-cols-2">
+        <section className="space-y-4">
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Zones du projet</p>
+                <h2 className="mt-1 text-xl font-semibold text-slate-950">Regroupements pour le planning négo</h2>
+              </div>
+              <Badge tone="info">{zonesQuery.data?.zones.length ?? 0} zone(s)</Badge>
+            </div>
+            {zonesQuery.isLoading ? <LoadingCard message="Chargement des zones..." /> : null}
+            {!zonesQuery.isLoading && (zonesQuery.data?.zones.length ?? 0) === 0 ? (
+              <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+                Aucune zone créée. Tu peux créer une zone manuellement ou importer les scopes, l&apos;import créera aussi les zones détectées.
+              </p>
+            ) : null}
+            {zonesQuery.data?.zones.length ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {zonesQuery.data.zones.map((zone) => (
+                  <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4" key={zone.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-semibold text-slate-950">{zone.name}</h3>
+                        <p className="mt-1 truncate text-sm text-slate-500">{[zone.city, zone.region].filter(Boolean).join(' - ') || 'Localisation non renseignée'}</p>
+                      </div>
+                      <Badge tone="neutral">{zone.scopeCount} scope(s)</Badge>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
           {scopesQuery.isLoading ? (
             <div className="xl:col-span-2">
               <LoadingCard message="Chargement des scopes..." />
@@ -414,6 +482,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
               </article>
             ))
           )}
+          </div>
         </section>
       ) : null}
 
@@ -618,9 +687,21 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
         onClose={() => setScopeDrawerOpen(false)}
         onCreated={() => {
           void queryClient.invalidateQueries({ queryKey: ['negotiation-project-scopes', projectId] });
+          void queryClient.invalidateQueries({ queryKey: ['negotiation-project-zones', projectId] });
           void queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
         }}
         open={scopeDrawerOpen}
+        projectId={projectId}
+      />
+
+      <ZoneFormDrawer
+        onClose={() => setZoneDrawerOpen(false)}
+        onCreated={() => {
+          void queryClient.invalidateQueries({ queryKey: ['negotiation-project-zones', projectId] });
+          void queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
+          void queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+        }}
+        open={zoneDrawerOpen}
         projectId={projectId}
       />
 
@@ -628,6 +709,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
         onClose={() => setScopeImportOpen(false)}
         onImported={() => {
           void queryClient.invalidateQueries({ queryKey: ['negotiation-project-scopes', projectId] });
+          void queryClient.invalidateQueries({ queryKey: ['negotiation-project-zones', projectId] });
           void queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
         }}
         open={scopeImportOpen}
@@ -1011,6 +1093,96 @@ function ScopeFormDrawer({
           type="button"
         >
           {mutation.isPending ? 'Creation...' : 'Créer le scope'}
+        </button>
+      </aside>
+    </div>
+  );
+}
+
+function ZoneFormDrawer({
+  open,
+  projectId,
+  onCreated,
+  onClose,
+}: Readonly<{
+  open: boolean;
+  projectId: string;
+  onCreated: () => void;
+  onClose: () => void;
+}>) {
+  const { pushToast } = useToast();
+  const [form, setForm] = useState({
+    name: '',
+    city: '',
+    region: '',
+  });
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const response = await authFetch('/api/negotiation/zones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          name: form.name,
+          city: form.city,
+          region: form.region,
+        }),
+      });
+      if (!response.ok) {
+        const errorBody = (await safeJson(response)) as { message?: string } | null;
+        throw new Error(errorBody?.message ?? 'Impossible de creer la zone.');
+      }
+      return response.json() as Promise<unknown>;
+    },
+    onSuccess: () => {
+      pushToast({ type: 'success', title: 'Zone creee', message: 'La zone est disponible dans le planning negociation.' });
+      setForm({ name: '', city: '', region: '' });
+      onCreated();
+      onClose();
+    },
+    onError: (error) => {
+      pushToast({
+        type: 'error',
+        title: 'Creation impossible',
+        message: error instanceof Error ? error.message : 'La zone n a pas pu etre creee.',
+      });
+    },
+  });
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/45">
+      <aside className="custom-scrollbar h-full w-full max-w-xl overflow-y-auto bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Nouvelle zone</p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-950">Créer une zone</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              La zone regroupe les scopes du projet et sert ensuite à planifier les ressources négo.
+            </p>
+          </div>
+          <button className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" onClick={onClose} type="button">
+            Fermer
+          </button>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <ScopeInput label="Nom de la zone" required value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ScopeInput label="Commune" value={form.city} onChange={(value) => setForm((current) => ({ ...current, city: value }))} />
+            <ScopeInput label="Région" value={form.region} onChange={(value) => setForm((current) => ({ ...current, region: value }))} />
+          </div>
+        </div>
+
+        <button
+          className="mt-6 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!form.name.trim() || mutation.isPending}
+          onClick={() => mutation.mutate()}
+          type="button"
+        >
+          {mutation.isPending ? 'Creation...' : 'Créer la zone'}
         </button>
       </aside>
     </div>
