@@ -22,7 +22,7 @@ const mobileCameraRoles: readonly Role[] = [
   Role.GENERAL_SUPERVISOR,
   Role.BE_RESOURCE,
   Role.NEGOTIATION_RESOURCE,
-  Role.DRIVER,
+  Role.FLEET_RESOURCE,
 ];
 
 const mobileCameraFabRoles: readonly Role[] = [

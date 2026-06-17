@@ -11,7 +11,7 @@ const ROLE_LABELS: Record<Role, string> = {
   NEGOTIATION_MANAGER: 'Responsable Négociation',
   NEGOTIATION_RESOURCE: 'Ressource Négociation',
   FLEET_MANAGER: 'Responsable Parc Auto',
-  DRIVER: 'Chauffeur',
+  FLEET_RESOURCE: 'Ressource parc auto',
   PROJECT_MANAGER: 'Chef de projet',
   DIRECTION: 'Direction',
   HR: 'Ressources humaines',

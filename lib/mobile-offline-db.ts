@@ -1,6 +1,6 @@
 import type { ClockInType, PhotoTag } from '@prisma/client';
 import { authFetch } from '@/lib/auth/client-session';
-import type { BatchSyncItemInput, BatchSyncItemResult } from '@/types/clock-in';
+import type { BatchSyncItemResult, ClockInInput } from '@/types/clock-in';
 
 const DB_NAME = 'chantierpro-mobile-offline';
 const DB_VERSION = 2;
@@ -23,9 +23,13 @@ type StoreName =
   | 'syncLogs'
   | 'clientMappings';
 
-export type OfflineClockInItem = BatchSyncItemInput & {
+export type OfflineClockInItem = ClockInInput & {
   clientId: string;
   siteName: string;
+  siteId?: string | null;
+  freeMissionId?: string | null;
+  officeLocationId?: string | null;
+  planningAssignmentId?: string | null;
 };
 
 export type OfflineCommentItem = {
@@ -334,60 +338,168 @@ async function syncClockIns(errors: string[]) {
   const sortedClockIns = clockIns.sort(
     (left, right) => new Date(left.timestampLocal).getTime() - new Date(right.timestampLocal).getTime(),
   );
-  const response = await authFetch('/api/sync/batch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items: sortedClockIns }),
-  });
-
-  if (!response.ok) {
-    errors.push('Synchronisation des pointages refusee.');
-    return;
-  }
-
-  const payload = (await response.json()) as { items: BatchSyncItemResult[] };
+  const siteClockIns = sortedClockIns.filter((item): item is OfflineClockInItem & { siteId: string } => Boolean(item.siteId));
+  const contextualClockIns = sortedClockIns.filter((item) => !item.siteId);
   const nextDb = await openDb();
 
-  for (let index = 0; index < payload.items.length; index += 1) {
-    const result = payload.items[index];
-    const source = sortedClockIns[index];
+  if (siteClockIns.length > 0) {
+    const response = await authFetch('/api/sync/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: siteClockIns.map((item) => ({
+          siteId: item.siteId,
+          type: item.type,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          accuracy: item.accuracy,
+          timestampLocal: item.timestampLocal,
+          comment: item.comment ?? null,
+        })),
+      }),
+    });
 
-    const recordId = result?.recordId;
+    if (!response.ok) {
+      errors.push('Synchronisation des pointages chantier refusee.');
+    } else {
+      const payload = (await response.json()) as { items: BatchSyncItemResult[] };
 
-    if (!source || !recordId) {
-      if (result?.message) {
-        errors.push(result.message);
+      for (let index = 0; index < payload.items.length; index += 1) {
+        const result = payload.items[index];
+        const source = siteClockIns[index];
+        if (!result || !source) {
+          continue;
+        }
+        await syncClockInResult({
+          comments,
+          db: nextDb,
+          errors,
+          result,
+          source,
+        });
       }
+    }
+  }
+
+  for (const source of contextualClockIns) {
+    const response = await syncContextualClockIn(source);
+
+    if (!response.ok) {
+      errors.push(response.message);
       continue;
     }
 
-    await storeRequest(nextDb, 'clientMappings', 'readwrite', (store) =>
-      store.put({ clockInClientId: source.clientId, serverRecordId: recordId } satisfies ClientMapping),
-    );
-    await storeRequest(nextDb, 'clockIns', 'readwrite', (store) => store.delete(source.clientId));
-
-    const comment = comments.find((item) => item.clientId === source.clientId);
-
-    if (comment) {
-      const commentResponse = await authFetch(`/api/clock-in/${recordId}/comment`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: comment.comment }),
-      });
-
-      if (commentResponse.ok) {
-        await storeRequest(nextDb, 'comments', 'readwrite', (store) => store.delete(comment.clientId));
-      } else {
-        errors.push('Commentaire en attente non synchronise.');
-      }
-    }
-
-    if (result.status === 'ANOMALY' && result.message) {
-      errors.push(result.message);
-    }
+    await syncClockInResult({
+      comments,
+      db: nextDb,
+      errors,
+      result: {
+        status: response.status ?? 'VALID',
+        recordId: response.recordId,
+      },
+      source,
+    });
   }
 
   nextDb.close();
+}
+
+async function syncContextualClockIn(item: OfflineClockInItem): Promise<{
+  ok: boolean;
+  message: string;
+  recordId?: string;
+  status?: BatchSyncItemResult['status'];
+}> {
+  const payload = {
+    type: item.type,
+    latitude: item.latitude,
+    longitude: item.longitude,
+    accuracy: item.accuracy,
+    timestampLocal: item.timestampLocal,
+    comment: item.comment ?? null,
+  };
+
+  if (item.officeLocationId) {
+    const response = await authFetch('/api/office-clock-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...payload,
+        officeLocationId: item.officeLocationId,
+        planningAssignmentId: item.planningAssignmentId ?? null,
+      }),
+    });
+
+    if (!response.ok) {
+      return { ok: false, message: 'Synchronisation du pointage bureau refusee.' };
+    }
+
+    const data = (await response.json()) as { record: { id: string; status: BatchSyncItemResult['status'] } };
+    return { ok: true, message: '', recordId: data.record.id, status: data.record.status };
+  }
+
+  if (item.freeMissionId) {
+    const response = await authFetch(`/api/free-missions/${item.freeMissionId}/clock-in`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      return { ok: false, message: 'Synchronisation du pointage zone refusee.' };
+    }
+
+    const data = (await response.json()) as { record: { id: string; status: BatchSyncItemResult['status'] } };
+    return { ok: true, message: '', recordId: data.record.id, status: data.record.status };
+  }
+
+  return { ok: false, message: 'Pointage offline sans contexte exploitable.' };
+}
+
+async function syncClockInResult(payload: {
+  db: IDBDatabase;
+  source: OfflineClockInItem;
+  result: {
+    message?: string | undefined;
+    recordId?: string | undefined;
+    status?: BatchSyncItemResult['status'] | undefined;
+  };
+  comments: OfflineCommentItem[];
+  errors: string[];
+}) {
+  const { db, source, result, comments, errors } = payload;
+  const recordId = result.recordId;
+
+  if (!recordId) {
+    if (result.message) {
+      errors.push(result.message);
+    }
+    return;
+  }
+
+  await storeRequest(db, 'clientMappings', 'readwrite', (store) =>
+    store.put({ clockInClientId: source.clientId, serverRecordId: recordId } satisfies ClientMapping),
+  );
+  await storeRequest(db, 'clockIns', 'readwrite', (store) => store.delete(source.clientId));
+
+  const comment = comments.find((item) => item.clientId === source.clientId);
+  if (comment) {
+    const commentResponse = await authFetch(`/api/clock-in/${recordId}/comment`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment: comment.comment }),
+    });
+
+    if (commentResponse.ok) {
+      await storeRequest(db, 'comments', 'readwrite', (store) => store.delete(comment.clientId));
+    } else {
+      errors.push('Commentaire en attente non synchronise.');
+    }
+  }
+
+  if (result.status === 'ANOMALY' && result.message) {
+    errors.push(result.message);
+  }
 }
 
 async function syncReports(errors: string[]) {
@@ -676,11 +788,13 @@ function isClockInItem(value: unknown): value is OfflineClockInItem {
   return (
     isRecord(value) &&
     typeof value.clientId === 'string' &&
-    typeof value.siteId === 'string' &&
     typeof value.siteName === 'string' &&
     typeof value.latitude === 'number' &&
     typeof value.longitude === 'number' &&
     typeof value.timestampLocal === 'string' &&
+    ((typeof value.siteId === 'string' && value.siteId.trim().length > 0) ||
+      (typeof value.freeMissionId === 'string' && value.freeMissionId.trim().length > 0) ||
+      (typeof value.officeLocationId === 'string' && value.officeLocationId.trim().length > 0)) &&
     isClockInType(value.type)
   );
 }

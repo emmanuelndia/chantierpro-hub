@@ -11,7 +11,7 @@ export default async function MobileSessionReportPageWrapper() {
   }
 
   // Rôles autorisés à soumettre des rapports
-  const allowedRoles = ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'NEGOTIATION_MANAGER', 'DRIVER'];
+  const allowedRoles = ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'NEGOTIATION_MANAGER', 'FLEET_RESOURCE'];
   
   if (allowedRoles.includes(session.role)) {
     return <MobileSessionReportPage user={session} />;

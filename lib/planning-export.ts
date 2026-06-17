@@ -52,7 +52,7 @@ const roleLabels: Partial<Record<Role, string>> = {
   NEGOTIATION_MANAGER: 'Responsable Négociation',
   NEGOTIATION_RESOURCE: 'Ressource Négociation',
   FLEET_MANAGER: 'Responsable Parc Auto',
-  DRIVER: 'Chauffeur',
+  FLEET_RESOURCE: 'Ressource parc auto',
 };
 
 export function parsePlanningExportQuery(searchParams: URLSearchParams): PlanningExportQuery | null {

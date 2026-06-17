@@ -14,7 +14,7 @@ export const NEGOTIATION_FIELD_USER_ROLES: readonly Role[] = [
   Role.NEGOTIATION_RESOURCE,
   Role.NEGOTIATION_MANAGER,
 ];
-export const FLEET_FIELD_USER_ROLES: readonly Role[] = [Role.DRIVER];
+export const FLEET_FIELD_USER_ROLES: readonly Role[] = [Role.FLEET_RESOURCE];
 
 export const FIELD_USER_ROLES: readonly Role[] = [
   ...CLASSIC_FIELD_USER_ROLES,

@@ -31,7 +31,7 @@ const fieldRoles: readonly Role[] = [
   'BE_RESOURCE',
   'NEGOTIATION_RESOURCE',
   'NEGOTIATION_MANAGER',
-  'DRIVER',
+  'FLEET_RESOURCE',
   'PROJECT_MANAGER',
 ];
 

@@ -7,7 +7,7 @@ import { MobileAdminDashboardPage } from '@/components/mobile-admin-dashboard-pa
 import { MobileRhOfficeHomePage } from '@/components/mobile-rh-office-home-page';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
 
-const fieldRoles = ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'DRIVER'] as const;
+const fieldRoles = ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'FLEET_RESOURCE'] as const;
 const generalSupervisorRoles = ['GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER'] as const;
 const coordinatorRoles = ['COORDINATOR'] as const;
 const managementRoles = ['PROJECT_MANAGER', 'DIRECTION'] as const;

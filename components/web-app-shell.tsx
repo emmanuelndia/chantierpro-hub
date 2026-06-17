@@ -40,7 +40,7 @@ const roleTone: Record<Role, 'success' | 'warning' | 'error' | 'neutral' | 'info
   NEGOTIATION_MANAGER: 'warning',
   NEGOTIATION_RESOURCE: 'success',
   FLEET_MANAGER: 'warning',
-  DRIVER: 'success',
+  FLEET_RESOURCE: 'success',
   PROJECT_MANAGER: 'neutral',
   DIRECTION: 'error',
   HR: 'info',

@@ -12,7 +12,7 @@ const mobileCameraRoles: readonly Role[] = [
   Role.BE_RESOURCE,
   Role.NEGOTIATION_RESOURCE,
   Role.NEGOTIATION_MANAGER,
-  Role.DRIVER,
+  Role.FLEET_RESOURCE,
   Role.PROJECT_MANAGER,
 ];
 

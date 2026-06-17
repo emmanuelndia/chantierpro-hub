@@ -46,7 +46,7 @@ const TERRAIN_CLOCK_IN_ROLES: readonly Role[] = [
   'BE_RESOURCE',
   'NEGOTIATION_RESOURCE',
   'NEGOTIATION_MANAGER',
-  'DRIVER',
+  'FLEET_RESOURCE',
   'PROJECT_MANAGER',
 ];
 
@@ -197,7 +197,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
 
   useEffect(() => {
     void getMobileOfflinePreparationState().then((preparation) => {
-      setOfflineReadyToday(preparation.status === 'ready' || preparation.status === 'incomplete');
+      setOfflineReadyToday(preparation.status === 'ready');
     });
   }, []);
 
@@ -534,6 +534,16 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     queryKey: ['mobile-session-status', selectedSite?.id, selectedFreeMission?.freeMissionId, selectedOffice],
     queryFn: async () => {
       if (selectedOffice) {
+        if (networkState === 'offline') {
+          return selectedOfficeLocationId
+            ? buildOfflineSessionStatus(
+                { contextType: 'OFFICE', officeLocationId: selectedOfficeLocationId },
+                todayQuery.data?.items ?? [],
+                pendingClockInsQuery.data ?? [],
+              )
+            : null;
+        }
+
         const response = await authFetch('/api/office-clock-in/session-status');
         if (!response.ok) {
           return null;
@@ -542,6 +552,14 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       }
 
       if (selectedFreeMission?.freeMissionId) {
+        if (networkState === 'offline') {
+          return buildOfflineSessionStatus(
+            { contextType: 'FREE_MISSION', freeMissionId: selectedFreeMission.freeMissionId },
+            todayQuery.data?.items ?? [],
+            pendingClockInsQuery.data ?? [],
+          );
+        }
+
         const response = await authFetch(`/api/free-missions/${selectedFreeMission.freeMissionId}/clock-in/session-status`);
         if (!response.ok) {
           return null;
@@ -557,12 +575,20 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         const response = await authFetch(`/api/sites/${selectedSite.id}/clock-in/session-status`);
 
         if (!response.ok) {
-          return buildOfflineSessionStatus(selectedSite.id, todayQuery.data?.items ?? [], pendingClockInsQuery.data ?? []);
+          return buildOfflineSessionStatus(
+            { contextType: 'SITE', siteId: selectedSite.id },
+            todayQuery.data?.items ?? [],
+            pendingClockInsQuery.data ?? [],
+          );
         }
 
         return (await response.json()) as SessionStatus;
       } catch {
-        return buildOfflineSessionStatus(selectedSite.id, todayQuery.data?.items ?? [], pendingClockInsQuery.data ?? []);
+        return buildOfflineSessionStatus(
+          { contextType: 'SITE', siteId: selectedSite.id },
+          todayQuery.data?.items ?? [],
+          pendingClockInsQuery.data ?? [],
+        );
       }
     },
     enabled: Boolean(selectedSite ?? selectedFreeMission ?? selectedOffice) && !isNegotiationZoneSelected,
@@ -571,11 +597,27 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   });
 
   const localSessionStatus = selectedSite
-    ? buildOfflineSessionStatus(selectedSite.id, todayQuery.data?.items ?? [], pendingClockInsQuery.data ?? [])
-    : null;
+    ? buildOfflineSessionStatus(
+        { contextType: 'SITE', siteId: selectedSite.id },
+        todayQuery.data?.items ?? [],
+        pendingClockInsQuery.data ?? [],
+      )
+    : selectedFreeMission?.freeMissionId
+      ? buildOfflineSessionStatus(
+          { contextType: 'FREE_MISSION', freeMissionId: selectedFreeMission.freeMissionId },
+          todayQuery.data?.items ?? [],
+          pendingClockInsQuery.data ?? [],
+        )
+      : selectedOfficeLocation
+        ? buildOfflineSessionStatus(
+            { contextType: 'OFFICE', officeLocationId: selectedOfficeLocation.id },
+            todayQuery.data?.items ?? [],
+            pendingClockInsQuery.data ?? [],
+          )
+        : null;
   const sessionStatus =
-    !selectedFreeMission && (networkState === 'offline' || (pendingClockInsQuery.data?.length ?? 0) > 0)
-      ? localSessionStatus
+    networkState === 'offline' || (pendingClockInsQuery.data?.length ?? 0) > 0
+      ? localSessionStatus ?? sessionStatusQuery.data
       : sessionStatusQuery.data;
   const selectedSiteSessionLoaded = sessionStatus !== undefined || sessionStatusQuery.isError;
   const selectedContextSessionLoaded = isNegotiationZoneSelected || selectedSiteSessionLoaded;
@@ -713,7 +755,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     zoneActualNameReady &&
     geoState.status === 'ready' &&
     !outsideRadius &&
-    (selectedFreeMission || selectedOffice || isNegotiationZoneSelected ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
+    (isNegotiationZoneSelected ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
     !(staleOpenSession && currentType === 'ARRIVAL') &&
     !clockInMutation.isPending;
 
@@ -763,7 +805,25 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       }
 
       if (!navigator.onLine) {
-        throw new Error('Le pointage bureau demande une connexion reseau pour cette version.');
+        await enqueueOfflineClockIn({
+          clientId,
+          siteName: selectedOfficeLocation.name,
+          ...payload,
+          officeLocationId: selectedOfficeLocation.id,
+          planningAssignmentId: selectedOfficeAssignmentId,
+        });
+
+        return {
+          clientId,
+          offline: true,
+          record: null,
+          type: actionType,
+          siteId: null,
+          freeMissionId: null,
+          siteName: selectedOfficeLocation.name,
+          timestampLocal,
+          durationSeconds: actionType === 'DEPARTURE' ? sessionStatus?.duration ?? activeSession?.durationSeconds ?? null : null,
+        };
       }
 
       const response = await authFetch('/api/office-clock-in', {
@@ -873,10 +933,6 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     }
 
     if (selectedFreeMission) {
-      if (!navigator.onLine) {
-        throw new Error('Le pointage mission libre demande une connexion reseau pour cette version.');
-      }
-
       if (actionType === 'ARRIVAL' && !zoneActualName.trim()) {
         throw new Error('Renseignez la zone reelle avant de pointer.');
       }
@@ -890,6 +946,28 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               comment: zoneClockInComment,
             })
           : null;
+      if (!navigator.onLine) {
+        await enqueueOfflineClockIn({
+          clientId,
+          siteName: selectedFreeMission.siteName,
+          ...payload,
+          freeMissionId: missionId,
+          comment: zoneComment,
+        });
+
+        return {
+          clientId,
+          offline: true,
+          record: null,
+          type: actionType,
+          siteId: null,
+          freeMissionId: missionId,
+          siteName: selectedFreeMission.siteName,
+          timestampLocal,
+          durationSeconds: actionType === 'DEPARTURE' ? sessionStatus?.duration ?? activeSession?.durationSeconds ?? null : null,
+        };
+      }
+
       const response = await authFetch(`/api/free-missions/${missionId}/clock-in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1068,6 +1146,11 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       {networkState === 'offline' && !offlineReadyToday ? (
         <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm font-semibold text-orange-800">
           Donnees offline du jour manquantes. Reconnectez-vous pour preparer les actions terrain.
+        </div>
+      ) : null}
+      {networkState === 'offline' && offlineReadyToday && geoState.status !== 'ready' ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+          Offline prêt, mais le GPS est indisponible. Activez la localisation pour pointer.
         </div>
       ) : null}
       {pendingCount > 0 ? (
@@ -2038,11 +2121,14 @@ function fromNearbySite(site: NearbySiteItem): SelectableSite {
 }
 
 function buildOfflineSessionStatus(
-  siteId: string,
+  context:
+    | { contextType: 'SITE'; siteId: string }
+    | { contextType: 'FREE_MISSION'; freeMissionId: string }
+    | { contextType: 'OFFICE'; officeLocationId: string },
   serverItems: ClockInRecordItem[],
   pendingItems: Awaited<ReturnType<typeof getPendingOfflineClockIns>>,
 ) {
-  return buildLocalSessionStatus(siteId, serverItems, pendingItems);
+  return buildLocalSessionStatus(context, serverItems, pendingItems);
 }
 
 async function readApiMessage(response: Response, fallback: string) {

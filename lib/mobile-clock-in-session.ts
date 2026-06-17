@@ -2,60 +2,63 @@ import type { ClockInRecordItem, SessionStatus } from '@/types/clock-in';
 import type { OfflineClockInItem } from '@/lib/mobile-offline-db';
 
 type ClockInEvent = {
-  siteId: string;
+  siteId: string | null;
+  freeMissionId: string | null;
+  officeLocationId: string | null;
   siteName: string;
   type: ClockInRecordItem['type'];
   timestampLocal: string;
 };
 
+type SessionContext =
+  | { contextType: 'SITE'; siteId: string }
+  | { contextType: 'FREE_MISSION'; freeMissionId: string }
+  | { contextType: 'OFFICE'; officeLocationId: string };
+
 export function buildLocalSessionStatus(
-  siteId: string,
+  context: SessionContext,
   serverItems: ClockInRecordItem[],
   pendingItems: OfflineClockInItem[],
 ): SessionStatus {
   const events = [
-    ...serverItems.filter((item) => item.status === 'VALID' && item.siteId).map(toClockInEvent),
+    ...serverItems.filter((item) => item.status === 'VALID').map(toClockInEvent),
     ...pendingItems.map(toClockInEvent),
-  ]
-    .sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal));
+  ].sort((left, right) => left.timestampLocal.localeCompare(right.timestampLocal));
 
   let arrivalTime: string | null = null;
-  let openSiteId: string | null = null;
-  let openSiteName: string | null = null;
+  let openEvent: ClockInEvent | null = null;
   let pauseStartedAt: string | null = null;
   let accumulatedPauseSeconds = 0;
 
   for (const event of events) {
     if (event.type === 'ARRIVAL') {
       arrivalTime = event.timestampLocal;
-      openSiteId = event.siteId;
-      openSiteName = event.siteName;
+      openEvent = event;
       pauseStartedAt = null;
       accumulatedPauseSeconds = 0;
       continue;
     }
 
-    if (event.type === 'PAUSE_START' && arrivalTime && openSiteId === event.siteId && !pauseStartedAt) {
+    if (event.type === 'PAUSE_START' && arrivalTime && sameContext(openEvent, event) && !pauseStartedAt) {
       pauseStartedAt = event.timestampLocal;
       continue;
     }
 
-    if (event.type === 'PAUSE_END' && arrivalTime && openSiteId === event.siteId && pauseStartedAt) {
+    if (event.type === 'PAUSE_END' && arrivalTime && sameContext(openEvent, event) && pauseStartedAt) {
       accumulatedPauseSeconds += elapsedSeconds(pauseStartedAt, event.timestampLocal);
       pauseStartedAt = null;
       continue;
     }
 
-    if (event.type === 'DEPARTURE' && arrivalTime && openSiteId === event.siteId) {
+    if (event.type === 'DEPARTURE' && arrivalTime && sameContext(openEvent, event)) {
       arrivalTime = null;
-      openSiteId = null;
-      openSiteName = null;
+      openEvent = null;
       pauseStartedAt = null;
       accumulatedPauseSeconds = 0;
     }
   }
 
-  if (!arrivalTime) {
+  if (!arrivalTime || !openEvent || !matchesContext(context, openEvent)) {
     return {
       sessionOpen: false,
       arrivalTime: null,
@@ -64,12 +67,17 @@ export function buildLocalSessionStatus(
       pauseDuration: 0,
       openSessionSiteId: null,
       openSessionSiteName: null,
+      openSessionFreeMissionId: null,
+      openSessionPlanningAssignmentId: null,
+      openSessionPlanningAssignmentAction: null,
+      openSessionContextType: null,
     };
   }
 
   const now = new Date().toISOString();
   const activePauseSeconds = pauseStartedAt ? elapsedSeconds(pauseStartedAt, now) : 0;
   const pauseDuration = accumulatedPauseSeconds + activePauseSeconds;
+  const contextType = context.contextType;
 
   return {
     sessionOpen: true,
@@ -77,18 +85,45 @@ export function buildLocalSessionStatus(
     duration: Math.max(0, elapsedSeconds(arrivalTime, now) - pauseDuration),
     pauseActive: Boolean(pauseStartedAt),
     pauseDuration,
-    openSessionSiteId: openSiteId,
-    openSessionSiteName: openSiteName,
+    openSessionSiteId: openEvent.siteId,
+    openSessionSiteName: openEvent.siteName,
+    openSessionFreeMissionId: openEvent.freeMissionId,
+    openSessionPlanningAssignmentId: null,
+    openSessionPlanningAssignmentAction: null,
+    openSessionContextType: contextType,
   };
 }
 
 function toClockInEvent(item: ClockInRecordItem | OfflineClockInItem): ClockInEvent {
   return {
-    siteId: item.siteId ?? '',
+    siteId: item.siteId ?? null,
+    freeMissionId: 'freeMissionId' in item ? (item.freeMissionId ?? null) : null,
+    officeLocationId: 'officeLocationId' in item ? (item.officeLocationId ?? null) : null,
     siteName: item.siteName,
     type: item.type,
     timestampLocal: item.timestampLocal,
   };
+}
+
+function sameContext(left: ClockInEvent | null, right: ClockInEvent) {
+  if (!left) return false;
+  return (
+    left.siteId === right.siteId &&
+    left.freeMissionId === right.freeMissionId &&
+    left.officeLocationId === right.officeLocationId
+  );
+}
+
+function matchesContext(context: SessionContext, event: ClockInEvent) {
+  if (context.contextType === 'SITE') {
+    return event.siteId === context.siteId;
+  }
+
+  if (context.contextType === 'FREE_MISSION') {
+    return event.freeMissionId === context.freeMissionId;
+  }
+
+  return event.officeLocationId === context.officeLocationId;
 }
 
 function elapsedSeconds(startedAt: string, endedAt: string) {

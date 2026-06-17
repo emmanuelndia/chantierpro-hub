@@ -96,7 +96,7 @@ export type BatchSyncItemInput = ClockInInput & {
 };
 
 export type BatchSyncItemResult = {
-  siteId: string;
+  siteId: string | null;
   type: ClockInType;
   timestampLocal: string;
   accepted: boolean;

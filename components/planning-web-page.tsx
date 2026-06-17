@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { PlanningAssignmentStatus, PlanningWorkLocationType, type Role } from '@prisma/client';
 import { useMutation, useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { Copy, Download, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Download, Pencil, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
@@ -26,6 +26,11 @@ import type {
 } from '@/types/planning-web';
 import type { AvailableNegotiationZone, AvailableSite, UnassignedSupervisor } from '@/types/mobile-planning';
 import type { PlanningTaskTemplateItem, PlanningTaskTemplatesResponse } from '@/types/planning-templates';
+import type {
+  PlanningImportCommitResponse,
+  PlanningImportPreviewResponse,
+  PlanningImportPreviewRow,
+} from '@/types/planning-import';
 
 type PlanningWebPageProps = Readonly<{
   viewer: {
@@ -139,6 +144,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [form, setForm] = useState<AssignmentFormState>(() => createEmptyForm(selectedDate));
   const [deleteTarget, setDeleteTarget] = useState<PlanningWebAssignment | null>(null);
+  const [planningImportOpen, setPlanningImportOpen] = useState(false);
   const canMutate =
     viewer.role === 'GENERAL_SUPERVISOR' ||
     viewer.role === 'BE_MANAGER' ||
@@ -267,6 +273,25 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
     onError: (error) => pushMutationError(error, 'Suppression impossible'),
+  });
+
+  const planningImportPreviewMutation = useMutation({
+    mutationFn: previewPlanningImportFile,
+    onError: (error) => pushMutationError(error, 'Prévisualisation impossible'),
+  });
+
+  const planningImportCommitMutation = useMutation({
+    mutationFn: commitPlanningImportRows,
+    onSuccess: async (result) => {
+      pushToast({
+        type: 'success',
+        title: "Import planning terminé",
+        message: `${result.createdAssignmentsCount + result.createdFreeMissionsCount} tâche(s), ${result.createdTemplatesCount} modèle(s).`,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+      await queryClient.invalidateQueries({ queryKey: ['planning-task-templates'] });
+    },
+    onError: (error) => pushMutationError(error, "Import planning impossible"),
   });
 
   const duplicateMutation = useMutation({
@@ -744,10 +769,19 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
                 onClick={duplicateSelectedDay}
                 type="button"
               >
-                <Copy className="h-4 w-4" />
-                {duplicateMutation.isPending ? 'Duplication...' : 'Dupliquer'}
+              <Copy className="h-4 w-4" />
+              {duplicateMutation.isPending ? 'Duplication...' : 'Dupliquer'}
               </button>
             </div>
+            <button
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              disabled={isMutating}
+              onClick={() => setPlanningImportOpen(true)}
+              type="button"
+            >
+              <Upload className="h-4 w-4" />
+              Importer un planning
+            </button>
             <button className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60" disabled={isMutating} onClick={() => openCreate()} type="button">
               Ajouter une tâche
             </button>
@@ -826,6 +860,15 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           isDeleting={deleteMutation.isPending}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
+        />
+      ) : null}
+
+      {planningImportOpen ? (
+        <PlanningImportModal
+          commitMutation={planningImportCommitMutation}
+          preview={planningImportPreviewMutation.data ?? null}
+          previewMutation={planningImportPreviewMutation}
+          onClose={() => setPlanningImportOpen(false)}
         />
       ) : null}
     </div>
@@ -1575,7 +1618,7 @@ function SegmentedButton({ active, onClick, children }: Readonly<{ active: boole
   );
 }
 
-function MetricCard({ label, value }: Readonly<{ label: string; value: number }>) {
+function MetricCard({ label, value }: Readonly<{ label: string; value: number | string }>) {
   return (
     <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
@@ -1774,6 +1817,182 @@ function LoadingState() {
   );
 }
 
+function PlanningImportModal({
+  preview,
+  previewMutation,
+  commitMutation,
+  onClose,
+}: Readonly<{
+  preview: PlanningImportPreviewResponse | null;
+  previewMutation: {
+    isPending: boolean;
+    mutate: (file: File) => void;
+  };
+  commitMutation: {
+    isPending: boolean;
+    mutate: (rows: PlanningImportPreviewRow[]) => void;
+    data?: PlanningImportCommitResponse | undefined;
+  };
+  onClose: () => void;
+}>) {
+  const [file, setFile] = useState<File | null>(null);
+  const validRows = preview?.rows.filter((row) => row.valid) ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/50">
+      <div className="custom-scrollbar absolute inset-x-4 top-6 bottom-6 overflow-auto rounded-[2rem] bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.28)] lg:inset-x-16">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-orange-600">Import planning</p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-950">Importer un planning Excel</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Détection automatique des fichiers “par ressource” et “objectifs projet”. Les lignes invalides restent ignorées.
+            </p>
+          </div>
+          <button className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" onClick={onClose} type="button">
+            Fermer
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">1. Modèle</p>
+            <p className="mt-2 text-sm text-slate-600">Télécharge le modèle recommandé pour les futurs imports.</p>
+            <a className="mt-4 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800" href="/api/planning/import/template">
+              Télécharger le modèle
+            </a>
+          </article>
+
+          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">2. Fichier</p>
+            <input
+              accept=".xlsx"
+              className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              type="file"
+            />
+            <button
+              className="mt-4 rounded-full bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!file || previewMutation.isPending}
+              onClick={() => file && previewMutation.mutate(file)}
+              type="button"
+            >
+              {previewMutation.isPending ? 'Analyse...' : 'Prévisualiser'}
+            </button>
+          </article>
+
+          <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">3. Import</p>
+            <p className="mt-2 text-sm text-slate-600">Importe uniquement les lignes valides détectées par la prévisualisation.</p>
+            <button
+              className="mt-4 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={validRows.length === 0 || commitMutation.isPending}
+              onClick={() => commitMutation.mutate(validRows)}
+              type="button"
+            >
+              {commitMutation.isPending ? 'Import...' : 'Importer les lignes valides'}
+            </button>
+          </article>
+        </div>
+
+        {preview ? (
+          <div className="mt-6 space-y-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              <MetricCard label="Format" value={preview.detectedFormat === 'RESOURCE_ROWS' ? 'Ressources' : 'Objectifs projet'} />
+              <MetricCard label="Total lignes" value={preview.totalRows} />
+              <MetricCard label="Valides" value={preview.validRows} />
+              <MetricCard label="Erreurs" value={preview.errorRows} />
+            </div>
+
+            <div className="overflow-hidden rounded-3xl border border-slate-200">
+              <div className="custom-scrollbar max-h-[48vh] overflow-auto">
+                <table className="min-w-[1180px] divide-y divide-slate-200 text-left text-sm">
+                  <thead className="sticky top-0 bg-slate-50 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Ligne</th>
+                      <th className="px-4 py-3">Statut</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Date / Projet</th>
+                      <th className="px-4 py-3">Ressource / Localité</th>
+                      <th className="px-4 py-3">Action</th>
+                      <th className="px-4 py-3">Messages</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {preview.rows.map((row) => (
+                      <tr key={row.id}>
+                        <td className="px-4 py-3 font-semibold text-slate-900">{row.sheetName} · {row.rowNumber}</td>
+                        <td className="px-4 py-3">
+                          <Badge tone={row.valid ? 'success' : 'error'}>{row.valid ? 'Valide' : 'Erreur'}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {row.kind === 'RESOURCE_ROW'
+                            ? row.suggestedWorkLocationType === 'ON_SITE'
+                              ? 'Chantier'
+                              : row.suggestedWorkLocationType === 'OFFICE'
+                                ? 'Bureau'
+                                : 'Zone'
+                            : 'Modèle'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {row.kind === 'RESOURCE_ROW' ? (
+                            <>
+                              <p className="font-semibold text-slate-900">{row.date ?? '-'}</p>
+                              <p>{row.projectLabel || '-'}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-semibold text-slate-900">{row.projectLabel || '-'}</p>
+                              <p>{row.locality || '-'}</p>
+                            </>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {row.kind === 'RESOURCE_ROW' ? (
+                            <>
+                              <p className="font-semibold text-slate-900">{row.resourceLabel || '-'}</p>
+                              <p>{row.locationLabel || '-'}</p>
+                            </>
+                          ) : (
+                            <p className="font-semibold text-slate-900">{row.locality || '-'}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          <p className="font-semibold text-slate-900">{row.action}</p>
+                          {row.kind === 'PROJECT_TEMPLATE_ROW' && row.targetQuantity !== null ? (
+                            <p>{row.targetQuantity} {row.targetUnit ?? ''}</p>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3">
+                          {row.errors.length > 0 ? (
+                            <div className="space-y-1">
+                              {row.errors.map((message) => (
+                                <p className="text-xs font-semibold text-red-600" key={message}>{message}</p>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs font-semibold text-emerald-700">Prêt pour import</p>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {commitMutation.data ? (
+              <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+                {commitMutation.data.createdAssignmentsCount} tâche(s) chantier/bureau, {commitMutation.data.createdFreeMissionsCount} zone(s), {commitMutation.data.createdTemplatesCount} modèle(s). {commitMutation.data.skippedCount} ligne(s) ignorée(s).
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 async function fetchPlanningDay(date: string) {
   const response = await authFetch(`/api/planning?date=${encodeURIComponent(date)}`, { cache: 'no-store' });
   if (!response.ok) {
@@ -1820,6 +2039,31 @@ async function fetchPlanningTemplates(): Promise<PlanningTaskTemplatesResponse> 
   }
 
   return (await response.json()) as PlanningTaskTemplatesResponse;
+}
+
+async function previewPlanningImportFile(file: File) {
+  const formData = new FormData();
+  formData.set('file', file);
+  const response = await authFetch('/api/planning/import/preview', {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Prévisualisation planning impossible.'));
+  }
+  return (await response.json()) as PlanningImportPreviewResponse;
+}
+
+async function commitPlanningImportRows(rows: PlanningImportPreviewRow[]) {
+  const response = await authFetch('/api/planning/import/commit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rows }),
+  });
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Import planning impossible.'));
+  }
+  return (await response.json()) as PlanningImportCommitResponse;
 }
 
 async function savePlanningTemplate({ name, form }: { name: string; form: AssignmentFormState }) {

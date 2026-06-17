@@ -13,7 +13,7 @@ const mobilePhotoSiteRoles: readonly Role[] = [
   Role.GENERAL_SUPERVISOR,
   Role.BE_RESOURCE,
   Role.NEGOTIATION_RESOURCE,
-  Role.DRIVER,
+  Role.FLEET_RESOURCE,
   Role.BE_MANAGER,
   Role.NEGOTIATION_MANAGER,
   Role.FLEET_MANAGER,
