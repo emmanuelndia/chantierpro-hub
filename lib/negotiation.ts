@@ -272,6 +272,35 @@ export async function createNegotiationAssignment(prisma: PrismaClient, user: Re
   });
 }
 
+export async function deleteNegotiationAssignment(prisma: PrismaClient, user: RequestAuthUser, assignmentId: string) {
+  if (!canManageNegotiation(user.role)) {
+    return Response.json({ code: 'FORBIDDEN', message: 'Suppression negociation refusee.' }, { status: 403 });
+  }
+
+  const assignment = await prisma.negotiationAssignment.findFirst({
+    where: {
+      id: assignmentId,
+      deletedAt: null,
+      project: negotiationProjectWhere(user),
+    },
+    select: { id: true },
+  });
+
+  if (!assignment) {
+    return Response.json({ code: 'NOT_FOUND', message: 'Mission negociation introuvable.' }, { status: 404 });
+  }
+
+  await prisma.negotiationAssignment.update({
+    where: { id: assignment.id },
+    data: {
+      status: NegotiationAssignmentStatus.CANCELLED,
+      deletedAt: new Date(),
+    },
+  });
+
+  return new Response(null, { status: 204 });
+}
+
 export async function getMobileNegotiationDay(prisma: PrismaClient, user: RequestAuthUser, date: string) {
   if (!canUseNegotiationField(user.role)) {
     return Response.json({ code: 'FORBIDDEN', message: 'Acces mobile negociation refuse.' }, { status: 403 });

@@ -234,6 +234,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       }));
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+      await queryClient.refetchQueries({ queryKey: ['web-planning'], type: 'active' });
     },
     onError: (error) => pushMutationError(error, "Creation impossible"),
   });
@@ -244,6 +245,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       pushToast({ type: 'success', title: 'Tâche modifiée' });
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+      await queryClient.refetchQueries({ queryKey: ['web-planning'], type: 'active' });
     },
     onError: (error) => pushMutationError(error, 'Modification impossible'),
   });
@@ -283,6 +285,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       }));
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+      await queryClient.refetchQueries({ queryKey: ['web-planning'], type: 'active' });
       await queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
     },
     onError: (error) => pushMutationError(error, 'Zone nego impossible'),
@@ -306,6 +309,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       }));
       closeDrawer();
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+      await queryClient.refetchQueries({ queryKey: ['web-planning'], type: 'active' });
       if (payload.type === 'NEGOTIATION_ZONE') {
         await queryClient.invalidateQueries({ queryKey: ['negotiation-overview'] });
       }
@@ -319,6 +323,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       pushToast({ type: 'success', title: 'Tâche supprimée' });
       setDeleteTarget(null);
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+      await queryClient.refetchQueries({ queryKey: ['web-planning'], type: 'active' });
     },
     onError: (error) => pushMutationError(error, 'Suppression impossible'),
   });
@@ -491,7 +496,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
               assigneeIds: [form.supervisorId],
               zoneId: form.zoneId || null,
               plannedZone: (negotiationZones.find((zone) => zone.id === form.zoneId)?.name ?? form.action.trim()) || null,
-              instruction: form.objectiveText.trim() || null,
+              instruction: form.action.trim() || null,
             },
           });
           return;
@@ -519,7 +524,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           assigneeIds: form.supervisorIds,
           zoneId: form.zoneId || null,
           plannedZone: (negotiationZones.find((zone) => zone.id === form.zoneId)?.name ?? form.action.trim()) || null,
-          instruction: form.objectiveText.trim() || null,
+          instruction: form.action.trim() || null,
         });
         return;
       }
@@ -1514,7 +1519,6 @@ function AssignmentDrawer({
                     ...form,
                     zoneId: value,
                     projectId: zone?.projectId ?? form.projectId,
-                    action: form.action ? form.action : zone?.name ?? '',
                   });
                 }}
                 options={negotiationZoneOptions}
@@ -2159,6 +2163,14 @@ async function deleteAssignment(id: string) {
   const response = await authFetch(`/api/planning/assignments/${id}`, { method: 'DELETE' });
   if (response.status === 404) {
     const freeMissionResponse = await authFetch(`/api/free-missions/${id}`, { method: 'DELETE' });
+    if (freeMissionResponse.status === 404) {
+      const negotiationResponse = await authFetch(`/api/negotiation/assignments/${id}`, { method: 'DELETE' });
+      if (!negotiationResponse.ok) {
+        throw new Error(await getApiErrorMessage(negotiationResponse, 'Impossible de supprimer la mission negociation.'));
+      }
+      return;
+    }
+
     if (!freeMissionResponse.ok) {
       throw new Error(await getApiErrorMessage(freeMissionResponse, 'Impossible de supprimer la mission libre.'));
     }
