@@ -695,10 +695,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       setComment('');
       setStep('comment');
       await refreshPendingCount();
-      await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-pending-items'] });
-      await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-today'] });
-      await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-history'] });
-      await queryClient.invalidateQueries({ queryKey: ['mobile-negotiation-clock-in-day'] });
+      await refreshClockInQueries();
     },
     onError: (error) => {
       setErrorMessage(error instanceof Error ? error.message : 'Pointage impossible.');
@@ -712,8 +709,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       setErrorMessage(null);
       setComment('');
       setStep('comment');
-      await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-today'] });
-      await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-history'] });
+      await refreshClockInQueries();
     },
     onError: (error) => {
       setErrorMessage(error instanceof Error ? error.message : 'Fermeture de session impossible.');
@@ -1104,6 +1100,16 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
 
   async function refreshPendingCount() {
     setPendingCount(await getMobileClockInPendingCount());
+  }
+
+  async function refreshClockInQueries() {
+    await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-pending-items'] });
+    await queryClient.refetchQueries({ queryKey: ['mobile-clock-in-pending-items'], type: 'active' });
+    await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-today'] });
+    await queryClient.invalidateQueries({ queryKey: ['mobile-clock-in-history'] });
+    await queryClient.invalidateQueries({ queryKey: ['mobile-negotiation-clock-in-day'] });
+    await queryClient.invalidateQueries({ queryKey: ['mobile-session-status'] });
+    await queryClient.refetchQueries({ queryKey: ['mobile-session-status'], type: 'active' });
   }
 
   
