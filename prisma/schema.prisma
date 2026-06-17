@@ -231,6 +231,39 @@ model User {
   coordinatorProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeCoordinator")
   coordinatedProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeProjectManager")
   createdCoordinatorProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeCreator")
+  drivenFleetVehicleAssignments FleetVehicleAssignment[] @relation("FleetVehicleAssignmentDriver")
+  apprenticedFleetVehicleAssignments FleetVehicleAssignment[] @relation("FleetVehicleAssignmentApprentice")
+}
+
+model FleetVehicle {
+  id                 String                   @id @default(cuid())
+  registrationNumber String                   @unique
+  brand              String
+  model              String
+  isActive           Boolean                  @default(true)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  assignments        FleetVehicleAssignment[]
+}
+
+model FleetVehicleAssignment {
+  id               String       @id @default(cuid())
+  vehicleId        String
+  driverUserId     String
+  apprenticeUserId String?
+  startDate        DateTime
+  endDate          DateTime?
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  vehicle          FleetVehicle @relation(fields: [vehicleId], references: [id])
+  driverUser       User         @relation("FleetVehicleAssignmentDriver", fields: [driverUserId], references: [id])
+  apprenticeUser   User?        @relation("FleetVehicleAssignmentApprentice", fields: [apprenticeUserId], references: [id])
+
+  @@index([vehicleId, isActive])
+  @@index([driverUserId, isActive])
+  @@index([apprenticeUserId, isActive])
+  @@index([startDate])
 }
 
 model Project {

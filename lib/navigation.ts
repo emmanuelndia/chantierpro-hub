@@ -87,6 +87,13 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Planning'],
   },
   {
+    href: '/web/fleet-vehicles',
+    label: 'Parc auto',
+    icon: 'users',
+    roles: ['FLEET_MANAGER', 'ADMIN'],
+    breadcrumb: ['Parc auto'],
+  },
+  {
     href: '/web/supervisor-scopes',
     label: 'Perimetres',
     icon: 'users',

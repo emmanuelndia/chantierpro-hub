@@ -1,4 +1,5 @@
 import type { Role } from '@prisma/client';
+import type { FleetVehicleCurrentAssignment } from '@/types/fleet-vehicles';
 
 export type UserAvailability = {
   status: 'AVAILABLE' | 'ASSIGNED';
@@ -31,6 +32,7 @@ export type UserListItem = {
   createdAt: string;
   availability?: UserAvailability;
   projectManagerScopes: UserProjectManagerScope[];
+  currentFleetVehicle: FleetVehicleCurrentAssignment | null;
 };
 
 export type UserDetail = UserListItem;

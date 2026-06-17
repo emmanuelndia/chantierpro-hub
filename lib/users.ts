@@ -10,6 +10,7 @@ import {
 import { PASSWORD_RESET_DEFAULT } from '@/lib/auth/constants';
 import { hashPassword, isStrongPassword, verifyPassword } from '@/lib/auth/password';
 import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import type { FleetVehicleCurrentAssignment } from '@/types/fleet-vehicles';
 import type {
   CreateUserResponse,
   PaginatedUsersResponse,
@@ -20,6 +21,10 @@ import type {
 } from '@/types/users';
 
 export const USERS_PAGE_SIZE = 15;
+const currentFleetVehicleAssignmentOrderBy: Prisma.FleetVehicleAssignmentOrderByWithRelationInput[] = [
+  { startDate: 'desc' },
+  { createdAt: 'desc' },
+];
 
 const TEMP_PASSWORD_UPPERCASE = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const TEMP_PASSWORD_LOWERCASE = 'abcdefghijkmnopqrstuvwxyz';
@@ -57,7 +62,41 @@ export const userPublicSelect = {
       },
     },
   },
-} satisfies Prisma.UserSelect;
+  drivenFleetVehicleAssignments: {
+    where: { isActive: true },
+    orderBy: currentFleetVehicleAssignmentOrderBy,
+    take: 1,
+    select: {
+      id: true,
+      startDate: true,
+      vehicle: {
+        select: {
+          id: true,
+          registrationNumber: true,
+          brand: true,
+          model: true,
+        },
+      },
+    },
+  },
+  apprenticedFleetVehicleAssignments: {
+    where: { isActive: true },
+    orderBy: currentFleetVehicleAssignmentOrderBy,
+    take: 1,
+    select: {
+      id: true,
+      startDate: true,
+      vehicle: {
+        select: {
+          id: true,
+          registrationNumber: true,
+          brand: true,
+          model: true,
+        },
+      },
+    },
+  },
+} as const;
 
 type SerializableUser = Prisma.UserGetPayload<{
   select: typeof userPublicSelect;
@@ -146,6 +185,7 @@ export function serializeUser(user: SerializableUser): UserListItem {
       lastName: scope.projectManager.lastName,
       username: scope.projectManager.username,
     })),
+    currentFleetVehicle: buildCurrentFleetVehicle(user),
   };
 }
 
@@ -747,4 +787,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function pickRandom(characters: string) {
   return characters[randomInt(characters.length)] ?? characters[0] ?? 'A';
+}
+
+function buildCurrentFleetVehicle(user: SerializableUser): FleetVehicleCurrentAssignment | null {
+  const drivenAssignment = user.drivenFleetVehicleAssignments[0];
+  if (drivenAssignment) {
+    return {
+      assignmentId: drivenAssignment.id,
+      vehicleId: drivenAssignment.vehicle.id,
+      registrationNumber: drivenAssignment.vehicle.registrationNumber,
+      brand: drivenAssignment.vehicle.brand,
+      model: drivenAssignment.vehicle.model,
+      roleInVehicle: 'DRIVER',
+      startDate: drivenAssignment.startDate.toISOString(),
+    };
+  }
+
+  const apprenticedAssignment = user.apprenticedFleetVehicleAssignments[0];
+  if (apprenticedAssignment) {
+    return {
+      assignmentId: apprenticedAssignment.id,
+      vehicleId: apprenticedAssignment.vehicle.id,
+      registrationNumber: apprenticedAssignment.vehicle.registrationNumber,
+      brand: apprenticedAssignment.vehicle.brand,
+      model: apprenticedAssignment.vehicle.model,
+      roleInVehicle: 'APPRENTICE',
+      startDate: apprenticedAssignment.startDate.toISOString(),
+    };
+  }
+
+  return null;
 }

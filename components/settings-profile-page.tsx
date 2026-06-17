@@ -249,6 +249,30 @@ export function SettingsProfilePage() {
         </article>
       </section>
 
+      {user.role === 'FLEET_RESOURCE' ? (
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+          <h2 className="text-xl font-semibold text-slate-950">Vehicule actuel</h2>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <ReadOnlyField
+              label="Immatriculation"
+              value={user.currentFleetVehicle?.registrationNumber ?? 'Aucun vehicule actif rattache'}
+            />
+            <ReadOnlyField label="Marque" value={user.currentFleetVehicle?.brand ?? '-'} />
+            <ReadOnlyField label="Modele" value={user.currentFleetVehicle?.model ?? '-'} />
+            <ReadOnlyField
+              label="Role dans le vehicule"
+              value={
+                user.currentFleetVehicle
+                  ? user.currentFleetVehicle.roleInVehicle === 'DRIVER'
+                    ? 'Chauffeur'
+                    : 'Apprenti'
+                  : '-'
+              }
+            />
+          </div>
+        </section>
+      ) : null}
+
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
         <h2 className="text-xl font-semibold text-slate-950">Changer le mot de passe</h2>
         <div className="mt-5 grid gap-4 lg:grid-cols-3">

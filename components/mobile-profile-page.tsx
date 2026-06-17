@@ -336,6 +336,30 @@ export function MobileProfilePage() {
         </button>
       </section>
 
+      {user.role === 'FLEET_RESOURCE' ? (
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <SectionTitle title="Vehicule actuel" />
+          <div className="mt-4 space-y-3">
+            <ReadOnlyField
+              label="Immatriculation"
+              value={user.currentFleetVehicle?.registrationNumber ?? 'Aucun vehicule actif rattache'}
+            />
+            <ReadOnlyField label="Marque" value={user.currentFleetVehicle?.brand ?? '-'} />
+            <ReadOnlyField label="Modele" value={user.currentFleetVehicle?.model ?? '-'} />
+            <ReadOnlyField
+              label="Role dans le vehicule"
+              value={
+                user.currentFleetVehicle
+                  ? user.currentFleetVehicle.roleInVehicle === 'DRIVER'
+                    ? 'Chauffeur'
+                    : 'Apprenti'
+                  : '-'
+              }
+            />
+          </div>
+        </section>
+      ) : null}
+
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <SectionTitle title="Notifications" />
         <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
