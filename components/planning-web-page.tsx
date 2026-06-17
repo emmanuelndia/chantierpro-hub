@@ -2232,6 +2232,10 @@ async function convertAssignmentToZone(request: ConvertToZoneRequest) {
       ? await createNegotiationZoneAssignments(request.data)
       : await createFreeMission(request.data);
 
+  if (result.createdCount !== undefined && result.createdCount <= 0) {
+    throw new Error('Aucune zone nouvelle creee. La tache chantier est conservee.');
+  }
+
   await deleteAssignment(request.sourceAssignmentId);
   return result;
 }

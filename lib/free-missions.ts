@@ -629,10 +629,6 @@ async function validateFreeMissionMutationAccess(
 }
 
 function freeMissionScopeWhere(user: AuthLikeUser): Prisma.FreeMissionWhereInput {
-  if (FIELD_USER_ROLES.includes(user.role)) {
-    return { assigneeId: user.id };
-  }
-
   if (user.role === Role.PROJECT_MANAGER) {
     return { project: { projectManagerId: user.id } };
   }
@@ -648,6 +644,10 @@ function freeMissionScopeWhere(user: AuthLikeUser): Prisma.FreeMissionWhereInput
 
   if (user.role === Role.GENERAL_SUPERVISOR) {
     return { createdById: user.id };
+  }
+
+  if (FIELD_USER_ROLES.includes(user.role)) {
+    return { assigneeId: user.id };
   }
 
   return { id: '__none__' };
