@@ -126,6 +126,7 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
   const [zoneDrawerOpen, setZoneDrawerOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<ProjectSiteItem | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [selectedSiteIdsToComplete, setSelectedSiteIdsToComplete] = useState<string[]>([]);
 
   const projectQuery = useQuery({
     queryKey: ['project-detail', projectId],
@@ -272,11 +273,53 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
     },
   });
 
+  const completeSitesMutation = useMutation({
+    mutationFn: async (siteIds: string[]) => {
+      const response = await authFetch(`/api/projects/${projectId}/sites/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteIds }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await safeJson(response)) as { message?: string } | null;
+        throw new Error(errorBody?.message ?? 'Impossible de terminer les sites selectionnes.');
+      }
+
+      return (await response.json()) as { updatedCount: number };
+    },
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ['project-detail', projectId] });
+      void queryClient.invalidateQueries({ queryKey: ['projects-list'] });
+      setSelectedSiteIdsToComplete([]);
+      pushToast({
+        type: 'success',
+        title: `${result.updatedCount} site(s) termine(s)`,
+      });
+    },
+    onError: (error) => {
+      pushToast({
+        type: 'error',
+        title: 'Cloture impossible',
+        message: error instanceof Error ? error.message : 'Les sites selectionnes n ont pas pu etre termines.',
+      });
+    },
+  });
+
   const project = projectQuery.data;
   const canManageRadius = viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
   const canManageProject = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
   const canManageSites = SITE_WRITE_ROLES.includes(viewer.role);
   const canManageProjectDocuments = PROJECT_DOCUMENT_ROLES.includes(viewer.role);
+  const completableSites = project?.sites.filter((site) => site.status !== 'COMPLETED') ?? [];
+  const allCompletableSitesSelected =
+    completableSites.length > 0 && completableSites.every((site) => selectedSiteIdsToComplete.includes(site.id));
+
+  useEffect(() => {
+    if (!project) return;
+    const completableSiteIds = new Set(project.sites.filter((site) => site.status !== 'COMPLETED').map((site) => site.id));
+    setSelectedSiteIdsToComplete((current) => current.filter((siteId) => completableSiteIds.has(siteId)));
+  }, [project]);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -488,6 +531,42 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
 
       {activeTab === 'sites' && !isNegotiationProjectMode ? (
         <section className="grid gap-4 xl:grid-cols-2">
+          {canManageSites && completableSites.length > 0 ? (
+            <div className="xl:col-span-2 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Cloture des sites</p>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-950">Terminer une selection de sites</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Termine uniquement les sites cochés. Quand il ne reste plus de site actif, tu peux archiver le projet.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    onClick={() =>
+                      setSelectedSiteIdsToComplete(
+                        allCompletableSitesSelected ? [] : completableSites.map((site) => site.id),
+                      )
+                    }
+                    type="button"
+                  >
+                    {allCompletableSitesSelected ? 'Tout décocher' : 'Tout sélectionner'}
+                  </button>
+                  <button
+                    className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={selectedSiteIdsToComplete.length === 0 || completeSitesMutation.isPending}
+                    onClick={() => completeSitesMutation.mutate(selectedSiteIdsToComplete)}
+                    type="button"
+                  >
+                    {completeSitesMutation.isPending
+                      ? 'Cloture...'
+                      : `Terminer ${selectedSiteIdsToComplete.length} site(s)`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {project.sites.length === 0 ? (
             <div className="xl:col-span-2">
               <EmptyState
@@ -501,6 +580,23 @@ export function ProjectDetailPage({ projectId, viewer }: ProjectDetailPageProps)
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
+                      {canManageSites && site.status !== 'COMPLETED' ? (
+                        <label className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
+                          <input
+                            checked={selectedSiteIdsToComplete.includes(site.id)}
+                            className="h-4 w-4 accent-orange-600"
+                            onChange={(event) =>
+                              setSelectedSiteIdsToComplete((current) =>
+                                event.target.checked
+                                  ? [...new Set([...current, site.id])]
+                                  : current.filter((siteId) => siteId !== site.id),
+                              )
+                            }
+                            title={`Selectionner ${site.name}`}
+                            type="checkbox"
+                          />
+                        </label>
+                      ) : null}
                       <h2 className="text-xl font-semibold text-slate-950">{site.name}</h2>
                       <Badge tone={site.status === 'ACTIVE' ? 'success' : site.status === 'ON_HOLD' ? 'warning' : 'neutral'}>
                         {site.status}
