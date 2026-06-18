@@ -30,7 +30,7 @@ type LiveResourceListItem = RhSitePresenceLiveResource & {
 
 type LiveResourceContext = LiveResourceListItem;
 
-type AggregatedLiveResource = RhSitePresenceLiveResource & {
+type AggregatedLiveResource = LiveResourceListItem & {
   contexts: LiveResourceContext[];
 };
 
@@ -441,7 +441,7 @@ function ResourcePresenceItem({
             <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
               resource.presenceContext === 'OFFICE' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
             }`}>
-              {presenceContextLabel(resource.presenceContext)}
+              {presenceContextLabel(resource)}
             </span>
           </div>
           <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
@@ -465,7 +465,7 @@ function ResourcePresenceItem({
             <div className="rounded-2xl bg-white p-3" key={`${context.siteId ?? 'mission'}:${context.userId}:${index}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold text-slate-950">
-                  {presenceContextLabel(context.presenceContext)} - {context.siteName}
+                  {contextTitleLabel(context)}
                 </p>
                 <Badge tone={liveStatusTone(context.status)}>{getLiveResourceStatusLabel(context)}</Badge>
               </div>
@@ -483,8 +483,13 @@ function ResourcePresenceItem({
                   <span className="font-semibold text-slate-950">Distance :</span>{' '}
                   {context.distanceKm === null ? '-' : `${context.distanceKm.toFixed(2)} km`}
                 </p>
-                <p><span className="font-semibold text-slate-950">Tache :</span> {context.taskAction ?? (context.presenceContext === 'OFFICE' ? 'Pointage bureau' : 'Aucune tache terrain planifiee')}</p>
+                <p><span className="font-semibold text-slate-950">Tache :</span> {context.taskAction ?? (isProfessionalTravelContext(context) ? 'Deplacement professionnel' : context.presenceContext === 'OFFICE' ? 'Pointage bureau' : 'Aucune tache terrain planifiee')}</p>
               </div>
+              {context.zoneComment ? (
+                <p className="mt-2 rounded-xl bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-700">
+                  <span className="font-semibold text-slate-950">Commentaire :</span> {context.zoneComment}
+                </p>
+              ) : null}
               {context.arrivalGps || context.departureGps ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {context.arrivalGps ? (
@@ -644,14 +649,21 @@ function flattenLiveResources(sites: RhSitePresenceLiveResponse['sites']): LiveR
       ...resource,
       siteId: site.siteId,
       siteName: site.siteName,
-      siteAddress: getLiveResourcePositionLabel(resource, site.siteAddress),
+      siteAddress: getLiveResourcePositionLabel(resource, site.siteName, site.siteAddress),
       projectName: site.projectName,
     })),
   );
 }
 
-function getLiveResourcePositionLabel(resource: RhSitePresenceLiveResource, fallback: string) {
+function getLiveResourcePositionLabel(resource: RhSitePresenceLiveResource, siteName: string, fallback: string) {
   if (!resource.zoneActualName) return fallback;
+
+  if (resource.presenceContext === 'OFFICE' && siteName === 'Deplacement professionnel') {
+    return resource.zoneSpecificPlace
+      ? `${resource.zoneActualName} - ${resource.zoneSpecificPlace}`
+      : resource.zoneActualName;
+  }
+
   return resource.zoneSpecificPlace
     ? `Zone - ${resource.zoneActualName} (${resource.zoneSpecificPlace})`
     : `Zone - ${resource.zoneActualName}`;
@@ -798,8 +810,18 @@ function isExpectedContext(context: LiveResourceContext) {
   return Boolean(context.taskAction) || context.status === 'EXPECTED_NOT_CLOCKED';
 }
 
-function presenceContextLabel(context: 'TERRAIN' | 'OFFICE') {
-  return context === 'OFFICE' ? 'Bureau' : 'Terrain';
+function presenceContextLabel(context: Pick<LiveResourceContext, 'presenceContext' | 'siteName'>) {
+  if (isProfessionalTravelContext(context)) return 'Deplacement';
+  return context.presenceContext === 'OFFICE' ? 'Bureau' : 'Terrain';
+}
+
+function contextTitleLabel(context: Pick<LiveResourceContext, 'presenceContext' | 'siteName'>) {
+  if (isProfessionalTravelContext(context)) return 'Deplacement professionnel';
+  return `${presenceContextLabel(context)} - ${context.siteName}`;
+}
+
+function isProfessionalTravelContext(context: Pick<LiveResourceContext, 'presenceContext' | 'siteName'>) {
+  return context.presenceContext === 'OFFICE' && context.siteName === 'Deplacement professionnel';
 }
 
 function clockInTypeLabel(type: string | null) {

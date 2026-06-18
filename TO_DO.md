@@ -106,7 +106,7 @@ Le premier sujet couvre les besoins d'upload planning des chefs de projet. Le se
   - verifier l'apparition des taches dans :
     - planning web
     - mobile `Taches`
-    - `Pointer`
+    - `Pointer`       (40000 + 10000 + 15000) = 65000 + (40000 + 15000) =  120000 + ( 40000 + 15000 )
 
 - **Offline**
   - preparer offline avec reseau, puis couper internet :

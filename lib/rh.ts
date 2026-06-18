@@ -618,6 +618,7 @@ export async function getSitePresencesLive(
         isAutoClosed: true,
         isRegularized: true,
         isLate: true,
+        comment: true,
         planningAssignment: {
           select: {
             id: true,
@@ -2638,6 +2639,10 @@ function buildLiveResource(
     hasStaleOpenSession,
   });
   const zoneDetails = extractZoneClockInDetails(arrival?.comment ?? latest?.comment ?? null);
+  const displayTaskAction =
+    presenceContext === 'OFFICE' && zoneDetails.reason
+      ? zoneDetails.reason
+      : taskAction;
 
   return {
     userId: user.id,
@@ -2646,7 +2651,7 @@ function buildLiveResource(
     role: user.role,
     presenceContext,
     status,
-    taskAction,
+    taskAction: displayTaskAction,
     arrivalRecordId: arrival?.id ?? null,
     arrivalAt: arrival?.timestampLocal.toISOString() ?? null,
     lastClockInAt: latest?.timestampLocal.toISOString() ?? null,
@@ -2669,6 +2674,7 @@ function extractZoneClockInDetails(comment: string | null | undefined) {
   const empty = {
     actualZone: null as string | null,
     specificPlace: null as string | null,
+    reason: null as string | null,
     comment: null as string | null,
   };
 
@@ -2683,8 +2689,9 @@ function extractZoneClockInDetails(comment: string | null | undefined) {
   };
 
   return {
-    actualZone: readValue('Zone reelle :'),
-    specificPlace: readValue('Lieu/quartier :'),
+    actualZone: readValue('Zone reelle :') ?? readValue('Ville / zone reelle :'),
+    specificPlace: readValue('Lieu/quartier :') ?? readValue('Lieu precis :'),
+    reason: readValue('Motif :'),
     comment: readValue('Commentaire :'),
   };
 }
