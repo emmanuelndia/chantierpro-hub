@@ -138,6 +138,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const canUseTerrainClockIn = TERRAIN_CLOCK_IN_ROLES.includes(userRole);
   const isNegotiationClockInUser = NEGOTIATION_CLOCK_IN_ROLES.includes(userRole);
   const isOfficeStaff = userRole === 'OFFICE_STAFF';
+  const canUseProfessionalTravel = isOfficeStaff || userRole === 'PROJECT_MANAGER';
   const queryClient = useQueryClient();
   const requestedSiteId = searchParams.get('siteId');
   const requestedFreeMissionId = searchParams.get('freeMissionId');
@@ -1285,9 +1286,9 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
             />
           </div>
         ) : (
-          <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
+          <div className={`mt-4 grid gap-2 rounded-2xl bg-slate-100 p-1 ${canUseProfessionalTravel ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
             <ContextButton
-              active={selectedClockContext === 'OFFICE'}
+              active={selectedClockContext === 'OFFICE' && selectedOfficeClockInLocation === OfficeClockInLocation.OFFICE}
               icon={<BuildingIcon className="h-4 w-4" />}
               label="Bureau"
               onClick={() => {
@@ -1309,6 +1310,17 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               label="Zone"
               onClick={() => setSelectedClockContext('ZONE')}
             />
+            {canUseProfessionalTravel ? (
+              <ContextButton
+                active={selectedClockContext === 'OFFICE' && selectedOfficeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL}
+                icon={<NavigationIcon className="h-4 w-4" />}
+                label="Deplacement"
+                onClick={() => {
+                  setSelectedClockContext('OFFICE');
+                  setSelectedOfficeClockInLocation(OfficeClockInLocation.PROFESSIONAL_TRAVEL);
+                }}
+              />
+            ) : null}
           </div>
         )}
       </section>
@@ -1779,7 +1791,17 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               <ActionButton
                 busy={clockInMutation.isPending && currentType === 'DEPARTURE'}
                 disabled={geoState.status !== 'ready' || clockInMutation.isPending}
-                label={isNegotiationZoneSelected ? 'POINTER SORTIE ZONE NEGO' : selectedOffice ? 'POINTER SORTIE BUREAU' : remoteDeparture ? 'FERMER SESSION A DISTANCE' : 'POINTER SORTIE'}
+                label={
+                  isNegotiationZoneSelected
+                    ? 'POINTER SORTIE ZONE NEGO'
+                    : isProfessionalTravel
+                      ? 'POINTER SORTIE DEPLACEMENT'
+                      : selectedOffice
+                        ? 'POINTER SORTIE BUREAU'
+                        : remoteDeparture
+                          ? 'FERMER SESSION A DISTANCE'
+                          : 'POINTER SORTIE'
+                }
                 onClick={() => {
                   setSelectedIntent('departure');
                   clockInMutation.mutate('departure');
@@ -1789,7 +1811,15 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               <ActionButton
                 busy={clockInMutation.isPending && (currentType === 'PAUSE_START' || currentType === 'PAUSE_END')}
                 disabled={geoState.status !== 'ready' || clockInMutation.isPending}
-                label={pauseActive ? 'TERMINER PAUSE' : 'DEMARRER PAUSE'}
+                label={
+                  isProfessionalTravel
+                    ? pauseActive
+                      ? 'TERMINER PAUSE DEPLACEMENT'
+                      : 'DEMARRER PAUSE DEPLACEMENT'
+                    : pauseActive
+                      ? 'TERMINER PAUSE'
+                      : 'DEMARRER PAUSE'
+                }
                 onClick={() => {
                   const intent = pauseActive ? 'pause-end' : 'pause-start';
                   setSelectedIntent(intent);
@@ -1807,7 +1837,17 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
             <ActionButton
               busy={clockInMutation.isPending}
               disabled={!canSubmit}
-              label={isNegotiationZoneSelected ? 'POINTER ENTREE ZONE NEGO' : selectedFreeMission ? 'POINTER ENTREE ZONE' : selectedOffice ? 'POINTER ENTREE BUREAU' : 'POINTER ENTREE'}
+              label={
+                isNegotiationZoneSelected
+                  ? 'POINTER ENTREE ZONE NEGO'
+                  : selectedFreeMission
+                    ? 'POINTER ENTREE ZONE'
+                    : isProfessionalTravel
+                      ? 'POINTER ENTREE DEPLACEMENT'
+                      : selectedOffice
+                        ? 'POINTER ENTREE BUREAU'
+                        : 'POINTER ENTREE'
+              }
               onClick={() => {
                 setSelectedIntent('arrival');
                 clockInMutation.mutate('arrival');
