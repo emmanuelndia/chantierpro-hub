@@ -149,6 +149,7 @@ export type UpdateAssignmentRequest = {
 export type DuplicateAssignmentsRequest = {
   sourceDate: string;
   targetDate: string;
+  assignmentId?: string;
 };
 
 export type PlanningAssignmentMutationResponse = {

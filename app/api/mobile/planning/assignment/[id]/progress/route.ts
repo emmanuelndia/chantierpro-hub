@@ -2,13 +2,14 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import {
   canAccessSupervisorPlanning,
+  canManageFleetProgress,
   createTaskProgressUpdate,
   getTaskProgressUpdates,
 } from '@/lib/mobile-planning';
 import type { CreateTaskProgressUpdateRequest } from '@/types/mobile-planning';
 
 export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
-  if (!canAccessSupervisorPlanning(user.role)) {
+  if (!canAccessSupervisorPlanning(user.role) && !canManageFleetProgress(user.role)) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
@@ -25,7 +26,7 @@ export const GET = withAuth<{ id: string }>(async ({ user, params }) => {
 });
 
 export const POST = withAuth<{ id: string }>(async ({ req, user, params }) => {
-  if (!canAccessSupervisorPlanning(user.role)) {
+  if (!canAccessSupervisorPlanning(user.role) && !canManageFleetProgress(user.role)) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 

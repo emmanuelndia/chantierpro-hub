@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { PlanningAssignmentStatus, PlanningWorkLocationType, type Role } from '@prisma/client';
 import { useMutation, useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { Copy, Download, Pencil, Trash2, Upload } from 'lucide-react';
+import { CheckCircle2, Copy, Download, Pencil, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
@@ -24,7 +24,13 @@ import type {
   PlanningWebMutationResponse,
   PlanningWebUpdateRequest,
 } from '@/types/planning-web';
-import type { AvailableNegotiationZone, AvailableSite, UnassignedSupervisor } from '@/types/mobile-planning';
+import type {
+  AvailableNegotiationZone,
+  AvailableSite,
+  CreateTaskProgressUpdateRequest,
+  TaskProgressUpdateResponse,
+  UnassignedSupervisor,
+} from '@/types/mobile-planning';
 import type { PlanningTaskTemplateItem, PlanningTaskTemplatesResponse } from '@/types/planning-templates';
 import type {
   PlanningImportCommitResponse,
@@ -97,6 +103,14 @@ type ConvertToZoneRequest =
   | { sourceAssignmentId: string; date: string; type: 'FREE_MISSION'; data: FreeMissionWebRequest }
   | { sourceAssignmentId: string; date: string; type: 'NEGOTIATION_ZONE'; data: NegotiationZonePlanningRequest };
 
+type ProgressFormState = {
+  progress: string;
+  actualQuantity: string;
+  comment: string;
+  blocked: boolean;
+  completed: boolean;
+};
+
 const todayKey = formatDateKey(new Date());
 const filterClassName =
   'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-500';
@@ -149,6 +163,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [form, setForm] = useState<AssignmentFormState>(() => createEmptyForm(selectedDate));
   const [deleteTarget, setDeleteTarget] = useState<PlanningWebAssignment | null>(null);
+  const [progressTarget, setProgressTarget] = useState<PlanningWebAssignment | null>(null);
+  const [progressForm, setProgressForm] = useState<ProgressFormState>(() => createEmptyProgressForm());
   const [planningImportOpen, setPlanningImportOpen] = useState(false);
   const canMutate =
     viewer.role === 'GENERAL_SUPERVISOR' ||
@@ -162,6 +178,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     viewer.role === 'NEGOTIATION_MANAGER' ||
     viewer.role === 'FLEET_MANAGER' ||
     canAccessCentralized;
+  const canManageProgress = viewer.role === 'FLEET_MANAGER';
 
   const dayQuery = useQuery({
     queryKey: ['web-planning', selectedDate],
@@ -359,6 +376,17 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     },
     onError: (error) => pushMutationError(error, 'Duplication impossible'),
   });
+  const progressMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: CreateTaskProgressUpdateRequest }) => updateTaskProgress(id, data),
+    onSuccess: async () => {
+      pushToast({ type: 'success', title: 'Avancement mis à jour' });
+      setProgressTarget(null);
+      setProgressForm(createEmptyProgressForm());
+      await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
+      await queryClient.refetchQueries({ queryKey: ['web-planning'], type: 'active' });
+    },
+    onError: (error) => pushMutationError(error, 'Avancement impossible'),
+  });
   const saveTemplateMutation = useMutation({
     mutationFn: savePlanningTemplate,
     onSuccess: async () => {
@@ -411,6 +439,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const isMutating =
     createMutation.isPending ||
     updateMutation.isPending ||
+    progressMutation.isPending ||
     deleteMutation.isPending ||
     freeMissionMutation.isPending ||
     negotiationZoneMutation.isPending ||
@@ -594,6 +623,48 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     duplicateMutation.mutate({
       sourceDate: selectedDate,
       targetDate: duplicateTargetDate,
+    });
+  }
+
+  function duplicateSingleAssignment(assignment: PlanningWebAssignment) {
+    if (duplicateTargetDate === selectedDate) {
+      pushToast({
+        type: 'error',
+        title: 'Date cible invalide',
+        message: 'Choisis une date différente du jour source.',
+      });
+      return;
+    }
+
+    duplicateMutation.mutate({
+      sourceDate: selectedDate,
+      targetDate: duplicateTargetDate,
+      assignmentId: assignment.id,
+    });
+  }
+
+  function openProgress(assignment: PlanningWebAssignment) {
+    setProgressTarget(assignment);
+    setProgressForm({
+      progress: assignment.status === PlanningAssignmentStatus.IN_PROGRESS ? '0' : '',
+      actualQuantity: '',
+      comment: assignment.latestProgressUpdate?.comment ?? '',
+      blocked: assignment.objectiveStatus === 'BLOCKED',
+      completed: assignment.status === PlanningAssignmentStatus.COMPLETED,
+    });
+  }
+
+  function submitProgress() {
+    if (!progressTarget) return;
+    progressMutation.mutate({
+      id: progressTarget.id,
+      data: {
+        progress: progressForm.completed ? 100 : progressForm.blocked ? null : 0,
+        actualQuantity: null,
+        comment: progressForm.comment.trim() || null,
+        blocked: progressForm.blocked,
+        completed: progressForm.completed,
+      },
     });
   }
 
@@ -887,10 +958,13 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       {data && viewMode === 'day' ? (
         <DayPlanningCards
           assignments={filteredAssignments}
+          canManageProgress={canManageProgress}
           canMutate={canMutate}
           sites={sites}
           onDelete={setDeleteTarget}
+          onDuplicate={duplicateSingleAssignment}
           onEdit={openEdit}
+          onProgress={openProgress}
         />
       ) : null}
 
@@ -952,6 +1026,20 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         />
       ) : null}
 
+      {progressTarget ? (
+        <ProgressUpdateModal
+          assignment={progressTarget}
+          form={progressForm}
+          isSaving={progressMutation.isPending}
+          onCancel={() => {
+            setProgressTarget(null);
+            setProgressForm(createEmptyProgressForm());
+          }}
+          onChange={setProgressForm}
+          onSubmit={submitProgress}
+        />
+      ) : null}
+
       {planningImportOpen ? (
         <PlanningImportModal
           commitMutation={planningImportCommitMutation}
@@ -968,14 +1056,20 @@ function DayPlanningCards({
   assignments,
   sites,
   canMutate,
+  canManageProgress,
   onEdit,
   onDelete,
+  onDuplicate,
+  onProgress,
 }: Readonly<{
   assignments: PlanningWebAssignment[];
   sites: AvailableSite[];
   canMutate: boolean;
+  canManageProgress: boolean;
   onEdit: (assignment: PlanningWebAssignment) => void;
   onDelete: (assignment: PlanningWebAssignment) => void;
+  onDuplicate: (assignment: PlanningWebAssignment) => void;
+  onProgress: (assignment: PlanningWebAssignment) => void;
 }>) {
   if (assignments.length === 0) {
     return <EmptyState title="Aucune tâche" description="Aucune ligne ne correspond aux filtres sélectionnés." />;
@@ -1017,10 +1111,13 @@ function DayPlanningCards({
               return (
                 <CompactPlanningTaskRow
                   assignment={assignment}
+                  canManageProgress={canManageProgress}
                   canMutate={canMutate}
                   key={assignment.id}
                   onDelete={onDelete}
+                  onDuplicate={onDuplicate}
                   onEdit={onEdit}
+                  onProgress={onProgress}
                   projectName={site?.project.name ?? assignment.projectName ?? '-'}
                   showInterventionZone={site?.siteType === 'INTERVENTION_ZONE'}
                 />
@@ -1036,16 +1133,22 @@ function DayPlanningCards({
 
 function CompactPlanningTaskRow({
   assignment,
+  canManageProgress,
   canMutate,
   onDelete,
+  onDuplicate,
   onEdit,
+  onProgress,
   projectName,
   showInterventionZone,
 }: Readonly<{
   assignment: PlanningWebAssignment;
+  canManageProgress: boolean;
   canMutate: boolean;
   onDelete: (assignment: PlanningWebAssignment) => void;
+  onDuplicate: (assignment: PlanningWebAssignment) => void;
   onEdit: (assignment: PlanningWebAssignment) => void;
+  onProgress: (assignment: PlanningWebAssignment) => void;
   projectName: string;
   showInterventionZone: boolean;
 }>) {
@@ -1098,6 +1201,20 @@ function CompactPlanningTaskRow({
         {canMutate ? (
           <TableActionsMenu
             actions={[
+              ...(canManageProgress
+                ? [
+                    {
+                      label: 'Avancement',
+                      icon: <CheckCircle2 className="h-4 w-4" />,
+                      onClick: () => onProgress(assignment),
+                    },
+                  ]
+                : []),
+              {
+                label: 'Dupliquer cette tâche',
+                icon: <Copy className="h-4 w-4" />,
+                onClick: () => onDuplicate(assignment),
+              },
               {
                 label: 'Modifier',
                 icon: <Pencil className="h-4 w-4" />,
@@ -1702,6 +1819,104 @@ function AssignmentDrawer({
   );
 }
 
+function ProgressUpdateModal({
+  assignment,
+  form,
+  isSaving,
+  onCancel,
+  onChange,
+  onSubmit,
+}: Readonly<{
+  assignment: PlanningWebAssignment;
+  form: ProgressFormState;
+  isSaving: boolean;
+  onCancel: () => void;
+  onChange: (form: ProgressFormState) => void;
+  onSubmit: () => void;
+}>) {
+  const canSubmit = !form.blocked || form.comment.trim().length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+      <section className="w-full max-w-lg rounded-[2rem] bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Avancement</p>
+        <h2 className="mt-2 text-2xl font-semibold text-slate-950">{assignment.action}</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          {assignment.supervisorFirstName} {assignment.supervisorName} - {assignment.siteName}
+        </p>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <button
+            className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            onClick={() =>
+              onChange({
+                ...form,
+                actualQuantity: '',
+                blocked: false,
+                completed: false,
+                progress: '0',
+              })
+            }
+            type="button"
+          >
+            Démarré
+          </button>
+          <button
+            className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+            onClick={() =>
+              onChange({
+                ...form,
+                actualQuantity: '',
+                blocked: false,
+                completed: true,
+                progress: '100',
+              })
+            }
+            type="button"
+          >
+            Terminé
+          </button>
+          <button
+            className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100"
+            onClick={() => onChange({ ...form, blocked: true, completed: false })}
+            type="button"
+          >
+            Bloqué
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          <p className="rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600">
+            Suivi parc auto : aucun pourcentage ni quantité à renseigner. Choisis simplement l&apos;état de la tâche.
+          </p>
+          <Field label={form.blocked ? 'Commentaire obligatoire' : 'Commentaire'}>
+            <textarea
+              className={`${filterClassName} min-h-24`}
+              onChange={(event) => onChange({ ...form, comment: event.target.value })}
+              placeholder={form.blocked ? 'Explique le blocage.' : 'Note facultative.'}
+              value={form.comment}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button className={buttonClassName} onClick={onCancel} type="button">
+            Annuler
+          </button>
+          <button
+            className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+            disabled={!canSubmit || isSaving}
+            onClick={onSubmit}
+            type="button"
+          >
+            {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ConfirmDeleteModal({
   assignment,
   isDeleting,
@@ -2160,7 +2375,7 @@ async function convertAssignmentToZone(request: ConvertToZoneRequest) {
   return result;
 }
 
-async function duplicatePlanning(data: { sourceDate: string; targetDate: string }) {
+async function duplicatePlanning(data: { sourceDate: string; targetDate: string; assignmentId?: string }) {
   const response = await authFetch('/api/planning/duplicate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -2170,6 +2385,18 @@ async function duplicatePlanning(data: { sourceDate: string; targetDate: string 
     throw new Error(await getApiErrorMessage(response, 'Impossible de dupliquer le planning.'));
   }
   return (await response.json()) as PlanningWebDuplicateResponse;
+}
+
+async function updateTaskProgress(id: string, data: CreateTaskProgressUpdateRequest) {
+  const response = await authFetch(`/api/mobile/planning/assignment/${id}/progress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, "Impossible d'enregistrer l'avancement."));
+  }
+  return (await response.json()) as TaskProgressUpdateResponse;
 }
 
 async function deleteAssignment(id: string) {
@@ -2382,6 +2609,16 @@ function createEmptyForm(date: string): AssignmentFormState {
     plannedDurationMinutes: '',
     status: PlanningAssignmentStatus.ASSIGNED,
     workLocationType: PlanningWorkLocationType.ON_SITE,
+  };
+}
+
+function createEmptyProgressForm(): ProgressFormState {
+  return {
+    progress: '',
+    actualQuantity: '',
+    comment: '',
+    blocked: false,
+    completed: false,
   };
 }
 

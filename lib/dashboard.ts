@@ -778,6 +778,7 @@ async function getGeneralSupervisorDashboard(
           targetUnit: true,
           objectiveText: true,
           status: true,
+          workLocationType: true,
           progressUpdates: {
             orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
             take: 1,
@@ -931,10 +932,14 @@ async function getGeneralSupervisorDashboard(
   const objectiveCounts = countObjectiveStatuses(assignmentsToday);
   const relevantSiteAlerts = directionAlerts.sitesWithoutPresence.filter((item) => siteScope.includes(item.siteId));
   const relevantIncompleteSessions = directionAlerts.incompleteSessions.filter((item) => siteScope.includes(item.siteId));
-  const assignmentMissingReportAlerts = assignmentsToday
+  const terrainAssignmentsToday = assignmentsToday.filter((assignment) => assignment.workLocationType === 'ON_SITE');
+  const assignedTerrainSiteIds = new Set(terrainAssignmentsToday.map((assignment) => assignment.site.id));
+  const assignmentMissingReportAlerts = terrainAssignmentsToday
     .filter((assignment) => !reportBySiteAndUser.has(`${assignment.site.id}:${assignment.supervisorId}`))
     .slice(0, 4);
-  const sitesWithoutPresenceToday = entrustedSites.filter((site) => !presentSiteIds.has(site.id)).slice(0, 4);
+  const sitesWithoutPresenceToday = entrustedSites
+    .filter((site) => assignedTerrainSiteIds.has(site.id) && !presentSiteIds.has(site.id))
+    .slice(0, 4);
 
   const alerts: DashboardAlertItem[] = [
     ...sitesWithoutPresenceToday.map<DashboardAlertItem>((site) => ({

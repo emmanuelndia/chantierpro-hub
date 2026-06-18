@@ -81,6 +81,10 @@ export function canMutateWebPlanning(role: Role) {
   return allowedRoles.includes(role);
 }
 
+export function canManageFleetProgress(role: Role) {
+  return role === Role.FLEET_MANAGER;
+}
+
 export function canAccessSupervisorPlanning(role: Role) {
   return FIELD_USER_ROLES.includes(role);
 }
@@ -666,7 +670,7 @@ export async function getSupervisorMyAssignments(
 }
 
 export async function getTaskProgressUpdates(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
-  const assignment = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
+  const assignment = await getAccessibleProgressAssignment(prisma, user, assignmentId);
   if (assignment) {
     return {
       assignment: serializeSupervisorAssignment(assignment),
@@ -674,7 +678,7 @@ export async function getTaskProgressUpdates(prisma: PrismaClient, user: AuthLik
     };
   }
 
-  const mission = await getAccessibleSupervisorFreeMission(prisma, user, assignmentId);
+  const mission = await getAccessibleProgressFreeMission(prisma, user, assignmentId);
   if (!mission) {
     return planningError('NOT_FOUND', 'Assignation introuvable.', 404);
   }
@@ -691,8 +695,8 @@ export async function createTaskProgressUpdate(
   assignmentId: string,
   input: CreateTaskProgressUpdateRequest,
 ): Promise<TaskProgressUpdateResponse | Response> {
-  const assignment = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
-  const mission = assignment ? null : await getAccessibleSupervisorFreeMission(prisma, user, assignmentId);
+  const assignment = await getAccessibleProgressAssignment(prisma, user, assignmentId);
+  const mission = assignment ? null : await getAccessibleProgressFreeMission(prisma, user, assignmentId);
   if (!assignment && !mission) {
     return planningError('NOT_FOUND', 'Assignation introuvable.', 404);
   }
@@ -755,7 +759,7 @@ export async function createTaskProgressUpdate(
       });
     }
 
-    const refreshed = await getAccessibleSupervisorAssignment(prisma, user, assignmentId);
+    const refreshed = await getAccessibleProgressAssignment(prisma, user, assignmentId);
 
     return {
       update: serializeTaskProgressUpdate(update),
@@ -776,7 +780,7 @@ export async function createTaskProgressUpdate(
     });
   }
 
-  const refreshedMission = await getAccessibleSupervisorFreeMission(prisma, user, assignmentId);
+  const refreshedMission = await getAccessibleProgressFreeMission(prisma, user, assignmentId);
 
   return {
     update: serializeTaskProgressUpdate(update),
@@ -844,6 +848,7 @@ export async function duplicatePlanningAssignments(
   user: AuthLikeUser,
   sourceDateValue: string,
   targetDateValue: string,
+  sourceAssignmentId?: string,
 ): Promise<DuplicateAssignmentsResponse | Response> {
   const sourceDate = parsePlanningDate(sourceDateValue);
   const targetDate = parsePlanningDate(targetDateValue);
@@ -878,6 +883,7 @@ export async function duplicatePlanningAssignments(
       where: {
         date: sourceDate,
         deletedAt: null,
+        ...(sourceAssignmentId ? { id: sourceAssignmentId } : {}),
         site: sourceSiteWhere,
         ...assignmentScopeWhere,
       },
@@ -908,7 +914,9 @@ export async function duplicatePlanningAssignments(
     getScopedSupervisorIds(prisma, user, targetDate),
   ]);
 
-  const sourceFreeMissions = sourceFreeMissionResponse.missions;
+  const sourceFreeMissions = sourceAssignmentId
+    ? sourceFreeMissionResponse.missions.filter((mission) => mission.id === sourceAssignmentId)
+    : sourceFreeMissionResponse.missions;
   if (sourceAssignments.length === 0 && sourceFreeMissions.length === 0) {
     return planningError('NO_ASSIGNMENTS', 'Aucune assignation à dupliquer pour la date source.', 404);
   }
@@ -998,7 +1006,11 @@ export async function duplicatePlanningAssignments(
         assigneeId: mission.assigneeId,
         date: targetDate,
         action: mission.action,
+        targetProgress: mission.targetProgress,
+        targetQuantity: mission.targetQuantity,
+        targetUnit: mission.targetUnit,
         objectiveText: mission.objectiveText,
+        plannedDurationMinutes: mission.plannedDurationMinutes,
         status: FreeMissionStatus.ASSIGNED,
         createdById: user.id,
       })),
@@ -1054,24 +1066,37 @@ function planningAssignmentScopeWhere(user: AuthLikeUser): Prisma.PlanningAssign
   };
 }
 
-function getAccessibleSupervisorAssignment(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
+function getAccessibleProgressAssignment(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
   return prisma.planningAssignment.findFirst({
     where: {
       id: assignmentId,
-      supervisorId: user.id,
       deletedAt: null,
+      ...(canManageFleetProgress(user.role)
+        ? {
+            site: operationalPlanningSiteWhere(user),
+            supervisor: {
+              role: { in: [...getBusinessManagedResourceRoles(user.role)] },
+            },
+          }
+        : { supervisorId: user.id }),
     },
     select: supervisorAssignmentSelect,
   });
 }
 
-function getAccessibleSupervisorFreeMission(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
+function getAccessibleProgressFreeMission(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
   return prisma.freeMission.findFirst({
     where: {
       id: assignmentId,
-      assigneeId: user.id,
       deletedAt: null,
       status: { not: FreeMissionStatus.CANCELLED },
+      ...(canManageFleetProgress(user.role)
+        ? {
+            assignee: {
+              role: { in: [...getBusinessManagedResourceRoles(user.role)] },
+            },
+          }
+        : { assigneeId: user.id }),
     },
     select: freeMissionSelect,
   });

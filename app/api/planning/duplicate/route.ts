@@ -16,7 +16,7 @@ export const POST = withAuth(async ({ req, user }) => {
   }
 
   try {
-    const result = await duplicatePlanningAssignments(prisma, user, body.sourceDate, body.targetDate);
+    const result = await duplicatePlanningAssignments(prisma, user, body.sourceDate, body.targetDate, body.assignmentId);
     return result instanceof Response ? result : Response.json(result, { status: 201 });
   } catch (error) {
     console.error('Web planning duplicate assignments error:', error);
