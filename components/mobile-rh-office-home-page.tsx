@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { OfficeClockInLocation } from '@prisma/client';
 import { authFetch } from '@/lib/auth/client-session';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { TodayClockInView } from '@/types/clock-in';
@@ -35,6 +36,7 @@ export function MobileRhOfficeHomePage({ mode, user }: MobileRhOfficeHomePagePro
   });
 
   const activeSession = clockInQuery.data?.activeSession ?? null;
+  const activeSessionIsTravel = activeSession?.officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL;
   const summary = presencesQuery.data?.summary;
 
   return (
@@ -61,7 +63,7 @@ export function MobileRhOfficeHomePage({ mode, user }: MobileRhOfficeHomePagePro
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-panel">
         <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Pointage du jour</p>
         <h2 className="mt-2 text-lg font-black text-slate-950">
-          {activeSession ? `Session ouverte - ${contextLabel(activeSession.contextType)}` : 'Aucune session ouverte'}
+          {activeSession ? `Session ouverte - ${contextLabel(activeSession)}` : 'Aucune session ouverte'}
         </h2>
         <p className="mt-2 text-sm font-semibold text-slate-600">
           {activeSession
@@ -72,7 +74,7 @@ export function MobileRhOfficeHomePage({ mode, user }: MobileRhOfficeHomePagePro
           className="mt-4 flex min-h-12 items-center justify-center rounded-xl bg-primary px-4 text-sm font-black text-white"
           href="/mobile/clock-in?office=1"
         >
-          Pointer au bureau
+          {activeSessionIsTravel ? 'Gerer le deplacement' : 'Pointer au bureau'}
         </Link>
       </section>
 
@@ -107,9 +109,10 @@ function QuickLink({ href, label }: Readonly<{ href: string; label: string }>) {
   );
 }
 
-function contextLabel(context: 'SITE' | 'FREE_MISSION' | 'OFFICE') {
-  if (context === 'OFFICE') return 'bureau';
-  if (context === 'FREE_MISSION') return 'zone';
+function contextLabel(session: NonNullable<TodayClockInView['activeSession']>) {
+  if (session.officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL) return 'deplacement professionnel';
+  if (session.contextType === 'OFFICE') return 'bureau';
+  if (session.contextType === 'FREE_MISSION') return 'zone';
   return 'chantier';
 }
 
