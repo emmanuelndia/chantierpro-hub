@@ -103,10 +103,10 @@ Le premier sujet couvre les besoins d'upload planning des chefs de projet. Le se
     - projet introuvable
     - site ambigu
     - type corrige
-  - verifier l'apparition des taches dans :
+  - verifier l'apparition des taches dans 
     - planning web
     - mobile `Taches`
-    - `Pointer`
+    - `Pointer`       40000 + 10000 = 50000 + 15000 = 65000 + 40000 + 15000 
 
 - **Offline**
   - preparer offline avec reseau, puis couper internet :

@@ -347,11 +347,18 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const freeMissionAssignments = useMemo(
     () =>
       todayAssignments.filter(
-        (assignment) => assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId),
+        (assignment) =>
+          assignment.kind !== 'NEGOTIATION_ASSIGNMENT' &&
+          (assignment.workLocationType === PlanningWorkLocationType.FREE_MISSION || Boolean(assignment.freeMissionId)),
       ),
     [todayAssignments],
   );
   const hasFreeMissionToday = freeMissionAssignments.length > 0;
+  const hasRequestedClassicFreeMission =
+    Boolean(requestedFreeMissionId) &&
+    freeMissionAssignments.some(
+      (assignment) => assignment.freeMissionId === requestedFreeMissionId || assignment.id === requestedFreeMissionId,
+    );
   const selectedFreeMissionFromAssignments = useMemo(
     () =>
       selectedFreeMissionId
@@ -368,7 +375,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       : null;
   const selectedFreeMissionKey = selectedFreeMission?.freeMissionId ?? selectedFreeMission?.id ?? null;
   const hasClassicZoneAssignments =
-    hasFreeMissionToday || Boolean(requestedFreeMissionId) || todayQuery.data?.activeSession?.contextType === 'FREE_MISSION';
+    hasFreeMissionToday || hasRequestedClassicFreeMission || todayQuery.data?.activeSession?.contextType === 'FREE_MISSION';
   const useNegotiationZoneFlow =
     isNegotiationClockInUser &&
     !selectedFreeMission &&
