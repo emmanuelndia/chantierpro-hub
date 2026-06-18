@@ -549,7 +549,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       const payload: PlanningWebCreateRequest = {
         supervisorId: form.supervisorId,
         supervisorIds: form.supervisorIds,
-        siteId: form.siteId,
+        siteId: form.workLocationType === PlanningWorkLocationType.ON_SITE ? form.siteId : null,
+        projectId: form.projectId || null,
         action: form.action,
         targetProgress: normalizedTargetProgress,
         targetQuantity,
@@ -1379,16 +1380,26 @@ function AssignmentDrawer({
   const quantityNumber = form.targetQuantity === '' ? null : Number(form.targetQuantity);
   const hasQuantityObjective = quantityNumber !== null && quantityNumber > 0;
   const isFreeMission = form.workLocationType === PlanningWorkLocationType.FREE_MISSION;
+  const isOfficeTask = form.workLocationType === PlanningWorkLocationType.OFFICE;
   const isNegotiationZone = isFreeMission && isNegotiationManager;
   const isZoneConversion = mode === 'edit' && form.initialWorkLocationType !== PlanningWorkLocationType.FREE_MISSION && isFreeMission;
   const canEditZoneIdentity = mode === 'create' || isZoneConversion;
+  const projectNegotiationZones = negotiationZones.filter((zone) => zone.projectId === form.projectId);
+  const zoneSelectionRequired = isNegotiationZone && projectNegotiationZones.length > 0;
   const progressValid = progressNumber === null || (Number.isInteger(progressNumber) && progressNumber >= 0 && progressNumber <= 100);
   const quantityValid = quantityNumber === null || (Number.isFinite(quantityNumber) && quantityNumber >= 0);
   const canSubmit = Boolean(form.action.trim() && form.date) && progressValid && quantityValid;
   const selectedResourceCount = mode === 'create' ? form.supervisorIds.length : form.supervisorId ? 1 : 0;
   const createIdentityValid =
     (mode === 'edit' && !isZoneConversion) ||
-    Boolean(selectedResourceCount > 0 && (isNegotiationZone ? form.zoneId : isFreeMission ? form.projectId : form.siteId));
+    Boolean(
+      selectedResourceCount > 0 &&
+        (isNegotiationZone
+          ? form.projectId && (!zoneSelectionRequired || form.zoneId)
+          : isFreeMission || isOfficeTask
+            ? form.projectId
+            : form.siteId),
+    );
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/50">
@@ -1435,7 +1446,7 @@ function AssignmentDrawer({
                   ...form,
                   workLocationType,
                   zoneId: workLocationType === PlanningWorkLocationType.FREE_MISSION ? form.zoneId : '',
-                  siteId: workLocationType === PlanningWorkLocationType.FREE_MISSION ? '' : form.siteId,
+                  siteId: workLocationType === PlanningWorkLocationType.ON_SITE ? form.siteId : '',
                 });
               }}
               value={form.workLocationType}
@@ -1500,7 +1511,7 @@ function AssignmentDrawer({
               value={form.projectId}
             />
           </Field>
-          {!isFreeMission ? (
+          {form.workLocationType === PlanningWorkLocationType.ON_SITE ? (
             <Field label="Chantier">
               <SearchableSelect
                 disabled={!canEditIdentity}
@@ -1514,6 +1525,10 @@ function AssignmentDrawer({
                 value={form.siteId}
               />
             </Field>
+          ) : isOfficeTask ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-600">
+              Bureau : sélectionne seulement le projet. La présence sera enregistrée au bureau, sans choix de chantier.
+            </div>
           ) : isNegotiationZone ? (
             <Field label="Zone">
               <SearchableSelect
@@ -1531,6 +1546,11 @@ function AssignmentDrawer({
                 placeholder="Rechercher une zone"
                 value={form.zoneId}
               />
+              {zoneSelectionRequired && !form.zoneId ? (
+                <p className="mt-2 text-xs font-semibold text-red-600">
+                  Ce projet contient des zones : sélectionne obligatoirement la zone à planifier.
+                </p>
+              ) : null}
               <p className="mt-2 text-xs font-semibold text-slate-500">
                 La ressource pointera cette zone puis verra les scopes de la zone dans Négociation.
               </p>
@@ -2376,7 +2396,7 @@ function applyTemplateToForm(form: AssignmentFormState, template: PlanningTaskTe
     plannedDurationMinutes: template.plannedDurationMinutes === null ? '' : String(template.plannedDurationMinutes),
     workLocationType: template.workLocationType,
     zoneId: template.workLocationType === PlanningWorkLocationType.FREE_MISSION ? form.zoneId : '',
-    siteId: template.workLocationType === PlanningWorkLocationType.FREE_MISSION ? '' : form.siteId,
+    siteId: template.workLocationType === PlanningWorkLocationType.ON_SITE ? form.siteId : '',
   };
 }
 

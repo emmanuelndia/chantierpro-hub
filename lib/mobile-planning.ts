@@ -1087,7 +1087,8 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   if (rangeError) return rangeError;
 
   const supervisorId = normalizeId(input.supervisorId);
-  const siteId = normalizeId(input.siteId);
+  const inputSiteId = normalizeId(input.siteId);
+  const projectId = normalizeId(input.projectId);
   const action = normalizeOptionalAction(input.action);
   const targetProgress = normalizeTargetProgress(input.targetProgress);
   const targetQuantity = normalizeQuantity(input.targetQuantity);
@@ -1096,8 +1097,16 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   const plannedDurationMinutes = normalizePlannedDurationMinutes(input.plannedDurationMinutes);
   const workLocationType = normalizeWorkLocationType(input.workLocationType) ?? PlanningWorkLocationType.ON_SITE;
 
-  if (!supervisorId || !siteId || !action) {
-    return planningError('INVALID_REQUEST', 'Ressource terrain, chantier et action sont requis.', 400);
+  const requiresProjectOnly = workLocationType === PlanningWorkLocationType.OFFICE;
+
+  if (!supervisorId || !action || (requiresProjectOnly ? !projectId : !inputSiteId)) {
+    return planningError(
+      'INVALID_REQUEST',
+      requiresProjectOnly
+        ? 'Ressource terrain, projet et action sont requis pour une tache bureau.'
+        : 'Ressource terrain, chantier et action sont requis.',
+      400,
+    );
   }
 
   if (targetProgress instanceof Response) return targetProgress;
@@ -1107,9 +1116,10 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   const [site, supervisorIds] = await Promise.all([
     prisma.site.findFirst({
       where: {
-        id: siteId,
+        ...(requiresProjectOnly ? { projectId: projectId! } : { id: inputSiteId! }),
         ...operationalPlanningSiteWhere(user, date),
       },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
       select: { id: true },
     }),
     getScopedSupervisorIds(prisma, user, date),
@@ -1128,7 +1138,7 @@ async function validateAssignmentInput(prisma: PrismaClient, user: AuthLikeUser,
   return {
     date,
     supervisorId,
-    siteId,
+    siteId: site.id,
     action,
     targetProgress: normalizedTargetProgress,
     targetQuantity,
@@ -1213,11 +1223,11 @@ async function validateNegotiationAssignmentInput(prisma: PrismaClient, user: Au
   const zoneId = normalizeId(input.zoneId);
   const action = normalizeOptionalAction(input.action);
 
-  if (!supervisorId || !projectId || !zoneId) {
-    return planningError('INVALID_REQUEST', 'Ressource, projet et zone sont requis pour une tache nego.', 400);
+  if (!supervisorId || !projectId) {
+    return planningError('INVALID_REQUEST', 'Ressource et projet sont requis pour une tache nego.', 400);
   }
 
-  const [project, zone, supervisorIds] = await Promise.all([
+  const [project, zone, zoneCount, supervisorIds] = await Promise.all([
     prisma.project.findFirst({
       where: {
         id: projectId,
@@ -1225,13 +1235,16 @@ async function validateNegotiationAssignmentInput(prisma: PrismaClient, user: Au
       },
       select: { id: true },
     }),
-    prisma.negotiationZone.findFirst({
-      where: {
-        id: zoneId,
-        projectId,
-      },
-      select: { id: true, name: true },
-    }),
+    zoneId
+      ? prisma.negotiationZone.findFirst({
+          where: {
+            id: zoneId,
+            projectId,
+          },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve(null),
+    prisma.negotiationZone.count({ where: { projectId } }),
     getScopedSupervisorIds(prisma, user, date),
   ]);
 
@@ -1239,8 +1252,12 @@ async function validateNegotiationAssignmentInput(prisma: PrismaClient, user: Au
     return planningError('PROJECT_NOT_FOUND', 'Projet actif introuvable ou non accessible.', 404);
   }
 
-  if (!zone) {
+  if (zoneId && !zone) {
     return planningError('ZONE_NOT_FOUND', 'Zone introuvable pour ce projet.', 404);
+  }
+
+  if (!zoneId && zoneCount > 0) {
+    return planningError('ZONE_REQUIRED', 'Selectionne une zone pour ce projet.', 400);
   }
 
   if (!supervisorIds.includes(supervisorId)) {
@@ -1251,9 +1268,9 @@ async function validateNegotiationAssignmentInput(prisma: PrismaClient, user: Au
     date,
     supervisorId,
     projectId,
-    zoneId,
-    zoneName: zone.name,
-    action: action ?? `Negociation - ${zone.name}`,
+    zoneId: zone?.id ?? null,
+    zoneName: zone?.name ?? action ?? 'Zone nego',
+    action: action ?? (zone ? `Negociation - ${zone.name}` : 'Negociation'),
   };
 }
 

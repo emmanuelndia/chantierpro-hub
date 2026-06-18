@@ -14,7 +14,7 @@ Le premier sujet couvre les besoins d'upload planning des chefs de projet. Le se
 - Ajouter dans le `Planning` web un bloc `Importer un planning` avec :
   - `Telecharger le modele`
   - `Choisir un fichier`
-  - `Previsualiser`
+  - `Previsualiser` 0777214431
   - `Importer`
 - Creer des endpoints dedies :
   - `GET /api/planning/import/template`
