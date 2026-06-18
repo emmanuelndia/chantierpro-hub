@@ -1,4 +1,4 @@
-import type { ClockInStatus, ClockInType, Role } from '@prisma/client';
+import type { ClockInStatus, ClockInType, OfficeClockInLocation, Role } from '@prisma/client';
 
 export type ClockInRecordItem = {
   id: string;
@@ -11,6 +11,7 @@ export type ClockInRecordItem = {
   projectId: string | null;
   projectName: string | null;
   contextType: 'SITE' | 'FREE_MISSION' | 'OFFICE';
+  officeClockInLocation: OfficeClockInLocation | null;
   userId: string;
   type: ClockInType;
   clockInDate: string;
@@ -37,6 +38,7 @@ export type ActiveClockInSession = {
   planningAssignmentId: string | null;
   planningAssignmentAction: string | null;
   contextType: 'SITE' | 'FREE_MISSION' | 'OFFICE';
+  officeClockInLocation: OfficeClockInLocation | null;
   contextName: string;
   arrivalDate: string;
   arrivalAt: string;
@@ -64,6 +66,7 @@ export type SessionStatus = {
   openSessionPlanningAssignmentId?: string | null;
   openSessionPlanningAssignmentAction?: string | null;
   openSessionContextType?: 'SITE' | 'FREE_MISSION' | 'OFFICE' | null;
+  openSessionOfficeClockInLocation?: OfficeClockInLocation | null;
 };
 
 export type AttendancePersonItem = {

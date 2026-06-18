@@ -130,6 +130,7 @@ enum PlanningWorkLocationType {
 
 enum OfficeClockInLocation {
   OFFICE
+  PROFESSIONAL_TRAVEL
 }
 
 enum UserNotificationAudience {

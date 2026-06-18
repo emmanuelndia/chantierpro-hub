@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlanningWorkLocationType, type ClockInType, type Role } from '@prisma/client';
+import { OfficeClockInLocation, PlanningWorkLocationType, type ClockInType, type Role } from '@prisma/client';
 import { authFetch } from '@/lib/auth/client-session';
 import { haversineDistanceKm } from '@/lib/haversine';
 import {
@@ -137,6 +137,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const searchParams = useSearchParams();
   const canUseTerrainClockIn = TERRAIN_CLOCK_IN_ROLES.includes(userRole);
   const isNegotiationClockInUser = NEGOTIATION_CLOCK_IN_ROLES.includes(userRole);
+  const isOfficeStaff = userRole === 'OFFICE_STAFF';
   const queryClient = useQueryClient();
   const requestedSiteId = searchParams.get('siteId');
   const requestedFreeMissionId = searchParams.get('freeMissionId');
@@ -177,6 +178,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const [selectedFreeMissionId, setSelectedFreeMissionId] = useState<string | null>(requestedFreeMissionId);
   const [selectedNegotiationAssignmentId, setSelectedNegotiationAssignmentId] = useState<string | null>(null);
   const [selectedOffice, setSelectedOffice] = useState(requestedOffice || (!requestedSiteId && !requestedFreeMissionId));
+  const [selectedOfficeClockInLocation, setSelectedOfficeClockInLocation] = useState<OfficeClockInLocation>(OfficeClockInLocation.OFFICE);
   const [selectedOfficeAssignmentId, setSelectedOfficeAssignmentId] = useState<string | null>(requestedOfficeAssignmentId);
   const [selectedOfficeLocationId, setSelectedOfficeLocationId] = useState<string | null>(null);
   const [selectedClockContext, setSelectedClockContext] = useState<ClockContext>(
@@ -190,6 +192,10 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const [zoneActualName, setZoneActualName] = useState('');
   const [zoneSpecificPlace, setZoneSpecificPlace] = useState('');
   const [zoneClockInComment, setZoneClockInComment] = useState('');
+  const [travelActualZone, setTravelActualZone] = useState('');
+  const [travelSpecificPlace, setTravelSpecificPlace] = useState('');
+  const [travelReason, setTravelReason] = useState('');
+  const [travelComment, setTravelComment] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [now, setNow] = useState(() => Date.now());
@@ -450,6 +456,9 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     if (!selectedOffice && activeSession?.contextType === 'OFFICE') {
       setSelectedOffice(true);
     }
+    if (activeSession?.contextType === 'OFFICE' && activeSession.officeClockInLocation) {
+      setSelectedOfficeClockInLocation(activeSession.officeClockInLocation);
+    }
     if (activeSession?.contextType === 'OFFICE') {
       setSelectedClockContext('OFFICE');
     } else if (activeSession?.contextType === 'FREE_MISSION') {
@@ -663,13 +672,18 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     selectedSite !== null &&
     selectedDistance > selectedSite.radiusKm;
   const activeContextLabel = contextLabels[selectedClockContext];
+  const isProfessionalTravel = selectedOffice && selectedOfficeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL;
+  const displayContextLabel = isProfessionalTravel ? 'Deplacement' : activeContextLabel;
   const staleOpenSession = activeSession?.isStaleOpenSession ? activeSession : null;
   const selectedContextReady = Boolean(selectedSite ?? selectedFreeMission ?? selectedOffice) || (isNegotiationZoneSelected && Boolean(selectedNegotiationAssignment ?? openNegotiationSession));
-  const zoneActualNameRequired = Boolean(selectedFreeMission && currentType === 'ARRIVAL');
+  const isZoneClockInContext = selectedFreeMission !== null || isNegotiationZoneSelected;
+  const zoneActualNameRequired = isZoneClockInContext && currentType === 'ARRIVAL';
   const zoneActualNameReady = !zoneActualNameRequired || zoneActualName.trim().length > 0;
+  const travelDetailsRequired = isProfessionalTravel && currentType === 'ARRIVAL';
+  const travelDetailsReady = !travelDetailsRequired || (travelActualZone.trim().length > 0 && travelReason.trim().length > 0);
 
   useEffect(() => {
-    if (!selectedFreeMissionKey || selectedClockContext !== 'ZONE') {
+    if ((!selectedFreeMissionKey && !selectedNegotiationAssignment?.id) || selectedClockContext !== 'ZONE') {
       setZoneActualName('');
       setZoneSpecificPlace('');
       setZoneClockInComment('');
@@ -679,7 +693,16 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     setZoneActualName('');
     setZoneSpecificPlace('');
     setZoneClockInComment('');
-  }, [selectedClockContext, selectedFreeMissionKey]);
+  }, [selectedClockContext, selectedFreeMissionKey, selectedNegotiationAssignment?.id]);
+
+  useEffect(() => {
+    if (!isProfessionalTravel || currentType !== 'ARRIVAL') {
+      setTravelActualZone('');
+      setTravelSpecificPlace('');
+      setTravelReason('');
+      setTravelComment('');
+    }
+  }, [currentType, isProfessionalTravel]);
 
   useEffect(() => {
     if (!requestedIntent && sessionStatus?.sessionOpen) {
@@ -756,9 +779,10 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const canSubmit =
     selectedContextReady &&
     zoneActualNameReady &&
+    travelDetailsReady &&
     geoState.status === 'ready' &&
     !outsideRadius &&
-    (isNegotiationZoneSelected ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
+    (isNegotiationZoneSelected || isProfessionalTravel ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
     !(staleOpenSession && currentType === 'ARRIVAL') &&
     !clockInMutation.isPending;
 
@@ -803,16 +827,41 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     };
 
     if (selectedOffice) {
-      if (!selectedOfficeLocation) {
+      if (isProfessionalTravel && actionType === 'ARRIVAL' && (!travelActualZone.trim() || !travelReason.trim())) {
+        throw new Error('Renseignez la ville et le motif du deplacement.');
+      }
+
+      if (!isProfessionalTravel && !selectedOfficeLocation) {
         throw new Error('Selectionnez un bureau actif avant de pointer.');
+      }
+
+      const officeSiteName = isProfessionalTravel ? 'Deplacement professionnel' : selectedOfficeLocation?.name ?? 'Bureau';
+      const officePayload = {
+        ...payload,
+        officeClockInLocation: selectedOfficeClockInLocation,
+        ...(isProfessionalTravel
+          ? {
+              travelActualZone,
+              travelSpecificPlace,
+              travelReason,
+              travelComment,
+            }
+          : {
+              officeLocationId: selectedOfficeLocation!.id,
+              planningAssignmentId: selectedOfficeAssignmentId,
+            }),
+      };
+
+      if (isProfessionalTravel && !navigator.onLine) {
+        throw new Error('Le pointage deplacement professionnel demande une connexion reseau pour cette version.');
       }
 
       if (!navigator.onLine) {
         await enqueueOfflineClockIn({
           clientId,
-          siteName: selectedOfficeLocation.name,
+          siteName: officeSiteName,
           ...payload,
-          officeLocationId: selectedOfficeLocation.id,
+          officeLocationId: selectedOfficeLocation!.id,
           planningAssignmentId: selectedOfficeAssignmentId,
         });
 
@@ -823,7 +872,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           type: actionType,
           siteId: null,
           freeMissionId: null,
-          siteName: selectedOfficeLocation.name,
+          siteName: officeSiteName,
           timestampLocal,
           durationSeconds: actionType === 'DEPARTURE' ? sessionStatus?.duration ?? activeSession?.durationSeconds ?? null : null,
         };
@@ -832,11 +881,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       const response = await authFetch('/api/office-clock-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...payload,
-          officeLocationId: selectedOfficeLocation.id,
-          planningAssignmentId: selectedOfficeAssignmentId,
-        }),
+        body: JSON.stringify(officePayload),
       });
 
       if (!response.ok) {
@@ -852,7 +897,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         type: actionType,
         siteId: null,
         freeMissionId: null,
-        siteName: selectedOfficeLocation.name,
+        siteName: officeSiteName,
         timestampLocal: data.record.timestampLocal,
         durationSeconds: actionType === 'DEPARTURE' ? sessionStatus?.duration ?? activeSession?.durationSeconds ?? null : null,
       };
@@ -902,6 +947,12 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         throw new Error('Selectionnez une zone negociation avant de pointer.');
       }
 
+      const negotiationZoneComment = buildZoneClockInComment({
+        actualZone: zoneActualName,
+        specificPlace: zoneSpecificPlace,
+        comment: zoneClockInComment,
+      });
+
       const response = await authFetch('/api/mobile/negotiation/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -912,7 +963,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           latitude: geoState.latitude,
           longitude: geoState.longitude,
           accuracy: geoState.accuracy,
-          comment,
+          comment: negotiationZoneComment,
         }),
       });
 
@@ -1203,7 +1254,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Pointage</p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950">{activeContextLabel}</h2>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">{displayContextLabel}</h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">{typeLabels[currentType]}</p>
           </div>
           {activeSession ? (
@@ -1212,28 +1263,54 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
             </span>
           ) : null}
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
-          <ContextButton
-            active={selectedClockContext === 'OFFICE'}
-            icon={<BuildingIcon className="h-4 w-4" />}
-            label="Bureau"
-            onClick={() => setSelectedClockContext('OFFICE')}
-          />
-          <ContextButton
-            active={selectedClockContext === 'SITE'}
-            disabled={!canUseTerrainClockIn}
-            icon={<MapPinIcon className="h-4 w-4" />}
-            label="Chantier"
-            onClick={() => setSelectedClockContext('SITE')}
-          />
-          <ContextButton
-            active={selectedClockContext === 'ZONE'}
-            disabled={!hasZoneOption}
-            icon={<NavigationIcon className="h-4 w-4" />}
-            label="Zone"
-            onClick={() => setSelectedClockContext('ZONE')}
-          />
-        </div>
+        {isOfficeStaff ? (
+          <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+            <ContextButton
+              active={selectedClockContext === 'OFFICE' && selectedOfficeClockInLocation === OfficeClockInLocation.OFFICE}
+              icon={<BuildingIcon className="h-4 w-4" />}
+              label="Bureau"
+              onClick={() => {
+                setSelectedClockContext('OFFICE');
+                setSelectedOfficeClockInLocation(OfficeClockInLocation.OFFICE);
+              }}
+            />
+            <ContextButton
+              active={selectedClockContext === 'OFFICE' && selectedOfficeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL}
+              icon={<NavigationIcon className="h-4 w-4" />}
+              label="Deplacement"
+              onClick={() => {
+                setSelectedClockContext('OFFICE');
+                setSelectedOfficeClockInLocation(OfficeClockInLocation.PROFESSIONAL_TRAVEL);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
+            <ContextButton
+              active={selectedClockContext === 'OFFICE'}
+              icon={<BuildingIcon className="h-4 w-4" />}
+              label="Bureau"
+              onClick={() => {
+                setSelectedClockContext('OFFICE');
+                setSelectedOfficeClockInLocation(OfficeClockInLocation.OFFICE);
+              }}
+            />
+            <ContextButton
+              active={selectedClockContext === 'SITE'}
+              disabled={!canUseTerrainClockIn}
+              icon={<MapPinIcon className="h-4 w-4" />}
+              label="Chantier"
+              onClick={() => setSelectedClockContext('SITE')}
+            />
+            <ContextButton
+              active={selectedClockContext === 'ZONE'}
+              disabled={!hasZoneOption}
+              icon={<NavigationIcon className="h-4 w-4" />}
+              label="Zone"
+              onClick={() => setSelectedClockContext('ZONE')}
+            />
+          </div>
+        )}
       </section>
 
       {selectedClockContext === 'ZONE' ? (
@@ -1323,7 +1400,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               Aucun chantier proche ne sera detecte automatiquement.
             </p>
           </div>
-          {selectedFreeMission && currentType === 'ARRIVAL' ? (
+          {isZoneClockInContext && currentType === 'ARRIVAL' ? (
             <div className="space-y-3 rounded-xl bg-white p-3">
               <label className="block space-y-2">
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">
@@ -1413,11 +1490,17 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Presence bureau</p>
-              <h3 className="mt-2 text-lg font-black text-slate-950">Pointage bureau</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-600">Présence quotidienne indépendante du planning.</p>
+              <h3 className="mt-2 text-lg font-black text-slate-950">
+                {isProfessionalTravel ? 'Deplacement professionnel' : 'Pointage bureau'}
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                {isProfessionalTravel
+                  ? 'Presence professionnelle hors bureau, sans chantier ni projet.'
+                  : 'Presence quotidienne independante du planning.'}
+              </p>
             </div>
             <span className="rounded-full bg-sky-600 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
-              Bureau
+              {isProfessionalTravel ? 'Deplacement' : 'Bureau'}
             </span>
           </div>
           {isAfterOfficeStartTime && currentType === 'ARRIVAL' ? (
@@ -1425,7 +1508,50 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               Arrivee apres 08:30 : ce pointage sera signale en retard.
             </div>
           ) : null}
-          {officeAssignments.length > 0 ? (
+          {isProfessionalTravel && currentType === 'ARRIVAL' ? (
+            <div className="space-y-3 rounded-lg border border-sky-100 bg-sky-50 p-3">
+              <label className="block space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Ville / zone reelle</span>
+                <input
+                  className="min-h-12 w-full rounded-lg border border-sky-100 bg-white px-3 text-sm font-bold text-slate-950 outline-none focus:border-sky-400"
+                  onChange={(event) => setTravelActualZone(event.target.value)}
+                  placeholder="Ex: Bouake, San Pedro..."
+                  value={travelActualZone}
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Lieu precis</span>
+                <input
+                  className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-950 outline-none focus:border-sky-300"
+                  onChange={(event) => setTravelSpecificPlace(event.target.value)}
+                  placeholder="Facultatif"
+                  value={travelSpecificPlace}
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Motif du deplacement</span>
+                <input
+                  className="min-h-12 w-full rounded-lg border border-sky-100 bg-white px-3 text-sm font-bold text-slate-950 outline-none focus:border-sky-400"
+                  onChange={(event) => setTravelReason(event.target.value)}
+                  placeholder="Ex: reunion, mission administrative..."
+                  value={travelReason}
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Commentaire</span>
+                <textarea
+                  className="min-h-20 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none focus:border-sky-300"
+                  onChange={(event) => setTravelComment(event.target.value)}
+                  placeholder="Facultatif"
+                  value={travelComment}
+                />
+              </label>
+              {!travelDetailsReady ? (
+                <p className="text-xs font-bold text-red-700">Renseignez la ville et le motif du deplacement.</p>
+              ) : null}
+            </div>
+          ) : null}
+          {!isProfessionalTravel && officeAssignments.length > 0 ? (
             <div className="space-y-3 rounded-lg border border-sky-100 bg-sky-50 p-3">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Taches bureau prevues</p>
@@ -1457,35 +1583,52 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               )}
             </div>
           ) : null}
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Bureau</label>
-            <select
-              className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none"
-              onChange={(event) => setSelectedOfficeLocationId(event.target.value)}
-              value={selectedOfficeLocation?.id ?? ''}
-            >
-              {officeLocations.length === 0 ? <option value="">Aucun bureau actif</option> : null}
-              {officeLocations.map((office) => (
-                <option key={office.id} value={office.id}>
-                  {office.name} - {office.address}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Distance</p>
-              <p className="mt-1 text-sm font-black text-slate-950">
-                {selectedOfficeDistance === null ? 'GPS requis' : `${selectedOfficeDistance.toFixed(2)} km`}
-              </p>
+          {!isProfessionalTravel ? (
+            <>
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Bureau</label>
+                <select
+                  className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none"
+                  onChange={(event) => setSelectedOfficeLocationId(event.target.value)}
+                  value={selectedOfficeLocation?.id ?? ''}
+                >
+                  {officeLocations.length === 0 ? <option value="">Aucun bureau actif</option> : null}
+                  {officeLocations.map((office) => (
+                    <option key={office.id} value={office.id}>
+                      {office.name} - {office.address}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Distance</p>
+                  <p className="mt-1 text-sm font-black text-slate-950">
+                    {selectedOfficeDistance === null ? 'GPS requis' : `${selectedOfficeDistance.toFixed(2)} km`}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Rayon bureau</p>
+                  <p className="mt-1 text-sm font-black text-slate-950">{selectedOfficeLocation?.radiusKm ?? '-'} km</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Position</p>
+                <p className="mt-1 text-sm font-black text-slate-950">GPS actif</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Rayon</p>
+                <p className="mt-1 text-sm font-black text-slate-950">Non applique</p>
+              </div>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Rayon bureau</p>
-              <p className="mt-1 text-sm font-black text-slate-950">{selectedOfficeLocation?.radiusKm ?? '-'} km</p>
-            </div>
-          </div>
+          )}
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">
-            La position GPS est enregistrée comme preuve du pointage. Aucun chantier proche ne sera sélectionné.
+            {isProfessionalTravel
+              ? 'La position GPS est enregistree comme preuve du deplacement. Aucun bureau, chantier ou projet ne sera impose.'
+              : 'La position GPS est enregistree comme preuve du pointage. Aucun chantier proche ne sera selectionne.'}
           </p>
         </section>
       ) : null}

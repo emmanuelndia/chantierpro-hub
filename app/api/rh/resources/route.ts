@@ -1,4 +1,4 @@
-import { ClockInStatus, ClockInType, Prisma, Role } from '@prisma/client';
+import { ClockInStatus, ClockInType, OfficeClockInLocation, Prisma, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { canAccessRh, jsonRhError } from '@/lib/rh';
@@ -152,7 +152,7 @@ function buildTodayPresence(
     type: ClockInType;
     timestampLocal: Date;
     isLate: boolean;
-    officeClockInLocation: 'OFFICE' | null;
+    officeClockInLocation: OfficeClockInLocation | null;
     siteId: string | null;
     freeMissionId: string | null;
     isAutoClosed: boolean;
@@ -166,7 +166,7 @@ function buildTodayPresence(
     ? null
     : [...records.slice(arrivalIndex + 1)].reverse().find((record) => record.type === ClockInType.DEPARTURE) ?? null;
   const context = latest
-    ? latest.officeClockInLocation === 'OFFICE'
+    ? latest.officeClockInLocation
       ? 'OFFICE'
       : 'TERRAIN'
     : null;
@@ -191,7 +191,12 @@ function buildTodayPresence(
         };
   }
 
-  const baseLabel = context === 'OFFICE' ? 'bureau' : 'terrain';
+  const baseLabel =
+    latest.officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL
+      ? 'deplacement professionnel'
+      : context === 'OFFICE'
+        ? 'bureau'
+        : 'terrain';
   const status = records.some((record) => record.isAutoClosed)
     ? 'ANOMALY'
     : latest.type === ClockInType.PAUSE_START

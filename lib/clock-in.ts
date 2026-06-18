@@ -1,6 +1,7 @@
 ﻿import {
   ClockInStatus,
   ClockInType,
+  OfficeClockInLocation,
   Prisma,
   Role,
   SiteGeofenceType,
@@ -133,7 +134,7 @@ type PauseRecord = {
   freeMissionId?: string | null;
   planningAssignmentId?: string | null;
   officeLocationId?: string | null;
-  officeClockInLocation?: 'OFFICE' | null;
+  officeClockInLocation?: OfficeClockInLocation | null;
   userId: string;
   type: ClockInType;
   status: ClockInStatus;
@@ -470,10 +471,14 @@ export function findActivePauseFromRecords(records: PauseRecord[]) {
 
 export function serializeClockInRecord(record: SerializableClockInRecord): ClockInRecordItem {
   const contextType = record.officeClockInLocation ? 'OFFICE' : record.freeMissionId ? 'FREE_MISSION' : 'SITE';
+  const officeName =
+    record.officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL
+      ? 'Deplacement professionnel'
+      : record.officeLocation?.name ?? 'Bureau';
   return {
     id: record.id,
     siteId: record.siteId,
-    siteName: record.site?.name ?? record.freeMission?.action ?? record.officeLocation?.name ?? 'Bureau',
+    siteName: record.site?.name ?? record.freeMission?.action ?? officeName,
     freeMissionId: record.freeMissionId,
     freeMissionAction: record.freeMission?.action ?? null,
     planningAssignmentId: record.planningAssignmentId,
@@ -481,6 +486,7 @@ export function serializeClockInRecord(record: SerializableClockInRecord): Clock
     projectId: record.freeMission?.projectId ?? null,
     projectName: record.freeMission?.project.name ?? null,
     contextType,
+    officeClockInLocation: record.officeClockInLocation,
     userId: record.userId,
     type: record.type,
     clockInDate: record.clockInDate.toISOString().slice(0, 10),
@@ -531,6 +537,7 @@ export function serializeSessionStatus(
       openSessionSiteName: null,
       openSessionFreeMissionId: null,
       openSessionContextType: null,
+      openSessionOfficeClockInLocation: null,
     };
   }
 
@@ -545,11 +552,16 @@ export function serializeSessionStatus(
       openSession.site?.name ??
       openSession.freeMission?.action ??
       openSession.officeLocation?.name ??
-      (openSession.officeClockInLocation ? 'Bureau' : null),
+      (openSession.officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL
+        ? 'Deplacement professionnel'
+        : openSession.officeClockInLocation
+          ? 'Bureau'
+          : null),
     openSessionFreeMissionId: openSession.freeMissionId,
     openSessionPlanningAssignmentId: openSession.planningAssignmentId,
     openSessionPlanningAssignmentAction: openSession.planningAssignment?.action ?? null,
     openSessionContextType: openSession.officeClockInLocation ? 'OFFICE' : openSession.freeMissionId ? 'FREE_MISSION' : 'SITE',
+    openSessionOfficeClockInLocation: openSession.officeClockInLocation,
   };
 }
 
@@ -558,7 +570,12 @@ export function serializeActiveSession(record: OpenSessionRecord | null): Active
     return null;
   }
 
-  const contextName = record.site?.name ?? record.freeMission?.action ?? record.officeLocation?.name ?? 'Bureau';
+  const contextName =
+    record.site?.name ??
+    record.freeMission?.action ??
+    (record.officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL
+      ? 'Deplacement professionnel'
+      : record.officeLocation?.name ?? 'Bureau');
   const arrivalDate = record.clockInDate.toISOString().slice(0, 10);
   const today = new Date().toISOString().slice(0, 10);
 
@@ -570,6 +587,7 @@ export function serializeActiveSession(record: OpenSessionRecord | null): Active
     planningAssignmentId: record.planningAssignmentId,
     planningAssignmentAction: record.planningAssignment?.action ?? null,
     contextType: record.officeClockInLocation ? 'OFFICE' : record.freeMissionId ? 'FREE_MISSION' : 'SITE',
+    officeClockInLocation: record.officeClockInLocation,
     contextName,
     arrivalDate,
     arrivalAt: record.timestampLocal.toISOString(),
@@ -616,7 +634,7 @@ export async function createClockInRecord(
     freeMissionId?: string | null;
     planningAssignmentId?: string | null;
     officeLocationId?: string | null;
-    officeClockInLocation?: 'OFFICE' | null;
+    officeClockInLocation?: OfficeClockInLocation | null;
     userId: string;
     input: ClockInInput;
     distanceKm: number;
@@ -665,7 +683,7 @@ export async function createBatchClockInRecord(
     freeMissionId?: string | null;
     planningAssignmentId?: string | null;
     officeLocationId?: string | null;
-    officeClockInLocation?: 'OFFICE' | null;
+    officeClockInLocation?: OfficeClockInLocation | null;
     userId: string;
     input: BatchSyncItemInput;
     distanceKm: number;

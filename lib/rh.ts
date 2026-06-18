@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
-import { ClockInStatus, ClockInType, Prisma, Role, type PrismaClient } from '@prisma/client';
+import { ClockInStatus, ClockInType, OfficeClockInLocation, Prisma, Role, type PrismaClient } from '@prisma/client';
 import { createSignedStorageUrl, uploadPrivateStorageObject } from '@/lib/storage';
 import { projectAccessWhere } from '@/lib/projects';
 import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
@@ -591,7 +591,7 @@ export async function getSitePresencesLive(
     includeOffice ? prisma.clockInRecord.findMany({
       where: {
         status: ClockInStatus.VALID,
-        officeClockInLocation: 'OFFICE',
+        officeClockInLocation: { not: null },
         timestampLocal: {
           gte: today,
           lt: tomorrow,
@@ -607,6 +607,7 @@ export async function getSitePresencesLive(
         id: true,
         userId: true,
         officeLocationId: true,
+        officeClockInLocation: true,
         type: true,
         timestampLocal: true,
         distanceToSite: true,
@@ -809,17 +810,18 @@ export async function getSitePresencesLive(
     }
   }
   for (const record of officeRecords) {
-    const rowId = `office:${record.officeLocationId ?? 'default'}`;
+    const isProfessionalTravel = record.officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL;
+    const rowId = isProfessionalTravel ? 'office:professional-travel' : `office:${record.officeLocationId ?? 'default'}`;
     if (!siteRows.has(rowId)) {
       siteRows.set(rowId, {
         siteId: rowId,
-        siteName: record.officeLocation?.name ?? 'Bureau',
-        siteAddress: record.officeLocation?.address ?? 'Pointage bureau',
+        siteName: isProfessionalTravel ? 'Deplacement professionnel' : record.officeLocation?.name ?? 'Bureau',
+        siteAddress: isProfessionalTravel ? 'Pointage en deplacement' : record.officeLocation?.address ?? 'Pointage bureau',
         presenceContext: 'OFFICE',
         projectId: '',
-        projectName: 'Bureau',
+        projectName: isProfessionalTravel ? 'Deplacement professionnel' : 'Bureau',
         projectManagerId: '',
-        projectManagerName: 'Bureau',
+        projectManagerName: isProfessionalTravel ? 'Deplacement professionnel' : 'Bureau',
         expectedCount: 0,
         presentCount: 0,
         pausedCount: 0,
@@ -858,7 +860,10 @@ export async function getSitePresencesLive(
     recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), ...mission.clockInRecords]);
   }
   for (const record of officeRecords) {
-    const rowId = `office:${record.officeLocationId ?? 'default'}`;
+    const rowId =
+      record.officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL
+        ? 'office:professional-travel'
+        : `office:${record.officeLocationId ?? 'default'}`;
     const key = liveResourceKey(rowId, record.userId);
     recordsBySiteUser.set(key, [...(recordsBySiteUser.get(key) ?? []), record]);
   }
@@ -1860,7 +1865,10 @@ function getPresenceContext(record: SerializableRhClockInRecord): {
 
   return {
     type: 'OFFICE',
-    position: record.officeLocation?.name ?? 'Bureau',
+    position:
+      record.officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL
+        ? 'Deplacement professionnel'
+        : record.officeLocation?.name ?? 'Bureau',
     projectId: null,
     projectName: null,
   };

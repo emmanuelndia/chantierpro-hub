@@ -1,4 +1,4 @@
-import { ClockInStatus, ClockInType, PlanningWorkLocationType } from '@prisma/client';
+import { ClockInStatus, ClockInType, OfficeClockInLocation, PlanningWorkLocationType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   createClockInRecord,
@@ -19,9 +19,32 @@ export const POST = withAuth(async ({ req, user }) => {
   const input = parseClockInInput(body);
   const officeLocationId = parseOfficeLocationId(body);
   const requestedPlanningAssignmentId = parsePlanningAssignmentId(body);
+  const requestedOfficeClockInLocation = parseOfficeClockInLocation(body);
+  const officeClockInLocation =
+    input?.type === ClockInType.ARRIVAL
+      ? requestedOfficeClockInLocation
+      : null;
 
-  if (!input || (input.type === ClockInType.ARRIVAL && !officeLocationId)) {
+  if (!input || !requestedOfficeClockInLocation) {
     return jsonClockInError('BAD_REQUEST', 400, 'Payload de pointage bureau invalide.');
+  }
+
+  if (requestedOfficeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL && user.role !== Role.OFFICE_STAFF) {
+    return jsonClockInError('PERMISSION_DENIED', 403, 'Le deplacement professionnel est reserve au personnel bureau.');
+  }
+
+  if (input.type === ClockInType.ARRIVAL) {
+    if (officeClockInLocation === OfficeClockInLocation.OFFICE && !officeLocationId) {
+      return jsonClockInError('BAD_REQUEST', 400, 'Selectionnez un bureau avant de pointer.');
+    }
+
+    if (officeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL) {
+      const travelDetails = parseProfessionalTravelDetails(body);
+      if (!travelDetails) {
+        return jsonClockInError('BAD_REQUEST', 400, 'Renseignez la ville et le motif du deplacement.');
+      }
+      input.comment = buildProfessionalTravelComment(travelDetails);
+    }
   }
 
   const gpsError = getClockInGpsValidationError(input);
@@ -30,14 +53,15 @@ export const POST = withAuth(async ({ req, user }) => {
   }
 
   const openSession = await getOpenSessionForUser(prisma, user.id);
+  const activeOfficeClockInLocation = input.type === ClockInType.ARRIVAL ? officeClockInLocation : openSession?.officeClockInLocation ?? null;
   const officeLocation =
-    input.type === ClockInType.ARRIVAL
+    input.type === ClockInType.ARRIVAL && officeClockInLocation === OfficeClockInLocation.OFFICE
       ? await getActiveOfficeLocation(prisma, officeLocationId!)
       : openSession?.officeLocationId
         ? await getOfficeLocationById(prisma, openSession.officeLocationId)
         : null;
 
-  if (!officeLocation) {
+  if (activeOfficeClockInLocation === OfficeClockInLocation.OFFICE && !officeLocation) {
     return jsonClockInError('PERMISSION_DENIED', 403, 'Bureau introuvable ou inactif.');
   }
 
@@ -52,12 +76,16 @@ export const POST = withAuth(async ({ req, user }) => {
       return jsonClockInError('NO_OPEN_SESSION', 400, 'Aucune session bureau ouverte.');
     }
 
-    if (openSession.officeClockInLocation !== 'OFFICE') {
+    if (!openSession.officeClockInLocation) {
       return jsonClockInError('PERMISSION_DENIED', 400, 'La session ouverte ne concerne pas le bureau.');
     }
   }
 
-  if (input.type === ClockInType.ARRIVAL) {
+  if (input.type === ClockInType.ARRIVAL && officeClockInLocation === OfficeClockInLocation.OFFICE) {
+    if (!officeLocation) {
+      return jsonClockInError('PERMISSION_DENIED', 403, 'Bureau introuvable ou inactif.');
+    }
+
     const distanceKm = haversineDistanceKm(
       {
         latitude: input.latitude,
@@ -89,7 +117,7 @@ export const POST = withAuth(async ({ req, user }) => {
     const officeRecords = await prisma.clockInRecord.findMany({
       where: {
         userId: user.id,
-        officeClockInLocation: 'OFFICE',
+        officeClockInLocation: activeOfficeClockInLocation,
         status: ClockInStatus.VALID,
       },
       orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
@@ -124,8 +152,8 @@ export const POST = withAuth(async ({ req, user }) => {
   }
 
   const record = await createClockInRecord(prisma, {
-    officeClockInLocation: 'OFFICE',
-    officeLocationId: officeLocation.id,
+    officeClockInLocation: activeOfficeClockInLocation,
+    officeLocationId: activeOfficeClockInLocation === OfficeClockInLocation.OFFICE ? officeLocation?.id ?? null : null,
     planningAssignmentId: linkedAssignmentId,
     userId: user.id,
     input,
@@ -152,6 +180,67 @@ function parsePlanningAssignmentId(body: unknown) {
 
   const value = (body as Record<string, unknown>).planningAssignmentId;
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function parseOfficeClockInLocation(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    return OfficeClockInLocation.OFFICE;
+  }
+
+  const value = (body as Record<string, unknown>).officeClockInLocation;
+  if (value === undefined || value === null || value === '') {
+    return OfficeClockInLocation.OFFICE;
+  }
+
+  return value === OfficeClockInLocation.OFFICE || value === OfficeClockInLocation.PROFESSIONAL_TRAVEL
+    ? value
+    : null;
+}
+
+function parseProfessionalTravelDetails(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    return null;
+  }
+
+  const record = body as Record<string, unknown>;
+  const actualZone = sanitizeText(record.travelActualZone);
+  const specificPlace = sanitizeText(record.travelSpecificPlace);
+  const reason = sanitizeText(record.travelReason);
+  const comment = sanitizeText(record.travelComment);
+
+  if (!actualZone || !reason) {
+    return null;
+  }
+
+  return { actualZone, specificPlace, reason, comment };
+}
+
+function sanitizeText(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim().slice(0, 500) : null;
+}
+
+function buildProfessionalTravelComment({
+  actualZone,
+  specificPlace,
+  reason,
+  comment,
+}: {
+  actualZone: string;
+  specificPlace: string | null;
+  reason: string;
+  comment: string | null;
+}) {
+  const lines = [`Ville / zone reelle : ${actualZone}`, `Motif : ${reason}`];
+
+  if (specificPlace) {
+    lines.push(`Lieu precis : ${specificPlace}`);
+  }
+
+  if (comment) {
+    lines.push(`Commentaire : ${comment}`);
+  }
+
+  return lines.join('\n');
 }
 
 async function validateOfficePlanningAssignment(userId: string, assignmentId: string | null, timestampLocal: string) {

@@ -11,7 +11,7 @@ export const GET = withAuth(async ({ user }) => {
   const records = await prisma.clockInRecord.findMany({
     where: {
       userId: user.id,
-      officeClockInLocation: 'OFFICE',
+      officeClockInLocation: { not: null },
       status: ClockInStatus.VALID,
     },
     orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
