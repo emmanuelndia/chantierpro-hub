@@ -945,6 +945,24 @@ export async function getSitePresencesLive(
   const projectManagersById = new Map<string, { id: string; label: string }>();
   const assignersById = new Map<string, { id: string; label: string }>();
   const roles = new Set<Role>();
+  const liveResourceEntries: {
+    site: LivePresenceRow;
+    resource: RhSitePresenceLiveResource;
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string | null;
+      role: Role;
+    };
+    assignment: {
+      action: string;
+      supervisorId: string;
+      supervisor: (typeof assignments)[number]['supervisor'];
+      createdById: string;
+      createdBy: (typeof assignments)[number]['createdBy'];
+    } | null;
+  }[] = [];
 
   for (const key of allKeys) {
     const { siteId } = parseLiveResourceKey(key);
@@ -958,7 +976,17 @@ export async function getSitePresencesLive(
 
     const officeTaskAction = site.presenceContext === 'OFFICE' ? getOfficeTaskAction(siteRecords) : null;
     const resource = buildLiveResource(user, assignment?.action ?? officeTaskAction, siteRecords, site.presenceContext, today);
-    if (!matchesLiveResourceFilters(resource, query)) continue;
+    liveResourceEntries.push({ site, resource, user, assignment });
+  }
+
+  const usersWithPresenceInScope = new Set(
+    liveResourceEntries
+      .filter(({ resource }) => hasLivePresenceDuringSelectedDay(resource) || resource.status === 'ANOMALY')
+      .map(({ resource }) => resource.userId),
+  );
+
+  for (const { site, resource, user, assignment } of liveResourceEntries) {
+    if (!matchesLiveResourceFilters(resource, query, usersWithPresenceInScope)) continue;
 
     site.resources.push(resource);
     roles.add(user.role);
@@ -2710,7 +2738,14 @@ function getLiveStatusFromLatestRecord(
   return 'PRESENT';
 }
 
-function matchesLiveResourceFilters(resource: RhSitePresenceLiveResource, query: SitePresenceLiveQuery) {
+function matchesLiveResourceFilters(
+  resource: RhSitePresenceLiveResource,
+  query: SitePresenceLiveQuery,
+  usersWithPresenceInScope: Set<string>,
+) {
+  if (query.status === 'EXPECTED_NOT_CLOCKED' && !query.siteId && usersWithPresenceInScope.has(resource.userId)) {
+    return false;
+  }
   if (query.status && resource.status !== query.status) return false;
   if (query.anomaliesOnly && resource.status !== 'ANOMALY' && !resource.anomalyReason) return false;
   if (query.lateOnly && !resource.isLate) return false;
