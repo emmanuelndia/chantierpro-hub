@@ -163,6 +163,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
   const [drawerMode, setDrawerMode] = useState<DrawerMode | null>(null);
   const [form, setForm] = useState<AssignmentFormState>(() => createEmptyForm(selectedDate));
   const [deleteTarget, setDeleteTarget] = useState<PlanningWebAssignment | null>(null);
+  const [singleDuplicateTarget, setSingleDuplicateTarget] = useState<PlanningWebAssignment | null>(null);
+  const [singleDuplicateDate, setSingleDuplicateDate] = useState(() => formatDateKey(addDays(parseDateKey(todayKey), 1)));
   const [progressTarget, setProgressTarget] = useState<PlanningWebAssignment | null>(null);
   const [progressForm, setProgressForm] = useState<ProgressFormState>(() => createEmptyProgressForm());
   const [planningImportOpen, setPlanningImportOpen] = useState(false);
@@ -372,6 +374,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         title: `${result.createdCount} tache(s) dupliquee(s)`,
         ...(result.skippedCount > 0 ? { message: `${result.skippedCount} deja existante(s) ou hors perimetre ignoree(s).` } : {}),
       });
+      setSingleDuplicateTarget(null);
       await queryClient.invalidateQueries({ queryKey: ['web-planning'] });
     },
     onError: (error) => pushMutationError(error, 'Duplication impossible'),
@@ -626,8 +629,15 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
     });
   }
 
-  function duplicateSingleAssignment(assignment: PlanningWebAssignment) {
-    if (duplicateTargetDate === selectedDate) {
+  function openSingleDuplicate(assignment: PlanningWebAssignment) {
+    setSingleDuplicateTarget(assignment);
+    setSingleDuplicateDate(duplicateTargetDate || formatDateKey(addDays(parseDateKey(selectedDate), 1)));
+  }
+
+  function duplicateSingleAssignment() {
+    if (!singleDuplicateTarget) return;
+
+    if (singleDuplicateDate === selectedDate) {
       pushToast({
         type: 'error',
         title: 'Date cible invalide',
@@ -638,8 +648,8 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
 
     duplicateMutation.mutate({
       sourceDate: selectedDate,
-      targetDate: duplicateTargetDate,
-      assignmentId: assignment.id,
+      targetDate: singleDuplicateDate,
+      assignmentId: singleDuplicateTarget.id,
     });
   }
 
@@ -962,7 +972,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           canMutate={canMutate}
           sites={sites}
           onDelete={setDeleteTarget}
-          onDuplicate={duplicateSingleAssignment}
+          onDuplicate={openSingleDuplicate}
           onEdit={openEdit}
           onProgress={openProgress}
         />
@@ -1023,6 +1033,17 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           isDeleting={deleteMutation.isPending}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
+        />
+      ) : null}
+
+      {singleDuplicateTarget ? (
+        <SingleDuplicateModal
+          assignment={singleDuplicateTarget}
+          date={singleDuplicateDate}
+          isDuplicating={duplicateMutation.isPending}
+          onCancel={() => setSingleDuplicateTarget(null)}
+          onChangeDate={setSingleDuplicateDate}
+          onConfirm={duplicateSingleAssignment}
         />
       ) : null}
 
@@ -1910,6 +1931,59 @@ function ProgressUpdateModal({
             type="button"
           >
             {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SingleDuplicateModal({
+  assignment,
+  date,
+  isDuplicating,
+  onCancel,
+  onChangeDate,
+  onConfirm,
+}: Readonly<{
+  assignment: PlanningWebAssignment;
+  date: string;
+  isDuplicating: boolean;
+  onCancel: () => void;
+  onChangeDate: (date: string) => void;
+  onConfirm: () => void;
+}>) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+      <section className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Dupliquer une tâche</p>
+        <h2 className="mt-2 line-clamp-2 text-xl font-semibold text-slate-950">{assignment.action}</h2>
+        <p className="mt-2 text-sm text-slate-500">
+          {assignment.supervisorFirstName} {assignment.supervisorName} - {assignment.siteName}
+        </p>
+
+        <div className="mt-5">
+          <Field label="Dupliquer vers">
+            <input
+              className={filterClassName}
+              onChange={(event) => onChangeDate(event.target.value)}
+              type="date"
+              value={date}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button className={buttonClassName} onClick={onCancel} type="button">
+            Annuler
+          </button>
+          <button
+            className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+            disabled={isDuplicating || !date}
+            onClick={onConfirm}
+            type="button"
+          >
+            {isDuplicating ? 'Duplication...' : 'Dupliquer'}
           </button>
         </div>
       </section>
