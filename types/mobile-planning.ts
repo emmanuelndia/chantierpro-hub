@@ -35,6 +35,7 @@ export type PlanningAssignment = {
   siteAddress: string;
   siteType: SiteType | 'FREE_MISSION';
   action: string;
+  plannedZone?: string | null;
   targetProgress: number | null;
   targetQuantity: number | null;
   targetUnit: string | null;
@@ -126,6 +127,7 @@ export type CreateAssignmentRequest = {
   projectId?: string | null;
   zoneId?: string | null;
   action: string;
+  plannedZone?: string | null;
   targetProgress?: number | null;
   targetQuantity?: number | null;
   targetUnit?: string | null;
@@ -137,6 +139,7 @@ export type CreateAssignmentRequest = {
 
 export type UpdateAssignmentRequest = {
   action?: string;
+  plannedZone?: string | null;
   targetProgress?: number | null;
   targetQuantity?: number | null;
   targetUnit?: string | null;
@@ -187,6 +190,7 @@ export type SupervisorMyAssignment = {
   siteAddress: string;
   siteType: SiteType | 'FREE_MISSION';
   action: string;
+  plannedZone?: string | null;
   targetProgress: number | null;
   targetQuantity: number | null;
   targetUnit: string | null;

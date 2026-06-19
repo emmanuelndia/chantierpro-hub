@@ -22,6 +22,7 @@ export type FreeMissionMutationInput = {
   assigneeIds?: unknown;
   date?: unknown;
   action?: unknown;
+  plannedZone?: unknown;
   targetProgress?: unknown;
   targetQuantity?: unknown;
   targetUnit?: unknown;
@@ -52,6 +53,7 @@ export const freeMissionSelect = {
   assigneeId: true,
   date: true,
   action: true,
+  plannedZone: true,
   targetProgress: true,
   targetQuantity: true,
   targetUnit: true,
@@ -140,6 +142,7 @@ export function parseFreeMissionInput(body: unknown) {
   const assigneeId = sanitizeString(input.assigneeId) ?? assigneeIds[0];
   const date = sanitizeDate(input.date);
   const action = sanitizeString(input.action);
+  const plannedZone = sanitizeOptionalString(input.plannedZone);
   const targetQuantity = parseNullablePositiveNumber(input.targetQuantity);
   const targetProgress =
     targetQuantity !== null && targetQuantity > 0 ? null : parseNullableInt(input.targetProgress, 0, 100);
@@ -154,6 +157,7 @@ export function parseFreeMissionInput(body: unknown) {
     assigneeId,
     date,
     action,
+    plannedZone,
     targetProgress,
     targetQuantity,
     targetUnit,
@@ -225,6 +229,7 @@ export async function createFreeMission(prisma: PrismaClient, user: AuthLikeUser
           assigneeId,
           date: input.date,
           action: input.action,
+          plannedZone: input.plannedZone,
           deletedAt: null,
           status: { not: FreeMissionStatus.CANCELLED },
         },
@@ -242,6 +247,7 @@ export async function createFreeMission(prisma: PrismaClient, user: AuthLikeUser
           assigneeId,
           date: input.date,
           action: input.action,
+          plannedZone: input.plannedZone,
           targetProgress: input.targetProgress,
           targetQuantity: input.targetQuantity,
           targetUnit: input.targetUnit,
@@ -274,6 +280,7 @@ export async function createFreeMission(prisma: PrismaClient, user: AuthLikeUser
       assigneeId: input.assigneeId,
       date: input.date,
       action: input.action,
+      plannedZone: input.plannedZone,
       deletedAt: null,
       status: { not: FreeMissionStatus.CANCELLED },
     },
@@ -290,6 +297,7 @@ export async function createFreeMission(prisma: PrismaClient, user: AuthLikeUser
       assigneeId: input.assigneeId,
       date: input.date,
       action: input.action,
+      plannedZone: input.plannedZone,
       targetProgress: input.targetProgress,
       targetQuantity: input.targetQuantity,
       targetUnit: input.targetUnit,
@@ -329,6 +337,7 @@ export async function updateFreeMission(prisma: PrismaClient, user: AuthLikeUser
       assigneeId: input.assigneeId,
       date: input.date,
       action: input.action,
+      plannedZone: input.plannedZone,
       targetProgress: input.targetProgress,
       targetQuantity: input.targetQuantity,
       targetUnit: input.targetUnit,
@@ -445,6 +454,7 @@ export function serializeFreeMission(row: FreeMissionRow) {
     assigneeRole: row.assignee.role,
     date: row.date.toISOString().slice(0, 10),
     action: row.action,
+    plannedZone: row.plannedZone,
     targetProgress: row.targetProgress,
     targetQuantity,
     targetUnit: row.targetUnit,

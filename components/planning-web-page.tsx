@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { PlanningAssignmentStatus, PlanningWorkLocationType, type Role } from '@prisma/client';
@@ -63,6 +63,7 @@ type AssignmentFormState = {
   siteId: string;
   date: string;
   action: string;
+  plannedZone: string;
   targetProgress: string;
   targetQuantity: string;
   targetUnit: string;
@@ -78,6 +79,7 @@ type FreeMissionWebRequest = {
   assigneeIds?: string[];
   date: string;
   action: string;
+  plannedZone: string | null;
   targetProgress: number | null;
   targetQuantity: number | null;
   targetUnit: string | null;
@@ -492,6 +494,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
       siteId: assignment.siteId ?? '',
       date: selectedDate,
       action: assignment.action,
+      plannedZone: assignment.plannedZone ?? '',
       targetProgress: assignment.targetProgress === null ? '' : String(assignment.targetProgress),
       targetQuantity: assignment.targetQuantity === null ? '' : String(assignment.targetQuantity),
       targetUnit: assignment.targetUnit ?? '',
@@ -539,6 +542,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
           assigneeId: form.supervisorId,
           date: form.date,
           action: form.action,
+          plannedZone: form.plannedZone.trim() || null,
           targetProgress: normalizedTargetProgress,
           targetQuantity,
           targetUnit,
@@ -567,6 +571,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         ...(drawerMode === 'create' ? { assigneeIds: form.supervisorIds } : {}),
         date: form.date,
         action: form.action,
+        plannedZone: form.plannedZone.trim() || null,
         targetProgress: normalizedTargetProgress,
         targetQuantity,
         targetUnit,
@@ -584,6 +589,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         siteId: form.workLocationType === PlanningWorkLocationType.ON_SITE ? form.siteId : null,
         projectId: form.projectId || null,
         action: form.action,
+        plannedZone: form.plannedZone.trim() || null,
         targetProgress: normalizedTargetProgress,
         targetQuantity,
         targetUnit,
@@ -601,6 +607,7 @@ export function PlanningWebPage({ viewer }: PlanningWebPageProps) {
         id: form.id,
         data: {
           action: form.action,
+          plannedZone: form.plannedZone.trim() || null,
           targetProgress: normalizedTargetProgress,
           targetQuantity,
           targetUnit,
@@ -1116,7 +1123,7 @@ function DayPlanningCards({
                 {group.supervisorFirstName} {group.supervisorName}
               </Link>
               <p className="mt-1 text-sm text-slate-500">
-                Ressource terrain Â· {group.assignments.length} tache(s) Â· {terrainCount} terrain Â· {officeCount} bureau
+                Ressource terrain · {group.assignments.length} tache(s) · {terrainCount} terrain · {officeCount} bureau
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1197,6 +1204,7 @@ function CompactPlanningTaskRow({
           <span className="font-bold uppercase tracking-[0.12em] text-slate-400">{projectName}</span>
           <span className="hidden text-slate-300 sm:inline">/</span>
           <span className="truncate font-semibold">{assignment.siteName}</span>
+          {assignment.plannedZone ? <span className="rounded-full bg-orange-50 px-2 py-0.5 font-bold text-orange-700">Zone prevue : {assignment.plannedZone}</span> : null}
           {assignment.siteAddress ? <span className="truncate text-slate-400">{assignment.siteAddress}</span> : null}
         </div>
         {assignment.objectiveText ? <p className="mt-1 line-clamp-1 text-xs text-slate-500">Consigne : {assignment.objectiveText}</p> : null}
@@ -1583,6 +1591,7 @@ function AssignmentDrawer({
                 onChange({
                   ...form,
                   workLocationType,
+                  plannedZone: workLocationType === PlanningWorkLocationType.FREE_MISSION ? form.plannedZone : '',
                   zoneId: workLocationType === PlanningWorkLocationType.FREE_MISSION ? form.zoneId : '',
                   siteId: workLocationType === PlanningWorkLocationType.ON_SITE ? form.siteId : '',
                 });
@@ -1694,11 +1703,19 @@ function AssignmentDrawer({
               </p>
             </Field>
           ) : (
-            <div className="rounded-2xl border border-orange-100 bg-orange-50 p-3 text-xs font-semibold text-orange-800">
-              Zone sans chantier fixe : la ressource pointera avec sa position GPS reelle.
-            </div>
+            <Field label="Zone prévue / lieu prévu">
+              <input
+                className={filterClassName}
+                onChange={(event) => onChange({ ...form, plannedZone: event.target.value })}
+                placeholder="Ex : Zone Cocody, Yopougon, dépôt Nord..."
+                value={form.plannedZone}
+              />
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                Pour le parc auto, ce libellé sera utilisé automatiquement comme zone réelle au pointage simplifié.
+              </p>
+            </Field>
           )}
-          <Field label="Tâche à  réaliser">
+          <Field label="Tâche à réaliser">
             <textarea
               className={`${filterClassName} min-h-32`}
               onChange={(event) => onChange({ ...form, action: event.target.value })}
@@ -2676,6 +2693,7 @@ function createEmptyForm(date: string): AssignmentFormState {
     siteId: '',
     date,
     action: '',
+    plannedZone: '',
     targetProgress: '',
     targetQuantity: '',
     targetUnit: '',
@@ -2700,6 +2718,7 @@ function applyTemplateToForm(form: AssignmentFormState, template: PlanningTaskTe
   return {
     ...form,
     action: template.action,
+    plannedZone: '',
     targetProgress: template.targetProgress === null ? '' : String(template.targetProgress),
     targetQuantity: template.targetQuantity ?? '',
     targetUnit: template.targetUnit ?? '',

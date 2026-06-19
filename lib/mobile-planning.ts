@@ -467,6 +467,7 @@ async function createSingleFreeMissionPlanningAssignment(
       assigneeId: normalized.supervisorId,
       date: normalized.date,
       action: normalized.action,
+      plannedZone: normalized.plannedZone,
       deletedAt: null,
       status: { not: FreeMissionStatus.CANCELLED },
     },
@@ -486,6 +487,7 @@ async function createSingleFreeMissionPlanningAssignment(
       assigneeId: normalized.supervisorId,
       date: normalized.date,
       action: normalized.action,
+      plannedZone: normalized.plannedZone,
       targetProgress: normalized.targetProgress,
       targetQuantity: normalized.targetQuantity,
       targetUnit: normalized.targetUnit,
@@ -939,7 +941,7 @@ export async function duplicatePlanningAssignments(
   );
   const existingTargetFreeMissionKeys = new Set(
     existingTargetFreeMissionResponse.missions.map((mission) =>
-      buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action),
+      buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action, mission.plannedZone),
     ),
   );
   const validAssignments: PlanningAssignmentRow[] = [];
@@ -965,7 +967,7 @@ export async function duplicatePlanningAssignments(
   }
 
   for (const mission of sourceFreeMissions) {
-    const key = buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action);
+    const key = buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action, mission.plannedZone);
 
     if (!targetProjectIds.has(mission.projectId) || !targetSupervisorIds.has(mission.assigneeId) || existingTargetFreeMissionKeys.has(key)) {
       continue;
@@ -1006,6 +1008,7 @@ export async function duplicatePlanningAssignments(
         assigneeId: mission.assigneeId,
         date: targetDate,
         action: mission.action,
+        plannedZone: mission.plannedZone,
         targetProgress: mission.targetProgress,
         targetQuantity: mission.targetQuantity,
         targetUnit: mission.targetUnit,
@@ -1018,12 +1021,12 @@ export async function duplicatePlanningAssignments(
   }
 
   const createdFreeMissionKeys = new Set(
-    validFreeMissions.map((mission) => buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action)),
+    validFreeMissions.map((mission) => buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action, mission.plannedZone)),
   );
   const targetFreeMissionResponse =
     validFreeMissions.length > 0 ? await listFreeMissions(prisma, user, formatPlanningDate(targetDate)) : { missions: [] };
   const createdFreeMissionAssignments = targetFreeMissionResponse.missions
-    .filter((mission) => createdFreeMissionKeys.has(buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action)))
+    .filter((mission) => createdFreeMissionKeys.has(buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action, mission.plannedZone)))
     .map(serializeFreeMissionAsPlanningAssignment);
 
   return {
@@ -1186,6 +1189,7 @@ async function validateFreeMissionAssignmentInput(prisma: PrismaClient, user: Au
   const supervisorId = normalizeId(input.supervisorId);
   const projectId = normalizeId(input.projectId);
   const action = normalizeOptionalAction(input.action);
+  const plannedZone = normalizeOptionalText(input.plannedZone);
   const targetProgress = normalizeTargetProgress(input.targetProgress);
   const targetQuantity = normalizeQuantity(input.targetQuantity);
   const targetUnit = normalizeUnit(input.targetUnit);
@@ -1226,6 +1230,7 @@ async function validateFreeMissionAssignmentInput(prisma: PrismaClient, user: Au
     supervisorId,
     projectId,
     action,
+    plannedZone,
     targetProgress: normalizedTargetProgress,
     targetQuantity,
     targetUnit,
@@ -1432,8 +1437,8 @@ function buildTaskKey(
   return `${supervisorId}:${siteId}:${normalizeTaskActionKey(action)}:${normalizedTargetProgress ?? 'null'}:${normalizedTargetQuantity ?? 'null'}:${targetUnit ?? 'null'}:${workLocationType}`;
 }
 
-function buildFreeMissionKey(assigneeId: string, projectId: string, action: string) {
-  return `${assigneeId}:${projectId}:${normalizeTaskActionKey(action)}:${PlanningWorkLocationType.FREE_MISSION}`;
+function buildFreeMissionKey(assigneeId: string, projectId: string, action: string, plannedZone?: string | null) {
+  return `${assigneeId}:${projectId}:${normalizeTaskActionKey(action)}:${normalizeTaskActionKey(plannedZone ?? '')}:${PlanningWorkLocationType.FREE_MISSION}`;
 }
 
 function normalizeTaskActionKey(action: string) {
@@ -1462,6 +1467,7 @@ function withoutSupervisorIds(input: CreateAssignmentRequest): Omit<CreateAssign
 function isSameTask(
   existing: {
     action: string;
+    plannedZone?: string | null;
     targetProgress: number | null;
     targetQuantity?: unknown;
     targetUnit?: string | null;
@@ -1470,6 +1476,7 @@ function isSameTask(
   },
   normalized: {
     action: string;
+    plannedZone?: string | null;
     targetProgress: number | null;
     targetQuantity?: unknown;
     targetUnit?: string | null;
@@ -1479,6 +1486,7 @@ function isSameTask(
 ) {
   return (
     normalizeTaskActionKey(existing.action) === normalizeTaskActionKey(normalized.action) &&
+    (existing.plannedZone ?? null) === (normalized.plannedZone ?? null) &&
     normalizeProgressForQuantity(existing.targetProgress, existing.targetQuantity) ===
       normalizeProgressForQuantity(normalized.targetProgress, normalized.targetQuantity) &&
     decimalToNumber(existing.targetQuantity) === decimalToNumber(normalized.targetQuantity) &&
@@ -1780,10 +1788,12 @@ function serializeFreeMissionAsSupervisorAssignment(mission: Awaited<ReturnType<
     freeMissionId: mission.id,
     projectId: mission.projectId,
     projectName: mission.projectName,
-    siteName: mission.action,
+    siteName: mission.plannedZone ?? mission.action,
+    zoneName: mission.plannedZone ?? mission.action,
     siteAddress: mission.projectName,
     siteType: 'FREE_MISSION' as const,
     action: mission.action,
+    plannedZone: mission.plannedZone,
     targetProgress: mission.targetProgress,
     targetQuantity,
     targetUnit: mission.targetUnit,
@@ -1893,10 +1903,12 @@ function serializeFreeMissionAsPlanningAssignment(mission: Awaited<ReturnType<ty
     freeMissionId: mission.id,
     projectId: mission.projectId,
     projectName: mission.projectName,
-    siteName: mission.action,
+    siteName: mission.plannedZone ?? mission.action,
+    zoneName: mission.plannedZone ?? mission.action,
     siteAddress: mission.projectName,
     siteType: 'FREE_MISSION',
     action: mission.action,
+    plannedZone: mission.plannedZone,
     targetProgress: mission.targetProgress,
     targetQuantity,
     targetUnit: mission.targetUnit,

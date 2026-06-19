@@ -481,6 +481,7 @@ model FreeMission {
   assigneeId     String
   date           DateTime          @db.Date
   action         String
+  plannedZone    String?
   targetProgress Int?
   targetQuantity Decimal?          @db.Decimal(12, 2)
   targetUnit     String?

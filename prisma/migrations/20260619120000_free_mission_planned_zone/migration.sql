@@ -1,0 +1,2 @@
+ALTER TABLE "FreeMission"
+ADD COLUMN IF NOT EXISTS "plannedZone" TEXT;

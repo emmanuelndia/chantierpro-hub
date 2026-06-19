@@ -40,6 +40,7 @@ export type CentralizedPlanningAssignment = {
   resourceName: string;
   resourceRole: Role;
   action: string;
+  plannedZone?: string | null;
   targetProgress: number | null;
   targetQuantity: number | null;
   targetUnit: string | null;

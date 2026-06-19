@@ -138,6 +138,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const canUseTerrainClockIn = TERRAIN_CLOCK_IN_ROLES.includes(userRole);
   const isNegotiationClockInUser = NEGOTIATION_CLOCK_IN_ROLES.includes(userRole);
   const isOfficeStaff = userRole === 'OFFICE_STAFF';
+  const isFleetResource = userRole === 'FLEET_RESOURCE';
   const canUseProfessionalTravel = isOfficeStaff || userRole === 'PROJECT_MANAGER';
   const queryClient = useQueryClient();
   const requestedSiteId = searchParams.get('siteId');
@@ -678,7 +679,8 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const staleOpenSession = activeSession?.isStaleOpenSession ? activeSession : null;
   const selectedContextReady = Boolean(selectedSite ?? selectedFreeMission ?? selectedOffice) || (isNegotiationZoneSelected && Boolean(selectedNegotiationAssignment ?? openNegotiationSession));
   const isZoneClockInContext = selectedFreeMission !== null || isNegotiationZoneSelected;
-  const zoneActualNameRequired = isZoneClockInContext && currentType === 'ARRIVAL';
+  const usesSimplifiedFleetZone = isFleetResource && Boolean(selectedFreeMission) && !isNegotiationZoneSelected;
+  const zoneActualNameRequired = isZoneClockInContext && !usesSimplifiedFleetZone && currentType === 'ARRIVAL';
   const zoneActualNameReady = !zoneActualNameRequired || zoneActualName.trim().length > 0;
   const travelDetailsRequired = isProfessionalTravel && currentType === 'ARRIVAL';
   const travelDetailsReady = !travelDetailsRequired || (travelActualZone.trim().length > 0 && travelReason.trim().length > 0);
@@ -988,18 +990,24 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     }
 
     if (selectedFreeMission) {
-      if (actionType === 'ARRIVAL' && !zoneActualName.trim()) {
+      if (actionType === 'ARRIVAL' && !usesSimplifiedFleetZone && !zoneActualName.trim()) {
         throw new Error('Renseignez la zone reelle avant de pointer.');
       }
 
       const missionId = selectedFreeMission.freeMissionId ?? selectedFreeMission.id;
       const zoneComment =
         actionType === 'ARRIVAL'
-          ? buildZoneClockInComment({
-              actualZone: zoneActualName,
-              specificPlace: zoneSpecificPlace,
-              comment: zoneClockInComment,
-            })
+          ? usesSimplifiedFleetZone
+            ? buildZoneClockInComment({
+                actualZone: getFleetZoneLabel(selectedFreeMission),
+                specificPlace: '',
+                comment: 'Pointage simplifie parc auto',
+              })
+            : buildZoneClockInComment({
+                actualZone: zoneActualName,
+                specificPlace: zoneSpecificPlace,
+                comment: zoneClockInComment,
+              })
           : null;
       if (!navigator.onLine) {
         await enqueueOfflineClockIn({
@@ -1390,21 +1398,46 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               Aucune zone prevue aujourd&apos;hui.
             </p>
           ) : freeMissionAssignments.length > 1 ? (
-            <label className="space-y-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Zone a pointer</span>
-              <select
-                className="min-h-12 w-full rounded-xl border border-orange-100 bg-white px-3 text-sm font-bold text-slate-950 outline-none"
-                onChange={(event) => setSelectedFreeMissionId(event.target.value || null)}
-                value={selectedFreeMission?.freeMissionId ?? selectedFreeMission?.id ?? ''}
-              >
-                <option value="">Selectionner une zone</option>
-                {freeMissionAssignments.map((assignment) => (
-                  <option key={assignment.id} value={assignment.freeMissionId ?? assignment.id}>
-                    {assignment.action} - {assignment.projectName}
-                  </option>
-                ))}
-              </select>
-            </label>
+            isFleetResource ? (
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Zone a pointer</p>
+                <div className="grid gap-2">
+                  {freeMissionAssignments.map((assignment) => {
+                    const assignmentKey = assignment.freeMissionId ?? assignment.id;
+                    const selected = selectedFreeMissionKey === assignmentKey;
+                    return (
+                      <button
+                        className={`min-h-16 rounded-xl border px-4 py-3 text-left transition ${
+                          selected ? 'border-orange-500 bg-white text-slate-950 shadow-sm' : 'border-orange-100 bg-white/80 text-slate-700'
+                        }`}
+                        key={assignment.id}
+                        onClick={() => setSelectedFreeMissionId(assignmentKey)}
+                        type="button"
+                      >
+                        <span className="block text-sm font-black">{assignment.action}</span>
+                        <span className="mt-1 block text-xs font-semibold text-slate-500">{assignment.projectName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <label className="space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Zone a pointer</span>
+                <select
+                  className="min-h-12 w-full rounded-xl border border-orange-100 bg-white px-3 text-sm font-bold text-slate-950 outline-none"
+                  onChange={(event) => setSelectedFreeMissionId(event.target.value || null)}
+                  value={selectedFreeMission?.freeMissionId ?? selectedFreeMission?.id ?? ''}
+                >
+                  <option value="">Selectionner une zone</option>
+                  {freeMissionAssignments.map((assignment) => (
+                    <option key={assignment.id} value={assignment.freeMissionId ?? assignment.id}>
+                      {assignment.action} - {assignment.projectName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )
           ) : null}
           <div className="rounded-xl bg-white p-3">
             <p className="text-sm font-black text-slate-950">Pointage GPS sans chantier fixe.</p>
@@ -1412,7 +1445,12 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               Aucun chantier proche ne sera detecte automatiquement.
             </p>
           </div>
-          {isZoneClockInContext && currentType === 'ARRIVAL' ? (
+          {usesSimplifiedFleetZone && currentType === 'ARRIVAL' ? (
+            <div className="rounded-xl bg-white p-3 text-sm font-semibold leading-6 text-orange-900">
+              Pointage simplifie parc auto : aucune saisie texte n&apos;est demandee. La zone prevue et le GPS seront enregistres automatiquement.
+            </div>
+          ) : null}
+          {isZoneClockInContext && !usesSimplifiedFleetZone && currentType === 'ARRIVAL' ? (
             <div className="space-y-3 rounded-xl bg-white p-3">
               <label className="block space-y-2">
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">
@@ -2392,6 +2430,9 @@ function formatClockContext(value: 'SITE' | 'FREE_MISSION' | 'OFFICE') {
   return 'Chantier';
 }
 
+function getFleetZoneLabel(assignment: { zoneName?: string | null; action: string; siteName: string; projectName?: string | null }) {
+  return assignment.zoneName ?? assignment.action ?? assignment.siteName ?? assignment.projectName ?? 'Zone parc auto';
+}
 function buildZoneClockInComment({
   actualZone,
   specificPlace,
