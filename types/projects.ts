@@ -20,6 +20,8 @@ export type ProjectListItem = {
   sitesCount: number;
   activeSitesCount: number;
   resourcesCount: number;
+  zonesCount: number;
+  scopesCount: number;
 };
 
 export type ProjectSiteItem = {

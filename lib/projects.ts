@@ -84,6 +84,12 @@ export const projectPublicSelect = {
       },
     },
   },
+  _count: {
+    select: {
+      negotiationZones: true,
+      negotiationBuildings: true,
+    },
+  },
 } satisfies Prisma.ProjectSelect;
 
 export const SITE_ADDRESS_NOT_PROVIDED = 'Adresse non renseignée';
@@ -116,6 +122,12 @@ export const projectDetailSelect = {
     },
     orderBy: {
       createdAt: 'desc',
+    },
+  },
+  _count: {
+    select: {
+      negotiationZones: true,
+      negotiationBuildings: true,
     },
   },
 } satisfies Prisma.ProjectSelect;
@@ -248,6 +260,8 @@ export function serializeProject(project: SerializableProject): ProjectListItem 
     sitesCount,
     activeSitesCount,
     resourcesCount: activeResourceIds.size,
+    zonesCount: project._count.negotiationZones,
+    scopesCount: project._count.negotiationBuildings,
   };
 }
 

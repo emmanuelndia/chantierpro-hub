@@ -52,6 +52,7 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
 
   const canCreateProject = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
   const canViewInactiveProjects = viewer.role === 'ADMIN';
+  const isNegotiationView = viewer.role === 'NEGOTIATION_MANAGER';
   const pageTitle = scope === 'all' ? 'Tous les projets' : 'Mes projets';
   const pageDescription =
     scope === 'all'
@@ -174,14 +175,14 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
 
   const summary = useMemo(() => {
     const projects = projectsQuery.data?.items ?? [];
-    const totalSites = projects.reduce((sum, project) => sum + project.sitesCount, 0);
-    const totalResources = projects.reduce((sum, project) => sum + project.resourcesCount, 0);
+    const totalSites = projects.reduce((sum, project) => sum + (isNegotiationView ? project.zonesCount : project.sitesCount), 0);
+    const totalResources = projects.reduce((sum, project) => sum + (isNegotiationView ? project.scopesCount : project.resourcesCount), 0);
 
     return {
       totalSites,
       totalResources,
     };
-  }, [projectsQuery.data?.items]);
+  }, [isNegotiationView, projectsQuery.data?.items]);
 
   return (
     <div className="space-y-6">
@@ -211,8 +212,8 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
 
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard label="Projets visibles" value={projectsQuery.data?.totalItems ?? 0} />
-        <MetricCard label="Nb sites sur cette page" value={summary.totalSites} />
-        <MetricCard label="Nb ressources sur cette page" value={summary.totalResources} />
+        <MetricCard label={isNegotiationView ? "Nb zones sur cette page" : "Nb sites sur cette page"} value={summary.totalSites} />
+        <MetricCard label={isNegotiationView ? "Nb scopes sur cette page" : "Nb ressources sur cette page"} value={summary.totalResources} />
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
@@ -305,8 +306,8 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
               <tr>
                 <th className="px-6 py-4 font-semibold">Nom</th>
                 <th className="px-6 py-4 font-semibold">Dates</th>
-                <th className="px-6 py-4 font-semibold">Nb sites</th>
-                <th className="px-6 py-4 font-semibold">Nb ressources</th>
+                <th className="px-6 py-4 font-semibold">{isNegotiationView ? "Nb zones" : "Nb sites"}</th>
+                <th className="px-6 py-4 font-semibold">{isNegotiationView ? "Nb scopes" : "Nb ressources"}</th>
                 <th className="px-6 py-4 font-semibold">Statut</th>
                 <th className="px-6 py-4 font-semibold">Actions</th>
               </tr>
@@ -342,12 +343,12 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
                       {formatDate(project.startDate)} → {project.endDate ? formatDate(project.endDate) : 'Ouvert'}
                     </td>
                     <td className="px-6 py-5 text-slate-600">
-                      {project.sitesCount}
+                      {isNegotiationView ? project.zonesCount : project.sitesCount}
                       <span className="ml-2 text-xs text-slate-400">
-                        {project.activeSitesCount} actif(s)
+                        {isNegotiationView ? 'zone(s)' : `${project.activeSitesCount} actif(s)`}
                       </span>
                     </td>
-                    <td className="px-6 py-5 text-slate-600">{project.resourcesCount}</td>
+                    <td className="px-6 py-5 text-slate-600">{isNegotiationView ? project.scopesCount : project.resourcesCount}</td>
                     <td className="px-6 py-5">
                       <Badge tone={projectStatusTone(project.status)}>{humanizeProjectStatus(project.status)}</Badge>
                     </td>
