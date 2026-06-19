@@ -178,7 +178,7 @@ export function MobilePlanningPage({ user }: MobilePlanningPageProps) {
   function handleCreateAssignment() {
     const isZoneTask = formData.workLocationType === PlanningWorkLocationType.FREE_MISSION;
     const isNegotiationZoneTask = isZoneTask && user.role === 'NEGOTIATION_MANAGER';
-    if (!formData.supervisorId || !formData.action.trim() || (isNegotiationZoneTask ? !formData.projectId || !formData.zoneId : isZoneTask ? !formData.projectId : !formData.siteId)) {
+    if (!formData.supervisorId || (!isNegotiationZoneTask && !formData.action.trim()) || (isNegotiationZoneTask ? !formData.projectId || !formData.zoneId : isZoneTask ? !formData.projectId : !formData.siteId)) {
       return;
     }
     createAssignmentMutation.mutate(formData);
@@ -811,7 +811,7 @@ function AssignmentBottomSheet({
   const hasAvailableSupervisors = availableSupervisors.length > 0;
   const canSubmit = Boolean(
     formData.supervisorId &&
-      formData.action.trim() &&
+      (isNegotiationZoneTask || formData.action.trim()) &&
       hasAvailableSupervisors &&
       (isNegotiationZoneTask
         ? formData.projectId && formData.zoneId && hasAvailableProjects
@@ -957,7 +957,6 @@ function AssignmentBottomSheet({
                     ...prev,
                     zoneId,
                     projectId: zone?.projectId ?? prev.projectId ?? '',
-                    action: prev.action.trim() ? prev.action : zone ? `Negociation - ${zone.name}` : prev.action,
                   }));
                 }}
                 options={zoneOptions}
@@ -1062,7 +1061,7 @@ function AssignmentBottomSheet({
               }}
               rows={3}
               className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-              placeholder="Décrire la tâche à réaliser..."
+              placeholder={isNegotiationZoneTask ? 'Consigne optionnelle pour la zone...' : 'Décrire la tâche à réaliser...'}
             />
           </label>
 

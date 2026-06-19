@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/badge';
 import { useToast } from '@/components/toast-provider';
@@ -43,6 +43,7 @@ type NegotiationSession = {
   project: { id: string; name: string } | null;
   startTime: string;
   endTime: string | null;
+  assignment: { id: string; plannedZone: string | null; instruction: string | null; zone?: { id: string; name: string; city: string | null; region: string | null } | null } | null;
   status: string;
   visits: { id: string; buildingName: string; actualZone: string | null; status: string; remark: string; visitedAt: string }[];
   visitCount: number;
@@ -55,18 +56,7 @@ export function MobileNegotiationPage() {
   const { pushToast } = useToast();
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
   const [comment, setComment] = useState('');
-  const [visitForm, setVisitForm] = useState({
-    actualZone: '',
-    zoneId: '',
-    scopeSearch: '',
-    buildingId: '',
-    buildingName: '',
-    city: '',
-    commune: '',
-    contactInfo: '',
-    status: 'EN_COURS',
-    remark: '',
-  });
+  const [visitForm, setVisitForm] = useState(createEmptyVisitForm());
 
   const dayQuery = useQuery({
     queryKey: ['mobile-negotiation', todayKey],
@@ -79,12 +69,29 @@ export function MobileNegotiationPage() {
     [day?.assignments, selectedAssignmentId],
   );
   const openSession = day?.openSession ?? null;
-  const activeZoneId = visitForm.zoneId ? visitForm.zoneId : selectedAssignment?.zoneId ?? '';
+  const activeAssignment = openSession?.assignment
+    ? day?.assignments.find((assignment) => assignment.id === openSession.assignment?.id) ?? selectedAssignment
+    : selectedAssignment;
+  const openSessionId = openSession?.id ?? '';
+  const openSessionZoneId = openSession?.assignment?.zone?.id ?? '';
+  const activeZoneId = visitForm.zoneId ? visitForm.zoneId : openSessionZoneId ? openSessionZoneId : activeAssignment?.zoneId ?? '';
   const scopeQuery = useQuery({
-    queryKey: ['mobile-negotiation-scopes', openSession?.projectId, visitForm.scopeSearch, activeZoneId],
-    queryFn: () => fetchNegotiationScopes(openSession?.projectId ?? '', visitForm.scopeSearch, activeZoneId),
-    enabled: Boolean(openSession?.projectId),
+    queryKey: ['mobile-negotiation-scopes', openSession?.projectId, visitForm.scopeSearch.trim(), activeZoneId],
+    queryFn: () => fetchNegotiationScopes(openSession?.projectId ?? '', visitForm.scopeSearch.trim(), activeZoneId),
+    enabled: Boolean(openSession?.projectId && visitForm.scopeSearch.trim()),
   });
+
+  useEffect(() => {
+    if (!openSessionId) {
+      setVisitForm(createEmptyVisitForm());
+      return;
+    }
+
+    setVisitForm((current) => ({
+      ...createEmptyVisitForm(),
+      zoneId: openSessionZoneId ? openSessionZoneId : activeAssignment?.zoneId ?? current.zoneId,
+    }));
+  }, [activeAssignment?.zoneId, openSessionId, openSessionZoneId]);
 
   const startMutation = useMutation({
     mutationFn: async () => {
@@ -109,11 +116,12 @@ export function MobileNegotiationPage() {
 
   const closeMutation = useMutation({
     mutationFn: async () => {
-      if (!openSession) {
+      const session = openSession;
+      if (!session) {
         throw new Error('Aucune session ouverte.');
       }
       const position = await getCurrentPosition();
-      await closeSession(openSession.id, {
+      await closeSession(session.id, {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy,
@@ -130,17 +138,18 @@ export function MobileNegotiationPage() {
 
   const visitMutation = useMutation({
     mutationFn: async () => {
-      if (!openSession) {
+      const session = openSession;
+      if (!session) {
         throw new Error('Demarre la journee avant une visite.');
       }
       const position = await getCurrentPosition();
       await createVisit({
-        sessionId: openSession.id,
+        sessionId: session.id,
         ...visitForm,
-        zoneId: visitForm.zoneId ? visitForm.zoneId : selectedAssignment?.zoneId ?? '',
+        zoneId: visitForm.zoneId ? visitForm.zoneId : activeAssignment?.zoneId ?? session.assignment?.zone?.id ?? '',
         actualZone: visitForm.actualZone
           ? visitForm.actualZone
-          : selectedAssignment?.zone?.name ?? selectedAssignment?.plannedZone ?? '',
+          : activeAssignment?.zone?.name ?? activeAssignment?.plannedZone ?? session.assignment?.zone?.name ?? session.assignment?.plannedZone ?? '',
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy,
@@ -149,16 +158,9 @@ export function MobileNegotiationPage() {
     onSuccess: async () => {
       pushToast({ type: 'success', title: 'Scope enregistre' });
       setVisitForm((current) => ({
+        ...createEmptyVisitForm(),
         actualZone: current.actualZone,
         zoneId: current.zoneId,
-        scopeSearch: '',
-        buildingId: '',
-        buildingName: '',
-        city: '',
-        commune: '',
-        contactInfo: '',
-        status: 'EN_COURS',
-        remark: '',
       }));
       await queryClient.invalidateQueries({ queryKey: ['mobile-negotiation'] });
     },
@@ -170,7 +172,7 @@ export function MobileNegotiationPage() {
       ...current,
       buildingId: scope.id,
       zoneId: scope.zoneId ?? scope.zone?.id ?? current.zoneId,
-      scopeSearch: scope.name,
+      scopeSearch: '',
       buildingName: scope.name,
       city: scope.city,
       commune: scope.commune ?? '',
@@ -239,25 +241,25 @@ export function MobileNegotiationPage() {
               <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Scope visite</p>
               <div className="mt-4 space-y-3">
                 <Input label="Zone reellement visitee" value={visitForm.actualZone} onChange={(value) => setVisitForm((current) => ({ ...current, actualZone: value }))} />
-                {!visitForm.actualZone && (selectedAssignment?.zone?.name ?? selectedAssignment?.plannedZone) ? (
+                {!visitForm.actualZone && (activeAssignment?.zone?.name ?? activeAssignment?.plannedZone ?? openSession.assignment?.zone?.name ?? openSession.assignment?.plannedZone) ? (
                   <button
                     className="rounded-2xl bg-orange-50 px-4 py-3 text-left text-sm font-black text-orange-800"
-                    onClick={() => setVisitForm((current) => ({ ...current, actualZone: selectedAssignment?.zone?.name ?? selectedAssignment?.plannedZone ?? '', zoneId: selectedAssignment?.zoneId ?? current.zoneId }))}
+                    onClick={() => setVisitForm((current) => ({ ...current, actualZone: activeAssignment?.zone?.name ?? activeAssignment?.plannedZone ?? openSession.assignment?.zone?.name ?? openSession.assignment?.plannedZone ?? '', zoneId: activeAssignment?.zoneId ?? openSession.assignment?.zone?.id ?? current.zoneId }))}
                     type="button"
                   >
-                    Utiliser la zone prevue : {selectedAssignment?.zone?.name ?? selectedAssignment?.plannedZone}
+                    Utiliser la zone prevue : {activeAssignment?.zone?.name ?? activeAssignment?.plannedZone ?? openSession.assignment?.zone?.name ?? openSession.assignment?.plannedZone}
                   </button>
                 ) : null}
                 <label className="block text-sm font-black text-slate-700">
                   Rechercher un scope existant
                   <input
                     className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-orange-500"
-                    onChange={(event) => setVisitForm((current) => ({ ...current, scopeSearch: event.target.value, buildingId: '' }))}
+                    onChange={(event) => setVisitForm((current) => ({ ...current, scopeSearch: event.target.value, buildingId: '', buildingName: '', city: '', commune: '', contactInfo: '' }))}
                     placeholder="Nom, ville, commune, contact..."
                     value={visitForm.scopeSearch}
                   />
                 </label>
-                {(scopeQuery.data?.buildings ?? []).length > 0 ? (
+                {visitForm.scopeSearch.trim() && (scopeQuery.data?.buildings ?? []).length > 0 ? (
                   <div className="space-y-2 rounded-2xl bg-slate-50 p-2">
                     {(scopeQuery.data?.buildings ?? []).slice(0, 5).map((scope) => (
                       <button className="w-full rounded-xl bg-white px-3 py-2 text-left text-sm font-bold text-slate-800" key={scope.id} onClick={() => selectScope(scope)} type="button">
@@ -352,6 +354,21 @@ export function MobileNegotiationPage() {
       )}
     </div>
   );
+}
+
+function createEmptyVisitForm() {
+  return {
+    actualZone: '',
+    zoneId: '',
+    scopeSearch: '',
+    buildingId: '',
+    buildingName: '',
+    city: '',
+    commune: '',
+    contactInfo: '',
+    status: 'EN_COURS',
+    remark: '',
+  };
 }
 
 function Input({ label, value, onChange }: Readonly<{ label: string; value: string; onChange: (value: string) => void }>) {
