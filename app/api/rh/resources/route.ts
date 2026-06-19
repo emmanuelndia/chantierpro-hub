@@ -217,7 +217,7 @@ function buildTodayPresence(
     status,
     arrivalAt: arrival?.timestampLocal.toISOString() ?? null,
     departureAt: departure?.timestampLocal.toISOString() ?? null,
-    isLate: records.some((record) => record.type === ClockInType.ARRIVAL && isLateArrival(record.timestampLocal)),
+    isLate: Boolean(arrival?.isLate),
   };
 }
 
@@ -229,11 +229,6 @@ function findLastRecordIndex<T>(items: T[], predicate: (item: T) => boolean) {
   return -1;
 }
 
-function isLateArrival(value: Date) {
-  const hour = value.getUTCHours();
-  const minute = value.getUTCMinutes();
-  return hour > 8 || (hour === 8 && minute > 30);
-}
 
 function matchesPresenceStatus(
   presence: ReturnType<typeof buildTodayPresence>,

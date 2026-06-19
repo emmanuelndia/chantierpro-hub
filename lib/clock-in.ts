@@ -1,4 +1,4 @@
-﻿import {
+import {
   ClockInStatus,
   ClockInType,
   OfficeClockInLocation,
@@ -645,6 +645,7 @@ export async function createClockInRecord(
   },
 ) {
   const timestampLocal = new Date(payload.input.timestampLocal);
+  const isLate = await calculateIsLateForDailyArrival(prisma, payload.userId, payload.input);
 
   const record = await prisma.clockInRecord.create({
     data: {
@@ -668,7 +669,7 @@ export async function createClockInRecord(
       isRemoteCheckout: payload.isRemoteCheckout ?? false,
       isAutoClosed: payload.isAutoClosed ?? false,
       isRegularized: payload.isRegularized ?? false,
-      isLate: isLateClockIn(payload.input.type, payload.input.timestampLocal),
+      isLate,
     },
     select: clockInRecordSelect,
   });
@@ -694,6 +695,7 @@ export async function createBatchClockInRecord(
   },
 ) {
   const timestampLocal = new Date(payload.input.timestampLocal);
+  const isLate = await calculateIsLateForDailyArrival(prisma, payload.userId, payload.input);
 
   return prisma.clockInRecord.create({
     data: {
@@ -717,7 +719,7 @@ export async function createBatchClockInRecord(
       isRemoteCheckout: payload.isRemoteCheckout ?? false,
       isAutoClosed: payload.isAutoClosed ?? false,
       isRegularized: payload.isRegularized ?? false,
-      isLate: isLateClockIn(payload.input.type, payload.input.timestampLocal),
+      isLate,
     },
     select: {
       id: true,
@@ -725,6 +727,29 @@ export async function createBatchClockInRecord(
   });
 }
 
+async function calculateIsLateForDailyArrival(
+  prisma: PrismaClient,
+  userId: string,
+  input: Pick<ClockInInput, 'type' | 'timestampLocal'>,
+) {
+  if (!isLateClockIn(input.type, input.timestampLocal)) {
+    return false;
+  }
+
+  const timestampLocal = new Date(input.timestampLocal);
+  const previousArrival = await prisma.clockInRecord.findFirst({
+    where: {
+      userId,
+      clockInDate: toDateOnlyDate(timestampLocal),
+      type: ClockInType.ARRIVAL,
+      status: ClockInStatus.VALID,
+      timestampLocal: { lt: timestampLocal },
+    },
+    select: { id: true },
+  });
+
+  return !previousArrival;
+}
 export async function updateClockInComment(
   prisma: PrismaClient,
   payload: {

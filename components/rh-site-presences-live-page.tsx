@@ -701,7 +701,7 @@ function buildAggregatedLiveResource(contexts: LiveResourceContext[]): Aggregate
     isAutoClosed: sortedContexts.some((context) => context.isAutoClosed),
     isRegularized: sortedContexts.some((context) => context.isRegularized),
     anomalyReason: sortedContexts.find((context) => context.anomalyReason)?.anomalyReason ?? null,
-    isLate: sortedContexts.some((context) => !isForgottenExitContext(context) && context.isLate),
+    isLate: isDailyLate(sortedContexts),
     contexts: sortedContexts,
   };
 }
@@ -712,6 +712,13 @@ function compareLivePresenceContext(left: LiveResourceContext, right: LiveResour
   return left.siteName.localeCompare(right.siteName);
 }
 
+function isDailyLate(contexts: LiveResourceContext[]) {
+  const firstArrival = contexts
+    .filter((context) => context.arrivalAt && !isForgottenExitContext(context))
+    .sort((left, right) => left.arrivalAt!.localeCompare(right.arrivalAt!))[0];
+
+  return Boolean(firstArrival?.isLate);
+}
 function getAggregateLiveStatus(contexts: LiveResourceContext[]): RhSitePresenceLiveStatus {
   if (contexts.some((context) => context.status === 'ANOMALY')) return 'ANOMALY';
   if (contexts.some((context) => context.status === 'PAUSED')) return 'PAUSED';

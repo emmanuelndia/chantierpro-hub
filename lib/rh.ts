@@ -1949,7 +1949,7 @@ function buildCompleteSession(
     isRemoteCheckout: departure.isRemoteCheckout,
     isAutoClosed: departure.isAutoClosed,
     isRegularized: departure.isRegularized,
-    isLate: isLateArrival(arrival.timestampLocal),
+    isLate: arrival.isLate,
     startedAt: arrival.timestampLocal.toISOString(),
   };
 }
@@ -1987,7 +1987,7 @@ function buildIncompleteSession(
     isRemoteCheckout: false,
     isAutoClosed: isPreviousDay || arrival.isAutoClosed,
     isRegularized: arrival.isRegularized,
-    isLate: isLateArrival(arrival.timestampLocal),
+    isLate: arrival.isLate,
     startedAt: arrival.timestampLocal.toISOString(),
   };
 }
@@ -2269,7 +2269,7 @@ function aggregateAttendanceGroup(group: ExportRow[]): ExportRow {
       : '',
     realDurationHours: totalHours > 0 ? formatHours(totalHours) : '',
     timeSpent: totalHours > 0 ? formatDurationLabel(totalHours) : '',
-    isLate: sortedRows.some((row) => row.isLate === 'Oui') ? 'Oui' : 'Non',
+    isLate: firstRow.isLate,
     status: aggregateAttendanceStatus(sortedRows),
     detailPositions: sortedRows.map((row) => row.detailPositions || buildAttendanceDetailPosition(row)).join('; '),
   };
@@ -2663,7 +2663,7 @@ function buildLiveResource(
     isAutoClosed: records.some((record) => record.isAutoClosed),
     isRegularized: records.some((record) => record.isRegularized),
     anomalyReason,
-    isLate: Boolean(arrival?.timestampLocal.toISOString().slice(0, 10) === today && isLateArrival(arrival.timestampLocal)),
+    isLate: Boolean(arrival?.timestampLocal.toISOString().slice(0, 10) === today && arrival.isLate),
     zoneActualName: zoneDetails.actualZone,
     zoneSpecificPlace: zoneDetails.specificPlace,
     zoneComment: zoneDetails.comment,
