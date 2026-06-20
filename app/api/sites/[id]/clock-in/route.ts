@@ -1,6 +1,7 @@
-import { ClockInStatus, ClockInType } from '@prisma/client';
+import { ClockInStatus, ClockInType, UserNotificationAudience, type Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
+import { createUserNotification } from '@/lib/notifications';
 import {
   buildOutsideGeofenceMessage,
   calculateDistanceToSite,
@@ -43,16 +44,6 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonClockInError('PERMISSION_DENIED', 403, 'Seuls les roles terrain peuvent pointer.');
   }
 
-  const site = await getAccessibleClockInSite(prisma, params.id, user.id);
-
-  if (!site) {
-    return jsonClockInError(
-      'PERMISSION_DENIED',
-      403,
-      'Ce role terrain ne peut pas pointer sur ce chantier.',
-    );
-  }
-
   const body = await parseJsonBody<unknown>(req);
   const input = parseClockInInput(body);
 
@@ -66,7 +57,23 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return jsonClockInError('GPS_SPOOFING_SUSPECTED', 400, gpsValidationError);
   }
 
+  const accessibleSite = await getAccessibleClockInSite(prisma, params.id, user.id);
   const openSession = await getOpenSessionForUser(prisma, user.id);
+  const fallbackSite =
+    accessibleSite || input.type === ClockInType.ARRIVAL || openSession?.siteId === params.id
+      ? await getClockInSiteWithProject(params.id)
+      : null;
+  const site = accessibleSite ?? fallbackSite;
+
+  if (!site) {
+    return jsonClockInError(
+      'PERMISSION_DENIED',
+      403,
+      'Ce role terrain ne peut pas pointer sur ce chantier.',
+    );
+  }
+
+  const isOutOfPlanningArrival = !accessibleSite && input.type === ClockInType.ARRIVAL;
   const closingCurrentSiteSession =
     input.type !== ClockInType.ARRIVAL && openSession?.siteId === site.id;
 
@@ -142,6 +149,51 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const distanceKm = calculateDistanceToSite(site, input);
   const withinGeofence = isWithinSiteGeofence(site, input, distanceKm);
+
+  if (isOutOfPlanningArrival) {
+    const taskText = sanitizeOutOfPlanningTask(input.comment);
+
+    if (!taskText) {
+      return jsonClockInError(
+        'BAD_REQUEST',
+        400,
+        'Renseignez les taches a effectuer pour ce pointage hors planning.',
+      );
+    }
+
+    if (!withinGeofence) {
+      return jsonClockInError(
+        'OUTSIDE_RADIUS',
+        400,
+        buildOutsideGeofenceMessage(distanceKm, site),
+        { distanceKm },
+      );
+    }
+
+    const record = await createClockInRecord(prisma, {
+      siteId: site.id,
+      userId: user.id,
+      input: {
+        ...input,
+        comment: buildOutOfPlanningComment(taskText),
+      },
+      distanceKm,
+      status: ClockInStatus.VALID,
+      isRemoteCheckout: false,
+    });
+
+    if (fallbackSite?.project.projectManagerId) {
+      await notifyProjectManagerOfOutOfPlanningClockIn({
+        projectManagerId: fallbackSite.project.projectManagerId,
+        siteName: site.name,
+        taskText,
+        user,
+      });
+    }
+
+    return Response.json({ record, outOfPlanning: true }, { status: 201 });
+  }
+
   const remoteDepartureAllowed =
     input.type === ClockInType.DEPARTURE &&
     !withinGeofence &&
@@ -184,6 +236,65 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 function appendClockInComment(existing: string | null | undefined, note: string) {
   const trimmed = existing?.trim();
   return trimmed ? `${note}\n${trimmed}` : note;
+}
+
+async function getClockInSiteWithProject(siteId: string) {
+  return prisma.site.findUnique({
+    where: { id: siteId },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      requiresClockIn: true,
+      latitude: true,
+      longitude: true,
+      radiusKm: true,
+      geofenceType: true,
+      geofencePolygon: true,
+      project: {
+        select: {
+          projectManagerId: true,
+        },
+      },
+    },
+  });
+}
+
+function sanitizeOutOfPlanningTask(value: string | null | undefined) {
+  const text = value?.trim().replace(/\s+/g, ' ');
+  if (!text || text.length < 3) return null;
+  return text.slice(0, 500);
+}
+
+function buildOutOfPlanningComment(taskText: string) {
+  return [
+    'Pointage hors planning',
+    `Taches prevues : ${taskText}`,
+    'Validation PM : en attente',
+  ].join('\n');
+}
+
+async function notifyProjectManagerOfOutOfPlanningClockIn({
+  projectManagerId,
+  siteName,
+  taskText,
+  user,
+}: {
+  projectManagerId: string;
+  siteName: string;
+  taskText: string;
+  user: { id: string; role: Role };
+}) {
+  if (!projectManagerId || projectManagerId === user.id) {
+    return;
+  }
+
+  await createUserNotification(prisma, user, {
+    title: 'Pointage hors planning',
+    message: `Une ressource a pointe hors planning sur ${siteName}. Taches declarees : ${taskText}`,
+    audience: UserNotificationAudience.USERS,
+    userIds: [projectManagerId],
+  });
 }
 
 function formatTime(value: Date) {

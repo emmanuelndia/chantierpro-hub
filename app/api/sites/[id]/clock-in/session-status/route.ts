@@ -18,9 +18,11 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
     );
   }
 
+  const openSession = await getOpenSessionForUser(prisma, user.id);
   const site = await getAccessibleClockInSite(prisma, params.id, user.id);
+  const isCurrentOutOfPlanningSession = !site && openSession?.siteId === params.id;
 
-  if (!site) {
+  if (!site && !isCurrentOutOfPlanningSession) {
     return jsonClockInError(
       'PERMISSION_DENIED',
       403,
@@ -28,7 +30,6 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
     );
   }
 
-  const openSession = await getOpenSessionForUser(prisma, user.id);
   const activePause = openSession?.siteId ? await getActivePause(prisma, openSession.siteId, user.id) : null;
   return Response.json(serializeSessionStatus(openSession, activePause));
 });

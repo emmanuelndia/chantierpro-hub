@@ -104,7 +104,7 @@ Le premier sujet couvre les besoins d'upload planning des chefs de projet. Le se
     - site ambigu
     - type corrige
   - verifier l'apparition des taches dans :
-    - planning web
+    - planning webbbbbbbbbbbbbb
     - mobile `Taches`
     - `Pointer`       (40000 + 10000 + 15000) = 65000 + (40000 + 15000) =  120000 + ( 40000 + 15000 )
 

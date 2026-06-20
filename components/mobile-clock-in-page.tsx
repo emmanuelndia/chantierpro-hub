@@ -194,6 +194,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const [zoneActualName, setZoneActualName] = useState('');
   const [zoneSpecificPlace, setZoneSpecificPlace] = useState('');
   const [zoneClockInComment, setZoneClockInComment] = useState('');
+  const [outOfPlanningSiteTask, setOutOfPlanningSiteTask] = useState('');
   const [travelActualZone, setTravelActualZone] = useState('');
   const [travelSpecificPlace, setTravelSpecificPlace] = useState('');
   const [travelReason, setTravelReason] = useState('');
@@ -656,6 +657,15 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const siteIntent = (selectedSite || selectedFreeMission || selectedOffice || isNegotiationZoneSelected) && !hasOpenSession ? 'arrival' : selectedIntent;
   const currentIntent = pauseActive && siteIntent === 'pause-start' ? 'pause-end' : siteIntent;
   const currentType = intentToType[currentIntent];
+  const selectedSiteIsAssignedToday = Boolean(selectedSite && todaySites.some((site) => site.id === selectedSite.id));
+  const isOutOfPlanningSiteArrival =
+    selectedClockContext === 'SITE' &&
+    Boolean(selectedSite) &&
+    !selectedSiteIsAssignedToday &&
+    selectedSite?.address !== 'Session ouverte' &&
+    currentType === 'ARRIVAL' &&
+    !hasOpenSession;
+  const outOfPlanningSiteTaskReady = !isOutOfPlanningSiteArrival || outOfPlanningSiteTask.trim().length >= 3;
   const selectedDistance = selectedSite?.distanceKm ?? null;
   const selectedOfficeDistance =
     selectedOfficeLocation && geoState.status === 'ready'
@@ -783,11 +793,18 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     selectedContextReady &&
     zoneActualNameReady &&
     travelDetailsReady &&
+    outOfPlanningSiteTaskReady &&
     geoState.status === 'ready' &&
     !outsideRadius &&
     (isNegotiationZoneSelected || isProfessionalTravel ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
     !(staleOpenSession && currentType === 'ARRIVAL') &&
     !clockInMutation.isPending;
+
+  useEffect(() => {
+    if (!isOutOfPlanningSiteArrival) {
+      setOutOfPlanningSiteTask('');
+    }
+  }, [isOutOfPlanningSiteArrival]);
 
   useEffect(() => {
     if (step !== 'confirmation') {
@@ -1063,6 +1080,16 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       throw new Error('Chantier indisponible.');
     }
 
+    const siteOutOfPlanningTask = isOutOfPlanningSiteArrival && actionType === 'ARRIVAL' ? outOfPlanningSiteTask.trim() : '';
+
+    if (isOutOfPlanningSiteArrival && actionType === 'ARRIVAL' && siteOutOfPlanningTask.length < 3) {
+      throw new Error('Renseignez les taches a effectuer pour ce pointage hors planning.');
+    }
+
+    if (siteOutOfPlanningTask && !navigator.onLine) {
+      throw new Error('Le pointage chantier hors planning demande une connexion reseau.');
+    }
+
     if (!navigator.onLine) {
       await enqueueOfflineClockIn({
         clientId,
@@ -1086,7 +1113,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     const response = await authFetch(`/api/sites/${selectedSite.id}/clock-in`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(siteOutOfPlanningTask ? { ...payload, comment: siteOutOfPlanningTask } : payload),
     });
 
     if (!response.ok) {
@@ -1700,6 +1727,35 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               ? 'Une session est encore ouverte sur ce chantier. Vous pouvez pointer la sortie meme si vous etes hors zone.'
               : 'Ce pointage sera rattache a ce chantier. La distance et le rayon autorise sont verifies avec votre position GPS.'}
           </p>
+        </section>
+      ) : null}
+
+      {isOutOfPlanningSiteArrival ? (
+        <section className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Hors planning</p>
+              <h3 className="mt-1 text-base font-black text-slate-950">Pointage chantier a valider</h3>
+            </div>
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-amber-800">
+              PM notifie
+            </span>
+          </div>
+          <p className="text-sm font-semibold leading-6 text-amber-900">
+            Ce chantier est proche, mais il n&apos;est pas dans votre planning du jour. Decrivez les taches prevues avant de pointer.
+          </p>
+          <label className="block space-y-2">
+            <span className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Taches a effectuer</span>
+            <textarea
+              className="min-h-24 w-full rounded-lg border border-amber-200 bg-white px-3 py-3 text-sm font-bold text-slate-950 outline-none focus:border-amber-400"
+              onChange={(event) => setOutOfPlanningSiteTask(event.target.value)}
+              placeholder="Ex: verification installation, assistance equipe, livraison materiel..."
+              value={outOfPlanningSiteTask}
+            />
+          </label>
+          {!outOfPlanningSiteTaskReady ? (
+            <p className="text-xs font-bold text-red-700">Renseignez les taches a effectuer avant de pointer.</p>
+          ) : null}
         </section>
       ) : null}
 
