@@ -405,14 +405,9 @@ function ResourcePresenceItem({
   resource: AggregatedLiveResource;
 }>) {
   const contextSummary = getResourceContextSummary(resource.contexts);
-  const isUnplannedClockIn = resource.contexts.some(
-    (context) =>
-      context.presenceContext === 'TERRAIN' &&
-      !context.taskAction &&
-      context.status !== 'EXPECTED_NOT_CLOCKED',
-  );
+  const isOutOfPlanningClockIn = resource.contexts.some(isOutOfPlanningContext);
   const flags = [
-    isUnplannedClockIn ? 'Non prevu' : null,
+    isOutOfPlanningClockIn ? 'Hors planning' : null,
     resource.isLate ? 'Retard' : null,
   ].filter(Boolean);
   const statusLabel = getLiveResourceStatusLabel(resource);
@@ -428,9 +423,9 @@ function ResourcePresenceItem({
                 {contextSummary}
               </span>
             ) : null}
-            {isUnplannedClockIn ? (
+            {isOutOfPlanningClockIn ? (
               <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700">
-                Non prevu
+                Hors planning
               </span>
             ) : null}
             {resource.isLate ? (
@@ -603,9 +598,23 @@ function liveStatusLabel(status: RhSitePresenceLiveStatus) {
   return labels[status];
 }
 
-function getLiveResourceStatusLabel(resource: Pick<RhSitePresenceLiveResource, 'status' | 'anomalyReason'>) {
+function getLiveResourceStatusLabel(resource: Pick<RhSitePresenceLiveResource, 'status' | 'anomalyReason' | 'presenceContext' | 'taskAction'>) {
+  if (isOutOfPlanningContext(resource)) {
+    if (resource.status === 'PRESENT') return 'Present hors planning';
+    if (resource.status === 'PAUSED') return 'Pause hors planning';
+    if (resource.status === 'LEFT') return 'Sorti hors planning';
+  }
+
   if (resource.status !== 'ANOMALY') return liveStatusLabel(resource.status);
   return 'Anomalie';
+}
+
+function isOutOfPlanningContext(resource: Pick<RhSitePresenceLiveResource, 'status' | 'presenceContext' | 'taskAction'>) {
+  return (
+    resource.presenceContext === 'TERRAIN' &&
+    !resource.taskAction &&
+    resource.status !== 'EXPECTED_NOT_CLOCKED'
+  );
 }
 
 function liveStatusTone(status: RhSitePresenceLiveStatus) {
