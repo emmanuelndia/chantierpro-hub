@@ -5,6 +5,7 @@ import { createSignedStorageUrl, uploadPrivateStorageObject } from '@/lib/storag
 import { projectAccessWhere } from '@/lib/projects';
 import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 import { getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
+import { formatRoleLabel } from '@/lib/role-labels';
 import type {
   RhApiErrorCode,
   RhOptionsResponse,
@@ -173,6 +174,7 @@ type BuiltSession = {
   isRegularized: boolean;
   isLate: boolean;
   startedAt: string;
+  endedAt: string | null;
 };
 
 type MonthlyPresenceQuery = {
@@ -214,6 +216,8 @@ type SitePresenceLiveQuery = {
   role: Role | null;
   status: RhSitePresenceLiveStatus | null;
   lateOnly: boolean;
+  arrivalFromMinutes: number | null;
+  arrivalToMinutes: number | null;
   search: string | null;
   anomaliesOnly: boolean;
 };
@@ -243,6 +247,29 @@ type ExportRow = {
   isLate: string;
   status: string;
   detailPositions: string;
+};
+
+type PeriodSummaryRow = {
+  userId: string;
+  matricule: string;
+  lastName: string;
+  firstName: string;
+  role: string;
+  totalHours: string;
+  timeSpent: string;
+  reviewHours: string;
+  presentDays: number;
+  lateDays: number;
+  anomalyDays: number;
+  firstDate: string;
+  lastDate: string;
+  projects: string;
+  positions: string;
+  status: string;
+};
+
+type ExportAnomalyRow = ExportRow & {
+  reason: string;
 };
 
 export function jsonRhError(code: RhApiErrorCode, status: number, message: string) {
@@ -342,6 +369,8 @@ export function parseSitePresenceLiveQuery(searchParams: URLSearchParams): SiteP
     role: parseRole(searchParams.get('role')),
     status: parseLiveStatus(searchParams.get('status')),
     lateOnly: searchParams.get('lateOnly') === 'true',
+    arrivalFromMinutes: parseTimeOfDayMinutes(searchParams.get('arrivalFrom')),
+    arrivalToMinutes: parseTimeOfDayMinutes(searchParams.get('arrivalTo')),
     search: sanitizeString(searchParams.get('q')),
     anomaliesOnly: searchParams.get('anomaliesOnly') === 'true',
   };
@@ -1388,99 +1417,15 @@ export async function buildRhExportArtifact(
     lateOnly: payload.input.lateOnly,
   });
 
-  const grouped = new Map<string, BuiltSession[]>();
-
-  for (const session of sessions) {
-    grouped.set(session.userId, [...(grouped.get(session.userId) ?? []), session]);
-  }
-
-  const sortedUsers = [...grouped.values()].sort((left, right) => compareBuiltSession(left[0]!, right[0]!));
-  const rows: ExportRow[] = [];
-  let totalGeneralHours = 0;
-  const includeSummaryRows = !payload.input.attendanceList && payload.input.format !== 'pdf';
-
-  for (const userSessions of sortedUsers) {
-    const orderedSessions = [...userSessions].sort(compareBuiltSession);
-    let employeeTotalHours = 0;
-
-    for (const session of orderedSessions) {
-      employeeTotalHours += session.realDurationHours ?? 0;
-
-      rows.push({
-        userId: session.userId,
-        matricule: session.matricule ?? '',
-        lastName: session.lastName,
-        firstName: session.firstName,
-        position: session.position,
-        context: presenceContextLabel(session.context),
-        projectName: session.projectName ?? '',
-        date: session.date,
-        arrivalTime: session.arrivalTime,
-        departureTime: session.departureTime ?? '',
-        realDurationHours:
-          session.realDurationHours === null ? '' : formatHours(session.realDurationHours),
-        timeSpent: session.realDurationHours === null ? '' : formatDurationLabel(session.realDurationHours),
-        isLate: session.isLate ? 'Oui' : 'Non',
-        status: rhSessionStatusLabel(session.status),
-        detailPositions: buildAttendanceDetailPosition({
-          position: session.position,
-          context: presenceContextLabel(session.context),
-          arrivalTime: session.arrivalTime,
-          departureTime: session.departureTime ?? '',
-          status: rhSessionStatusLabel(session.status),
-        }),
-      });
-    }
-
-    if (includeSummaryRows) {
-      totalGeneralHours += employeeTotalHours;
-
-      const owner = orderedSessions[0]!;
-      rows.push({
-        userId: owner.userId,
-        matricule: owner.matricule ?? '',
-        lastName: owner.lastName,
-        firstName: owner.firstName,
-        position: 'TOTAL EMPLOYE',
-        context: '',
-        projectName: '',
-        date: '',
-        arrivalTime: '',
-        departureTime: '',
-        realDurationHours: formatHours(employeeTotalHours),
-        timeSpent: formatDurationLabel(employeeTotalHours),
-        isLate: '',
-        status: '',
-        detailPositions: '',
-      });
-    }
-  }
-
-  if (includeSummaryRows) {
-    rows.push({
-      userId: '',
-      matricule: '',
-      lastName: '',
-      firstName: '',
-      position: 'TOTAL GENERAL',
-      context: '',
-      projectName: '',
-      date: '',
-      arrivalTime: '',
-      departureTime: '',
-      realDurationHours: formatHours(totalGeneralHours),
-      timeSpent: formatDurationLabel(totalGeneralHours),
-      isLate: '',
-      status: '',
-      detailPositions: '',
-    });
-  }
-
+  const rows = sessions.map(buildExportRowFromSession).sort(compareExportRows);
   const exportRows = payload.input.attendanceList ? aggregateAttendanceRows(rows) : rows;
+  const periodSummaryRows = payload.input.attendanceList ? [] : buildPeriodSummaryRows(sessions);
+  const anomalyRows = payload.input.attendanceList ? [] : buildExportAnomalyRows(sessions);
   const fileBaseName = `rh-export-${payload.input.from.slice(0, 10)}-${payload.input.to.slice(0, 10)}`;
+  const rowCount = payload.input.attendanceList ? exportRows.length : periodSummaryRows.length;
 
   if (payload.input.format === 'csv') {
-    const buffer = payload.input.attendanceList ? buildAttendanceCsvBuffer(exportRows) : buildCsvBuffer(exportRows);
+    const buffer = payload.input.attendanceList ? buildAttendanceCsvBuffer(exportRows) : buildPeriodSummaryCsvBuffer(periodSummaryRows);
     const fileName = `${fileBaseName}.csv`;
     const storageKey = buildRhExportStorageKey(fileName);
     const expiresAt = new Date(Date.now() + RH_EXPORT_ARTIFACT_TTL_MS).toISOString();
@@ -1495,17 +1440,22 @@ export async function buildRhExportArtifact(
       contentType: 'text/csv; charset=utf-8',
       fileName,
       buffer,
-      rowCount: exportRows.length,
+      rowCount,
       storageKey,
       expiresAt,
     };
   }
 
   if (payload.input.format === 'pdf') {
-    const buffer = buildAttendancePdfBuffer(exportRows, {
-      from: payload.input.from,
-      to: payload.input.to,
-    });
+    const buffer = payload.input.attendanceList
+      ? buildAttendancePdfBuffer(exportRows, {
+          from: payload.input.from,
+          to: payload.input.to,
+        })
+      : buildPeriodSummaryPdfBuffer(periodSummaryRows, {
+          from: payload.input.from,
+          to: payload.input.to,
+        });
     const fileName = `${fileBaseName}.pdf`;
     const storageKey = buildRhExportStorageKey(fileName);
     const expiresAt = new Date(Date.now() + RH_EXPORT_ARTIFACT_TTL_MS).toISOString();
@@ -1520,13 +1470,15 @@ export async function buildRhExportArtifact(
       contentType: 'application/pdf',
       fileName,
       buffer,
-      rowCount: exportRows.length,
+      rowCount,
       storageKey,
       expiresAt,
     };
   }
 
-  const buffer = payload.input.attendanceList ? await buildAttendanceXlsxBuffer(exportRows) : await buildXlsxBuffer(exportRows);
+  const buffer = payload.input.attendanceList
+    ? await buildAttendanceXlsxBuffer(exportRows)
+    : await buildPeriodXlsxBuffer(periodSummaryRows, exportRows, anomalyRows);
   const fileName = `${fileBaseName}.xlsx`;
   const storageKey = buildRhExportStorageKey(fileName);
   const expiresAt = new Date(Date.now() + RH_EXPORT_ARTIFACT_TTL_MS).toISOString();
@@ -1541,7 +1493,7 @@ export async function buildRhExportArtifact(
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     fileName,
     buffer,
-    rowCount: exportRows.length,
+    rowCount,
     storageKey,
     expiresAt,
   };
@@ -1951,6 +1903,7 @@ function buildCompleteSession(
     isRegularized: departure.isRegularized,
     isLate: arrival.isLate,
     startedAt: arrival.timestampLocal.toISOString(),
+    endedAt: departure.timestampLocal.toISOString(),
   };
 }
 
@@ -1989,6 +1942,7 @@ function buildIncompleteSession(
     isRegularized: arrival.isRegularized,
     isLate: arrival.isLate,
     startedAt: arrival.timestampLocal.toISOString(),
+    endedAt: null,
   };
 }
 
@@ -2088,23 +2042,144 @@ function serializeRhExportHistory(item: SerializableRhExportHistory): RhExportHi
   };
 }
 
-function buildCsvBuffer(rows: ExportRow[]) {
+function buildExportRowFromSession(session: BuiltSession): ExportRow {
+  const context = presenceContextLabel(session.context);
+  const status = rhSessionStatusLabel(session.status);
+
+  return {
+    userId: session.userId,
+    matricule: session.matricule ?? '',
+    lastName: session.lastName,
+    firstName: session.firstName,
+    position: session.position,
+    context,
+    projectName: session.projectName ?? '',
+    date: session.date,
+    arrivalTime: session.arrivalTime,
+    departureTime: session.departureTime ?? '',
+    realDurationHours: session.realDurationHours === null ? '' : formatHours(session.realDurationHours),
+    timeSpent: session.realDurationHours === null ? '' : formatDurationLabel(session.realDurationHours),
+    isLate: session.isLate ? 'Oui' : 'Non',
+    status,
+    detailPositions: buildAttendanceDetailPosition({
+      position: session.position,
+      context,
+      arrivalTime: session.arrivalTime,
+      departureTime: session.departureTime ?? '',
+      status,
+    }),
+  };
+}
+
+function compareExportRows(left: ExportRow, right: ExportRow) {
+  return (
+    left.lastName.localeCompare(right.lastName) ||
+    left.firstName.localeCompare(right.firstName) ||
+    left.date.localeCompare(right.date) ||
+    left.arrivalTime.localeCompare(right.arrivalTime) ||
+    left.position.localeCompare(right.position)
+  );
+}
+
+function buildPeriodSummaryRows(sessions: BuiltSession[]): PeriodSummaryRow[] {
+  const grouped = new Map<string, BuiltSession[]>();
+
+  for (const session of sessions) {
+    grouped.set(session.userId, [...(grouped.get(session.userId) ?? []), session]);
+  }
+
+  return [...grouped.values()]
+    .map((group) => buildPeriodSummaryRow(group))
+    .sort((left, right) => left.lastName.localeCompare(right.lastName) || left.firstName.localeCompare(right.firstName));
+}
+
+function buildPeriodSummaryRow(group: BuiltSession[]): PeriodSummaryRow {
+  const orderedSessions = [...group].sort(compareBuiltSession);
+  const owner = orderedSessions[0]!;
+  const reliableSessions = orderedSessions.filter((session) => getSessionAnomalyReasons(session).length === 0);
+  const reviewSessions = orderedSessions.filter((session) => getSessionAnomalyReasons(session).length > 0);
+  const totalHours = reliableSessions.reduce((sum, session) => sum + (session.realDurationHours ?? 0), 0);
+  const reviewHours = reviewSessions.reduce((sum, session) => sum + (session.realDurationHours ?? 0), 0);
+  const presentDates = new Set(orderedSessions.map((session) => session.date));
+  const lateDates = new Set(orderedSessions.filter((session) => session.isLate).map((session) => session.date));
+  const anomalyDates = new Set(reviewSessions.map((session) => session.date));
+  const projects = joinUnique(orderedSessions.map((session) => session.projectName ?? ''));
+  const positions = joinUnique(orderedSessions.map((session) => session.position));
+  const status = anomalyDates.size > 0 ? 'A verifier RH' : 'OK';
+
+  return {
+    userId: owner.userId,
+    matricule: owner.matricule ?? '',
+    lastName: owner.lastName,
+    firstName: owner.firstName,
+    role: formatRoleLabel(owner.role),
+    totalHours: formatHours(totalHours),
+    timeSpent: formatDurationLabel(totalHours),
+    reviewHours: reviewHours > 0 ? formatHours(reviewHours) : '',
+    presentDays: presentDates.size,
+    lateDays: lateDates.size,
+    anomalyDays: anomalyDates.size,
+    firstDate: orderedSessions[0]?.date ?? '',
+    lastDate: orderedSessions.at(-1)?.date ?? '',
+    projects,
+    positions,
+    status,
+  };
+}
+
+function buildExportAnomalyRows(sessions: BuiltSession[]): ExportAnomalyRow[] {
+  return sessions
+    .flatMap((session) => {
+      const reason = getSessionAnomalyReasons(session).join(', ');
+      return reason ? [{ ...buildExportRowFromSession(session), reason }] : [];
+    })
+    .sort((left, right) => left.lastName.localeCompare(right.lastName) || left.firstName.localeCompare(right.firstName) || left.date.localeCompare(right.date));
+}
+
+function getSessionAnomalyReasons(session: BuiltSession) {
+  const reasons: string[] = [];
+
+  if (session.status !== 'COMPLETE') {
+    reasons.push(rhSessionStatusLabel(session.status));
+  }
+
+  if (!session.departureTime || !session.endedAt) {
+    reasons.push('Sortie manquante');
+  }
+
+  if (session.realDurationHours !== null && session.realDurationHours > 16) {
+    reasons.push('Duree superieure a 16h');
+  }
+
+  if (session.endedAt && session.startedAt.slice(0, 10) !== session.endedAt.slice(0, 10)) {
+    reasons.push('Session multi-jours');
+  }
+
+  if (session.endedAt && new Date(session.endedAt).getTime() < new Date(session.startedAt).getTime()) {
+    reasons.push('Sortie avant entree');
+  }
+
+  return [...new Set(reasons)];
+}
+
+function buildPeriodSummaryCsvBuffer(rows: PeriodSummaryRow[]) {
   const headers = [
     'Matricule',
     'Nom',
-    'Prénom',
-    'Position',
-    'Contexte',
-    'Projet',
-    'Date',
-    'Heure entrée',
-    'Heure sortie',
-    'Durée réelle (h)',
-    'Durée pauses (h)',
-    'Retard',
+    'Prenom',
+    'Role',
+    'Total heures fiables',
+    'Temps passe fiable',
+    'Heures a verifier',
+    'Jours presents',
+    'Jours retard',
+    'Jours anomalie',
+    'Premiere date',
+    'Derniere date',
+    'Projets',
+    'Positions',
     'Statut',
   ];
-
   const lines = [
     headers.join(','),
     ...rows.map((row) =>
@@ -2112,15 +2187,17 @@ function buildCsvBuffer(rows: ExportRow[]) {
         row.matricule,
         row.lastName,
         row.firstName,
-        row.position,
-        row.context,
-        row.projectName,
-        row.date,
-        row.arrivalTime,
-        row.departureTime,
-        row.realDurationHours,
+        row.role,
+        row.totalHours,
         row.timeSpent,
-        row.isLate,
+        row.reviewHours,
+        String(row.presentDays),
+        String(row.lateDays),
+        String(row.anomalyDays),
+        row.firstDate,
+        row.lastDate,
+        row.projects,
+        row.positions,
         row.status,
       ]
         .map(escapeCsvValue)
@@ -2131,45 +2208,176 @@ function buildCsvBuffer(rows: ExportRow[]) {
   return Buffer.from(`\uFEFF${lines.join('\r\n')}`, 'utf8');
 }
 
-async function buildXlsxBuffer(rows: ExportRow[]) {
+async function buildPeriodXlsxBuffer(
+  summaryRows: PeriodSummaryRow[],
+  detailRows: ExportRow[],
+  anomalyRows: ExportAnomalyRow[],
+) {
   const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Presences RH');
-
-  worksheet.columns = [
+  const summarySheet = workbook.addWorksheet('Recap periode');
+  summarySheet.columns = [
     { header: 'Matricule', key: 'matricule' },
     { header: 'Nom', key: 'lastName' },
-    { header: 'Prénom', key: 'firstName' },
+    { header: 'Prenom', key: 'firstName' },
+    { header: 'Role', key: 'role' },
+    { header: 'Total heures fiables', key: 'totalHours' },
+    { header: 'Temps passe fiable', key: 'timeSpent' },
+    { header: 'Heures a verifier', key: 'reviewHours' },
+    { header: 'Jours presents', key: 'presentDays' },
+    { header: 'Jours retard', key: 'lateDays' },
+    { header: 'Jours anomalie', key: 'anomalyDays' },
+    { header: 'Premiere date', key: 'firstDate' },
+    { header: 'Derniere date', key: 'lastDate' },
+    { header: 'Projets', key: 'projects' },
+    { header: 'Positions', key: 'positions' },
+    { header: 'Statut', key: 'status' },
+  ];
+  summaryRows.forEach((row) => summarySheet.addRow(row));
+  styleExportWorksheet(summarySheet);
+
+  const detailSheet = workbook.addWorksheet('Detail sessions');
+  detailSheet.columns = getExportDetailColumns();
+  detailRows.forEach((row) => detailSheet.addRow(row));
+  styleExportWorksheet(detailSheet);
+
+  const anomalySheet = workbook.addWorksheet('Anomalies');
+  anomalySheet.columns = [
+    { header: 'Motif', key: 'reason' },
+    ...getExportDetailColumns(),
+  ];
+  anomalyRows.forEach((row) => anomalySheet.addRow(row));
+  styleExportWorksheet(anomalySheet);
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+function buildPeriodSummaryPdfBuffer(rows: PeriodSummaryRow[], period: { from: string; to: string }) {
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 8;
+  const columns = [
+    { label: 'matricule', key: 'matricule', width: 24 },
+    { label: 'nom', key: 'lastName', width: 30 },
+    { label: 'prenom', key: 'firstName', width: 34 },
+    { label: 'role', key: 'role', width: 34 },
+    { label: 'heures', key: 'totalHours', width: 20 },
+    { label: 'jours', key: 'presentDays', width: 16 },
+    { label: 'retards', key: 'lateDays', width: 18 },
+    { label: 'anomalies', key: 'anomalyDays', width: 22 },
+    { label: 'statut', key: 'status', width: 28 },
+    { label: 'positions', key: 'positions', width: 86 },
+  ];
+  const scale = (pageWidth - margin * 2) / columns.reduce((sum, column) => sum + column.width, 0);
+  const scaledColumns = columns.map((column) => ({ ...column, width: column.width * scale }));
+  let y = margin;
+  const periodLabel = `${period.from.slice(0, 10)} au ${period.to.slice(0, 10)}`;
+
+  const drawHeader = () => {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.text('Recap RH periode - ChantierPro', margin, y + 5);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.text(`Periode : ${periodLabel}`, margin, y + 11);
+    pdf.text(`Employes : ${rows.length}`, pageWidth - margin, y + 11, { align: 'right' });
+    y += 17;
+
+    let x = margin;
+    pdf.setFillColor(239, 243, 248);
+    pdf.setDrawColor(210, 219, 232);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    scaledColumns.forEach((column) => {
+      pdf.rect(x, y, column.width, 9, 'FD');
+      pdf.text(column.label, x + 1.5, y + 5.8);
+      x += column.width;
+    });
+    y += 9;
+  };
+
+  drawHeader();
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+
+  for (const row of rows) {
+    const cells = {
+      matricule: row.matricule,
+      lastName: row.lastName,
+      firstName: row.firstName,
+      role: row.role,
+      totalHours: row.totalHours,
+      presentDays: String(row.presentDays),
+      lateDays: String(row.lateDays),
+      anomalyDays: String(row.anomalyDays),
+      status: row.status,
+      positions: row.positions,
+    };
+    const lineGroups = scaledColumns.map((column) =>
+      pdf.splitTextToSize(String(cells[column.key as keyof typeof cells] ?? ''), column.width - 3) as string[],
+    );
+    const rowHeight = Math.max(8, ...lineGroups.map((lines) => lines.length * 3.4 + 4));
+
+    if (y + rowHeight > pageHeight - margin) {
+      pdf.addPage();
+      y = margin;
+      drawHeader();
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+    }
+
+    let x = margin;
+    pdf.setDrawColor(225, 231, 240);
+    scaledColumns.forEach((column, index) => {
+      pdf.rect(x, y, column.width, rowHeight);
+      pdf.text(lineGroups[index] ?? [''], x + 1.5, y + 4.8);
+      x += column.width;
+    });
+    y += rowHeight;
+  }
+
+  if (rows.length === 0) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.text('Aucune presence pour les filtres selectionnes.', margin, y + 10);
+  }
+
+  return Buffer.from(pdf.output('arraybuffer'));
+}
+
+function getExportDetailColumns() {
+  return [
+    { header: 'Matricule', key: 'matricule' },
+    { header: 'Nom', key: 'lastName' },
+    { header: 'Prenom', key: 'firstName' },
     { header: 'Position', key: 'position' },
     { header: 'Contexte', key: 'context' },
     { header: 'Projet', key: 'projectName' },
     { header: 'Date', key: 'date' },
-    { header: 'Heure entrée', key: 'arrivalTime' },
+    { header: 'Heure entree', key: 'arrivalTime' },
     { header: 'Heure sortie', key: 'departureTime' },
-    { header: 'Durée réelle (h)', key: 'realDurationHours' },
+    { header: 'Duree reelle (h)', key: 'realDurationHours' },
     { header: 'Temps passe', key: 'timeSpent' },
     { header: 'Retard', key: 'isLate' },
     { header: 'Statut', key: 'status' },
   ];
+}
 
+function styleExportWorksheet(worksheet: ExcelJS.Worksheet) {
   worksheet.getRow(1).font = { bold: true };
-
-  for (const row of rows) {
-    worksheet.addRow(row);
-  }
-
+  worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+  worksheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: worksheet.columns.length },
+  };
   worksheet.columns.forEach((column) => {
     let maxLength = column.header ? String(column.header).length : 10;
-
     column.eachCell?.({ includeEmpty: true }, (cell) => {
-      const value = cell.text ?? '';
-      maxLength = Math.max(maxLength, value.length);
+      maxLength = Math.max(maxLength, cell.text.length);
     });
-
-    column.width = maxLength + 2;
+    column.width = Math.min(Math.max(maxLength + 2, 12), 60);
   });
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buffer);
 }
 
 function monthRangeStart(year: number, month: number) {
@@ -2526,6 +2734,17 @@ function parseLiveStatus(value: string | null): RhSitePresenceLiveStatus | null 
   return statuses.includes(value as RhSitePresenceLiveStatus) ? (value as RhSitePresenceLiveStatus) : null;
 }
 
+function parseTimeOfDayMinutes(value: string | null) {
+  if (!value) return null;
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
 function parsePresenceContext(value: string | null): 'TERRAIN' | 'OFFICE' | null {
   if (value === 'TERRAIN' || value === 'OFFICE') {
     return value;
@@ -2764,6 +2983,7 @@ function matchesLiveResourceFilters(
   if (query.status && resource.status !== query.status) return false;
   if (query.anomaliesOnly && resource.status !== 'ANOMALY' && !resource.anomalyReason) return false;
   if (query.lateOnly && !resource.isLate) return false;
+  if (!matchesArrivalTimeFilter(resource.arrivalAt, query)) return false;
 
   if (query.search) {
     const normalized = query.search.toLowerCase();
@@ -2772,6 +2992,21 @@ function matchesLiveResourceFilters(
       .includes(normalized);
   }
 
+  return true;
+}
+
+function matchesArrivalTimeFilter(
+  arrivalAt: string | null,
+  query: Pick<SitePresenceLiveQuery, 'arrivalFromMinutes' | 'arrivalToMinutes'>,
+) {
+  if (query.arrivalFromMinutes === null && query.arrivalToMinutes === null) return true;
+  if (!arrivalAt) return false;
+
+  const arrivalDate = new Date(arrivalAt);
+  const arrivalMinutes = arrivalDate.getUTCHours() * 60 + arrivalDate.getUTCMinutes();
+
+  if (query.arrivalFromMinutes !== null && arrivalMinutes < query.arrivalFromMinutes) return false;
+  if (query.arrivalToMinutes !== null && arrivalMinutes > query.arrivalToMinutes) return false;
   return true;
 }
 

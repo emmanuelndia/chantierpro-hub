@@ -119,6 +119,7 @@ const openSessionSelect = {
 
 const MAX_CLOCK_IN_FUTURE_SKEW_MS = 10 * 60 * 1000;
 const MAX_CLOCK_IN_PAST_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+export const OUT_OF_PLANNING_CLOCK_IN_RADIUS_KM = 0.1;
 
 type SerializableClockInRecord = Prisma.ClockInRecordGetPayload<{
   select: typeof clockInRecordSelect;
@@ -828,6 +829,14 @@ export function isWithinSiteGeofence(
   return isWithinSiteRadius(site, distanceKm);
 }
 
+export function isWithinOutOfPlanningClockInRadius(distanceKm: number) {
+  return distanceKm <= OUT_OF_PLANNING_CLOCK_IN_RADIUS_KM;
+}
+
+export function buildOutsideOutOfPlanningRadiusMessage(distanceKm: number) {
+  return `Pointage hors planning refuse : vous devez etre a moins de ${Math.round(OUT_OF_PLANNING_CLOCK_IN_RADIUS_KM * 1000)} m du chantier. Distance actuelle : ${Math.round(distanceKm * 1000)} m.`;
+}
+
 export function buildOutsideRadiusMessage(
   distanceKm: number,
   radiusKm: number | Pick<AccessibleSite, 'radiusKm'>,
@@ -1040,13 +1049,16 @@ export async function getNearbySites(
         distance,
       };
     })
-    .filter((item) => isWithinSiteGeofence(item.site, { latitude: payload.latitude, longitude: payload.longitude }, item.distance))
+    .filter((item) =>
+      isWithinSiteGeofence(item.site, { latitude: payload.latitude, longitude: payload.longitude }, item.distance) &&
+      isWithinOutOfPlanningClockInRadius(item.distance),
+    )
     .map(({ site, distance }) => ({
       id: site.id,
       name: site.name,
       address: site.address,
       distance,
-      radiusKm: site.radiusKm.toNumber(),
+      radiusKm: OUT_OF_PLANNING_CLOCK_IN_RADIUS_KM,
     }))
     .sort((left, right) => left.distance - right.distance || left.id.localeCompare(right.id));
 }

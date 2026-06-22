@@ -1742,7 +1742,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
             </span>
           </div>
           <p className="text-sm font-semibold leading-6 text-amber-900">
-            Ce chantier est proche, mais il n&apos;est pas dans votre planning du jour. Decrivez les taches prevues avant de pointer.
+            Ce chantier est proche, mais il n&apos;est pas dans votre planning du jour. Le pointage hors planning exige une presence a moins de 100 m du chantier. Decrivez les taches prevues avant de pointer.
           </p>
           <label className="block space-y-2">
             <span className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Taches a effectuer</span>

@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/auth/with-auth';
 import { createUserNotification } from '@/lib/notifications';
 import {
   buildOutsideGeofenceMessage,
+  buildOutsideOutOfPlanningRadiusMessage,
   calculateDistanceToSite,
   createClockInRecord,
   getClockInGpsValidationError,
@@ -12,6 +13,7 @@ import {
   getClockInHistoryForSiteAndUser,
   getOpenSessionForUser,
   isTechnician,
+  isWithinOutOfPlanningClockInRadius,
   isWithinSiteGeofence,
   jsonClockInError,
   parseClockInInput,
@@ -161,11 +163,13 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
       );
     }
 
-    if (!withinGeofence) {
+    if (!withinGeofence || !isWithinOutOfPlanningClockInRadius(distanceKm)) {
       return jsonClockInError(
         'OUTSIDE_RADIUS',
         400,
-        buildOutsideGeofenceMessage(distanceKm, site),
+        !withinGeofence
+          ? buildOutsideGeofenceMessage(distanceKm, site)
+          : buildOutsideOutOfPlanningRadiusMessage(distanceKm),
         { distanceKm },
       );
     }

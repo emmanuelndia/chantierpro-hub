@@ -50,6 +50,8 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   const [assignedById, setAssignedById] = useState('');
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
+  const [arrivalFrom, setArrivalFrom] = useState('');
+  const [arrivalTo, setArrivalTo] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [anomaliesOnly, setAnomaliesOnly] = useState(false);
@@ -75,13 +77,15 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
     if (assignedById) searchParams.set('assignedById', assignedById);
     if (role) searchParams.set('role', role);
     if (status) searchParams.set('status', status);
+    if (arrivalFrom) searchParams.set('arrivalFrom', arrivalFrom);
+    if (arrivalTo) searchParams.set('arrivalTo', arrivalTo);
     if (lateOnly) searchParams.set('lateOnly', 'true');
     if (debouncedSearch) searchParams.set('q', debouncedSearch);
     if (anomaliesOnly) searchParams.set('anomaliesOnly', 'true');
 
     const queryString = searchParams.toString();
     return queryString ? `/api/rh/site-presences-live?${queryString}` : '/api/rh/site-presences-live';
-  }, [anomaliesOnly, assignedById, context, debouncedSearch, lateOnly, projectId, projectManagerId, resourceId, role, selectedDate, siteId, status]);
+  }, [anomaliesOnly, arrivalFrom, arrivalTo, assignedById, context, debouncedSearch, lateOnly, projectId, projectManagerId, resourceId, role, selectedDate, siteId, status]);
 
   const liveQuery = useQuery({
     queryKey: ['rh-site-presences-live', requestPath],
@@ -322,6 +326,22 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Arrivee de">
+            <input
+              className={inputClassName}
+              onChange={(event) => setArrivalFrom(event.target.value)}
+              type="time"
+              value={arrivalFrom}
+            />
+          </Field>
+          <Field label="Arrivee a">
+            <input
+              className={inputClassName}
+              onChange={(event) => setArrivalTo(event.target.value)}
+              type="time"
+              value={arrivalTo}
+            />
           </Field>
           <Field label="Recherche">
             <input
