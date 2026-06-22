@@ -168,6 +168,10 @@ export type RhSitePresenceLiveResource = {
   zoneActualName?: string | null;
   zoneSpecificPlace?: string | null;
   zoneComment?: string | null;
+  outOfPlanningValidationStatus?: 'PENDING' | 'VALIDATED' | 'REFUSED' | null;
+  outOfPlanningValidationLabel?: string | null;
+  outOfPlanningTaskText?: string | null;
+  outOfPlanningDecisionNote?: string | null;
 };
 
 export type RhPresenceGpsPoint = {

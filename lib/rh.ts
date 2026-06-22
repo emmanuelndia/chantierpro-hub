@@ -2858,10 +2858,7 @@ function buildLiveResource(
     hasStaleOpenSession,
   });
   const zoneDetails = extractZoneClockInDetails(arrival?.comment ?? latest?.comment ?? null);
-  const displayTaskAction =
-    presenceContext === 'OFFICE' && zoneDetails.reason
-      ? zoneDetails.reason
-      : taskAction;
+  const displayTaskAction = zoneDetails.outOfPlanningTaskText ?? (presenceContext === 'OFFICE' ? zoneDetails.reason : null) ?? taskAction;
 
   return {
     userId: user.id,
@@ -2886,6 +2883,10 @@ function buildLiveResource(
     zoneActualName: zoneDetails.actualZone,
     zoneSpecificPlace: zoneDetails.specificPlace,
     zoneComment: zoneDetails.comment,
+    outOfPlanningValidationStatus: zoneDetails.outOfPlanningValidationStatus,
+    outOfPlanningValidationLabel: zoneDetails.outOfPlanningValidationLabel,
+    outOfPlanningTaskText: zoneDetails.outOfPlanningTaskText,
+    outOfPlanningDecisionNote: zoneDetails.outOfPlanningDecisionNote,
   };
 }
 
@@ -2895,6 +2896,10 @@ function extractZoneClockInDetails(comment: string | null | undefined) {
     specificPlace: null as string | null,
     reason: null as string | null,
     comment: null as string | null,
+    outOfPlanningValidationStatus: null as 'PENDING' | 'VALIDATED' | 'REFUSED' | null,
+    outOfPlanningValidationLabel: null as string | null,
+    outOfPlanningTaskText: null as string | null,
+    outOfPlanningDecisionNote: null as string | null,
   };
 
   if (!comment) return empty;
@@ -2907,12 +2912,26 @@ function extractZoneClockInDetails(comment: string | null | undefined) {
     return value;
   };
 
+  const validationLabel = readValue('Validation PM :');
+
   return {
     actualZone: readValue('Zone reelle :') ?? readValue('Ville / zone reelle :'),
     specificPlace: readValue('Lieu/quartier :') ?? readValue('Lieu precis :'),
     reason: readValue('Motif :'),
     comment: readValue('Commentaire :'),
+    outOfPlanningValidationStatus: getOutOfPlanningValidationStatus(validationLabel),
+    outOfPlanningValidationLabel: validationLabel,
+    outOfPlanningTaskText: readValue('Taches prevues :'),
+    outOfPlanningDecisionNote: readValue('Note PM :'),
   };
+}
+
+function getOutOfPlanningValidationStatus(value: string | null): 'PENDING' | 'VALIDATED' | 'REFUSED' | null {
+  const normalized = value?.toLowerCase() ?? '';
+  if (normalized.startsWith('valide')) return 'VALIDATED';
+  if (normalized.startsWith('refuse')) return 'REFUSED';
+  if (normalized.startsWith('en attente')) return 'PENDING';
+  return null;
 }
 
 function findLastRecordIndex<T>(items: T[], predicate: (item: T) => boolean) {

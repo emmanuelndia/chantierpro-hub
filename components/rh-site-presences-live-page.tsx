@@ -426,6 +426,7 @@ function ResourcePresenceItem({
 }>) {
   const contextSummary = getResourceContextSummary(resource.contexts);
   const isOutOfPlanningClockIn = resource.contexts.some(isOutOfPlanningContext);
+  const outOfPlanningStatus = getResourceOutOfPlanningStatus(resource.contexts);
   const flags = [
     isOutOfPlanningClockIn ? 'Hors planning' : null,
     resource.isLate ? 'Retard' : null,
@@ -448,6 +449,7 @@ function ResourcePresenceItem({
                 Hors planning
               </span>
             ) : null}
+            {outOfPlanningStatus ? <OutOfPlanningValidationBadge status={outOfPlanningStatus} /> : null}
             {resource.isLate ? (
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">
                 Retard
@@ -484,6 +486,11 @@ function ResourcePresenceItem({
                 </p>
                 <Badge tone={liveStatusTone(context.status)}>{getLiveResourceStatusLabel(context)}</Badge>
               </div>
+              {context.outOfPlanningValidationStatus ? (
+                <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${outOfPlanningValidationToneClass(context.outOfPlanningValidationStatus)}`}>
+                  {outOfPlanningValidationLabel(context.outOfPlanningValidationStatus)}
+                </p>
+              ) : null}
               {context.isLate ? (
                 <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">
                   Arrivee apres 08:30
@@ -500,6 +507,11 @@ function ResourcePresenceItem({
                 </p>
                 <p><span className="font-semibold text-slate-950">Tache :</span> {context.taskAction ?? (isProfessionalTravelContext(context) ? 'Deplacement professionnel' : context.presenceContext === 'OFFICE' ? 'Pointage bureau' : 'Aucune tache terrain planifiee')}</p>
               </div>
+              {context.outOfPlanningDecisionNote ? (
+                <p className="mt-2 rounded-xl bg-blue-50 p-3 text-sm font-semibold leading-6 text-blue-900">
+                  <span className="font-semibold">Note PM :</span> {context.outOfPlanningDecisionNote}
+                </p>
+              ) : null}
               {context.zoneComment ? (
                 <p className="mt-2 rounded-xl bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-700">
                   <span className="font-semibold text-slate-950">Commentaire :</span> {context.zoneComment}
@@ -618,23 +630,54 @@ function liveStatusLabel(status: RhSitePresenceLiveStatus) {
   return labels[status];
 }
 
-function getLiveResourceStatusLabel(resource: Pick<RhSitePresenceLiveResource, 'status' | 'anomalyReason' | 'presenceContext' | 'taskAction'>) {
+function getLiveResourceStatusLabel(resource: Pick<RhSitePresenceLiveResource, 'status' | 'anomalyReason' | 'presenceContext' | 'taskAction' | 'outOfPlanningValidationStatus'>) {
   if (isOutOfPlanningContext(resource)) {
-    if (resource.status === 'PRESENT') return 'Present hors planning';
-    if (resource.status === 'PAUSED') return 'Pause hors planning';
-    if (resource.status === 'LEFT') return 'Sorti hors planning';
+    const validationSuffix = resource.outOfPlanningValidationStatus ? ` - ${outOfPlanningValidationShortLabel(resource.outOfPlanningValidationStatus)}` : '';
+    if (resource.status === 'PRESENT') return `Present hors planning${validationSuffix}`;
+    if (resource.status === 'PAUSED') return `Pause hors planning${validationSuffix}`;
+    if (resource.status === 'LEFT') return `Sorti hors planning${validationSuffix}`;
   }
 
   if (resource.status !== 'ANOMALY') return liveStatusLabel(resource.status);
   return 'Anomalie';
 }
 
-function isOutOfPlanningContext(resource: Pick<RhSitePresenceLiveResource, 'status' | 'presenceContext' | 'taskAction'>) {
+function isOutOfPlanningContext(resource: Pick<RhSitePresenceLiveResource, 'status' | 'presenceContext' | 'taskAction' | 'outOfPlanningValidationStatus'>) {
   return (
     resource.presenceContext === 'TERRAIN' &&
-    !resource.taskAction &&
+    (Boolean(resource.outOfPlanningValidationStatus) || !resource.taskAction) &&
     resource.status !== 'EXPECTED_NOT_CLOCKED'
   );
+}
+
+function getResourceOutOfPlanningStatus(contexts: LiveResourceContext[]) {
+  return contexts.find((context) => context.outOfPlanningValidationStatus)?.outOfPlanningValidationStatus ?? null;
+}
+
+function OutOfPlanningValidationBadge({ status }: Readonly<{ status: NonNullable<RhSitePresenceLiveResource['outOfPlanningValidationStatus']> }>) {
+  return (
+    <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${outOfPlanningValidationToneClass(status)}`}>
+      {outOfPlanningValidationLabel(status)}
+    </span>
+  );
+}
+
+function outOfPlanningValidationLabel(status: NonNullable<RhSitePresenceLiveResource['outOfPlanningValidationStatus']>) {
+  if (status === 'VALIDATED') return 'Valide PM';
+  if (status === 'REFUSED') return 'Refuse PM';
+  return 'Validation PM en attente';
+}
+
+function outOfPlanningValidationShortLabel(status: NonNullable<RhSitePresenceLiveResource['outOfPlanningValidationStatus']>) {
+  if (status === 'VALIDATED') return 'valide PM';
+  if (status === 'REFUSED') return 'refuse PM';
+  return 'validation PM en attente';
+}
+
+function outOfPlanningValidationToneClass(status: NonNullable<RhSitePresenceLiveResource['outOfPlanningValidationStatus']>) {
+  if (status === 'VALIDATED') return 'bg-emerald-100 text-emerald-800';
+  if (status === 'REFUSED') return 'bg-red-100 text-red-800';
+  return 'bg-amber-100 text-amber-800';
 }
 
 function liveStatusTone(status: RhSitePresenceLiveStatus) {
