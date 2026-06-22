@@ -11,6 +11,7 @@ import {
   getActivePause,
   getAccessibleClockInSite,
   getClockInHistoryForSiteAndUser,
+  getOpenSession,
   getOpenSessionForUser,
   isTechnician,
   isWithinOutOfPlanningClockInRadius,
@@ -61,11 +62,15 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const accessibleSite = await getAccessibleClockInSite(prisma, params.id, user.id);
   const openSession = await getOpenSessionForUser(prisma, user.id);
+  const currentSiteOpenSession =
+    input.type !== ClockInType.ARRIVAL
+      ? (openSession?.siteId === params.id ? openSession : await getOpenSession(prisma, params.id, user.id))
+      : null;
   const fallbackSite =
-    accessibleSite || input.type === ClockInType.ARRIVAL || openSession?.siteId === params.id
+    accessibleSite || input.type === ClockInType.ARRIVAL || currentSiteOpenSession?.siteId === params.id
       ? await getClockInSiteWithProject(params.id)
       : null;
-  const site = accessibleSite ?? fallbackSite;
+  const site = fallbackSite ?? accessibleSite;
 
   if (!site) {
     return jsonClockInError(
@@ -77,7 +82,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const isOutOfPlanningArrival = !accessibleSite && input.type === ClockInType.ARRIVAL;
   const closingCurrentSiteSession =
-    input.type !== ClockInType.ARRIVAL && openSession?.siteId === site.id;
+    input.type !== ClockInType.ARRIVAL && currentSiteOpenSession?.siteId === site.id;
 
   if (site.status !== 'ACTIVE' && !closingCurrentSiteSession) {
     return jsonClockInError('SITE_INACTIVE', 400, 'Ce chantier est inactif.');
@@ -114,7 +119,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   if (
     (input.type === 'DEPARTURE' || input.type === 'INTERMEDIATE') &&
-    openSession?.siteId !== site.id
+    currentSiteOpenSession?.siteId !== site.id
   ) {
     return jsonClockInError(
       'NO_OPEN_SESSION',
@@ -125,7 +130,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const activePause = await getActivePause(prisma, site.id, user.id);
 
-  if (input.type === 'PAUSE_START' && openSession?.siteId !== site.id) {
+  if (input.type === 'PAUSE_START' && currentSiteOpenSession?.siteId !== site.id) {
     return jsonClockInError(
       'NO_OPEN_SESSION',
       400,
@@ -201,7 +206,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
   const remoteDepartureAllowed =
     input.type === ClockInType.DEPARTURE &&
     !withinGeofence &&
-    openSession?.siteId === site.id;
+    currentSiteOpenSession?.siteId === site.id;
   const status = withinGeofence || remoteDepartureAllowed ? ClockInStatus.VALID : ClockInStatus.REJECTED;
   const recordInput = remoteDepartureAllowed
     ? {

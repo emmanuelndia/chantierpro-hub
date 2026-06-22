@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth/with-auth';
 import {
   getActivePause,
   getAccessibleClockInSite,
+  getOpenSession,
   getOpenSessionForUser,
   isTechnician,
   jsonClockInError,
@@ -19,8 +20,10 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
   }
 
   const openSession = await getOpenSessionForUser(prisma, user.id);
+  const currentSiteOpenSession = openSession?.siteId === params.id ? openSession : await getOpenSession(prisma, params.id, user.id);
+  const selectedOpenSession = currentSiteOpenSession ?? openSession;
   const site = await getAccessibleClockInSite(prisma, params.id, user.id);
-  const isCurrentOutOfPlanningSession = !site && openSession?.siteId === params.id;
+  const isCurrentOutOfPlanningSession = !site && currentSiteOpenSession?.siteId === params.id;
 
   if (!site && !isCurrentOutOfPlanningSession) {
     return jsonClockInError(
@@ -30,6 +33,6 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
     );
   }
 
-  const activePause = openSession?.siteId ? await getActivePause(prisma, openSession.siteId, user.id) : null;
-  return Response.json(serializeSessionStatus(openSession, activePause));
+  const activePause = currentSiteOpenSession?.siteId ? await getActivePause(prisma, currentSiteOpenSession.siteId, user.id) : null;
+  return Response.json(serializeSessionStatus(selectedOpenSession, activePause));
 });
