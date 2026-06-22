@@ -50,6 +50,12 @@ export const webNavigation: readonly WebNavigationItem[] = [
     icon: 'rh',
     roles: ['HR', 'DIRECTION', 'ADMIN', 'PROJECT_MANAGER', 'GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER'],
     breadcrumb: ['Presences / RH', 'Presences'],
+  },  {
+    href: '/web/out-of-planning-validations',
+    label: 'Hors planning',
+    icon: 'planning',
+    roles: ['PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    breadcrumb: ['Presences', 'Hors planning'],
   },
   {
     href: '/web/photos',
