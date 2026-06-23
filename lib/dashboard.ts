@@ -5,6 +5,7 @@ import {
   ProjectStatus,
   ReportValidationStatus,
   Role,
+  SiteStatus,
   TeamMemberStatus,
   TeamStatus,
   type PrismaClient,
@@ -30,6 +31,7 @@ const DASHBOARD_ROLES: readonly DashboardSupportedRole[] = [
   Role.HR,
   Role.DIRECTION,
   Role.ADMIN,
+  Role.AUDITOR,
   Role.COORDINATOR,
   Role.GENERAL_SUPERVISOR,
   ...BUSINESS_MANAGER_ROLES,
@@ -97,6 +99,8 @@ export async function getDashboardData(prisma: PrismaClient, user: AuthLikeUser)
       return getDirectionDashboard(prisma);
     case Role.ADMIN:
       return getAdminDashboard(prisma);
+    case Role.AUDITOR:
+      return getAuditorDashboard(prisma, user.id);
     case Role.COORDINATOR:
       return getCoordinatorDashboard(prisma, user.id);
     case Role.GENERAL_SUPERVISOR:
@@ -110,6 +114,95 @@ export async function getDashboardData(prisma: PrismaClient, user: AuthLikeUser)
   }
 }
 
+async function getAuditorDashboard(prisma: PrismaClient, userId: string): Promise<DashboardResponse> {
+  const now = new Date();
+  const todayRange = dayRange(now);
+  const monthRange = { from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
+
+  const [activeProjects, activeSites, totalVisits, monthVisits, todayVisits, recentVisits] = await Promise.all([
+    prisma.project.count({ where: { status: ProjectStatus.IN_PROGRESS } }),
+    prisma.site.count({
+      where: {
+        status: SiteStatus.ACTIVE,
+        project: { status: ProjectStatus.IN_PROGRESS },
+      },
+    }),
+    prisma.siteVisitLog.count({ where: { auditorId: userId } }),
+    prisma.siteVisitLog.count({
+      where: {
+        auditorId: userId,
+        visitedAt: { gte: monthRange.from, lte: monthRange.to },
+      },
+    }),
+    prisma.siteVisitLog.count({
+      where: {
+        auditorId: userId,
+        visitedAt: { gte: todayRange.from, lte: todayRange.to },
+      },
+    }),
+    prisma.siteVisitLog.findMany({
+      where: { auditorId: userId },
+      orderBy: [{ visitedAt: 'desc' }, { id: 'desc' }],
+      take: 6,
+      select: {
+        id: true,
+        visitedAt: true,
+        comment: true,
+        latitude: true,
+        longitude: true,
+        site: {
+          select: {
+            id: true,
+            name: true,
+            project: { select: { name: true } },
+          },
+        },
+      },
+    }),
+  ]);
+
+  const alerts: DashboardAlertItem[] = [];
+  if (activeSites === 0) {
+    alerts.push({
+      id: 'auditor-no-active-sites',
+      level: 'info',
+      title: 'Aucun site actif cartographie',
+      description: 'La cartographie ne contient pas encore de chantier actif avec localisation exploitable.',
+      badge: 'Info',
+    });
+  }
+  if (totalVisits === 0) {
+    alerts.push({
+      id: 'auditor-no-visits',
+      level: 'info',
+      title: 'Aucune visite enregistree',
+      description: 'Les visites marquees depuis la cartographie apparaitront ici pour suivi rapide.',
+      badge: 'Visites',
+    });
+  }
+
+  return {
+    role: Role.AUDITOR,
+    generatedAt: now.toISOString(),
+    stats: [
+      createStat('sites', 'Sites actifs', activeSites, 'success'),
+      createStat('projects', 'Projets actifs', activeProjects, 'primary'),
+      createStat('planning', 'Visites ce mois', monthVisits, 'warning'),
+      createStat('clock', "Visites aujourd'hui", todayVisits, 'neutral'),
+    ],
+    recentVisits: recentVisits.map((visit) => ({
+      id: visit.id,
+      siteId: visit.site.id,
+      siteName: visit.site.name,
+      projectName: visit.site.project.name,
+      visitedAt: visit.visitedAt.toISOString(),
+      comment: visit.comment,
+      latitude: decimalToNumber(visit.latitude),
+      longitude: decimalToNumber(visit.longitude),
+    })),
+    alerts,
+  };
+}
 async function getProjectManagerDashboard(prisma: PrismaClient, userId: string): Promise<DashboardResponse> {
   const now = new Date();
   const todayRange = dayRange(now);

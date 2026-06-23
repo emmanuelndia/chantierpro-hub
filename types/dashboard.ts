@@ -13,6 +13,7 @@ export type DashboardSupportedRole =
   | 'HR'
   | 'DIRECTION'
   | 'ADMIN'
+  | 'AUDITOR'
   | 'COORDINATOR'
   | 'GENERAL_SUPERVISOR'
   | 'BE_MANAGER'
@@ -153,6 +154,17 @@ export type DashboardAdminRoleCount = {
   total: number;
 };
 
+export type AuditorVisitDashboardItem = {
+  id: string;
+  siteId: string;
+  siteName: string;
+  projectName: string;
+  visitedAt: string;
+  comment: string | null;
+  latitude: number | null;
+  longitude: number | null;
+};
+
 export type ProjectManagerDashboardData = {
   role: 'PROJECT_MANAGER';
   generatedAt: string;
@@ -189,6 +201,14 @@ export type AdminDashboardData = {
   alerts: DashboardAlertItem[];
 };
 
+export type AuditorDashboardData = {
+  role: 'AUDITOR';
+  generatedAt: string;
+  stats: DashboardStat[];
+  recentVisits: AuditorVisitDashboardItem[];
+  alerts: DashboardAlertItem[];
+};
+
 export type CoordinatorDashboardData = {
   role: 'COORDINATOR';
   generatedAt: string;
@@ -218,6 +238,7 @@ export type DashboardResponse =
   | HrDashboardData
   | DirectionDashboardData
   | AdminDashboardData
+  | AuditorDashboardData
   | CoordinatorDashboardData
   | GeneralSupervisorDashboardData;
 

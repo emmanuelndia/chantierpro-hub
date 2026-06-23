@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/badge';
@@ -9,6 +10,7 @@ import { EmptyState } from '@/components/empty-state';
 import { StatsCard } from '@/components/stats-card';
 import { authFetch } from '@/lib/auth/client-session';
 import type {
+  AuditorVisitDashboardItem,
   DashboardAdminRoleCount,
   DashboardAlertItem,
   DashboardPhotoItem,
@@ -114,6 +116,20 @@ function DashboardContent({ data }: Readonly<{ data: DashboardResponse }>) {
             right={<LatestDeletionsPanel items={data.latestDeletions} />}
           />
           <AlertsPanel alerts={data.alerts} title="Alertes systeme" />
+        </DashboardFrame>
+      );
+    case 'AUDITOR':
+      return (
+        <DashboardFrame
+          title="Accueil auditeur"
+          description="Consultation des projets et chantiers geolocalises, avec suivi simple des visites terrain."
+        >
+          <StatsGrid stats={data.stats} />
+          <AuditorQuickActionsPanel />
+          <TwoColumnLayout
+            left={<AuditorRecentVisitsPanel items={data.recentVisits} />}
+            right={<AlertsPanel alerts={data.alerts} title="Informations auditeur" />}
+          />
         </DashboardFrame>
       );
     case 'COORDINATOR':
@@ -328,6 +344,73 @@ function AlertsPanel({ alerts, title }: Readonly<{ alerts: DashboardAlertItem[];
   );
 }
 
+function AuditorQuickActionsPanel() {
+  return (
+    <section className="grid gap-4 lg:grid-cols-2">
+      <Link
+        className="group rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-xl"
+        href="/web/site-map"
+      >
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Cartographie</p>
+        <h2 className="mt-3 text-xl font-semibold text-slate-950">Cartographie des sites</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          Voir les sites sur carte, filtrer par projet ou chef projet, ouvrir la position GPS et marquer une visite.
+        </p>
+        <span className="mt-5 inline-flex rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-white group-hover:bg-orange-600">
+          Ouvrir la carte
+        </span>
+      </Link>
+      <Link
+        className="group rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-xl"
+        href="/web/projects"
+      >
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Consultation</p>
+        <h2 className="mt-3 text-xl font-semibold text-slate-950">Projets et sites</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          Retrouver les adresses, villes, statuts et details des chantiers sans modifier les donnees projet.
+        </p>
+        <span className="mt-5 inline-flex rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-900 group-hover:bg-blue-100">
+          Voir les projets
+        </span>
+      </Link>
+    </section>
+  );
+}
+
+function AuditorRecentVisitsPanel({ items }: Readonly<{ items: AuditorVisitDashboardItem[] }>) {
+  return (
+    <SectionCard title="Dernieres visites" subtitle="Visites marquees depuis la cartographie des sites.">
+      {items.length === 0 ? (
+        <CompactEmptyState message="Aucune visite enregistree pour le moment." />
+      ) : (
+        <div className="space-y-4">
+          {items.map((visit) => (
+            <article key={visit.id} className="rounded-3xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">{visit.siteName}</p>
+                  <p className="mt-1 text-sm text-slate-500">{visit.projectName}</p>
+                </div>
+                <Badge tone="neutral">{formatDateTime(visit.visitedAt)}</Badge>
+              </div>
+              {visit.comment ? <p className="mt-3 text-sm leading-6 text-slate-600">{visit.comment}</p> : null}
+              {visit.latitude !== null && visit.longitude !== null ? (
+                <a
+                  className="mt-3 inline-flex rounded-2xl bg-slate-950 px-3 py-2 text-xs font-black text-white"
+                  href={`https://www.google.com/maps?q=${visit.latitude},${visit.longitude}`}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Ouvrir Maps
+                </a>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
 function GeneralSupervisorSitesPanel({ items }: Readonly<{ items: GeneralSupervisorSiteDashboardItem[] }>) {
   return (
     <SectionCard title="Sites confies" subtitle="Perimetre actif aujourd'hui pour le pilotage planning et rapports.">
