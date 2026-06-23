@@ -560,7 +560,7 @@ export async function updatePlanningAssignment(
 ) {
   const existing = await getScopedPlanningAssignment(prisma, user, assignmentId);
   if (!existing) {
-    return planningError('NOT_FOUND', 'Assignation introuvable dans votre périmètre.', 404);
+    return planningError('NOT_FOUND', 'Assignation introuvable dans votre perimetre.', 404);
   }
 
   const action = normalizeOptionalAction(input.action);
@@ -830,19 +830,45 @@ export async function updateSupervisorAssignmentStatus(
 
 export async function deletePlanningAssignment(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
   const existing = await getScopedPlanningAssignment(prisma, user, assignmentId);
-  if (!existing) {
-    return planningError('NOT_FOUND', 'Assignation introuvable dans votre périmètre.', 404);
+  if (existing) {
+    await prisma.planningAssignment.update({
+      where: { id: existing.id },
+      data: {
+        status: PlanningAssignmentStatus.CANCELLED,
+        deletedAt: new Date(),
+      },
+    });
+
+    return new Response(null, { status: 204 });
   }
 
-  await prisma.planningAssignment.update({
-    where: { id: existing.id },
-    data: {
-      status: PlanningAssignmentStatus.CANCELLED,
-      deletedAt: new Date(),
-    },
-  });
+  const freeMission = await getScopedFreeMissionPlanningAssignment(prisma, user, assignmentId);
+  if (freeMission) {
+    await prisma.freeMission.update({
+      where: { id: freeMission.id },
+      data: {
+        status: FreeMissionStatus.CANCELLED,
+        deletedAt: new Date(),
+      },
+    });
 
-  return new Response(null, { status: 204 });
+    return new Response(null, { status: 204 });
+  }
+
+  const negotiationAssignment = await getScopedNegotiationPlanningAssignment(prisma, user, assignmentId);
+  if (negotiationAssignment) {
+    await prisma.negotiationAssignment.update({
+      where: { id: negotiationAssignment.id },
+      data: {
+        status: NegotiationAssignmentStatus.CANCELLED,
+        deletedAt: new Date(),
+      },
+    });
+
+    return new Response(null, { status: 204 });
+  }
+
+  return planningError('NOT_FOUND', 'Assignation introuvable dans votre perimetre.', 404);
 }
 
 export async function duplicatePlanningAssignments(
@@ -1054,6 +1080,44 @@ function getScopedPlanningAssignment(prisma: PrismaClient, user: AuthLikeUser, a
         : {}),
     },
     select: planningAssignmentSelect,
+  });
+}
+
+function getScopedFreeMissionPlanningAssignment(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
+  return prisma.freeMission.findFirst({
+    where: {
+      id: assignmentId,
+      deletedAt: null,
+      status: { not: FreeMissionStatus.CANCELLED },
+      project: operationalPlanningProjectWhere(user),
+      ...(isBusinessManagerRole(user.role)
+        ? {
+            assignee: {
+              role: { in: [...getBusinessManagedResourceRoles(user.role)] },
+            },
+          }
+        : {}),
+    },
+    select: { id: true },
+  });
+}
+
+function getScopedNegotiationPlanningAssignment(prisma: PrismaClient, user: AuthLikeUser, assignmentId: string) {
+  return prisma.negotiationAssignment.findFirst({
+    where: {
+      id: assignmentId,
+      deletedAt: null,
+      status: { not: NegotiationAssignmentStatus.CANCELLED },
+      project: operationalPlanningProjectWhere(user),
+      ...(isBusinessManagerRole(user.role)
+        ? {
+            assignee: {
+              role: { in: [...getBusinessManagedResourceRoles(user.role)] },
+            },
+          }
+        : {}),
+    },
+    select: { id: true },
   });
 }
 

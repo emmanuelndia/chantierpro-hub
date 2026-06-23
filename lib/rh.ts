@@ -965,7 +965,9 @@ export async function getSitePresencesLive(
     const rowId = `negotiation:${assignment.id}`;
     const key = liveResourceKey(rowId, assignment.assigneeId);
     const existing = assignmentBySiteUser.get(key);
-    const action = assignment.plannedZone ? `Negociation - ${assignment.plannedZone}` : 'Negociation';
+    const instruction = assignment.instruction?.trim();
+    let action = assignment.plannedZone ? `Negociation - ${assignment.plannedZone}` : 'Negociation';
+    if (instruction) action = instruction;
     const nextAssignment = {
       action,
       supervisorId: assignment.assigneeId,
