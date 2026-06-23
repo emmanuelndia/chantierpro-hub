@@ -449,6 +449,8 @@ function NavigationIcon({
       return <HelmetIcon className={className} />;
     case 'projects':
       return <GridIcon className={className} />;
+    case 'map':
+      return <MapIcon className={className} />;
     case 'rh':
       return <ClockIcon className={className} />;
     case 'consolidated':
@@ -514,6 +516,15 @@ function GridIcon({ className }: Readonly<{ className: string }>) {
   );
 }
 
+function MapIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <path d="M9 18 4 20V6l5-2 6 2 5-2v14l-5 2-6-2Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M9 4v14M15 6v14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
 function ClockIcon({ className }: Readonly<{ className: string }>) {
   return baseIconPath(
     className,

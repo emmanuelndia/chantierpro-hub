@@ -11,6 +11,7 @@ export type WebNavIcon =
   | 'dashboard'
   | 'my-projects'
   | 'projects'
+  | 'map'
   | 'rh'
   | 'consolidated'
   | 'photos'
@@ -29,7 +30,7 @@ export type WebNavigationItem = {
   breadcrumb: readonly string[];
 };
 
-export type MobileTabIcon = 'home' | 'clock-in' | 'photo' | 'calendar' | 'history' | 'reports' | 'teams' | 'profile' | 'folder' | 'presence';
+export type MobileTabIcon = 'home' | 'clock-in' | 'photo' | 'calendar' | 'history' | 'reports' | 'teams' | 'profile' | 'folder' | 'presence' | 'map';
 
 export type MobileNavigationItem = {
   href: string;

@@ -31,6 +31,13 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Tous les projets'],
   },
   {
+    href: '/web/site-map',
+    label: 'Cartographie sites',
+    icon: 'map',
+    roles: ['AUDITOR', 'PROJECT_MANAGER', 'HR', 'DIRECTION', 'ADMIN'],
+    breadcrumb: ['Cartographie des sites'],
+  },
+  {
     href: '/web/rh/presences',
     label: 'Presences / RH',
     icon: 'rh',
@@ -259,6 +266,12 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     roles: ['PROJECT_MANAGER', 'DIRECTION', 'AUDITOR'],
   },
   {
+    href: '/mobile/site-map',
+    label: 'Carte',
+    icon: 'map',
+    roles: ['AUDITOR', 'PROJECT_MANAGER', 'HR', 'DIRECTION', 'ADMIN'],
+  },
+  {
     href: '/mobile/sites',
     label: 'Chantiers',
     icon: 'folder',
@@ -340,7 +353,7 @@ export function canAccessMobileNavigationItem(role: Role, item: MobileNavigation
 
 export function getMobileNavigationForRole(role: Role) {
   if (role === 'HR') {
-    const hrBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/presences', '/mobile/profile']);
+    const hrBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/site-map', '/mobile/presences', '/mobile/profile']);
     return mobileTabNavigation.filter((item) => hrBottomTabs.has(item.href));
   }
 
@@ -350,7 +363,7 @@ export function getMobileNavigationForRole(role: Role) {
   }
 
   if (role === 'AUDITOR') {
-    const auditorBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/sites', '/mobile/profile']);
+    const auditorBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/site-map', '/mobile/sites', '/mobile/profile']);
     return mobileTabNavigation.filter((item) => auditorBottomTabs.has(item.href));
   }
 
@@ -360,6 +373,7 @@ export function getMobileNavigationForRole(role: Role) {
       '/mobile/clock-in',
       '/mobile/photo',
       '/mobile/supervisor-scopes',
+      '/mobile/site-map',
       '/mobile/history',
       '/mobile/profile',
     ]);

@@ -78,6 +78,8 @@ function MobileTabIconView({ icon }: Readonly<{ icon: MobileTabIcon }>) {
       return <TeamsIcon />;
     case 'presence':
       return <PresenceIcon />;
+    case 'map':
+      return <MapIcon />;
     case 'profile':
       return <ProfileIcon />;
     case 'folder':
@@ -199,6 +201,14 @@ function PresenceIcon() {
   );
 }
 
+function MapIcon() {
+  return baseIcon(
+    <>
+      <path d="M9 18 4 20V6l5-2 6 2 5-2v14l-5 2-6-2Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M9 4v14M15 6v14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
 function ProfileIcon() {
   return baseIcon(
     <>
