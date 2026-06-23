@@ -626,22 +626,22 @@ function QuickFilterTabs({
 }>) {
   return (
     <div className="sticky top-2 z-20 mb-4 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-sm backdrop-blur">
-      <div className="flex gap-2 overflow-x-auto">
+      <div className="flex flex-wrap gap-1.5">
         {quickFilterDefinitions.map((filter) => {
           const active = activeFilter === filter.id;
           return (
             <button
-              className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-black uppercase tracking-[0.11em] transition ${
+              className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-bold uppercase tracking-[0.08em] transition ${
                 active
                   ? quickFilterActiveClassName(filter.tone)
-                  : 'border-transparent bg-slate-50 text-slate-600 hover:bg-white hover:text-slate-950 hover:shadow-sm'
+                  : 'bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-950'
               }`}
               key={filter.id}
               onClick={() => onChange(filter.id)}
               type="button"
             >
               <span>{filter.label}</span>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] ${active ? 'bg-white/70 text-inherit' : 'bg-white text-slate-500'}`}>
+              <span className={`min-w-7 rounded-full px-2 py-0.5 text-center text-[11px] font-black ${active ? 'bg-white/80 text-inherit' : 'bg-slate-100 text-slate-500'}`}>
                 {counts[filter.id]}
               </span>
             </button>
@@ -654,15 +654,16 @@ function QuickFilterTabs({
 
 function quickFilterActiveClassName(tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info') {
   const classes = {
-    neutral: 'border-slate-900 bg-slate-950 text-white',
-    success: 'border-emerald-200 bg-emerald-100 text-emerald-800',
-    warning: 'border-orange-200 bg-orange-100 text-orange-800',
-    danger: 'border-red-200 bg-red-100 text-red-800',
-    info: 'border-blue-200 bg-blue-100 text-blue-800',
+    neutral: 'bg-slate-950 text-white shadow-sm',
+    success: 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200',
+    warning: 'bg-orange-100 text-orange-800 ring-1 ring-orange-200',
+    danger: 'bg-red-100 text-red-800 ring-1 ring-red-200',
+    info: 'bg-blue-100 text-blue-800 ring-1 ring-blue-200',
   };
 
   return classes[tone];
 }
+
 function Field({ children, label }: Readonly<{ children: ReactNode; label: string }>) {
   return (
     <label className="space-y-2">
@@ -671,7 +672,6 @@ function Field({ children, label }: Readonly<{ children: ReactNode; label: strin
     </label>
   );
 }
-
 
 function liveStatusLabel(status: RhSitePresenceLiveStatus) {
   const labels: Record<RhSitePresenceLiveStatus, string> = {
