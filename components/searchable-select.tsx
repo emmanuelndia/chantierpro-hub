@@ -187,6 +187,8 @@ export function SearchableMultiSelect({
   }, []);
 
   function toggleValue(nextValue: string) {
+    setQuery('');
+
     if (values.includes(nextValue)) {
       onChange(values.filter((value) => value !== nextValue));
       return;
@@ -213,7 +215,10 @@ export function SearchableMultiSelect({
                 <button
                   aria-label={`Retirer ${option.label}`}
                   className="rounded-full text-slate-300 transition hover:text-white"
-                  onClick={() => onChange(values.filter((value) => value !== option.value))}
+                  onClick={() => {
+                    setQuery('');
+                    onChange(values.filter((value) => value !== option.value));
+                  }}
                   type="button"
                 >
                   <X className="h-3.5 w-3.5" />
