@@ -38,7 +38,7 @@ Uploader les rapports sur l'application dans des formats
 responsable negociation qui fait le planning de ses ressources sur tous les projets comme le bureau d'études et responsable parc auto qui fait le planning de ses chauffeurs, faudra créer leur rôles, 
 
 
-
+23y@38GK3ILe3%.!
 Possibilité de voir les plannings d'autre chefs de projets pour une visibilité
 Exemple tous les chefs projets voit tous les plannings des ressources planning centralisé par projets pour savoir quel ressource est assigné à quelle tâche pour voir la disponibilité et la faisabilité de la multi assignation par exemple je veux assigner un superviseur qui est déjà sur un chantier d'un autre PM mais je veux savoir quel tâche il fait actuellement pour voir si c'est possible de le faire
 Permettre à une ressource de dire qu'il a fini une tâche, pas seulement à la prise de photo 

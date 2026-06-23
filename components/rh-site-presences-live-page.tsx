@@ -247,7 +247,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <LiveKpi label="Presentes" tone="success" value={displaySummary.present} />
+        <LiveKpi label="Presents" tone="success" value={displaySummary.present} />
         <LiveKpi label="Assignes" value={displaySummary.expected} />
         <LiveKpi label="Absentes" tone="danger" value={displaySummary.absent} />
         <LiveKpi label="Retards" tone={displaySummary.late > 0 ? 'warning' : 'neutral'} value={displaySummary.late} />
@@ -403,21 +403,12 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Liste de presence</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">Ressources du jour</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {displayedResources.length} ressource(s) affichee(s) sur {resources.length}, mise a jour {data ? formatTime(data.generatedAt) : '--:--'}.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <SiteCounter label="Presents" tone="success" value={displaySummary.present} />
-            <SiteCounter label="Pause" tone="warning" value={displaySummary.paused} />
-            <SiteCounter label="Absents" tone="danger" value={displaySummary.absent} />
-            <SiteCounter label="Sorties" value={displaySummary.left} />
-            <SiteCounter label="Retards" tone="warning" value={displaySummary.late} />
-          </div>
+        <div className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Liste de presence</p>
+          <h2 className="mt-2 text-xl font-semibold text-slate-950">Ressources du jour</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {displayedResources.length} ressource(s) affichee(s) sur {resources.length}, mise a jour {data ? formatTime(data.generatedAt) : '--:--'}.
+          </p>
         </div>
 
         <QuickFilterTabs
@@ -634,22 +625,25 @@ function QuickFilterTabs({
   onChange: (filter: PresenceQuickFilter) => void;
 }>) {
   return (
-    <div className="sticky top-0 z-20 -mx-5 mb-4 border-y border-slate-100 bg-white/95 px-5 py-3 backdrop-blur">
-      <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="sticky top-2 z-20 mb-4 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-sm backdrop-blur">
+      <div className="flex gap-2 overflow-x-auto">
         {quickFilterDefinitions.map((filter) => {
           const active = activeFilter === filter.id;
           return (
             <button
-              className={`whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-black uppercase tracking-[0.12em] transition ${
+              className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-black uppercase tracking-[0.11em] transition ${
                 active
                   ? quickFilterActiveClassName(filter.tone)
-                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white'
+                  : 'border-transparent bg-slate-50 text-slate-600 hover:bg-white hover:text-slate-950 hover:shadow-sm'
               }`}
               key={filter.id}
               onClick={() => onChange(filter.id)}
               type="button"
             >
-              {filter.label} <span className="ml-1 opacity-80">{counts[filter.id]}</span>
+              <span>{filter.label}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] ${active ? 'bg-white/70 text-inherit' : 'bg-white text-slate-500'}`}>
+                {counts[filter.id]}
+              </span>
             </button>
           );
         })}
@@ -678,28 +672,6 @@ function Field({ children, label }: Readonly<{ children: ReactNode; label: strin
   );
 }
 
-function SiteCounter({
-  label,
-  value,
-  tone = 'neutral',
-}: Readonly<{
-  label: string;
-  value: number;
-  tone?: 'neutral' | 'success' | 'warning' | 'danger';
-}>) {
-  const className = {
-    neutral: 'bg-slate-100 text-slate-700',
-    success: 'bg-emerald-100 text-emerald-700',
-    warning: 'bg-orange-100 text-orange-700',
-    danger: 'bg-red-100 text-red-700',
-  }[tone];
-
-  return (
-    <span className={`rounded-full px-3 py-1 text-xs font-bold ${className}`}>
-      {label}: {value}
-    </span>
-  );
-}
 
 function liveStatusLabel(status: RhSitePresenceLiveStatus) {
   const labels: Record<RhSitePresenceLiveStatus, string> = {
@@ -1012,7 +984,7 @@ function buildDisplaySummary(resources: AggregatedLiveResource[]) {
   return resources.reduce(
     (summary, resource) => {
       if (resource.contexts.some(isExpectedContext)) summary.expected += 1;
-      if (hasPresenceDuringSelectedDay(resource)) summary.present += 1;
+      if (resource.status === 'PRESENT') summary.present += 1;
       if (resource.status === 'PAUSED') summary.paused += 1;
       if (resource.status === 'EXPECTED_NOT_CLOCKED') summary.absent += 1;
       if (resource.status === 'LEFT') summary.left += 1;
@@ -1032,9 +1004,6 @@ function buildDisplaySummary(resources: AggregatedLiveResource[]) {
   );
 }
 
-function hasPresenceDuringSelectedDay(resource: Pick<AggregatedLiveResource, 'arrivalAt' | 'status'>) {
-  return Boolean(resource.arrivalAt) && resource.status !== 'EXPECTED_NOT_CLOCKED';
-}
 
 function isExpectedContext(context: LiveResourceContext) {
   return Boolean(context.taskAction) || context.status === 'EXPECTED_NOT_CLOCKED';
