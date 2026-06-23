@@ -10,7 +10,7 @@ import type { MobilePresenceListResponse } from '@/types/mobile-management-prese
 
 type MobileRhOfficeHomePageProps = Readonly<{
   user: WebSessionUser;
-  mode: 'HR' | 'OFFICE_STAFF';
+  mode: 'HR' | 'OFFICE_STAFF' | 'AUDITOR';
 }>;
 
 export function MobileRhOfficeHomePage({ mode, user }: MobileRhOfficeHomePageProps) {
@@ -43,13 +43,15 @@ export function MobileRhOfficeHomePage({ mode, user }: MobileRhOfficeHomePagePro
     <div className="space-y-5">
       <section className="rounded-3xl bg-slate-950 p-5 text-white shadow-xl">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">
-          {mode === 'HR' ? 'Accueil RH' : 'Personnel bureau'}
+          {mode === 'HR' ? 'Accueil RH' : mode === 'AUDITOR' ? 'Accueil auditeur' : 'Personnel bureau'}
         </p>
         <h1 className="mt-2 text-2xl font-black">Bonjour {user.firstName}</h1>
         <p className="mt-2 text-sm font-semibold leading-6 text-white/70">
           {mode === 'HR'
             ? 'Suivez les presences du jour et pointez au bureau si necessaire.'
-            : 'Pointez votre presence au bureau et consultez votre profil.'}
+            : mode === 'AUDITOR'
+              ? 'Consultez les sites, ouvrez les localisations et enregistrez vos visites.'
+              : 'Pointez votre presence au bureau et consultez votre profil.'}
         </p>
         {mode === 'HR' ? (
           <div className="mt-4 grid grid-cols-3 gap-2">
@@ -83,6 +85,12 @@ export function MobileRhOfficeHomePage({ mode, user }: MobileRhOfficeHomePagePro
           <>
             <QuickLink href="/mobile/presences" label="Presences" />
             <QuickLink href="/web/rh/resources" label="Ressources RH" />
+          </>
+        ) : null}
+        {mode === 'AUDITOR' ? (
+          <>
+            <QuickLink href="/mobile/site-map" label="Cartographie" />
+            <QuickLink href="/mobile/sites" label="Sites a visiter" />
           </>
         ) : null}
         <QuickLink href="/mobile/clock-in?office=1" label="Pointage" />

@@ -71,6 +71,9 @@ export function MobileAdminDashboardPage({ user }: MobileAdminDashboardPageProps
         <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">Acces rapides</h2>
         <div className="grid grid-cols-2 gap-3">
           <QuickAction href="/mobile/users" icon={<UsersIcon />} label="Utilisateurs" />
+          <QuickAction href="/mobile/clock-in" icon={<ClockIcon />} label="Pointage" />
+          <QuickAction href="/mobile/site-map" icon={<MapIcon />} label="Cartographie" />
+          <QuickAction href="/mobile/presences" icon={<PresenceIcon />} label="Presences" />
           <QuickAction href="/mobile/gallery" icon={<GalleryIcon />} label="Galerie" />
           <QuickAction href="/mobile/logs" icon={<LogsIcon />} label="Logs" />
           <QuickAction href="/mobile/profile" icon={<ProfileIcon />} label="Profil" />
@@ -141,6 +144,17 @@ function UsersIcon() {
   return icon(<path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.5 20a5.5 5.5 0 0 1 11 0M17 11a2.5 2.5 0 1 0-.7-4.9M17 14.5a5 5 0 0 1 3.5 4.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />);
 }
 
+function ClockIcon() {
+  return icon(<path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />);
+}
+
+function MapIcon() {
+  return icon(<><path d="M9 18 4 20V6l5-2 6 2 5-2v14l-5 2-6-2Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" /><path d="M9 4v14M15 6v14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" /></>);
+}
+
+function PresenceIcon() {
+  return icon(<><path d="M5 6h14M5 12h14M5 18h14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" /><path d="M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="3" /></>);
+}
 function GalleryIcon() {
   return icon(<path d="M4 6h16v12H4zM7 15l3-3 2 2 2-3 3 4M8 9h.01" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />);
 }

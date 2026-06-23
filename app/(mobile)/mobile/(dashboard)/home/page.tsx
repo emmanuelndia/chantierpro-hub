@@ -13,6 +13,7 @@ const coordinatorRoles = ['COORDINATOR'] as const;
 const managementRoles = ['PROJECT_MANAGER', 'DIRECTION'] as const;
 const adminRoles = ['ADMIN'] as const;
 const rhRoles = ['HR'] as const;
+const auditorRoles = ['AUDITOR'] as const;
 
 export default async function MobileHomePage() {
   const session = await getCurrentWebSession();
@@ -47,6 +48,10 @@ export default async function MobileHomePage() {
 
   if (session.role === 'OFFICE_STAFF') {
     return <MobileRhOfficeHomePage mode="OFFICE_STAFF" user={session} />;
+  }
+
+  if (auditorRoles.includes(session.role as (typeof auditorRoles)[number])) {
+    return <MobileRhOfficeHomePage mode="AUDITOR" user={session} />;
   }
 
   redirect('/mobile/profile');

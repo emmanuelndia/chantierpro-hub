@@ -352,6 +352,10 @@ export function canAccessMobileNavigationItem(role: Role, item: MobileNavigation
 }
 
 export function getMobileNavigationForRole(role: Role) {
+  if (role === 'ADMIN') {
+    const adminBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/users', '/mobile/profile']);
+    return mobileTabNavigation.filter((item) => adminBottomTabs.has(item.href));
+  }
   if (role === 'HR') {
     const hrBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/site-map', '/mobile/presences', '/mobile/profile']);
     return mobileTabNavigation.filter((item) => hrBottomTabs.has(item.href));
