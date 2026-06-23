@@ -41,6 +41,8 @@ const liveStatuses: RhSitePresenceLiveStatus[] = ['PRESENT', 'PAUSED', 'EXPECTED
 
 type PresenceSortMode = 'name' | 'arrival-asc' | 'arrival-desc';
 
+type PresenceQuickFilter = 'all' | 'present' | 'paused' | 'absent' | 'left' | 'late' | 'out-of-planning' | 'anomaly';
+
 export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps) {
   const { pushToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -55,6 +57,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   const [arrivalFrom, setArrivalFrom] = useState('');
   const [arrivalTo, setArrivalTo] = useState('');
   const [sortMode, setSortMode] = useState<PresenceSortMode>('name');
+  const [quickFilter, setQuickFilter] = useState<PresenceQuickFilter>('all');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [anomaliesOnly, setAnomaliesOnly] = useState(false);
@@ -172,6 +175,11 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   const resources = useMemo(
     () => sortAggregatedLiveResources(aggregateLiveResources(flattenLiveResources(filteredSites)), sortMode),
     [filteredSites, sortMode],
+  );
+  const quickFilterCounts = useMemo(() => buildQuickFilterCounts(resources), [resources]);
+  const displayedResources = useMemo(
+    () => resources.filter((resource) => matchesQuickFilter(resource, quickFilter)),
+    [quickFilter, resources],
   );
   const displaySummary = useMemo(() => buildDisplaySummary(resources), [resources]);
 
@@ -400,7 +408,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Liste de presence</p>
             <h2 className="mt-2 text-xl font-semibold text-slate-950">Ressources du jour</h2>
             <p className="mt-1 text-sm text-slate-500">
-              {resources.length} ressource(s) affichee(s), mise a jour {data ? formatTime(data.generatedAt) : '--:--'}.
+              {displayedResources.length} ressource(s) affichee(s) sur {resources.length}, mise a jour {data ? formatTime(data.generatedAt) : '--:--'}.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -412,14 +420,20 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
           </div>
         </div>
 
-        {resources.length === 0 ? (
+        <QuickFilterTabs
+          activeFilter={quickFilter}
+          counts={quickFilterCounts}
+          onChange={setQuickFilter}
+        />
+
+        {displayedResources.length === 0 ? (
           <EmptyState
             description="Aucune ressource ne correspond aux filtres actifs."
             title="Aucune presence"
           />
         ) : (
           <div className="divide-y divide-slate-100">
-            {resources.map((resource) => (
+            {displayedResources.map((resource) => (
               <ResourcePresenceItem
                 key={resource.userId}
                 resource={resource}
@@ -599,6 +613,62 @@ function LiveKpi({
   );
 }
 
+const quickFilterDefinitions: { id: PresenceQuickFilter; label: string; tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info' }[] = [
+  { id: 'all', label: 'Tous', tone: 'neutral' },
+  { id: 'present', label: 'Presents', tone: 'success' },
+  { id: 'paused', label: 'Pause', tone: 'warning' },
+  { id: 'absent', label: 'Absents', tone: 'danger' },
+  { id: 'left', label: 'Sortis', tone: 'neutral' },
+  { id: 'late', label: 'Retards', tone: 'warning' },
+  { id: 'out-of-planning', label: 'Hors planning', tone: 'info' },
+  { id: 'anomaly', label: 'Anomalies', tone: 'danger' },
+];
+
+function QuickFilterTabs({
+  activeFilter,
+  counts,
+  onChange,
+}: Readonly<{
+  activeFilter: PresenceQuickFilter;
+  counts: Record<PresenceQuickFilter, number>;
+  onChange: (filter: PresenceQuickFilter) => void;
+}>) {
+  return (
+    <div className="sticky top-0 z-20 -mx-5 mb-4 border-y border-slate-100 bg-white/95 px-5 py-3 backdrop-blur">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {quickFilterDefinitions.map((filter) => {
+          const active = activeFilter === filter.id;
+          return (
+            <button
+              className={`whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-black uppercase tracking-[0.12em] transition ${
+                active
+                  ? quickFilterActiveClassName(filter.tone)
+                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white'
+              }`}
+              key={filter.id}
+              onClick={() => onChange(filter.id)}
+              type="button"
+            >
+              {filter.label} <span className="ml-1 opacity-80">{counts[filter.id]}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function quickFilterActiveClassName(tone: 'neutral' | 'success' | 'warning' | 'danger' | 'info') {
+  const classes = {
+    neutral: 'border-slate-900 bg-slate-950 text-white',
+    success: 'border-emerald-200 bg-emerald-100 text-emerald-800',
+    warning: 'border-orange-200 bg-orange-100 text-orange-800',
+    danger: 'border-red-200 bg-red-100 text-red-800',
+    info: 'border-blue-200 bg-blue-100 text-blue-800',
+  };
+
+  return classes[tone];
+}
 function Field({ children, label }: Readonly<{ children: ReactNode; label: string }>) {
   return (
     <label className="space-y-2">
@@ -901,6 +971,43 @@ function getResourceContextSummary(contexts: LiveResourceContext[]) {
   return null;
 }
 
+function buildQuickFilterCounts(resources: AggregatedLiveResource[]): Record<PresenceQuickFilter, number> {
+  return resources.reduce(
+    (counts, resource) => {
+      counts.all += 1;
+      if (matchesQuickFilter(resource, 'present')) counts.present += 1;
+      if (matchesQuickFilter(resource, 'paused')) counts.paused += 1;
+      if (matchesQuickFilter(resource, 'absent')) counts.absent += 1;
+      if (matchesQuickFilter(resource, 'left')) counts.left += 1;
+      if (matchesQuickFilter(resource, 'late')) counts.late += 1;
+      if (matchesQuickFilter(resource, 'out-of-planning')) counts['out-of-planning'] += 1;
+      if (matchesQuickFilter(resource, 'anomaly')) counts.anomaly += 1;
+      return counts;
+    },
+    {
+      all: 0,
+      present: 0,
+      paused: 0,
+      absent: 0,
+      left: 0,
+      late: 0,
+      'out-of-planning': 0,
+      anomaly: 0,
+    },
+  );
+}
+
+function matchesQuickFilter(resource: AggregatedLiveResource, filter: PresenceQuickFilter) {
+  if (filter === 'all') return true;
+  if (filter === 'present') return resource.status === 'PRESENT';
+  if (filter === 'paused') return resource.status === 'PAUSED';
+  if (filter === 'absent') return resource.status === 'EXPECTED_NOT_CLOCKED';
+  if (filter === 'left') return resource.status === 'LEFT';
+  if (filter === 'late') return resource.isLate;
+  if (filter === 'out-of-planning') return resource.contexts.some(isOutOfPlanningContext);
+  if (filter === 'anomaly') return resource.status === 'ANOMALY' || Boolean(resource.anomalyReason);
+  return true;
+}
 function buildDisplaySummary(resources: AggregatedLiveResource[]) {
   return resources.reduce(
     (summary, resource) => {
