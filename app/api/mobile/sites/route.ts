@@ -1,6 +1,6 @@
 import { Prisma, ProjectStatus, SiteStatus } from '@prisma/client';
 import { withAuth } from '@/lib/auth/with-auth';
-import { canAccessMobileSitesManagement } from '@/lib/mobile-sites';
+import { canMutateMobileSitesManagement } from '@/lib/mobile-sites';
 import { prisma } from '@/lib/prisma';
 import {
   assertCreateSiteRadiusAllowed,
@@ -16,7 +16,7 @@ import {
 } from '@/lib/projects';
 
 export const POST = withAuth(async ({ req, user }) => {
-  if (!canAccessMobileSitesManagement(user.role)) {
+  if (!canMutateMobileSitesManagement(user.role)) {
     return jsonProjectError('FORBIDDEN', 403, 'Accès refusé à la création de chantier.');
   }
 

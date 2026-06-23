@@ -93,10 +93,14 @@ type ProjectDetailRow = {
   }[];
 };
 
-const MOBILE_PROJECT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION];
+const MOBILE_PROJECT_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.AUDITOR];
 
 export function canAccessMobileProjects(role: Role) {
   return MOBILE_PROJECT_ROLES.includes(role);
+}
+
+export function canMutateMobileProjects(role: Role) {
+  return role === Role.PROJECT_MANAGER || role === Role.DIRECTION;
 }
 
 export async function getMobileProjects(

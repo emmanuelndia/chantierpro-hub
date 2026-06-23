@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import { DocumentAttachmentsPanel } from '@/components/document-attachments-panel';
 import { SignedImage } from '@/components/mobile/SignedImage';
@@ -21,7 +21,7 @@ type TabId = 'presence' | 'photos' | 'reports' | 'documents';
 
 type GeoState =
   | { status: 'loading' }
-  | { status: 'ready'; latitude: number; longitude: number }
+  | { status: 'ready'; latitude: number; longitude: number; accuracy: number | null }
   | { status: 'unavailable' };
 
 export function MobileSiteSupervisionPage({ siteId }: MobileSiteSupervisionPageProps) {
@@ -87,41 +87,131 @@ export function MobileSiteSupervisionPage({ siteId }: MobileSiteSupervisionPageP
           <MetricTile label="Distance" value={distanceKm === null ? 'Indisponible' : `${distanceKm.toFixed(2)} km`} />
           <MetricTile label="Rayon" value={`${data.site.radiusKm} km`} />
         </div>
+        <a
+          className="mt-3 flex min-h-12 items-center justify-center rounded-lg bg-slate-950 px-4 text-sm font-black text-white"
+          href={`https://www.google.com/maps?q=${data.site.latitude},${data.site.longitude}`}
+          rel="noreferrer"
+          target="_blank"
+        >
+          Ouvrir dans Maps
+        </a>
       </section>
 
-      <nav className="grid grid-cols-4 gap-1 rounded-lg bg-slate-100 p-1">
-        <TabButton active={activeTab === 'presence'} label="Presences" onClick={() => setActiveTab('presence')} />
-        <TabButton active={activeTab === 'photos'} label="Photos" onClick={() => setActiveTab('photos')} />
-        <TabButton active={activeTab === 'reports'} label="Rapports" onClick={() => setActiveTab('reports')} />
-        <TabButton active={activeTab === 'documents'} label="Docs" onClick={() => setActiveTab('documents')} />
-      </nav>
+      {data.permissions.canLogVisit ? <VisitLogPanel geoState={geoState} siteId={siteId} /> : null}
 
-      {activeTab === 'presence' ? <PresenceTab items={data.presence.items} /> : null}
-      {activeTab === 'photos' ? <PhotosTab onOpen={setActivePhoto} photos={data.photos} siteId={siteId} /> : null}
-      {activeTab === 'reports' ? <ReportsTab reports={data.reports} /> : null}
-      {activeTab === 'documents' ? (
-        <DocumentAttachmentsPanel
-          compact
-          context={{ siteId }}
-          description="Documents rattachés à ce chantier."
-          title="Documents chantier"
-        />
+      {data.permissions.canViewOperations ? (
+        <>
+          <nav className="grid grid-cols-4 gap-1 rounded-lg bg-slate-100 p-1">
+            <TabButton active={activeTab === 'presence'} label="Presences" onClick={() => setActiveTab('presence')} />
+            <TabButton active={activeTab === 'photos'} label="Photos" onClick={() => setActiveTab('photos')} />
+            <TabButton active={activeTab === 'reports'} label="Rapports" onClick={() => setActiveTab('reports')} />
+            <TabButton active={activeTab === 'documents'} label="Docs" onClick={() => setActiveTab('documents')} />
+          </nav>
+
+          {activeTab === 'presence' ? <PresenceTab items={data.presence.items} /> : null}
+          {activeTab === 'photos' ? <PhotosTab onOpen={setActivePhoto} photos={data.photos} siteId={siteId} /> : null}
+          {activeTab === 'reports' ? <ReportsTab reports={data.reports} /> : null}
+          {activeTab === 'documents' ? (
+            <DocumentAttachmentsPanel
+              compact
+              context={{ siteId }}
+              description="Documents rattaches a ce chantier."
+              title="Documents chantier"
+            />
+          ) : null}
+        </>
       ) : null}
-
+      {data.permissions.canViewOperations ? (
       <Link
-        className="fixed right-4 z-40 flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition active:scale-[0.98]"
-        href={`/mobile/photo?siteId=${encodeURIComponent(siteId)}`}
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.5rem)' }}
-      >
-        <CameraIcon className="h-5 w-5" />
-        Prendre une photo
-      </Link>
+          className="fixed right-4 z-40 flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition active:scale-[0.98]"
+          href={`/mobile/photo?siteId=${encodeURIComponent(siteId)}`}
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.5rem)' }}
+        >
+          <CameraIcon className="h-5 w-5" />
+          Prendre une photo
+        </Link>
+  
+        ) : null}
 
       {activePhoto ? <PhotoLightbox onClose={() => setActivePhoto(null)} photo={activePhoto} /> : null}
     </div>
   );
 }
 
+function VisitLogPanel({
+  geoState,
+  siteId,
+}: Readonly<{
+  geoState: GeoState;
+  siteId: string;
+}>) {
+  const [comment, setComment] = useState('');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const visitMutation = useMutation({
+    mutationFn: async () => {
+      const response = await authFetch('/api/mobile/site-visits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          siteId,
+          comment: comment.trim() || null,
+          latitude: geoState.status === 'ready' ? geoState.latitude : null,
+          longitude: geoState.status === 'ready' ? geoState.longitude : null,
+          accuracy: geoState.status === 'ready' ? geoState.accuracy : null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('VISIT_LOG_FAILED');
+      }
+
+      return (await response.json()) as { visit: { visitedAt: string } };
+    },
+    onSuccess: (data) => {
+      setSuccessMessage(`Visite enregistree a ${formatTime(data.visit.visitedAt)}.`);
+      setComment('');
+    },
+  });
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Visite auditeur</p>
+      <h3 className="mt-2 text-lg font-black text-slate-950">Marquer visite</h3>
+      <p className="mt-1 text-sm font-semibold text-slate-500">
+        {geoState.status === 'ready'
+          ? `GPS pret${geoState.accuracy ? ` - precision ${Math.round(geoState.accuracy)} m` : ''}`
+          : geoState.status === 'loading'
+            ? 'Recherche GPS en cours'
+            : 'GPS indisponible, la visite sera enregistree sans position.'}
+      </p>
+      <textarea
+        className="mt-3 min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-900 outline-none focus:border-primary"
+        onChange={(event) => setComment(event.target.value)}
+        placeholder="Commentaire optionnel"
+        value={comment}
+      />
+      <button
+        className="mt-3 flex min-h-12 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+        disabled={visitMutation.isPending}
+        onClick={() => visitMutation.mutate()}
+        type="button"
+      >
+        {visitMutation.isPending ? 'Enregistrement...' : 'Marquer visite'}
+      </button>
+      {visitMutation.isError ? (
+        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+          Impossible d&apos;enregistrer la visite.
+        </p>
+      ) : null}
+      {successMessage ? (
+        <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
+          {successMessage}
+        </p>
+      ) : null}
+    </section>
+  );
+}
 function PresenceTab({ items }: Readonly<{ items: MobileSitePresenceItem[] }>) {
   if (items.length === 0) {
     return <EmptyPanel text="Aucune presence aujourd'hui." />;
@@ -314,6 +404,7 @@ function useCurrentPosition(): GeoState {
           status: 'ready',
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
         });
       },
       () => setGeoState({ status: 'unavailable' }),

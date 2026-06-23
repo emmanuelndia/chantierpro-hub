@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { MobileProjectDetailPage } from '@/components/mobile-project-detail-page';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
 
-const mobileProjectRoles: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION];
+const mobileProjectRoles: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.AUDITOR];
 
 export default async function MobileProjectDetailRoutePage({
   params,
@@ -21,5 +21,5 @@ export default async function MobileProjectDetailRoutePage({
     redirect('/mobile/profile');
   }
 
-  return <MobileProjectDetailPage projectId={id} />;
+  return <MobileProjectDetailPage projectId={id} userRole={session.role} />;
 }

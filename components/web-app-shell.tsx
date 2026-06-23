@@ -45,6 +45,7 @@ const roleTone: Record<Role, 'success' | 'warning' | 'error' | 'neutral' | 'info
   DIRECTION: 'error',
   HR: 'info',
   ADMIN: 'neutral',
+  AUDITOR: 'info',
   OFFICE_STAFF: 'info',
 };
 

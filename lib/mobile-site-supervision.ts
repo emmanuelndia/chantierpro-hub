@@ -28,6 +28,7 @@ const MOBILE_SITE_SUPERVISION_ROLES: readonly Role[] = [
   ...BUSINESS_MANAGER_ROLES,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
+  Role.AUDITOR,
 ];
 
 export function canAccessMobileSiteSupervision(role: Role) {
@@ -50,7 +51,9 @@ export async function getMobileSiteSupervision(
   }
 
   const today = toDateOnlyDate(new Date());
-  const [records, photos, reports] = await Promise.all([
+  const canViewOperations = user.role !== Role.AUDITOR;
+  const [records, photos, reports] = canViewOperations
+    ? await Promise.all([
     prisma.clockInRecord.findMany({
       where: {
         siteId,
@@ -118,7 +121,8 @@ export async function getMobileSiteSupervision(
         },
       },
     }),
-  ]);
+    ])
+    : [[], [], []];
 
   return {
     site: {
@@ -139,6 +143,10 @@ export async function getMobileSiteSupervision(
     },
     photos: photos.map(serializePhoto),
     reports: reports.map(serializeReport),
+    permissions: {
+      canLogVisit: user.role === Role.AUDITOR,
+      canViewOperations,
+    },
   };
 }
 

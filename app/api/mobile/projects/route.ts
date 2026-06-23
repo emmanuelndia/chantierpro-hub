@@ -1,7 +1,7 @@
 import { Prisma, ProjectStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { canAccessMobileProjects, getMobileProjects } from '@/lib/mobile-projects';
+import { canAccessMobileProjects, canMutateMobileProjects, getMobileProjects } from '@/lib/mobile-projects';
 import {
   jsonProjectError,
   parseCreateProjectInput,
@@ -36,7 +36,7 @@ export const GET = withAuth(async ({ req, user }) => {
 });
 
 export const POST = withAuth(async ({ req, user }) => {
-  if (!canAccessMobileProjects(user.role)) {
+  if (!canMutateMobileProjects(user.role)) {
     return jsonProjectError('FORBIDDEN', 403, 'Accès refusé à la création de projet.');
   }
 

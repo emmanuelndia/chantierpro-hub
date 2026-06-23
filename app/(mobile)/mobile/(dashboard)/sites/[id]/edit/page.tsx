@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { MobileSiteFormPage } from '@/components/mobile-site-form-page';
-import { canAccessMobileSitesManagement } from '@/lib/mobile-sites';
+import { canMutateMobileSitesManagement } from '@/lib/mobile-sites';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
 
 export default async function MobileEditSiteRoutePage({
@@ -15,7 +15,7 @@ export default async function MobileEditSiteRoutePage({
     redirect(`/mobile/login?next=${encodeURIComponent(`/mobile/sites/${id}/edit`)}`);
   }
 
-  if (!canAccessMobileSitesManagement(session.role)) {
+  if (!canMutateMobileSitesManagement(session.role)) {
     redirect('/mobile/profile');
   }
 

@@ -51,6 +51,7 @@ const TERRAIN_CLOCK_IN_ROLES: readonly Role[] = [
 ];
 
 const NEGOTIATION_CLOCK_IN_ROLES: readonly Role[] = ['NEGOTIATION_RESOURCE', 'NEGOTIATION_MANAGER'];
+const OFFICE_ONLY_CLOCK_IN_ROLES: readonly Role[] = ['OFFICE_STAFF', 'HR', 'DIRECTION', 'ADMIN', 'AUDITOR'];
 const todayKey = new Date().toISOString().slice(0, 10);
 
 type GeoState =
@@ -137,9 +138,9 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const searchParams = useSearchParams();
   const canUseTerrainClockIn = TERRAIN_CLOCK_IN_ROLES.includes(userRole);
   const isNegotiationClockInUser = NEGOTIATION_CLOCK_IN_ROLES.includes(userRole);
-  const isOfficeStaff = userRole === 'OFFICE_STAFF';
+  const usesOfficeOnlyClockIn = OFFICE_ONLY_CLOCK_IN_ROLES.includes(userRole);
   const isFleetResource = userRole === 'FLEET_RESOURCE';
-  const canUseProfessionalTravel = isOfficeStaff || userRole === 'PROJECT_MANAGER';
+  const canUseProfessionalTravel = usesOfficeOnlyClockIn || userRole === 'PROJECT_MANAGER';
   const queryClient = useQueryClient();
   const requestedSiteId = searchParams.get('siteId');
   const requestedFreeMissionId = searchParams.get('freeMissionId');
@@ -1299,7 +1300,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
             </span>
           ) : null}
         </div>
-        {isOfficeStaff ? (
+        {usesOfficeOnlyClockIn ? (
           <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
             <ContextButton
               active={selectedClockContext === 'OFFICE' && selectedOfficeClockInLocation === OfficeClockInLocation.OFFICE}

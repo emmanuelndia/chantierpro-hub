@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { canAccessMobileProjects, getMobileProjectDetail } from '@/lib/mobile-projects';
+import { canAccessMobileProjects, canMutateMobileProjects, getMobileProjectDetail } from '@/lib/mobile-projects';
 import {
   getScopedProjectById,
   jsonProjectError,
@@ -28,7 +28,7 @@ export const GET = withAuth<{ id: string }>(async ({ params, user }) => {
 });
 
 export const PATCH = withAuth<{ id: string }>(async ({ params, req, user }) => {
-  if (!canAccessMobileProjects(user.role)) {
+  if (!canMutateMobileProjects(user.role)) {
     return jsonProjectError('FORBIDDEN', 403, 'Accès refusé à la modification de projet.');
   }
 

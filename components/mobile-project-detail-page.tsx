@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ProjectStatus, type SiteStatus, type ReportValidationStatus } from '@prisma/client';
+import { ProjectStatus, type Role, type SiteStatus, type ReportValidationStatus } from '@prisma/client';
 import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
@@ -16,6 +16,7 @@ import type {
 
 type MobileProjectDetailPageProps = Readonly<{
   projectId: string;
+  userRole: Role;
 }>;
 
 type ProjectDetailTab = 'summary' | 'sites' | 'teams' | 'photos' | 'reports';
@@ -29,7 +30,8 @@ const tabs: { id: ProjectDetailTab; label: string }[] = [
   { id: 'reports', label: 'Rapports' },
 ];
 
-export function MobileProjectDetailPage({ projectId }: MobileProjectDetailPageProps) {
+export function MobileProjectDetailPage({ projectId, userRole }: MobileProjectDetailPageProps) {
+  const canMutateProject = userRole === 'PROJECT_MANAGER' || userRole === 'DIRECTION';
   const [activeTab, setActiveTab] = useState<ProjectDetailTab>('summary');
   const detailQuery = useQuery({
     queryKey: ['mobile-project-detail', projectId],
@@ -120,12 +122,14 @@ export function MobileProjectDetailPage({ projectId }: MobileProjectDetailPagePr
               Chef de projet : {detail.project.projectManagerName}
             </p>
           </div>
-          <Link
-            className="flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-primary px-3 text-sm font-black text-white"
-            href={`/mobile/projects/${encodeURIComponent(projectId)}/edit`}
-          >
-            Modifier
-          </Link>
+          {canMutateProject ? (
+            <Link
+              className="flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-primary px-3 text-sm font-black text-white"
+              href={`/mobile/projects/${encodeURIComponent(projectId)}/edit`}
+            >
+              Modifier
+            </Link>
+          ) : null}
         </div>
       </section>
 
@@ -136,20 +140,22 @@ export function MobileProjectDetailPage({ projectId }: MobileProjectDetailPagePr
         <KpiTile label="Rapports" value={detail.kpis.reports} />
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
-        <Link
-          className="flex min-h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-panel"
-          href={`/mobile/sites/new?projectId=${encodeURIComponent(projectId)}`}
-        >
-          Nouveau chantier
-        </Link>
-        <Link
-          className="flex min-h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-panel"
-          href={`/mobile/teams/new?projectId=${encodeURIComponent(projectId)}`}
-        >
-          Nouvelle équipe
-        </Link>
-      </section>
+      {canMutateProject ? (
+        <section className="grid grid-cols-2 gap-3">
+          <Link
+            className="flex min-h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-panel"
+            href={`/mobile/sites/new?projectId=${encodeURIComponent(projectId)}`}
+          >
+            Nouveau chantier
+          </Link>
+          <Link
+            className="flex min-h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-panel"
+            href={`/mobile/teams/new?projectId=${encodeURIComponent(projectId)}`}
+          >
+            Nouvelle equipe
+          </Link>
+        </section>
+      ) : null}
 
       <section className="flex gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 shadow-panel [-webkit-overflow-scrolling:touch]">
         {tabs.map((tab) => (

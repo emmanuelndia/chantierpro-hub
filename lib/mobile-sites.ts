@@ -49,6 +49,10 @@ type SiteManagementRow = {
 };
 
 export function canAccessMobileSitesManagement(role: Role) {
+  return canWriteSites(role) || role === Role.AUDITOR;
+}
+
+export function canMutateMobileSitesManagement(role: Role) {
   return canWriteSites(role);
 }
 
@@ -86,6 +90,14 @@ export async function getMobileSitesManagement(
                 is: {
                   ...projectWhere,
                   name: { contains: query, mode: 'insensitive' },
+                },
+              },
+            },
+            {
+              project: {
+                is: {
+                  ...projectWhere,
+                  city: { contains: query, mode: 'insensitive' },
                 },
               },
             },

@@ -37,6 +37,7 @@ const initialPasswordValues: PasswordValues = {
 
 const roleLabels: Record<Role, string> = {
   ADMIN: 'Administrateur',
+  AUDITOR: 'Auditeur',
   HR: 'Ressources humaines',
   SUPERVISOR: 'Superviseur',
   RESOURCE: 'Ressource',

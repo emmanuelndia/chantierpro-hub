@@ -1,6 +1,6 @@
 import { Prisma, ProjectStatus } from '@prisma/client';
 import { withAuth } from '@/lib/auth/with-auth';
-import { canAccessMobileSitesManagement } from '@/lib/mobile-sites';
+import { canMutateMobileSitesManagement } from '@/lib/mobile-sites';
 import { prisma } from '@/lib/prisma';
 import {
   assertUpdateSiteRadiusAllowed,
@@ -18,7 +18,7 @@ import {
 } from '@/lib/projects';
 
 export const PATCH = withAuth<{ id: string }>(async ({ params, req, user }) => {
-  if (!canAccessMobileSitesManagement(user.role)) {
+  if (!canMutateMobileSitesManagement(user.role)) {
     return jsonProjectError('FORBIDDEN', 403, 'Accès refusé à la modification de chantier.');
   }
 

@@ -53,4 +53,8 @@ export type MobileSiteSupervisionResponse = {
   };
   photos: MobileSitePhotoItem[];
   reports: MobileSiteReportItem[];
+  permissions: {
+    canLogVisit: boolean;
+    canViewOperations: boolean;
+  };
 };

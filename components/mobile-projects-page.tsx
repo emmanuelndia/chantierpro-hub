@@ -31,6 +31,7 @@ export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
   const [status, setStatus] = useState<MobileProjectStatusFilter>('ALL');
   const [includeInactive, setIncludeInactive] = useState(false);
   const canViewInactiveProjects = user.role === 'ADMIN';
+  const canMutateProjects = user.role === 'PROJECT_MANAGER' || user.role === 'DIRECTION';
   const statusFilters = useMemo(
     () =>
       canViewInactiveProjects
@@ -166,7 +167,7 @@ export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
             {data.projects.length > 0 ? (
               <div className="space-y-3">
                 {data.projects.map((project) => (
-                  <ProjectCard key={project.id} project={project} />
+                  <ProjectCard canMutate={canMutateProjects} key={project.id} project={project} />
                 ))}
               </div>
             ) : (
@@ -174,7 +175,7 @@ export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
             )}
           </section>
 
-          <MobileFloatingCreateLink href="/mobile/projects/new" label="Nouveau projet" />
+          {canMutateProjects ? <MobileFloatingCreateLink href="/mobile/projects/new" label="Nouveau projet" /> : null}
         </>
       ) : null}
     </div>
@@ -198,7 +199,7 @@ function WidgetTile({ widget }: Readonly<{ widget: MobileProjectWidget }>) {
   );
 }
 
-function ProjectCard({ project }: Readonly<{ project: MobileProjectListItem }>) {
+function ProjectCard({ canMutate, project }: Readonly<{ canMutate: boolean; project: MobileProjectListItem }>) {
   return (
     <article
       className={`rounded-lg border p-4 shadow-panel ${
@@ -249,12 +250,14 @@ function ProjectCard({ project }: Readonly<{ project: MobileProjectListItem }>) 
           <MetricTile label="Rapports" value={String(project.reportsCount)} />
         </div>
       </Link>
-      <Link
-        className="mt-3 flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-black text-slate-700 transition active:scale-[0.98]"
-        href={`/mobile/projects/${encodeURIComponent(project.id)}/edit`}
-      >
-        Modifier
-      </Link>
+      {canMutate ? (
+        <Link
+          className="mt-3 flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-black text-slate-700 transition active:scale-[0.98]"
+          href={`/mobile/projects/${encodeURIComponent(project.id)}/edit`}
+        >
+          Modifier
+        </Link>
+      ) : null}
     </article>
   );
 }

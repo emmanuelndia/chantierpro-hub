@@ -16,6 +16,7 @@ const ROLE_LABELS: Record<Role, string> = {
   DIRECTION: 'Direction',
   HR: 'Ressources humaines',
   ADMIN: 'Administrateur',
+  AUDITOR: 'Auditeur',
   OFFICE_STAFF: 'Personnel bureau',
 };
 

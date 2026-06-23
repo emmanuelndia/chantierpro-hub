@@ -24,6 +24,7 @@ export function MobileSitesManagementPage({ user }: MobileSitesManagementPagePro
   const [status, setStatus] = useState<MobileSiteStatusFilter>('ALL');
   const [projectId, setProjectId] = useState('ALL');
   const [query, setQuery] = useState('');
+  const isAuditor = user.role === 'AUDITOR';
 
   const sitesQuery = useQuery({
     queryKey: ['mobile-sites-management', status, projectId, query],
@@ -65,11 +66,11 @@ export function MobileSitesManagementPage({ user }: MobileSitesManagementPagePro
   return (
     <div className="space-y-5 pb-20">
       <section className="rounded-lg border border-primary/20 bg-primary/10 p-4">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Gestion chantiers</p>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">{isAuditor ? 'Sites a visiter' : 'Gestion chantiers'}</p>
         <div className="mt-2 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-2xl font-black leading-7 text-slate-950">
-              {user.role === 'PROJECT_MANAGER' ? 'Mes chantiers' : 'Tous les chantiers'}
+              {isAuditor ? 'Carte sites' : user.role === 'PROJECT_MANAGER' ? 'Mes chantiers' : 'Tous les chantiers'}
             </h1>
             <p className="mt-1 text-sm font-semibold text-slate-600">
               {selectedProjectName ?? 'Suivi des sites, équipes et pointages'}
@@ -93,7 +94,7 @@ export function MobileSitesManagementPage({ user }: MobileSitesManagementPagePro
           className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-primary"
           id="site-search"
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Nom, adresse ou projet"
+          placeholder="Projet, chantier, ville ou adresse"
           type="search"
           value={query}
         />
@@ -166,12 +167,14 @@ export function MobileSitesManagementPage({ user }: MobileSitesManagementPagePro
               </p>
             </Link>
 
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              <SmallMetric label="Équipes" value={site.teamsCount} />
-              <SmallMetric label="Ress." value={site.resourcesCount} />
-              <SmallMetric label="Photos" value={site.photosCount} />
-              <SmallMetric label="Pointages" value={site.clockInRecordsCount} />
-            </div>
+            {!isAuditor ? (
+              <div className="mt-4 grid grid-cols-4 gap-2">
+                <SmallMetric label="Equipes" value={site.teamsCount} />
+                <SmallMetric label="Ress." value={site.resourcesCount} />
+                <SmallMetric label="Photos" value={site.photosCount} />
+                <SmallMetric label="Pointages" value={site.clockInRecordsCount} />
+              </div>
+            ) : null}
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Link
@@ -180,21 +183,34 @@ export function MobileSitesManagementPage({ user }: MobileSitesManagementPagePro
               >
                 Voir détails
               </Link>
-              <Link
-                className="flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-xs font-black text-slate-700"
-                href={`/mobile/sites/${encodeURIComponent(site.id)}/edit`}
-              >
-                Modifier
-              </Link>
+              {isAuditor ? (
+                <a
+                  className="flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-xs font-black text-slate-700"
+                  href={`https://www.google.com/maps?q=${site.latitude},${site.longitude}`}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Ouvrir Maps
+                </a>
+              ) : (
+                <Link
+                  className="flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-xs font-black text-slate-700"
+                  href={`/mobile/sites/${encodeURIComponent(site.id)}/edit`}
+                >
+                  Modifier
+                </Link>
+              )}
             </div>
           </article>
         ))}
       </section>
 
-      <MobileFloatingCreateLink
-        href={projectId === 'ALL' ? '/mobile/sites/new' : `/mobile/sites/new?projectId=${encodeURIComponent(projectId)}`}
-        label="Nouveau chantier"
-      />
+      {!isAuditor ? (
+        <MobileFloatingCreateLink
+          href={projectId === 'ALL' ? '/mobile/sites/new' : `/mobile/sites/new?projectId=${encodeURIComponent(projectId)}`}
+          label="Nouveau chantier"
+        />
+      ) : null}
     </div>
   );
 }

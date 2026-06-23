@@ -23,6 +23,7 @@ enum Role {
   DIRECTION
   HR
   ADMIN
+  AUDITOR
   OFFICE_STAFF
 }
 
@@ -175,65 +176,66 @@ enum GeneralSupervisorSiteScopeStatus {
 }
 
 model User {
-  id                 String              @id @default(cuid())
-  username           String              @unique
-  email              String?             @unique
-  matricule          String?             @unique
-  passwordHash       String
-  firstName          String
-  lastName           String
-  role               Role
-  contact            String
-  isActive           Boolean             @default(true)
-  mustChangePassword Boolean             @default(false)
-  lastLoginAt        DateTime?
-  createdAt          DateTime            @default(now())
-  managedProjects    Project[]           @relation("ProjectManager")
-  createdProjects    Project[]           @relation("ProjectCreator")
-  managedSites       Site[]              @relation("SiteManager")
-  createdSites       Site[]              @relation("SiteCreator")
-  ledTeams           Team[]              @relation("TeamLead")
-  createdTeams       Team[]              @relation("TeamCreator")
-  teamMemberships    TeamMember[]        @relation("TeamMemberUser")
-  createdMemberships TeamMember[]        @relation("TeamMemberCreator")
-  clockInRecords     ClockInRecord[]
-  uploadedPhotos     Photo[]             @relation("PhotoUploader")
-  deletedPhotos      Photo[]             @relation("PhotoDeleter")
-  deletedPhotoLogs   PhotoDeletionLog[]  @relation("PhotoDeletionActor")
-  originalPhotoLogs  PhotoDeletionLog[]  @relation("PhotoDeletionOriginalAuthor")
-  uploadedDocuments  DocumentAttachment[] @relation("DocumentUploader")
-  deletedDocuments   DocumentAttachment[] @relation("DocumentDeleter")
-  deletedDocumentLogs DocumentDeletionLog[] @relation("DocumentDeletionActor")
-  originalDocumentLogs DocumentDeletionLog[] @relation("DocumentDeletionOriginalAuthor")
-  reports            Report[]
-  reportsValidated   Report[]            @relation("ReportValidator")
-  rhExportsCreated   RhExportHistory[]    @relation("RhExportCreator")
-  clockInRegularizations ClockInRegularization[] @relation("ClockInRegularizationAuthor")
-  refreshTokens      RefreshToken[]
-  pushTokens         PushToken[]
-  loginAttempts      LoginAttempt[]
-  notificationsReceived UserNotificationRecipient[] @relation("UserNotificationRecipientUser")
-  notificationsCreated  UserNotification[]          @relation("UserNotificationCreator")
-  createdPlanningTaskTemplates PlanningTaskTemplate[]
-  createdOfficeLocations       OfficeLocation[]    @relation("OfficeLocationCreator")
-  planningAssignments        PlanningAssignment[] @relation("PlanningAssignmentSupervisor")
-  createdPlanningAssignments PlanningAssignment[] @relation("PlanningAssignmentCreator")
-  taskProgressUpdates        TaskProgressUpdate[]
-  assignedFreeMissions       FreeMission[]        @relation("FreeMissionAssignee")
-  createdFreeMissions        FreeMission[]        @relation("FreeMissionCreator")
-  negotiationAssignments     NegotiationAssignment[] @relation("NegotiationAssignmentAssignee")
-  createdNegotiationAssignments NegotiationAssignment[] @relation("NegotiationAssignmentCreator")
-  negotiationSessions        NegotiationSession[] @relation("NegotiationSessionUser")
-  negotiationVisits          NegotiationVisit[] @relation("NegotiationVisitCreatedBy")
-  generalSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeGeneralSupervisor")
-  managedGeneralSupervisorSiteScopes GeneralSupervisorSiteScope[] @relation("GeneralSupervisorSiteScopeProjectManager")
-  generalSupervisorProjectScopes GeneralSupervisorProjectScope[] @relation("GeneralSupervisorProjectScopeGeneralSupervisor")
-  managedGeneralSupervisorProjectScopes GeneralSupervisorProjectScope[] @relation("GeneralSupervisorProjectScopeProjectManager")
-  coordinatorProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeCoordinator")
-  coordinatedProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeProjectManager")
+  id                                     String                           @id @default(cuid())
+  username                               String                           @unique
+  email                                  String?                          @unique
+  matricule                              String?                          @unique
+  passwordHash                           String
+  firstName                              String
+  lastName                               String
+  role                                   Role
+  contact                                String
+  isActive                               Boolean                          @default(true)
+  mustChangePassword                     Boolean                          @default(false)
+  lastLoginAt                            DateTime?
+  createdAt                              DateTime                         @default(now())
+  managedProjects                        Project[]                        @relation("ProjectManager")
+  createdProjects                        Project[]                        @relation("ProjectCreator")
+  managedSites                           Site[]                           @relation("SiteManager")
+  createdSites                           Site[]                           @relation("SiteCreator")
+  ledTeams                               Team[]                           @relation("TeamLead")
+  createdTeams                           Team[]                           @relation("TeamCreator")
+  teamMemberships                        TeamMember[]                     @relation("TeamMemberUser")
+  createdMemberships                     TeamMember[]                     @relation("TeamMemberCreator")
+  clockInRecords                         ClockInRecord[]
+  uploadedPhotos                         Photo[]                          @relation("PhotoUploader")
+  deletedPhotos                          Photo[]                          @relation("PhotoDeleter")
+  deletedPhotoLogs                       PhotoDeletionLog[]               @relation("PhotoDeletionActor")
+  originalPhotoLogs                      PhotoDeletionLog[]               @relation("PhotoDeletionOriginalAuthor")
+  uploadedDocuments                      DocumentAttachment[]             @relation("DocumentUploader")
+  deletedDocuments                       DocumentAttachment[]             @relation("DocumentDeleter")
+  deletedDocumentLogs                    DocumentDeletionLog[]            @relation("DocumentDeletionActor")
+  originalDocumentLogs                   DocumentDeletionLog[]            @relation("DocumentDeletionOriginalAuthor")
+  reports                                Report[]
+  reportsValidated                       Report[]                         @relation("ReportValidator")
+  rhExportsCreated                       RhExportHistory[]                @relation("RhExportCreator")
+  clockInRegularizations                 ClockInRegularization[]          @relation("ClockInRegularizationAuthor")
+  refreshTokens                          RefreshToken[]
+  pushTokens                             PushToken[]
+  loginAttempts                          LoginAttempt[]
+  notificationsReceived                  UserNotificationRecipient[]      @relation("UserNotificationRecipientUser")
+  notificationsCreated                   UserNotification[]               @relation("UserNotificationCreator")
+  createdPlanningTaskTemplates           PlanningTaskTemplate[]
+  createdOfficeLocations                 OfficeLocation[]                 @relation("OfficeLocationCreator")
+  planningAssignments                    PlanningAssignment[]             @relation("PlanningAssignmentSupervisor")
+  createdPlanningAssignments             PlanningAssignment[]             @relation("PlanningAssignmentCreator")
+  taskProgressUpdates                    TaskProgressUpdate[]
+  assignedFreeMissions                   FreeMission[]                    @relation("FreeMissionAssignee")
+  createdFreeMissions                    FreeMission[]                    @relation("FreeMissionCreator")
+  negotiationAssignments                 NegotiationAssignment[]          @relation("NegotiationAssignmentAssignee")
+  createdNegotiationAssignments          NegotiationAssignment[]          @relation("NegotiationAssignmentCreator")
+  negotiationSessions                    NegotiationSession[]             @relation("NegotiationSessionUser")
+  negotiationVisits                      NegotiationVisit[]               @relation("NegotiationVisitCreatedBy")
+  siteVisitLogs                          SiteVisitLog[]                   @relation("SiteVisitAuditor")
+  generalSupervisorSiteScopes            GeneralSupervisorSiteScope[]     @relation("GeneralSupervisorSiteScopeGeneralSupervisor")
+  managedGeneralSupervisorSiteScopes     GeneralSupervisorSiteScope[]     @relation("GeneralSupervisorSiteScopeProjectManager")
+  generalSupervisorProjectScopes         GeneralSupervisorProjectScope[]  @relation("GeneralSupervisorProjectScopeGeneralSupervisor")
+  managedGeneralSupervisorProjectScopes  GeneralSupervisorProjectScope[]  @relation("GeneralSupervisorProjectScopeProjectManager")
+  coordinatorProjectManagerScopes        CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeCoordinator")
+  coordinatedProjectManagerScopes        CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeProjectManager")
   createdCoordinatorProjectManagerScopes CoordinatorProjectManagerScope[] @relation("CoordinatorProjectManagerScopeCreator")
-  drivenFleetVehicleAssignments FleetVehicleAssignment[] @relation("FleetVehicleAssignmentDriver")
-  apprenticedFleetVehicleAssignments FleetVehicleAssignment[] @relation("FleetVehicleAssignmentApprentice")
+  drivenFleetVehicleAssignments          FleetVehicleAssignment[]         @relation("FleetVehicleAssignmentDriver")
+  apprenticedFleetVehicleAssignments     FleetVehicleAssignment[]         @relation("FleetVehicleAssignmentApprentice")
 }
 
 model FleetVehicle {
@@ -268,82 +270,105 @@ model FleetVehicleAssignment {
 }
 
 model Project {
-  id               String        @id @default(cuid())
-  name             String
-  description      String
-  address          String
-  city             String
-  startDate        DateTime      @db.Date
-  endDate          DateTime?     @db.Date
-  status           ProjectStatus
-  createdAt        DateTime      @default(now())
-  projectManagerId String
-  createdById      String
-  projectManager   User          @relation("ProjectManager", fields: [projectManagerId], references: [id])
-  createdBy        User          @relation("ProjectCreator", fields: [createdById], references: [id])
-  sites            Site[]
-  freeMissions     FreeMission[]
-  negotiationZones NegotiationZone[]
-  negotiationBuildings NegotiationBuilding[]
-  negotiationAssignments NegotiationAssignment[]
-  negotiationSessions NegotiationSession[]
-  negotiationVisits NegotiationVisit[]
-  documentAttachments DocumentAttachment[]
+  id                             String                          @id @default(cuid())
+  name                           String
+  description                    String
+  address                        String
+  city                           String
+  startDate                      DateTime                        @db.Date
+  endDate                        DateTime?                       @db.Date
+  status                         ProjectStatus
+  createdAt                      DateTime                        @default(now())
+  projectManagerId               String
+  createdById                    String
+  projectManager                 User                            @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  createdBy                      User                            @relation("ProjectCreator", fields: [createdById], references: [id])
+  sites                          Site[]
+  freeMissions                   FreeMission[]
+  negotiationZones               NegotiationZone[]
+  negotiationBuildings           NegotiationBuilding[]
+  negotiationAssignments         NegotiationAssignment[]
+  negotiationSessions            NegotiationSession[]
+  negotiationVisits              NegotiationVisit[]
+  documentAttachments            DocumentAttachment[]
   generalSupervisorProjectScopes GeneralSupervisorProjectScope[]
+  siteVisitLogs                  SiteVisitLog[]
 
   @@index([projectManagerId])
   @@index([createdById])
 }
 
 model Site {
-  id             String       @id @default(cuid())
-  projectId      String
-  name           String
-  address        String
-  siteType       SiteType     @default(WORKSITE)
-  requiresClockIn Boolean     @default(true)
-  latitude       Decimal      @db.Decimal(9, 6)
-  longitude      Decimal      @db.Decimal(9, 6)
-  radiusKm       Decimal      @default(2.0) @db.Decimal(4, 2)
-  geofenceType   SiteGeofenceType @default(RADIUS)
-  geofencePolygon Json?
-  description    String
-  status         SiteStatus
-  area           Decimal      @db.Decimal(10, 2)
-  startDate      DateTime     @db.Date
-  endDate        DateTime?    @db.Date
-  siteManagerId  String
-  createdById    String
-  createdAt      DateTime     @default(now())
-  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  siteManager    User         @relation("SiteManager", fields: [siteManagerId], references: [id])
-  createdBy      User         @relation("SiteCreator", fields: [createdById], references: [id])
-  teams          Team[]
-  clockInRecords ClockInRecord[]
-  photos         Photo[]
-  reports        Report[]
-  documentAttachments DocumentAttachment[]
-  planningAssignments PlanningAssignment[]
+  id                      String                       @id @default(cuid())
+  projectId               String
+  name                    String
+  address                 String
+  siteType                SiteType                     @default(WORKSITE)
+  requiresClockIn         Boolean                      @default(true)
+  latitude                Decimal                      @db.Decimal(9, 6)
+  longitude               Decimal                      @db.Decimal(9, 6)
+  radiusKm                Decimal                      @default(2.0) @db.Decimal(4, 2)
+  geofenceType            SiteGeofenceType             @default(RADIUS)
+  geofencePolygon         Json?
+  description             String
+  status                  SiteStatus
+  area                    Decimal                      @db.Decimal(10, 2)
+  startDate               DateTime                     @db.Date
+  endDate                 DateTime?                    @db.Date
+  siteManagerId           String
+  createdById             String
+  createdAt               DateTime                     @default(now())
+  project                 Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  siteManager             User                         @relation("SiteManager", fields: [siteManagerId], references: [id])
+  createdBy               User                         @relation("SiteCreator", fields: [createdById], references: [id])
+  teams                   Team[]
+  clockInRecords          ClockInRecord[]
+  photos                  Photo[]
+  reports                 Report[]
+  documentAttachments     DocumentAttachment[]
+  planningAssignments     PlanningAssignment[]
   generalSupervisorScopes GeneralSupervisorSiteScope[]
+  siteVisitLogs           SiteVisitLog[]
 
   @@index([projectId])
   @@index([siteManagerId])
   @@index([createdById])
 }
 
+model SiteVisitLog {
+  id        String   @id @default(cuid())
+  auditorId String
+  projectId String
+  siteId    String
+  visitedAt DateTime @default(now())
+  comment   String?
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+  accuracy  Decimal? @db.Decimal(8, 2)
+  createdAt DateTime @default(now())
+
+  auditor User    @relation("SiteVisitAuditor", fields: [auditorId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  site    Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([auditorId, visitedAt])
+  @@index([projectId, visitedAt])
+  @@index([siteId, visitedAt])
+}
+
 model OfficeLocation {
-  id          String   @id @default(cuid())
-  name        String
-  address     String
-  city        String?
-  latitude    Decimal  @db.Decimal(9, 6)
-  longitude   Decimal  @db.Decimal(9, 6)
-  radiusKm    Decimal  @default(0.5) @db.Decimal(4, 2)
-  isActive    Boolean  @default(true)
-  createdById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdBy   User     @relation("OfficeLocationCreator", fields: [createdById], references: [id])
+  id             String          @id @default(cuid())
+  name           String
+  address        String
+  city           String?
+  latitude       Decimal         @db.Decimal(9, 6)
+  longitude      Decimal         @db.Decimal(9, 6)
+  radiusKm       Decimal         @default(0.5) @db.Decimal(4, 2)
+  isActive       Boolean         @default(true)
+  createdById    String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  createdBy      User            @relation("OfficeLocationCreator", fields: [createdById], references: [id])
   clockInRecords ClockInRecord[]
 
   @@index([isActive])
@@ -351,16 +376,16 @@ model OfficeLocation {
 }
 
 model Team {
-  id          String     @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
   siteId      String
   teamLeadId  String
   status      TeamStatus
   createdById String
-  createdAt   DateTime   @default(now())
-  site        Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  teamLead    User       @relation("TeamLead", fields: [teamLeadId], references: [id])
-  createdBy   User       @relation("TeamCreator", fields: [createdById], references: [id])
+  createdAt   DateTime     @default(now())
+  site        Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  teamLead    User         @relation("TeamLead", fields: [teamLeadId], references: [id])
+  createdBy   User         @relation("TeamCreator", fields: [createdById], references: [id])
   members     TeamMember[]
 
   @@index([siteId])
@@ -387,35 +412,35 @@ model TeamMember {
 }
 
 model ClockInRecord {
-  id             String         @id @default(cuid())
-  siteId         String?
-  freeMissionId  String?
-  planningAssignmentId String?
-  officeLocationId String?
+  id                    String                  @id @default(cuid())
+  siteId                String?
+  freeMissionId         String?
+  planningAssignmentId  String?
+  officeLocationId      String?
   officeClockInLocation OfficeClockInLocation?
-  userId         String
-  type           ClockInType
-  clockInDate    DateTime       @db.Date
-  clockInTime    DateTime       @db.Time(6)
-  latitude       Decimal        @db.Decimal(9, 6)
-  longitude      Decimal        @db.Decimal(9, 6)
-  accuracy       Decimal?       @db.Decimal(6, 2)
-  distanceToSite Decimal        @db.Decimal(5, 2)
-  status         ClockInStatus
-  comment        String?
-  timestampLocal DateTime
-  isRemoteCheckout Boolean      @default(false)
-  isAutoClosed     Boolean      @default(false)
-  isRegularized    Boolean      @default(false)
-  isLate            Boolean      @default(false)
-  createdAt      DateTime       @default(now())
-  site           Site?          @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  freeMission    FreeMission?   @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
-  planningAssignment PlanningAssignment? @relation(fields: [planningAssignmentId], references: [id], onDelete: SetNull)
-  officeLocation OfficeLocation? @relation(fields: [officeLocationId], references: [id], onDelete: SetNull)
-  user           User           @relation(fields: [userId], references: [id])
-  report         Report?
-  regularizations ClockInRegularization[]
+  userId                String
+  type                  ClockInType
+  clockInDate           DateTime                @db.Date
+  clockInTime           DateTime                @db.Time(6)
+  latitude              Decimal                 @db.Decimal(9, 6)
+  longitude             Decimal                 @db.Decimal(9, 6)
+  accuracy              Decimal?                @db.Decimal(6, 2)
+  distanceToSite        Decimal                 @db.Decimal(5, 2)
+  status                ClockInStatus
+  comment               String?
+  timestampLocal        DateTime
+  isRemoteCheckout      Boolean                 @default(false)
+  isAutoClosed          Boolean                 @default(false)
+  isRegularized         Boolean                 @default(false)
+  isLate                Boolean                 @default(false)
+  createdAt             DateTime                @default(now())
+  site                  Site?                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  freeMission           FreeMission?            @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
+  planningAssignment    PlanningAssignment?     @relation(fields: [planningAssignmentId], references: [id], onDelete: SetNull)
+  officeLocation        OfficeLocation?         @relation(fields: [officeLocationId], references: [id], onDelete: SetNull)
+  user                  User                    @relation(fields: [userId], references: [id])
+  report                Report?
+  regularizations       ClockInRegularization[]
 
   @@index([siteId])
   @@index([freeMissionId])
@@ -446,26 +471,26 @@ model ClockInRegularization {
 }
 
 model Report {
-  id                       String                 @id @default(cuid())
-  siteId                   String?
-  freeMissionId            String?
-  site                     Site?                  @relation(fields: [siteId], references: [id])
-  freeMission              FreeMission?           @relation(fields: [freeMissionId], references: [id])
-  userId                   String
-  user                     User                   @relation(fields: [userId], references: [id])
-  clockInRecordId          String                 @unique
-  clockInRecord            ClockInRecord          @relation(fields: [clockInRecordId], references: [id])
-  content                  String
-  progression              Int?
-  blocage                  String?
-  status                   ReportStatus           @default(RECU)
-  validationStatus         ReportValidationStatus @default(SUBMITTED)
-  validatedForClientAt     DateTime?
-  validatedForClientById   String?
-  validatedForClientBy     User?                  @relation("ReportValidator", fields: [validatedForClientById], references: [id])
-  submittedAt              DateTime               @default(now())
-  createdAt                DateTime               @default(now())
-  documentAttachments      DocumentAttachment[]
+  id                     String                 @id @default(cuid())
+  siteId                 String?
+  freeMissionId          String?
+  site                   Site?                  @relation(fields: [siteId], references: [id])
+  freeMission            FreeMission?           @relation(fields: [freeMissionId], references: [id])
+  userId                 String
+  user                   User                   @relation(fields: [userId], references: [id])
+  clockInRecordId        String                 @unique
+  clockInRecord          ClockInRecord          @relation(fields: [clockInRecordId], references: [id])
+  content                String
+  progression            Int?
+  blocage                String?
+  status                 ReportStatus           @default(RECU)
+  validationStatus       ReportValidationStatus @default(SUBMITTED)
+  validatedForClientAt   DateTime?
+  validatedForClientById String?
+  validatedForClientBy   User?                  @relation("ReportValidator", fields: [validatedForClientById], references: [id])
+  submittedAt            DateTime               @default(now())
+  createdAt              DateTime               @default(now())
+  documentAttachments    DocumentAttachment[]
 
   @@index([siteId])
   @@index([freeMissionId])
@@ -476,29 +501,29 @@ model Report {
 }
 
 model FreeMission {
-  id             String            @id @default(cuid())
-  projectId      String
-  assigneeId     String
-  date           DateTime          @db.Date
-  action         String
-  plannedZone    String?
-  targetProgress Int?
-  targetQuantity Decimal?          @db.Decimal(12, 2)
-  targetUnit     String?
-  objectiveText  String?
+  id                     String               @id @default(cuid())
+  projectId              String
+  assigneeId             String
+  date                   DateTime             @db.Date
+  action                 String
+  plannedZone            String?
+  targetProgress         Int?
+  targetQuantity         Decimal?             @db.Decimal(12, 2)
+  targetUnit             String?
+  objectiveText          String?
   plannedDurationMinutes Int?
-  status         FreeMissionStatus @default(ASSIGNED)
-  createdById    String
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  deletedAt      DateTime?
-  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee       User              @relation("FreeMissionAssignee", fields: [assigneeId], references: [id])
-  createdBy      User              @relation("FreeMissionCreator", fields: [createdById], references: [id])
-  clockInRecords ClockInRecord[]
-  photos         Photo[]
-  reports        Report[]
-  progressUpdates TaskProgressUpdate[]
+  status                 FreeMissionStatus    @default(ASSIGNED)
+  createdById            String
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  deletedAt              DateTime?
+  project                Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee               User                 @relation("FreeMissionAssignee", fields: [assigneeId], references: [id])
+  createdBy              User                 @relation("FreeMissionCreator", fields: [createdById], references: [id])
+  clockInRecords         ClockInRecord[]
+  photos                 Photo[]
+  reports                Report[]
+  progressUpdates        TaskProgressUpdate[]
 
   @@index([projectId])
   @@index([assigneeId])
@@ -508,15 +533,15 @@ model FreeMission {
 }
 
 model NegotiationZone {
-  id             String   @id @default(cuid())
+  id             String                  @id @default(cuid())
   projectId      String
   name           String
   normalizedName String
   city           String?
   region         String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  project        Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   scopes         NegotiationBuilding[]
   assignments    NegotiationAssignment[]
 
@@ -526,32 +551,32 @@ model NegotiationZone {
 }
 
 model NegotiationBuilding {
-  id               String   @id @default(cuid())
-  projectId        String
-  zoneId           String?
-  cluster          String?
-  city             String
-  commune          String?
-  plaque           String?
-  habitation       String?
-  name             String
-  contactInfo      String?
-  level            String?
-  targetEl         Int?
-  actualEl         Int?
-  longitude        Decimal? @db.Decimal(10, 7)
-  latitude         Decimal? @db.Decimal(10, 7)
-  layer            String?
-  color            String?
-  operatorPresence String?
+  id                String             @id @default(cuid())
+  projectId         String
+  zoneId            String?
+  cluster           String?
+  city              String
+  commune           String?
+  plaque            String?
+  habitation        String?
+  name              String
+  contactInfo       String?
+  level             String?
+  targetEl          Int?
+  actualEl          Int?
+  longitude         Decimal?           @db.Decimal(10, 7)
+  latitude          Decimal?           @db.Decimal(10, 7)
+  layer             String?
+  color             String?
+  operatorPresence  String?
   negotiationStatus String?
-  remark           String?
-  sourceImportName String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  zone             NegotiationZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
-  visits           NegotiationVisit[]
+  remark            String?
+  sourceImportName  String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  zone              NegotiationZone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  visits            NegotiationVisit[]
 
   @@index([projectId])
   @@index([zoneId])
@@ -589,27 +614,27 @@ model NegotiationAssignment {
 }
 
 model NegotiationSession {
-  id              String                   @id @default(cuid())
-  assignmentId    String?
-  projectId       String
-  userId          String
-  date            DateTime                 @db.Date
-  startTime       DateTime
-  startLatitude   Decimal                  @db.Decimal(10, 7)
-  startLongitude  Decimal                  @db.Decimal(10, 7)
-  startAccuracy   Decimal?                 @db.Decimal(7, 2)
-  endTime         DateTime?
-  endLatitude     Decimal?                 @db.Decimal(10, 7)
-  endLongitude    Decimal?                 @db.Decimal(10, 7)
-  endAccuracy     Decimal?                 @db.Decimal(7, 2)
-  comment         String?
-  status          NegotiationSessionStatus @default(OPEN)
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  assignment      NegotiationAssignment?   @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
-  project         Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user            User                     @relation("NegotiationSessionUser", fields: [userId], references: [id])
-  visits          NegotiationVisit[]
+  id             String                   @id @default(cuid())
+  assignmentId   String?
+  projectId      String
+  userId         String
+  date           DateTime                 @db.Date
+  startTime      DateTime
+  startLatitude  Decimal                  @db.Decimal(10, 7)
+  startLongitude Decimal                  @db.Decimal(10, 7)
+  startAccuracy  Decimal?                 @db.Decimal(7, 2)
+  endTime        DateTime?
+  endLatitude    Decimal?                 @db.Decimal(10, 7)
+  endLongitude   Decimal?                 @db.Decimal(10, 7)
+  endAccuracy    Decimal?                 @db.Decimal(7, 2)
+  comment        String?
+  status         NegotiationSessionStatus @default(OPEN)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  assignment     NegotiationAssignment?   @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  project        Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user           User                     @relation("NegotiationSessionUser", fields: [userId], references: [id])
+  visits         NegotiationVisit[]
 
   @@index([assignmentId])
   @@index([projectId])
@@ -619,29 +644,29 @@ model NegotiationSession {
 }
 
 model NegotiationVisit {
-  id              String                 @id @default(cuid())
-  sessionId       String
-  buildingId      String?
-  projectId       String
-  visitedAt       DateTime               @default(now())
-  actualZone      String?
-  buildingName    String
-  city            String?
-  commune         String?
-  contactInfo     String?
-  latitude        Decimal?               @db.Decimal(10, 7)
-  longitude       Decimal?               @db.Decimal(10, 7)
-  accuracy        Decimal?               @db.Decimal(7, 2)
-  status          NegotiationVisitStatus
-  remark          String
-  createdById     String
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  session         NegotiationSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  building        NegotiationBuilding?   @relation(fields: [buildingId], references: [id], onDelete: SetNull)
-  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy       User                   @relation("NegotiationVisitCreatedBy", fields: [createdById], references: [id])
-  photos          Photo[]
+  id           String                 @id @default(cuid())
+  sessionId    String
+  buildingId   String?
+  projectId    String
+  visitedAt    DateTime               @default(now())
+  actualZone   String?
+  buildingName String
+  city         String?
+  commune      String?
+  contactInfo  String?
+  latitude     Decimal?               @db.Decimal(10, 7)
+  longitude    Decimal?               @db.Decimal(10, 7)
+  accuracy     Decimal?               @db.Decimal(7, 2)
+  status       NegotiationVisitStatus
+  remark       String
+  createdById  String
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  session      NegotiationSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  building     NegotiationBuilding?   @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  project      Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User                   @relation("NegotiationVisitCreatedBy", fields: [createdById], references: [id])
+  photos       Photo[]
 
   @@index([sessionId])
   @@index([buildingId])
@@ -652,28 +677,28 @@ model NegotiationVisit {
 }
 
 model PlanningAssignment {
-  id             String                   @id @default(cuid())
-  date           DateTime                 @db.Date
-  supervisorId   String
-  siteId         String
-  action         String
-  targetProgress Int?
-  targetQuantity Decimal?                 @db.Decimal(12, 2)
-  targetUnit     String?
-  objectiveText  String?
+  id                     String                   @id @default(cuid())
+  date                   DateTime                 @db.Date
+  supervisorId           String
+  siteId                 String
+  action                 String
+  targetProgress         Int?
+  targetQuantity         Decimal?                 @db.Decimal(12, 2)
+  targetUnit             String?
+  objectiveText          String?
   plannedDurationMinutes Int?
-  status         PlanningAssignmentStatus @default(ASSIGNED)
-  workLocationType PlanningWorkLocationType @default(ON_SITE)
-  createdById    String
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  deletedAt      DateTime?
-  supervisor     User                     @relation("PlanningAssignmentSupervisor", fields: [supervisorId], references: [id])
-  site           Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  createdBy      User                     @relation("PlanningAssignmentCreator", fields: [createdById], references: [id])
-  photos         Photo[]
-  progressUpdates TaskProgressUpdate[]
-  clockInRecords ClockInRecord[]
+  status                 PlanningAssignmentStatus @default(ASSIGNED)
+  workLocationType       PlanningWorkLocationType @default(ON_SITE)
+  createdById            String
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  deletedAt              DateTime?
+  supervisor             User                     @relation("PlanningAssignmentSupervisor", fields: [supervisorId], references: [id])
+  site                   Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  createdBy              User                     @relation("PlanningAssignmentCreator", fields: [createdById], references: [id])
+  photos                 Photo[]
+  progressUpdates        TaskProgressUpdate[]
+  clockInRecords         ClockInRecord[]
 
   @@index([date])
   @@index([siteId])
@@ -704,34 +729,34 @@ model GeneralSupervisorSiteScope {
 }
 
 model PlanningTaskTemplate {
-  id             String                   @id @default(cuid())
-  name           String
-  action         String
-  targetProgress Int?
-  targetQuantity Decimal?                 @db.Decimal(12, 2)
-  targetUnit     String?
-  objectiveText  String?
+  id                     String                   @id @default(cuid())
+  name                   String
+  action                 String
+  targetProgress         Int?
+  targetQuantity         Decimal?                 @db.Decimal(12, 2)
+  targetUnit             String?
+  objectiveText          String?
   plannedDurationMinutes Int?
-  workLocationType PlanningWorkLocationType @default(ON_SITE)
-  createdById    String
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  createdBy      User                     @relation(fields: [createdById], references: [id])
+  workLocationType       PlanningWorkLocationType @default(ON_SITE)
+  createdById            String
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  createdBy              User                     @relation(fields: [createdById], references: [id])
 
   @@index([createdById])
   @@index([workLocationType])
 }
 
 model UserNotification {
-  id             String                   @id @default(cuid())
-  title          String
-  message        String
-  audience       UserNotificationAudience
-  targetRole     Role?
-  createdById    String
-  createdAt      DateTime                 @default(now())
-  createdBy      User                     @relation("UserNotificationCreator", fields: [createdById], references: [id])
-  recipients     UserNotificationRecipient[]
+  id          String                      @id @default(cuid())
+  title       String
+  message     String
+  audience    UserNotificationAudience
+  targetRole  Role?
+  createdById String
+  createdAt   DateTime                    @default(now())
+  createdBy   User                        @relation("UserNotificationCreator", fields: [createdById], references: [id])
+  recipients  UserNotificationRecipient[]
 
   @@index([createdById])
   @@index([targetRole])
@@ -774,37 +799,37 @@ model GeneralSupervisorProjectScope {
 }
 
 model Photo {
-  id          String             @id @default(cuid())
-  siteId      String?
-  freeMissionId String?
-  negotiationVisitId String?
+  id                      String                 @id @default(cuid())
+  siteId                  String?
+  freeMissionId           String?
+  negotiationVisitId      String?
   negotiationAssignmentId String?
-  uploadedById String
-  planningAssignmentId String?
-  category    PhotoCategory
-  tags        PhotoTag[]         @default([])
-  description String
-  filename    String
-  storageKey  String             @unique
-  url         String
-  fileSize    Int
-  format      String
-  latitude    Decimal?           @db.Decimal(9, 6)
-  longitude   Decimal?           @db.Decimal(9, 6)
-  timestampLocal DateTime        @default(now())
-  takenAt     DateTime
-  isDeleted   Boolean            @default(false)
-  deletedAt   DateTime?
-  deletedById String?
-  createdAt   DateTime           @default(now())
-  site        Site?              @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  freeMission FreeMission?       @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
-  negotiationVisit NegotiationVisit? @relation(fields: [negotiationVisitId], references: [id], onDelete: Cascade)
-  negotiationAssignment NegotiationAssignment? @relation(fields: [negotiationAssignmentId], references: [id], onDelete: Cascade)
-  uploadedBy  User               @relation("PhotoUploader", fields: [uploadedById], references: [id])
-  planningAssignment PlanningAssignment? @relation(fields: [planningAssignmentId], references: [id], onDelete: SetNull)
-  deletedBy   User?              @relation("PhotoDeleter", fields: [deletedById], references: [id])
-  deletionLogs PhotoDeletionLog[]
+  uploadedById            String
+  planningAssignmentId    String?
+  category                PhotoCategory
+  tags                    PhotoTag[]             @default([])
+  description             String
+  filename                String
+  storageKey              String                 @unique
+  url                     String
+  fileSize                Int
+  format                  String
+  latitude                Decimal?               @db.Decimal(9, 6)
+  longitude               Decimal?               @db.Decimal(9, 6)
+  timestampLocal          DateTime               @default(now())
+  takenAt                 DateTime
+  isDeleted               Boolean                @default(false)
+  deletedAt               DateTime?
+  deletedById             String?
+  createdAt               DateTime               @default(now())
+  site                    Site?                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  freeMission             FreeMission?           @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
+  negotiationVisit        NegotiationVisit?      @relation(fields: [negotiationVisitId], references: [id], onDelete: Cascade)
+  negotiationAssignment   NegotiationAssignment? @relation(fields: [negotiationAssignmentId], references: [id], onDelete: Cascade)
+  uploadedBy              User                   @relation("PhotoUploader", fields: [uploadedById], references: [id])
+  planningAssignment      PlanningAssignment?    @relation(fields: [planningAssignmentId], references: [id], onDelete: SetNull)
+  deletedBy               User?                  @relation("PhotoDeleter", fields: [deletedById], references: [id])
+  deletionLogs            PhotoDeletionLog[]
 
   @@index([siteId])
   @@index([freeMissionId])
@@ -849,19 +874,19 @@ model CoordinatorProjectManagerScope {
 }
 
 model TaskProgressUpdate {
-  id           String             @id @default(cuid())
-  assignmentId String?
-  freeMissionId String?
-  progress     Int?
-  actualQuantity Decimal?           @db.Decimal(12, 2)
-  comment      String?
-  blocked      Boolean            @default(false)
-  completed    Boolean            @default(false)
-  createdById  String
-  createdAt    DateTime           @default(now())
-  assignment   PlanningAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  freeMission  FreeMission?       @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
-  createdBy    User               @relation(fields: [createdById], references: [id])
+  id             String              @id @default(cuid())
+  assignmentId   String?
+  freeMissionId  String?
+  progress       Int?
+  actualQuantity Decimal?            @db.Decimal(12, 2)
+  comment        String?
+  blocked        Boolean             @default(false)
+  completed      Boolean             @default(false)
+  createdById    String
+  createdAt      DateTime            @default(now())
+  assignment     PlanningAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  freeMission    FreeMission?        @relation(fields: [freeMissionId], references: [id], onDelete: Cascade)
+  createdBy      User                @relation(fields: [createdById], references: [id])
 
   @@index([assignmentId])
   @@index([freeMissionId])
@@ -870,26 +895,26 @@ model TaskProgressUpdate {
 }
 
 model DocumentAttachment {
-  id          String   @id @default(cuid())
-  projectId   String?
-  siteId      String?
-  reportId    String?
+  id           String                @id @default(cuid())
+  projectId    String?
+  siteId       String?
+  reportId     String?
   uploadedById String
-  filename    String
-  storageKey  String   @unique
-  url         String
-  fileSize    Int
-  contentType String
-  extension   String
-  isDeleted   Boolean  @default(false)
-  deletedAt   DateTime?
-  deletedById String?
-  createdAt   DateTime @default(now())
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  site        Site?    @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  report      Report?  @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  uploadedBy  User     @relation("DocumentUploader", fields: [uploadedById], references: [id])
-  deletedBy   User?    @relation("DocumentDeleter", fields: [deletedById], references: [id])
+  filename     String
+  storageKey   String                @unique
+  url          String
+  fileSize     Int
+  contentType  String
+  extension    String
+  isDeleted    Boolean               @default(false)
+  deletedAt    DateTime?
+  deletedById  String?
+  createdAt    DateTime              @default(now())
+  project      Project?              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  site         Site?                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  report       Report?               @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  uploadedBy   User                  @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  deletedBy    User?                 @relation("DocumentDeleter", fields: [deletedById], references: [id])
   deletionLogs DocumentDeletionLog[]
 
   @@index([projectId])
@@ -901,15 +926,15 @@ model DocumentAttachment {
 }
 
 model DocumentDeletionLog {
-  id               String   @id @default(cuid())
+  id               String             @id @default(cuid())
   documentId       String
   deletedById      String
   originalAuthorId String
   reason           String
-  deletedAt        DateTime @default(now())
+  deletedAt        DateTime           @default(now())
   document         DocumentAttachment @relation(fields: [documentId], references: [id])
-  deletedBy        User     @relation("DocumentDeletionActor", fields: [deletedById], references: [id])
-  originalAuthor   User     @relation("DocumentDeletionOriginalAuthor", fields: [originalAuthorId], references: [id])
+  deletedBy        User               @relation("DocumentDeletionActor", fields: [deletedById], references: [id])
+  originalAuthor   User               @relation("DocumentDeletionOriginalAuthor", fields: [originalAuthorId], references: [id])
 
   @@index([documentId])
   @@index([deletedById])
@@ -917,41 +942,41 @@ model DocumentDeletionLog {
 }
 
 model RefreshToken {
-  id         String    @id @default(cuid())
-  userId     String
-  tokenHash  String    @unique
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  userAgent  String?
-  ipAddress  String?
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  userAgent String?
+  ipAddress String?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
 }
 
 model PushToken {
-  id         String   @id @default(cuid())
-  userId     String
-  token      String   @unique
-  platform   String
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  platform    String
   deviceLabel String?
-  lastSeenAt DateTime @default(now())
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model LoginAttempt {
-  id         String   @id @default(cuid())
-  userId     String?
-  emailOrKey String
-  ipAddress  String
+  id          String   @id @default(cuid())
+  userId      String?
+  emailOrKey  String
+  ipAddress   String
   attemptedAt DateTime @default(now())
-  success    Boolean
-  user       User?    @relation(fields: [userId], references: [id])
+  success     Boolean
+  user        User?    @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([emailOrKey, ipAddress, attemptedAt])

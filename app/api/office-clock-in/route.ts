@@ -14,7 +14,7 @@ import { withAuth } from '@/lib/auth/with-auth';
 import { haversineDistanceKm } from '@/lib/haversine';
 import { getActiveOfficeLocation, getOfficeLocationById } from '@/lib/office-locations';
 
-const PROFESSIONAL_TRAVEL_ROLES: readonly Role[] = [Role.OFFICE_STAFF, Role.PROJECT_MANAGER];
+const PROFESSIONAL_TRAVEL_ROLES: readonly Role[] = [Role.OFFICE_STAFF, Role.HR, Role.DIRECTION, Role.ADMIN, Role.AUDITOR, Role.PROJECT_MANAGER];
 
 export const POST = withAuth(async ({ req, user }) => {
   const body = await parseJsonBody<unknown>(req);
@@ -35,7 +35,7 @@ export const POST = withAuth(async ({ req, user }) => {
     requestedOfficeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL &&
     !PROFESSIONAL_TRAVEL_ROLES.includes(user.role)
   ) {
-    return jsonClockInError('PERMISSION_DENIED', 403, 'Le deplacement professionnel est reserve au personnel bureau et aux chefs projets.');
+    return jsonClockInError('PERMISSION_DENIED', 403, 'Le deplacement professionnel est reserve aux profils bureau et aux chefs projets.');
   }
 
   if (input.type === ClockInType.ARRIVAL) {

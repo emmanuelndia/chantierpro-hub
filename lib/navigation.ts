@@ -13,7 +13,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/web/dashboard',
     label: 'Tableau de bord',
     icon: 'dashboard',
-    roles: ['GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'HR', 'ADMIN'],
+    roles: ['GENERAL_SUPERVISOR', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'HR', 'ADMIN', 'AUDITOR'],
     breadcrumb: ['Tableau de bord'],
   },
   {
@@ -27,7 +27,7 @@ export const webNavigation: readonly WebNavigationItem[] = [
     href: '/web/projects',
     label: 'Tous les projets',
     icon: 'projects',
-    roles: ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'DIRECTION', 'ADMIN'],
+    roles: ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'DIRECTION', 'ADMIN', 'AUDITOR'],
     breadcrumb: ['Tous les projets'],
   },
   {
@@ -226,7 +226,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/home',
     label: 'Accueil',
     icon: 'home',
-    roles: ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'FLEET_RESOURCE', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'HR', 'ADMIN', 'OFFICE_STAFF'],
+    roles: ['SUPERVISOR', 'RESOURCE', 'EXTERNAL_RESOURCE', 'COORDINATOR', 'GENERAL_SUPERVISOR', 'BE_RESOURCE', 'NEGOTIATION_RESOURCE', 'FLEET_RESOURCE', 'BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'HR', 'ADMIN', 'OFFICE_STAFF', 'AUDITOR'],
   },
   {
     href: '/mobile/clock-in',
@@ -256,19 +256,19 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/projects',
     label: 'Projets',
     icon: 'folder',
-    roles: ['PROJECT_MANAGER', 'DIRECTION'],
+    roles: ['PROJECT_MANAGER', 'DIRECTION', 'AUDITOR'],
   },
   {
     href: '/mobile/sites',
     label: 'Chantiers',
     icon: 'folder',
-    roles: ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    roles: ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN', 'AUDITOR'],
   },
   {
     href: '/mobile/gallery',
     label: 'Galerie',
     icon: 'photo',
-    roles: ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN'],
+    roles: ['BE_MANAGER', 'NEGOTIATION_MANAGER', 'FLEET_MANAGER', 'PROJECT_MANAGER', 'DIRECTION', 'ADMIN', 'AUDITOR'],
   },
   {
     href: '/mobile/users',
@@ -347,6 +347,11 @@ export function getMobileNavigationForRole(role: Role) {
   if (role === 'OFFICE_STAFF') {
     const officeStaffBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/profile']);
     return mobileTabNavigation.filter((item) => officeStaffBottomTabs.has(item.href));
+  }
+
+  if (role === 'AUDITOR') {
+    const auditorBottomTabs = new Set(['/mobile/home', '/mobile/clock-in', '/mobile/sites', '/mobile/profile']);
+    return mobileTabNavigation.filter((item) => auditorBottomTabs.has(item.href));
   }
 
   if (role === 'PROJECT_MANAGER') {
