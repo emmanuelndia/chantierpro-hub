@@ -39,6 +39,8 @@ const inputClassName =
 
 const liveStatuses: RhSitePresenceLiveStatus[] = ['PRESENT', 'PAUSED', 'EXPECTED_NOT_CLOCKED', 'LEFT', 'ANOMALY'];
 
+type PresenceSortMode = 'name' | 'arrival-asc' | 'arrival-desc';
+
 export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps) {
   const { pushToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -52,6 +54,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   const [status, setStatus] = useState('');
   const [arrivalFrom, setArrivalFrom] = useState('');
   const [arrivalTo, setArrivalTo] = useState('');
+  const [sortMode, setSortMode] = useState<PresenceSortMode>('name');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [anomaliesOnly, setAnomaliesOnly] = useState(false);
@@ -166,7 +169,10 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
     () => (data?.options.assigners ?? []).map((assigner) => ({ value: assigner.id, label: assigner.label })),
     [data?.options.assigners],
   );
-  const resources = useMemo(() => aggregateLiveResources(flattenLiveResources(filteredSites)), [filteredSites]);
+  const resources = useMemo(
+    () => sortAggregatedLiveResources(aggregateLiveResources(flattenLiveResources(filteredSites)), sortMode),
+    [filteredSites, sortMode],
+  );
   const displaySummary = useMemo(() => buildDisplaySummary(resources), [resources]);
 
   if (liveQuery.isLoading && !data) {
@@ -342,6 +348,13 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
               type="time"
               value={arrivalTo}
             />
+          </Field>
+          <Field label="Tri">
+            <select className={inputClassName} onChange={(event) => setSortMode(event.target.value as PresenceSortMode)} value={sortMode}>
+              <option value="name">Alphabetique</option>
+              <option value="arrival-asc">Arrivee : premier au dernier</option>
+              <option value="arrival-desc">Arrivee : dernier au premier</option>
+            </select>
           </Field>
           <Field label="Recherche">
             <input
@@ -753,6 +766,37 @@ function aggregateLiveResources(contexts: LiveResourceContext[]): AggregatedLive
   return Array.from(groupedResources.values())
     .map((resourceContexts) => buildAggregatedLiveResource(resourceContexts))
     .sort(compareLivePresenceResource);
+}
+
+function sortAggregatedLiveResources(resources: AggregatedLiveResource[], sortMode: PresenceSortMode) {
+  return [...resources].sort((left, right) => compareAggregatedLiveResource(left, right, sortMode));
+}
+
+function compareAggregatedLiveResource(left: AggregatedLiveResource, right: AggregatedLiveResource, sortMode: PresenceSortMode) {
+  if (sortMode === 'arrival-asc') {
+    return compareArrivalTime(left, right, 'asc') || compareLivePresenceResource(left, right);
+  }
+
+  if (sortMode === 'arrival-desc') {
+    return compareArrivalTime(left, right, 'desc') || compareLivePresenceResource(left, right);
+  }
+
+  return compareLivePresenceResource(left, right);
+}
+
+function compareArrivalTime(left: AggregatedLiveResource, right: AggregatedLiveResource, direction: 'asc' | 'desc') {
+  const leftTime = arrivalSortTime(left.arrivalAt);
+  const rightTime = arrivalSortTime(right.arrivalAt);
+
+  if (leftTime === rightTime) return 0;
+  if (leftTime === null) return 1;
+  if (rightTime === null) return -1;
+
+  return direction === 'asc' ? leftTime - rightTime : rightTime - leftTime;
+}
+
+function arrivalSortTime(value: string | null) {
+  return value ? new Date(value).getTime() : null;
 }
 
 function buildAggregatedLiveResource(contexts: LiveResourceContext[]): AggregatedLiveResource {
