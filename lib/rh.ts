@@ -504,6 +504,7 @@ export async function getSitePresencesLive(
         isAutoClosed: true,
         isRegularized: true,
         isLate: true,
+        comment: true,
         user: {
           select: {
             id: true,
@@ -2912,16 +2913,25 @@ function extractZoneClockInDetails(comment: string | null | undefined) {
     return value;
   };
 
+  const readAnyValue = (...prefixes: string[]) => {
+    for (const prefix of prefixes) {
+      const value = readValue(prefix);
+      if (value) return value;
+    }
+
+    return null;
+  };
+
   const validationLabel = readValue('Validation PM :');
 
   return {
-    actualZone: readValue('Zone reelle :') ?? readValue('Ville / zone reelle :'),
-    specificPlace: readValue('Lieu/quartier :') ?? readValue('Lieu precis :'),
+    actualZone: readAnyValue('Zone reelle :', 'Ville / zone reelle :'),
+    specificPlace: readAnyValue('Lieu/quartier :', 'Lieu precis :'),
     reason: readValue('Motif :'),
     comment: readValue('Commentaire :'),
     outOfPlanningValidationStatus: getOutOfPlanningValidationStatus(validationLabel),
     outOfPlanningValidationLabel: validationLabel,
-    outOfPlanningTaskText: readValue('Taches prevues :'),
+    outOfPlanningTaskText: readAnyValue('Taches prevues :', 'Taches declarees :', 'Tache declaree :'),
     outOfPlanningDecisionNote: readValue('Note PM :'),
   };
 }

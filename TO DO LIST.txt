@@ -3,11 +3,11 @@ Comptes email pro chef projet :
 "'Hyacinth Kouakou'           " <hyacinth.kouakou@hub-ci.com>
 "'Sibiri KAMBIRE'                     " <s.kambire@hub-ci.com>
 "'lionel.klutse'"                            <lionel.klutse@hub-ci.com>
-"'KOFFI YVES FLORENT'"           <yvesflorent@hub-ci.com>
+"'KOFFI YVES FLORENT'"                      < yvesflorent@hub-ci.com>
 "'ACHIEPO ROMARIC'"                <alain.gnagnouan@hub-ci.com>
 "'Pascale Meney'"                          <pascale.meney@hub-ci.com>
 "'Traoré Nouho'"                             <nouho.traore@hub-ci.com>
-
+w
 
 Retour chef projet: 
 
