@@ -6,6 +6,7 @@ import { SiteStatus } from '@prisma/client';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { authFetch } from '@/lib/auth/client-session';
+import { haversineDistanceKm } from '@/lib/haversine';
 import type { SiteMapResponse, SiteMapSiteItem } from '@/types/site-map';
 
 type SiteMapPageProps = Readonly<{
@@ -37,9 +38,13 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
   const [visitComment, setVisitComment] = useState('');
   const [visitMessage, setVisitMessage] = useState<string | null>(null);
+  const [userPosition, setUserPosition] = useState<GeoPoint | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   const requestPath = useMemo(() => {
     const params = new URLSearchParams();
@@ -69,6 +74,12 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
     [data?.sites, selectedSiteId],
   );
   const canRenderMap = Boolean(MAPBOX_TOKEN);
+  const selectedDistanceKm = selectedSite && userPosition
+    ? haversineDistanceKm(
+        { latitude: userPosition.latitude, longitude: userPosition.longitude },
+        { latitude: selectedSite.latitude, longitude: selectedSite.longitude },
+      )
+    : null;
 
   useEffect(() => {
     if (!canRenderMap || !mapContainerRef.current || mapRef.current) return;
@@ -128,6 +139,36 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
     if (!selectedSite || !mapRef.current) return;
     mapRef.current.flyTo({ center: [selectedSite.longitude, selectedSite.latitude], zoom: Math.max(mapRef.current.getZoom(), 12), essential: false });
   }, [selectedSite]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !userPosition) return;
+
+    if (!userMarkerRef.current) {
+      const element = document.createElement('div');
+      element.className = 'site-map-user-marker';
+      element.setAttribute('aria-label', 'Votre position');
+      userMarkerRef.current = new mapboxgl.Marker({ element }).setLngLat([userPosition.longitude, userPosition.latitude]).addTo(map);
+      return;
+    }
+
+    userMarkerRef.current.setLngLat([userPosition.longitude, userPosition.latitude]);
+  }, [userPosition]);
+
+  async function handleLocateMe() {
+    setLocationLoading(true);
+    setLocationError(null);
+
+    const position = await getCurrentPositionOrNull();
+    setLocationLoading(false);
+
+    if (!position) {
+      setLocationError('Position indisponible. Activez le GPS puis reessayez.');
+      return;
+    }
+
+    setUserPosition(position);
+    mapRef.current?.flyTo({ center: [position.longitude, position.latitude], zoom: 14, essential: false });
+  }
 
   const visitMutation = useMutation({
     mutationFn: async () => {
@@ -165,8 +206,21 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
               Sites geolocalises, filtres et acces rapide aux itineraires.
             </p>
           </div>
-          <div className="flex gap-2 text-xs font-black uppercase tracking-[0.12em]">
+          <div className="flex flex-wrap gap-2 text-xs font-black uppercase tracking-[0.12em]">
+            <button
+              className="rounded-full bg-slate-950 px-3 py-1 text-white disabled:bg-slate-300"
+              disabled={locationLoading}
+              onClick={() => void handleLocateMe()}
+              type="button"
+            >
+              {locationLoading ? 'Localisation...' : 'Ma position'}
+            </button>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{data?.totals.sites ?? 0} site(s)</span>
+            {userPosition ? (
+              <span className="rounded-full bg-sky-100 px-3 py-1 text-sky-800">
+                GPS {userPosition.accuracy ? `${Math.round(userPosition.accuracy)} m` : 'actif'}
+              </span>
+            ) : null}
             {(data?.totals.hiddenWithoutCoordinates ?? 0) > 0 ? (
               <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
                 {data?.totals.hiddenWithoutCoordinates} sans GPS
@@ -175,6 +229,12 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
           </div>
         </div>
       </section>
+
+      {locationError ? (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800">
+          {locationError}
+        </section>
+      ) : null}
 
       <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-panel md:grid-cols-4">
         <input
@@ -231,6 +291,7 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
               canLogVisit={Boolean(data?.viewer.canLogVisit)}
               surface={surface}
               comment={visitComment}
+              distanceKm={selectedDistanceKm}
               isSavingVisit={visitMutation.isPending}
               onCommentChange={setVisitComment}
               onLogVisit={() => visitMutation.mutate()}
@@ -264,6 +325,14 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
                     </span>
                   </div>
                   <p className="mt-2 line-clamp-2 text-xs font-semibold text-slate-500">{site.address}</p>
+                  {userPosition ? (
+                    <p className="mt-2 text-xs font-black text-primary">
+                      {formatDistance(haversineDistanceKm(
+                        { latitude: userPosition.latitude, longitude: userPosition.longitude },
+                        { latitude: site.latitude, longitude: site.longitude },
+                      ))}
+                    </p>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -283,6 +352,14 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
         .site-map-marker-active { background: #10b981; }
         .site-map-marker-on_hold { background: #f59e0b; }
         .site-map-marker-completed { background: #64748b; }
+        .site-map-user-marker {
+          width: 22px;
+          height: 22px;
+          border: 4px solid #fff;
+          border-radius: 999px;
+          background: #2563eb;
+          box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.18), 0 8px 18px rgba(15, 23, 42, 0.25);
+        }
       `}</style>
     </div>
   );
@@ -291,6 +368,7 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
 function SiteDetailsCard({
   canLogVisit,
   comment,
+  distanceKm,
   isSavingVisit,
   onCommentChange,
   onLogVisit,
@@ -301,6 +379,7 @@ function SiteDetailsCard({
 }: Readonly<{
   canLogVisit: boolean;
   comment: string;
+  distanceKm: number | null;
   isSavingVisit: boolean;
   onCommentChange: (value: string) => void;
   onLogVisit: () => void;
@@ -326,6 +405,7 @@ function SiteDetailsCard({
         <InfoRow label="Adresse" value={site.address || '-'} />
         <InfoRow label="GPS" value={`${site.latitude.toFixed(5)}, ${site.longitude.toFixed(5)}`} />
         <InfoRow label="Rayon" value={`${site.radiusKm} km`} />
+        {distanceKm !== null ? <InfoRow label="Distance" value={formatDistance(distanceKm)} /> : null}
       </dl>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <a
@@ -400,6 +480,11 @@ function formatStatus(status: SiteStatus) {
     default:
       return status;
   }
+}
+
+function formatDistance(distanceKm: number) {
+  if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`;
+  return `${distanceKm.toFixed(2)} km`;
 }
 
 function formatTime(value: string) {
