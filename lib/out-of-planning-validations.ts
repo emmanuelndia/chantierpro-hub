@@ -7,6 +7,8 @@ const validationSelect = {
   id: true,
   userId: true,
   siteId: true,
+  planningAssignmentId: true,
+  freeMissionId: true,
   timestampLocal: true,
   distanceToSite: true,
   comment: true,
@@ -23,6 +25,7 @@ const validationSelect = {
       id: true,
       name: true,
       address: true,
+      siteManagerId: true,
       project: {
         select: {
           id: true,
@@ -67,8 +70,20 @@ export async function listOutOfPlanningValidations(
       type: ClockInType.ARRIVAL,
       status: ClockInStatus.VALID,
       siteId: { not: null },
-      comment: { contains: OUT_OF_PLANNING_MARKER },
-      ...(user.role === Role.PROJECT_MANAGER ? { site: { project: { projectManagerId: user.id } } } : {}),
+      OR: [
+        { comment: { contains: OUT_OF_PLANNING_MARKER } },
+        { planningAssignmentId: null, freeMissionId: null, comment: { not: null } },
+      ],
+      ...(user.role === Role.PROJECT_MANAGER
+        ? {
+            site: {
+              OR: [
+                { siteManagerId: user.id },
+                { project: { projectManagerId: user.id } },
+              ],
+            },
+          }
+        : {}),
     },
     orderBy: [{ timestampLocal: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
     take: 200,
@@ -105,7 +120,8 @@ export async function decideOutOfPlanningValidation(
 
   if (
     payload.user.role === Role.PROJECT_MANAGER &&
-    record.site.project.projectManagerId !== payload.user.id
+    record.site.project.projectManagerId !== payload.user.id &&
+    record.site.siteManagerId !== payload.user.id
   ) {
     return { code: 'FORBIDDEN' as const };
   }
@@ -131,7 +147,10 @@ async function findOutOfPlanningRecord(prisma: PrismaClient, recordId: string) {
       type: ClockInType.ARRIVAL,
       status: ClockInStatus.VALID,
       siteId: { not: null },
-      comment: { contains: OUT_OF_PLANNING_MARKER },
+      OR: [
+        { comment: { contains: OUT_OF_PLANNING_MARKER } },
+        { planningAssignmentId: null, freeMissionId: null, comment: { not: null } },
+      ],
     },
     select: validationSelect,
   });
@@ -148,13 +167,18 @@ function serializeOutOfPlanningValidation(row: NonNullable<ValidationRow>) {
     projectName: row.site?.project.name ?? '',
     timestampLocal: row.timestampLocal.toISOString(),
     distanceMeters: Math.round(row.distanceToSite.toNumber() * 1000),
-    taskText: extractCommentValue(row.comment, 'Taches prevues :') ?? '',
+    taskText: extractCommentValue(row.comment, 'Taches prevues :') ?? extractCommentValue(row.comment, 'Taches declarees :') ?? extractCommentValue(row.comment, 'Tache declaree :') ?? getUnplannedClockInComment(row.comment) ?? '',
     validationStatus: getOutOfPlanningValidationStatus(row.comment),
     validationLabel: extractCommentValue(row.comment, VALIDATION_PREFIX) ?? 'en attente',
     decisionNote: extractCommentValue(row.comment, 'Note PM :'),
   };
 }
 
+function getUnplannedClockInComment(comment: string | null) {
+  const trimmed = comment?.trim();
+  if (!trimmed || trimmed.includes(OUT_OF_PLANNING_MARKER)) return null;
+  return trimmed;
+}
 function getOutOfPlanningValidationStatus(comment: string | null): OutOfPlanningValidationStatus {
   const value = extractCommentValue(comment, VALIDATION_PREFIX)?.toLowerCase() ?? '';
   if (value.startsWith('valide')) return 'VALIDATED';

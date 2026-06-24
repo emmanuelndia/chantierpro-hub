@@ -80,7 +80,10 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     );
   }
 
-  const isOutOfPlanningArrival = !accessibleSite && input.type === ClockInType.ARRIVAL;
+  const todayAssignment = input.type === ClockInType.ARRIVAL
+    ? await getTodaySitePlanningAssignment(params.id, user.id, input.timestampLocal)
+    : null;
+  const isOutOfPlanningArrival = input.type === ClockInType.ARRIVAL && !todayAssignment;
   const closingCurrentSiteSession =
     input.type !== ClockInType.ARRIVAL && currentSiteOpenSession?.siteId === site.id;
 
@@ -220,6 +223,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const record = await createClockInRecord(prisma, {
       siteId: site.id,
+      planningAssignmentId: todayAssignment?.id ?? null,
       userId: user.id,
       input: recordInput,
       distanceKm,
@@ -242,6 +246,21 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
   return Response.json({ record }, { status: 201 });
 });
 
+async function getTodaySitePlanningAssignment(siteId: string, userId: string, timestampLocal: string) {
+  const day = new Date(new Date(timestampLocal).toISOString().slice(0, 10) + 'T00:00:00.000Z');
+
+  return prisma.planningAssignment.findFirst({
+    where: {
+      siteId,
+      supervisorId: userId,
+      date: day,
+      deletedAt: null,
+      status: { not: 'CANCELLED' },
+    },
+    select: { id: true },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  });
+}
 function appendClockInComment(existing: string | null | undefined, note: string) {
   const trimmed = existing?.trim();
   return trimmed ? `${note}\n${trimmed}` : note;
