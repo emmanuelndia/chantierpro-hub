@@ -66,6 +66,7 @@ const rhClockInRecordSelect = {
     select: {
       id: true,
       name: true,
+      address: true,
       projectId: true,
       project: {
         select: {
@@ -1802,9 +1803,10 @@ function getPresenceContext(record: SerializableRhClockInRecord): {
   projectName: string | null;
 } {
   if (record.site) {
+    const siteAddress = record.site.address?.trim();
     return {
       type: 'SITE',
-      position: record.site.name,
+      position: siteAddress || record.site.name,
       projectId: record.site.projectId,
       projectName: record.site.project.name,
     };
@@ -2645,7 +2647,7 @@ function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to:
       matricule: row.matricule,
       lastName: row.lastName,
       firstName: row.firstName,
-      attendancePosition: buildAttendancePosition(row),
+      attendancePosition: buildAttendancePdfPosition(row),
       arrivalTime: row.arrivalTime,
       departureTime: row.departureTime,
       timeSpent: row.timeSpent,
@@ -2678,7 +2680,7 @@ function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to:
       matricule: row.matricule,
       lastName: row.lastName,
       firstName: row.firstName,
-      attendancePosition: buildAttendancePosition(row),
+      attendancePosition: buildAttendancePdfPosition(row),
       arrivalTime: row.arrivalTime,
       departureTime: row.departureTime,
       timeSpent: row.timeSpent,
@@ -2719,6 +2721,14 @@ function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to:
 
   return Buffer.from(pdf.output('arraybuffer'));
 }
+function buildAttendancePdfPosition(row: ExportRow) {
+  if (row.context === 'Mixte') {
+    return row.position || 'Bureau + Terrain';
+  }
+
+  return row.position || buildAttendancePosition(row);
+}
+
 function buildAttendancePosition(row: ExportRow) {
   if (row.context === 'Mixte') {
     return 'Mixte - Bureau + Terrain';
