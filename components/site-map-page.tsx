@@ -45,6 +45,8 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const selectedPopupRef = useRef<mapboxgl.Popup | null>(null);
+  const hoverPopupRef = useRef<mapboxgl.Popup | null>(null);
 
   const requestPath = useMemo(() => {
     const params = new URLSearchParams();
@@ -101,6 +103,10 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
     return () => {
       markers.forEach((marker) => marker.remove());
       markers.clear();
+      selectedPopupRef.current?.remove();
+      selectedPopupRef.current = null;
+      hoverPopupRef.current?.remove();
+      hoverPopupRef.current = null;
       map.remove();
       mapRef.current = null;
     };
@@ -112,6 +118,8 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
 
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current.clear();
+    hoverPopupRef.current?.remove();
+    hoverPopupRef.current = null;
 
     if (data.sites.length === 0) return;
 
@@ -120,8 +128,32 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
       const element = document.createElement('button');
       element.type = 'button';
       element.className = `site-map-marker site-map-marker-${site.status.toLowerCase()}`;
+      element.dataset.siteName = site.name;
       element.setAttribute('aria-label', site.name);
+      element.setAttribute('title', `${site.name} - ${site.project.name}`);
       element.addEventListener('click', () => setSelectedSiteId(site.id));
+      element.addEventListener('mouseenter', () => {
+        hoverPopupRef.current?.remove();
+        hoverPopupRef.current = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 18 })
+          .setLngLat([site.longitude, site.latitude])
+          .setHTML(sitePopupHtml(site, 'Survol'))
+          .addTo(map);
+      });
+      element.addEventListener('mouseleave', () => {
+        hoverPopupRef.current?.remove();
+        hoverPopupRef.current = null;
+      });
+      element.addEventListener('focus', () => {
+        hoverPopupRef.current?.remove();
+        hoverPopupRef.current = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 18 })
+          .setLngLat([site.longitude, site.latitude])
+          .setHTML(sitePopupHtml(site, 'Survol'))
+          .addTo(map);
+      });
+      element.addEventListener('blur', () => {
+        hoverPopupRef.current?.remove();
+        hoverPopupRef.current = null;
+      });
 
       const marker = new mapboxgl.Marker({ element }).setLngLat([site.longitude, site.latitude]).addTo(map);
       markersRef.current.set(site.id, marker);
@@ -136,8 +168,27 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
   }, [data]);
 
   useEffect(() => {
-    if (!selectedSite || !mapRef.current) return;
-    mapRef.current.flyTo({ center: [selectedSite.longitude, selectedSite.latitude], zoom: Math.max(mapRef.current.getZoom(), 12), essential: false });
+    const map = mapRef.current;
+    if (!selectedSite || !map) return;
+
+    markersRef.current.forEach((marker, siteId) => {
+      const element = marker.getElement();
+      element.classList.toggle('site-map-marker-selected', siteId === selectedSite.id);
+      element.style.zIndex = siteId === selectedSite.id ? '20' : '1';
+    });
+
+    selectedPopupRef.current?.remove();
+    selectedPopupRef.current = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 22 })
+      .setLngLat([selectedSite.longitude, selectedSite.latitude])
+      .setHTML(sitePopupHtml(selectedSite, 'Selection'))
+      .addTo(map);
+
+    map.flyTo({
+      center: [selectedSite.longitude, selectedSite.latitude],
+      zoom: Math.max(map.getZoom(), 16),
+      essential: false,
+      duration: 700,
+    });
   }, [selectedSite]);
   useEffect(() => {
     const map = mapRef.current;
@@ -348,10 +399,64 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
           border-radius: 999px;
           box-shadow: 0 8px 18px rgba(15, 23, 42, 0.25);
           cursor: pointer;
+          transition: transform 160ms ease, box-shadow 160ms ease;
         }
         .site-map-marker-active { background: #10b981; }
         .site-map-marker-on_hold { background: #f59e0b; }
         .site-map-marker-completed { background: #64748b; }
+        .site-map-marker-selected {
+          width: 28px;
+          height: 28px;
+          border-width: 4px;
+          transform: translateY(-4px) scale(1.1);
+          box-shadow: 0 0 0 8px rgba(249, 115, 22, 0.28), 0 16px 30px rgba(15, 23, 42, 0.34);
+        }
+        .site-map-marker-selected::after {
+          content: attr(data-site-name);
+          position: absolute;
+          left: 50%;
+          top: calc(100% + 8px);
+          max-width: 190px;
+          transform: translateX(-50%);
+          border-radius: 999px;
+          background: #020617;
+          color: #fff;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+          font-size: 11px;
+          font-weight: 900;
+          line-height: 1.15;
+          overflow: hidden;
+          padding: 6px 10px;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .site-map-popup {
+          display: grid;
+          gap: 3px;
+          min-width: 180px;
+          max-width: 240px;
+          padding: 2px;
+        }
+        .site-map-popup em {
+          color: #f97316;
+          font-size: 10px;
+          font-style: normal;
+          font-weight: 900;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        .site-map-popup strong {
+          color: #020617;
+          font-size: 13px;
+          line-height: 1.25;
+        }
+        .site-map-popup span,
+        .site-map-popup small {
+          color: #475569;
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1.3;
+        }
         .site-map-user-marker {
           width: 22px;
           height: 22px;
@@ -482,7 +587,20 @@ function formatStatus(status: SiteStatus) {
   }
 }
 
-function formatDistance(distanceKm: number) {
+
+function sitePopupHtml(site: SiteMapSiteItem, context: 'Selection' | 'Survol') {
+  const detail = [site.address, site.project.city, formatStatus(site.status)].filter(Boolean).join(' - ');
+
+  return `<div class="site-map-popup"><em>${context}</em><strong>${escapeHtml(site.name)}</strong><span>${escapeHtml(site.project.name)}</span><small>${escapeHtml(detail)}</small><small>Chef projet : ${escapeHtml(site.projectManager.name)}</small></div>`;
+}
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}function formatDistance(distanceKm: number) {
   if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`;
   return `${distanceKm.toFixed(2)} km`;
 }
