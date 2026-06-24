@@ -138,6 +138,13 @@ export type RhResourcesResponse = {
   roles: string[];
 };
 
+export type RhPresenceCommentItem = {
+  type: string;
+  label: string;
+  comment: string;
+  recordedAt: string;
+};
+
 export type RhSitePresenceLiveStatus =
   | 'PRESENT'
   | 'PAUSED'
@@ -168,6 +175,7 @@ export type RhSitePresenceLiveResource = {
   zoneActualName?: string | null;
   zoneSpecificPlace?: string | null;
   zoneComment?: string | null;
+  comments?: RhPresenceCommentItem[];
   outOfPlanningValidationStatus?: 'PENDING' | 'VALIDATED' | 'REFUSED' | null;
   outOfPlanningValidationLabel?: string | null;
   outOfPlanningTaskText?: string | null;

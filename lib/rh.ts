@@ -2861,6 +2861,7 @@ function buildLiveResource(
     hasStaleOpenSession,
   });
   const zoneDetails = extractZoneClockInDetails(arrival?.comment ?? latest?.comment ?? null);
+  const comments = collectPresenceComments(records, zoneDetails.comment);
   const displayTaskAction = zoneDetails.outOfPlanningTaskText ?? (presenceContext === 'OFFICE' ? zoneDetails.reason : null) ?? taskAction;
 
   return {
@@ -2886,6 +2887,7 @@ function buildLiveResource(
     zoneActualName: zoneDetails.actualZone,
     zoneSpecificPlace: zoneDetails.specificPlace,
     zoneComment: zoneDetails.comment,
+    comments,
     outOfPlanningValidationStatus: zoneDetails.outOfPlanningValidationStatus,
     outOfPlanningValidationLabel: zoneDetails.outOfPlanningValidationLabel,
     outOfPlanningTaskText: zoneDetails.outOfPlanningTaskText,
@@ -2893,6 +2895,52 @@ function buildLiveResource(
   };
 }
 
+function collectPresenceComments(records: { type: ClockInType; timestampLocal: Date; comment?: string | null }[], structuredComment: string | null) {
+  const comments: { type: ClockInType; label: string; comment: string; recordedAt: string }[] = [];
+  const addComment = (record: { type: ClockInType; timestampLocal: Date }, value: string | null | undefined) => {
+    const normalized = value?.trim();
+    if (!normalized) return;
+    if (comments.some((item) => item.type === record.type && item.comment.toLowerCase() === normalized.toLowerCase())) return;
+
+    comments.push({
+      type: record.type,
+      label: clockInCommentLabel(record.type),
+      comment: normalized,
+      recordedAt: record.timestampLocal.toISOString(),
+    });
+  };
+
+  for (const record of records) {
+    const rawComment = record.comment?.trim();
+    if (!rawComment) continue;
+
+    const details = extractZoneClockInDetails(rawComment);
+    addComment(record, details.comment);
+
+    if (!isStructuredPresenceComment(rawComment)) {
+      addComment(record, rawComment);
+    }
+  }
+
+  if (structuredComment && !comments.some((item) => item.comment.toLowerCase() === structuredComment.toLowerCase())) {
+    const arrival = records.find((record) => record.type === ClockInType.ARRIVAL) ?? records[0];
+    if (arrival) addComment(arrival, structuredComment);
+  }
+
+  return comments;
+}
+
+function clockInCommentLabel(type: ClockInType) {
+  if (type === ClockInType.ARRIVAL) return 'Commentaire arrivee';
+  if (type === ClockInType.DEPARTURE) return 'Commentaire depart';
+  if (type === ClockInType.PAUSE_START) return 'Commentaire debut pause';
+  if (type === ClockInType.PAUSE_END) return 'Commentaire reprise';
+  return 'Commentaire';
+}
+
+function isStructuredPresenceComment(comment: string) {
+  return /^(zone reelle|ville \/ zone reelle|lieu\/quartier|lieu precis|motif|commentaire|validation pm|taches prevues|taches declarees|tache declaree|note pm)\s*:/im.test(comment);
+}
 function extractZoneClockInDetails(comment: string | null | undefined) {
   const empty = {
     actualZone: null as string | null,

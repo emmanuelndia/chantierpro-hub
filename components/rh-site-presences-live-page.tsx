@@ -10,6 +10,7 @@ import { authFetch } from '@/lib/auth/client-session';
 import { formatRoleLabel } from '@/lib/role-labels';
 import { useToast } from '@/components/toast-provider';
 import type {
+  RhPresenceCommentItem,
   RhSitePresenceLiveResource,
   RhSitePresenceLiveResponse,
   RhSitePresenceLiveStatus,
@@ -530,11 +531,7 @@ function ResourcePresenceItem({
                   <span className="font-semibold">Note PM :</span> {context.outOfPlanningDecisionNote}
                 </p>
               ) : null}
-              {context.zoneComment ? (
-                <p className="mt-2 rounded-xl bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-700">
-                  <span className="font-semibold text-slate-950">Commentaire :</span> {context.zoneComment}
-                </p>
-              ) : null}
+              <PresenceComments comments={getPresenceComments(context)} />
               {context.arrivalGps || context.departureGps ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {context.arrivalGps ? (
@@ -556,6 +553,60 @@ function ResourcePresenceItem({
   );
 }
 
+function PresenceComments({ comments }: Readonly<{ comments: RhPresenceCommentItem[] }>) {
+  if (comments.length === 0) return null;
+
+  return (
+    <div className="mt-2 rounded-xl bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-700">
+      <p className="font-semibold text-slate-950">Commentaires :</p>
+      <div className="mt-2 space-y-2">
+        {comments.map((item) => (
+          <div className="rounded-lg bg-white px-3 py-2" key={`${item.type}:${item.recordedAt}:${item.comment}`}>
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+              {item.label} - {formatTime(item.recordedAt)}
+            </p>
+            <p className="mt-1 whitespace-pre-line text-slate-700">{item.comment}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function getPresenceComments(context: Pick<LiveResourceContext, 'zoneComment' | 'comments' | 'arrivalAt'>) {
+  const comments: RhPresenceCommentItem[] = [];
+  const addComment = (item: RhPresenceCommentItem) => {
+    const normalized = item.comment.trim();
+    if (!normalized) return;
+    if (!comments.some((comment) => comment.type === item.type && comment.comment.toLowerCase() === normalized.toLowerCase())) {
+      comments.push({ ...item, comment: normalized });
+    }
+  };
+
+  for (const item of context.comments ?? []) {
+    if (typeof item === 'string') {
+      addComment({
+        type: 'UNKNOWN',
+        label: 'Commentaire',
+        comment: item,
+        recordedAt: context.arrivalAt ?? new Date(0).toISOString(),
+      });
+    } else {
+      addComment(item);
+    }
+  }
+
+  if (context.zoneComment && !comments.some((item) => item.comment.toLowerCase() === context.zoneComment?.toLowerCase())) {
+    addComment({
+      type: 'ARRIVAL',
+      label: 'Commentaire arrivee',
+      comment: context.zoneComment,
+      recordedAt: context.arrivalAt ?? new Date(0).toISOString(),
+    });
+  }
+
+  return comments.sort((left, right) => new Date(left.recordedAt).getTime() - new Date(right.recordedAt).getTime());
+}
 function GpsPointLink({
   label,
   point,
