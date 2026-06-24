@@ -4,7 +4,7 @@ import mapboxgl from 'mapbox-gl';
 import Link from 'next/link';
 import { SiteStatus } from '@prisma/client';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authFetch } from '@/lib/auth/client-session';
 import { haversineDistanceKm } from '@/lib/haversine';
 import type { SiteMapResponse, SiteMapSiteItem } from '@/types/site-map';
@@ -72,7 +72,7 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
 
   const data = siteMapQuery.data;
   const selectedSite = useMemo(
-    () => data?.sites.find((site) => site.id === selectedSiteId) ?? data?.sites[0] ?? null,
+    () => selectedSiteId ? data?.sites.find((site) => site.id === selectedSiteId) ?? null : null,
     [data?.sites, selectedSiteId],
   );
   const canRenderMap = Boolean(MAPBOX_TOKEN);
@@ -82,6 +82,17 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
         { latitude: selectedSite.latitude, longitude: selectedSite.longitude },
       )
     : null;
+
+  const clearSelection = useCallback(() => {
+    setSelectedSiteId(null);
+    selectedPopupRef.current?.remove();
+    selectedPopupRef.current = null;
+    markersRef.current.forEach((marker) => {
+      const element = marker.getElement();
+      element.classList.remove('site-map-marker-selected');
+      element.style.zIndex = '1';
+    });
+  }, []);
 
   useEffect(() => {
     if (!canRenderMap || !mapContainerRef.current || mapRef.current) return;
@@ -97,6 +108,10 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
 
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
     map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
+    map.on('click', (event) => {
+      if ((event.originalEvent.target as HTMLElement | null)?.closest('.site-map-marker')) return;
+      clearSelection();
+    });
     mapRef.current = map;
     const markers = markersRef.current;
 
@@ -110,7 +125,7 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
       map.remove();
       mapRef.current = null;
     };
-  }, [canRenderMap]);
+  }, [canRenderMap, clearSelection]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -169,7 +184,18 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!selectedSite || !map) return;
+    if (!map) return;
+
+    if (!selectedSite) {
+      selectedPopupRef.current?.remove();
+      selectedPopupRef.current = null;
+      markersRef.current.forEach((marker) => {
+        const element = marker.getElement();
+        element.classList.remove('site-map-marker-selected');
+        element.style.zIndex = '1';
+      });
+      return;
+    }
 
     markersRef.current.forEach((marker, siteId) => {
       const element = marker.getElement();
@@ -345,6 +371,7 @@ export function SiteMapPage({ surface }: SiteMapPageProps) {
               distanceKm={selectedDistanceKm}
               isSavingVisit={visitMutation.isPending}
               onCommentChange={setVisitComment}
+              onClearSelection={clearSelection}
               onLogVisit={() => visitMutation.mutate()}
               site={selectedSite}
               visitError={visitMutation.isError}
@@ -476,6 +503,7 @@ function SiteDetailsCard({
   distanceKm,
   isSavingVisit,
   onCommentChange,
+  onClearSelection,
   onLogVisit,
   site,
   surface,
@@ -487,6 +515,7 @@ function SiteDetailsCard({
   distanceKm: number | null;
   isSavingVisit: boolean;
   onCommentChange: (value: string) => void;
+  onClearSelection: () => void;
   onLogVisit: () => void;
   site: SiteMapSiteItem;
   surface: 'mobile' | 'web';
@@ -503,6 +532,14 @@ function SiteDetailsCard({
           <h2 className="mt-3 text-lg font-black leading-6 text-slate-950">{site.name}</h2>
           <p className="mt-1 text-sm font-bold text-slate-500">{site.project.name}</p>
         </div>
+        <button
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-lg font-black text-slate-500 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600"
+          onClick={onClearSelection}
+          title="Deselectionner le site"
+          type="button"
+        >
+          x
+        </button>
       </div>
       <dl className="mt-4 space-y-2 text-sm">
         <InfoRow label="Chef projet" value={site.projectManager.name} />
