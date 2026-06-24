@@ -248,10 +248,14 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <LiveKpi label="Presents" tone="success" value={displaySummary.present} />
         <LiveKpi label="Assignes" value={displaySummary.expected} />
-        <LiveKpi label="Absentes" tone="danger" value={displaySummary.absent} />
+        <LiveKpi label="Presents" tone="success" value={displaySummary.present} />
+        <LiveKpi label="Presents terrain" tone="success" value={displaySummary.presentTerrain} />
+        <LiveKpi label="Presents bureau" tone="neutral" value={displaySummary.presentOffice} />
+        <LiveKpi label="Sortis" value={displaySummary.left} />
+        <LiveKpi label="Absents" tone="danger" value={displaySummary.absent} />
         <LiveKpi label="Retards" tone={displaySummary.late > 0 ? 'warning' : 'neutral'} value={displaySummary.late} />
+        <LiveKpi label="Anomalies" tone={displaySummary.anomaly > 0 ? 'danger' : 'neutral'} value={displaySummary.anomaly} />
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
@@ -1010,10 +1014,13 @@ function buildQuickFilterCounts(resources: AggregatedLiveResource[]): Record<Pre
     {
       all: 0,
       present: 0,
+      presentTerrain: 0,
+      presentOffice: 0,
       paused: 0,
       absent: 0,
       left: 0,
       late: 0,
+      oldSessionDepartures: 0,
       'out-of-planning': 0,
       anomaly: 0,
     },
@@ -1022,7 +1029,7 @@ function buildQuickFilterCounts(resources: AggregatedLiveResource[]): Record<Pre
 
 function matchesQuickFilter(resource: AggregatedLiveResource, filter: PresenceQuickFilter) {
   if (filter === 'all') return true;
-  if (filter === 'present') return resource.status === 'PRESENT';
+  if (filter === 'present') return hasPresenceDuringSelectedDay(resource);
   if (filter === 'paused') return resource.status === 'PAUSED';
   if (filter === 'absent') return resource.status === 'EXPECTED_NOT_CLOCKED';
   if (filter === 'left') return resource.status === 'LEFT';
@@ -1031,14 +1038,37 @@ function matchesQuickFilter(resource: AggregatedLiveResource, filter: PresenceQu
   if (filter === 'anomaly') return resource.status === 'ANOMALY' || Boolean(resource.anomalyReason);
   return true;
 }
+function hasPresenceDuringSelectedDay(resource: Pick<AggregatedLiveResource, 'contexts'>) {
+  return resource.contexts.some((context) => Boolean(context.arrivalAt) && context.status !== 'EXPECTED_NOT_CLOCKED');
+}
+
+function hasPresenceContextDuringSelectedDay(
+  resource: Pick<AggregatedLiveResource, 'contexts'>,
+  presenceContext: 'TERRAIN' | 'OFFICE',
+) {
+  return resource.contexts.some(
+    (context) =>
+      context.presenceContext === presenceContext &&
+      Boolean(context.arrivalAt) &&
+      context.status !== 'EXPECTED_NOT_CLOCKED',
+  );
+}
+function isOldSessionDepartureOnly(resource: Pick<AggregatedLiveResource, 'contexts' | 'status'>) {
+  return resource.status === 'LEFT' && resource.contexts.every((context) => !context.arrivalAt && context.lastClockInType === 'DEPARTURE');
+}
 function buildDisplaySummary(resources: AggregatedLiveResource[]) {
   return resources.reduce(
     (summary, resource) => {
       if (resource.contexts.some(isExpectedContext)) summary.expected += 1;
-      if (resource.status === 'PRESENT') summary.present += 1;
+      if (hasPresenceDuringSelectedDay(resource)) {
+        summary.present += 1;
+        if (hasPresenceContextDuringSelectedDay(resource, 'TERRAIN')) summary.presentTerrain += 1;
+        if (hasPresenceContextDuringSelectedDay(resource, 'OFFICE')) summary.presentOffice += 1;
+      }
       if (resource.status === 'PAUSED') summary.paused += 1;
       if (resource.status === 'EXPECTED_NOT_CLOCKED') summary.absent += 1;
       if (resource.status === 'LEFT') summary.left += 1;
+      if (isOldSessionDepartureOnly(resource)) summary.oldSessionDepartures += 1;
       if (resource.status === 'ANOMALY') summary.anomaly += 1;
       if (resource.isLate) summary.late += 1;
       return summary;
@@ -1046,11 +1076,14 @@ function buildDisplaySummary(resources: AggregatedLiveResource[]) {
     {
       expected: 0,
       present: 0,
+      presentTerrain: 0,
+      presentOffice: 0,
       paused: 0,
       absent: 0,
       left: 0,
       anomaly: 0,
       late: 0,
+      oldSessionDepartures: 0,
     },
   );
 }
