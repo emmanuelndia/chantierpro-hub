@@ -2572,22 +2572,30 @@ function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to:
   const margin = 8;
   const tableWidth = pageWidth - margin * 2;
   const columns = [
-    { label: 'numero matricule', key: 'matricule', width: 26 },
-    { label: 'nom', key: 'lastName', width: 34 },
-    { label: 'prenom', key: 'firstName', width: 34 },
-    { label: 'position', key: 'attendancePosition', width: 78 },
-    { label: 'heure arrivee', key: 'arrivalTime', width: 30 },
-    { label: 'heure depart', key: 'departureTime', width: 30 },
-    { label: 'temps passee', key: 'timeSpent', width: 34 },
-    { label: 'detail positions', key: 'detailPositions', width: 75 },
-  ];
+    { label: 'Numero\nmatricule', key: 'matricule', width: 25 },
+    { label: 'Nom', key: 'lastName', width: 30 },
+    { label: 'Prenom', key: 'firstName', width: 32 },
+    { label: 'Position', key: 'attendancePosition', width: 86 },
+    { label: 'Arrivee', key: 'arrivalTime', width: 24 },
+    { label: 'Depart', key: 'departureTime', width: 24 },
+    { label: 'Duree', key: 'timeSpent', width: 28 },
+    { label: 'Statut', key: 'status', width: 28 },
+  ] as const;
   const scale = tableWidth / columns.reduce((sum, column) => sum + column.width, 0);
   const scaledColumns = columns.map((column) => ({ ...column, width: column.width * scale }));
+  const periodLabel = `${period.from.slice(0, 10)} au ${period.to.slice(0, 10)}`;
+  const rowGap = 2;
   let y = margin;
 
-  const periodLabel = `${period.from.slice(0, 10)} au ${period.to.slice(0, 10)}`;
+  const resetTextStyle = () => {
+    pdf.setTextColor(15, 23, 42);
+    pdf.setDrawColor(210, 219, 232);
+    pdf.setFillColor(255, 255, 255);
+    pdf.setFont('helvetica', 'normal');
+  };
 
   const drawTitle = () => {
+    resetTextStyle();
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(14);
     pdf.text('Liste de presence - ChantierPro', margin, y + 5);
@@ -2602,26 +2610,37 @@ function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to:
     let x = margin;
     pdf.setFillColor(239, 243, 248);
     pdf.setDrawColor(210, 219, 232);
+    pdf.setTextColor(15, 23, 42);
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(8);
+    pdf.setFontSize(7.5);
+
     for (const column of scaledColumns) {
-      pdf.rect(x, y, column.width, 9, 'FD');
-      pdf.text(column.label, x + 1.5, y + 5.8);
+      const lines = pdf.splitTextToSize(column.label.replace('\\n', '\n'), column.width - 3) as string[];
+      pdf.setFillColor(239, 243, 248);
+      pdf.setDrawColor(210, 219, 232);
+      pdf.rect(x, y, column.width, 10, 'FD');
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(lines, x + 1.5, y + 3.7, { baseline: 'top' });
       x += column.width;
     }
-    y += 9;
+    y += 10;
+    resetTextStyle();
+    pdf.setFontSize(8);
   };
 
   const drawPageHeader = () => {
     drawTitle();
     drawHeader();
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
   };
 
-  drawPageHeader();
+  const addPageIfNeeded = (height: number) => {
+    if (y + height <= pageHeight - margin) return;
+    pdf.addPage();
+    y = margin;
+    drawPageHeader();
+  };
 
-  for (const row of rows) {
+  const drawMainCells = (row: ExportRow, rowHeight: number) => {
     const cells = {
       matricule: row.matricule,
       lastName: row.lastName,
@@ -2630,38 +2649,76 @@ function buildAttendancePdfBuffer(rows: ExportRow[], period: { from: string; to:
       arrivalTime: row.arrivalTime,
       departureTime: row.departureTime,
       timeSpent: row.timeSpent,
-      detailPositions: row.detailPositions,
+      status: row.status,
     };
     const lineGroups = scaledColumns.map((column) =>
-      pdf.splitTextToSize(String(cells[column.key as keyof typeof cells] ?? ''), column.width - 3) as string[],
+      pdf.splitTextToSize(String(cells[column.key] ?? ''), column.width - 3) as string[],
     );
-    const rowHeight = Math.max(8, ...lineGroups.map((lines) => lines.length * 3.4 + 4));
-
-    if (y + rowHeight > pageHeight - margin) {
-      pdf.addPage();
-      y = margin;
-      drawPageHeader();
-    }
 
     let x = margin;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.7);
+    pdf.setTextColor(15, 23, 42);
     pdf.setDrawColor(225, 231, 240);
     scaledColumns.forEach((column, index) => {
-      pdf.rect(x, y, column.width, rowHeight);
-      pdf.text(lineGroups[index] ?? [''], x + 1.5, y + 4.8);
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(x, y, column.width, rowHeight, 'S');
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(lineGroups[index] ?? [''], x + 1.5, y + 4.5, { baseline: 'top' });
       x += column.width;
     });
-    y += rowHeight;
+  };
+
+  const detailHeightFor = (detailLines: string[]) => detailLines.length > 0 ? detailLines.length * 3.4 + 5 : 0;
+
+  drawPageHeader();
+
+  for (const row of rows) {
+    const mainCells = {
+      matricule: row.matricule,
+      lastName: row.lastName,
+      firstName: row.firstName,
+      attendancePosition: buildAttendancePosition(row),
+      arrivalTime: row.arrivalTime,
+      departureTime: row.departureTime,
+      timeSpent: row.timeSpent,
+      status: row.status,
+    };
+    const mainLineGroups = scaledColumns.map((column) =>
+      pdf.splitTextToSize(String(mainCells[column.key] ?? ''), column.width - 3) as string[],
+    );
+    const mainRowHeight = Math.max(9, ...mainLineGroups.map((lines) => lines.length * 3.4 + 5));
+    const detailText = row.detailPositions?.trim() ?? '';
+    const detailLines = detailText ? pdf.splitTextToSize(`Detail : ${detailText}`, tableWidth - 5) as string[] : [];
+    const detailHeight = detailHeightFor(detailLines);
+    const totalRowHeight = mainRowHeight + detailHeight + rowGap;
+
+    addPageIfNeeded(totalRowHeight);
+    drawMainCells(row, mainRowHeight);
+    y += mainRowHeight;
+
+    if (detailLines.length > 0) {
+      pdf.setFillColor(248, 250, 252);
+      pdf.setDrawColor(225, 231, 240);
+      pdf.rect(margin, y, tableWidth, detailHeight, 'FD');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.3);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(detailLines, margin + 2, y + 3.5, { baseline: 'top' });
+      y += detailHeight;
+    }
+
+    y += rowGap;
   }
 
   if (rows.length === 0) {
-    pdf.setFont('helvetica', 'normal');
+    resetTextStyle();
     pdf.setFontSize(10);
     pdf.text('Aucune presence pour les filtres selectionnes.', margin, y + 10);
   }
 
   return Buffer.from(pdf.output('arraybuffer'));
 }
-
 function buildAttendancePosition(row: ExportRow) {
   if (row.context === 'Mixte') {
     return 'Mixte - Bureau + Terrain';
