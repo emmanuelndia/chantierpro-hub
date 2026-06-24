@@ -1,3 +1,4 @@
+import type { OfficeClockInLocation } from '@prisma/client';
 import type { ClockInRecordItem, SessionStatus } from '@/types/clock-in';
 import type { OfflineClockInItem } from '@/lib/mobile-offline-db';
 
@@ -5,6 +6,7 @@ type ClockInEvent = {
   siteId: string | null;
   freeMissionId: string | null;
   officeLocationId: string | null;
+  officeClockInLocation: OfficeClockInLocation | null;
   siteName: string;
   type: ClockInRecordItem['type'];
   timestampLocal: string;
@@ -13,7 +15,7 @@ type ClockInEvent = {
 type SessionContext =
   | { contextType: 'SITE'; siteId: string }
   | { contextType: 'FREE_MISSION'; freeMissionId: string }
-  | { contextType: 'OFFICE'; officeLocationId: string };
+  | { contextType: 'OFFICE'; officeLocationId: string | null; officeClockInLocation: OfficeClockInLocation | null };
 
 export function buildLocalSessionStatus(
   context: SessionContext,
@@ -71,6 +73,7 @@ export function buildLocalSessionStatus(
       openSessionPlanningAssignmentId: null,
       openSessionPlanningAssignmentAction: null,
       openSessionContextType: null,
+      openSessionOfficeClockInLocation: null,
     };
   }
 
@@ -91,6 +94,7 @@ export function buildLocalSessionStatus(
     openSessionPlanningAssignmentId: null,
     openSessionPlanningAssignmentAction: null,
     openSessionContextType: contextType,
+    openSessionOfficeClockInLocation: openEvent.officeClockInLocation,
   };
 }
 
@@ -99,6 +103,7 @@ function toClockInEvent(item: ClockInRecordItem | OfflineClockInItem): ClockInEv
     siteId: item.siteId ?? null,
     freeMissionId: 'freeMissionId' in item ? (item.freeMissionId ?? null) : null,
     officeLocationId: 'officeLocationId' in item ? (item.officeLocationId ?? null) : null,
+    officeClockInLocation: 'officeClockInLocation' in item ? (item.officeClockInLocation ?? null) : null,
     siteName: item.siteName,
     type: item.type,
     timestampLocal: item.timestampLocal,
@@ -110,7 +115,8 @@ function sameContext(left: ClockInEvent | null, right: ClockInEvent) {
   return (
     left.siteId === right.siteId &&
     left.freeMissionId === right.freeMissionId &&
-    left.officeLocationId === right.officeLocationId
+    left.officeLocationId === right.officeLocationId &&
+    left.officeClockInLocation === right.officeClockInLocation
   );
 }
 
@@ -123,7 +129,10 @@ function matchesContext(context: SessionContext, event: ClockInEvent) {
     return event.freeMissionId === context.freeMissionId;
   }
 
-  return event.officeLocationId === context.officeLocationId;
+  return (
+    event.officeLocationId === context.officeLocationId &&
+    event.officeClockInLocation === context.officeClockInLocation
+  );
 }
 
 function elapsedSeconds(startedAt: string, endedAt: string) {

@@ -1,4 +1,4 @@
-import type { ClockInType, PhotoTag } from '@prisma/client';
+import type { ClockInType, OfficeClockInLocation, PhotoTag } from '@prisma/client';
 import { authFetch } from '@/lib/auth/client-session';
 import type { BatchSyncItemResult, ClockInInput } from '@/types/clock-in';
 
@@ -29,6 +29,7 @@ export type OfflineClockInItem = ClockInInput & {
   siteId?: string | null;
   freeMissionId?: string | null;
   officeLocationId?: string | null;
+  officeClockInLocation?: OfficeClockInLocation | null;
   planningAssignmentId?: string | null;
 };
 
@@ -430,6 +431,7 @@ async function syncContextualClockIn(item: OfflineClockInItem): Promise<{
       body: JSON.stringify({
         ...payload,
         officeLocationId: item.officeLocationId,
+        officeClockInLocation: item.officeClockInLocation ?? 'OFFICE',
         planningAssignmentId: item.planningAssignmentId ?? null,
       }),
     });

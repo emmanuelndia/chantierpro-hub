@@ -2,6 +2,7 @@ import { ClockInStatus, ClockInType, FreeMissionStatus, Prisma, ProjectStatus, R
 import { BUSINESS_MANAGER_ROLES, FIELD_USER_ROLES, getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
 import {
   createClockInRecord,
+  findActivePauseFromRecords,
   getClockInGpsValidationError,
   getOpenSessionForUser,
   jsonClockInError,
@@ -405,6 +406,18 @@ export async function clockInFreeMission(prisma: PrismaClient, user: AuthLikeUse
     return jsonClockInError('NO_OPEN_SESSION', 400, 'Aucune session mission libre ouverte.');
   }
 
+  if (input.type === ClockInType.PAUSE_START || input.type === ClockInType.PAUSE_END) {
+    const activePause = await getActiveFreeMissionPause(prisma, mission.id, user.id);
+
+    if (input.type === ClockInType.PAUSE_START && activePause) {
+      return jsonClockInError('PAUSE_ALREADY_ACTIVE', 400, 'Une pause zone est deja active.');
+    }
+
+    if (input.type === ClockInType.PAUSE_END && !activePause) {
+      return jsonClockInError('NO_ACTIVE_PAUSE', 400, 'Aucune pause zone active.');
+    }
+  }
+
   const record = await createClockInRecord(prisma, {
     freeMissionId: mission.id,
     userId: user.id,
@@ -430,9 +443,39 @@ export async function getFreeMissionSessionStatus(prisma: PrismaClient, user: Au
   }
 
   const openSession = await getOpenSessionForUser(prisma, user.id);
-  return Response.json(serializeSessionStatus(openSession?.freeMissionId === mission.id ? openSession : null, null));
+  const currentMissionOpenSession = openSession?.freeMissionId === mission.id ? openSession : null;
+  const activePause = currentMissionOpenSession
+    ? await getActiveFreeMissionPause(prisma, mission.id, user.id)
+    : null;
+
+  return Response.json(serializeSessionStatus(currentMissionOpenSession, activePause));
 }
 
+async function getActiveFreeMissionPause(prisma: PrismaClient, freeMissionId: string, userId: string) {
+  const records = await prisma.clockInRecord.findMany({
+    where: {
+      freeMissionId,
+      userId,
+      status: ClockInStatus.VALID,
+      type: { in: [ClockInType.PAUSE_START, ClockInType.PAUSE_END] },
+    },
+    orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      siteId: true,
+      freeMissionId: true,
+      planningAssignmentId: true,
+      officeLocationId: true,
+      officeClockInLocation: true,
+      userId: true,
+      type: true,
+      status: true,
+      timestampLocal: true,
+    },
+  });
+
+  return findActivePauseFromRecords(records);
+}
 export function serializeFreeMission(row: FreeMissionRow) {
   const latest = row.clockInRecords.at(-1) ?? null;
   const arrival = row.clockInRecords.find((record) => record.type === ClockInType.ARRIVAL && record.status === ClockInStatus.VALID) ?? null;

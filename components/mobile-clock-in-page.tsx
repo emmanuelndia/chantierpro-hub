@@ -557,7 +557,11 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         if (networkState === 'offline') {
           return selectedOfficeLocationId
             ? buildOfflineSessionStatus(
-                { contextType: 'OFFICE', officeLocationId: selectedOfficeLocationId },
+                {
+                  contextType: 'OFFICE',
+                  officeLocationId: selectedOfficeClockInLocation === OfficeClockInLocation.OFFICE ? selectedOfficeLocationId : null,
+                  officeClockInLocation: selectedOfficeClockInLocation,
+                },
                 todayQuery.data?.items ?? [],
                 pendingClockInsQuery.data ?? [],
               )
@@ -630,7 +634,11 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         )
       : selectedOfficeLocation
         ? buildOfflineSessionStatus(
-            { contextType: 'OFFICE', officeLocationId: selectedOfficeLocation.id },
+            {
+              contextType: 'OFFICE',
+              officeLocationId: selectedOfficeClockInLocation === OfficeClockInLocation.OFFICE ? selectedOfficeLocation.id : null,
+              officeClockInLocation: selectedOfficeClockInLocation,
+            },
             todayQuery.data?.items ?? [],
             pendingClockInsQuery.data ?? [],
           )
@@ -883,6 +891,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           siteName: officeSiteName,
           ...payload,
           officeLocationId: selectedOfficeLocation!.id,
+          officeClockInLocation: selectedOfficeClockInLocation,
           planningAssignmentId: selectedOfficeAssignmentId,
         });
 
@@ -2415,7 +2424,7 @@ function buildOfflineSessionStatus(
   context:
     | { contextType: 'SITE'; siteId: string }
     | { contextType: 'FREE_MISSION'; freeMissionId: string }
-    | { contextType: 'OFFICE'; officeLocationId: string },
+    | { contextType: 'OFFICE'; officeLocationId: string | null; officeClockInLocation: OfficeClockInLocation | null },
   serverItems: ClockInRecordItem[],
   pendingItems: Awaited<ReturnType<typeof getPendingOfflineClockIns>>,
 ) {
