@@ -24,7 +24,7 @@ const PROJECT_READ_ROLES: readonly Role[] = [
   Role.ADMIN,
   Role.AUDITOR,
 ];
-const PROJECT_WRITE_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.ADMIN];
+const PROJECT_WRITE_ROLES: readonly Role[] = [Role.PROJECT_MANAGER, Role.NEGOTIATION_MANAGER, Role.DIRECTION, Role.ADMIN];
 const SITE_WRITE_ROLES: readonly Role[] = [
   Role.PROJECT_MANAGER,
   Role.BE_MANAGER,

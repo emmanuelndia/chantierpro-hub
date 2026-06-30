@@ -112,7 +112,7 @@ export function MobileProjectFormPage({ mode, user, projectId }: MobileProjectFo
       return;
     }
 
-    if (mode === 'create' && user.role === 'DIRECTION' && !values.projectManagerId) {
+    if (mode === 'create' && (user.role === 'DIRECTION' || user.role === 'NEGOTIATION_MANAGER') && !values.projectManagerId) {
       const firstManagerId = optionsQuery.data?.projectManagers.at(0)?.id;
 
       if (firstManagerId) {

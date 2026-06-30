@@ -31,7 +31,7 @@ export function MobileProjectsPage({ user }: MobileProjectsPageProps) {
   const [status, setStatus] = useState<MobileProjectStatusFilter>('ALL');
   const [includeInactive, setIncludeInactive] = useState(false);
   const canViewInactiveProjects = user.role === 'ADMIN';
-  const canMutateProjects = user.role === 'PROJECT_MANAGER' || user.role === 'DIRECTION';
+  const canMutateProjects = user.role === 'PROJECT_MANAGER' || user.role === 'NEGOTIATION_MANAGER' || user.role === 'DIRECTION';
   const statusFilters = useMemo(
     () =>
       canViewInactiveProjects

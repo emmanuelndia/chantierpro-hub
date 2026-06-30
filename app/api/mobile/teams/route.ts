@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth/with-auth';
 import { canMutateMobileTeams, getScopedMobileSiteForTeams, validateMobileAssignableUserForSite } from '@/lib/mobile-teams';
 import { prisma } from '@/lib/prisma';
 import {
+  createInitialTeamAssignment,
   jsonTeamError,
   parseCreateTeamInput,
   parseJsonBody,
@@ -51,6 +52,13 @@ export const POST = withAuth(async ({ req, user }) => {
         createdById: user.id,
       },
       select: { id: true },
+    });
+
+    await createInitialTeamAssignment(tx, {
+      teamId: created.id,
+      siteId: site.id,
+      supervisorId: input.teamLeadId,
+      createdById: user.id,
     });
 
     await syncTeamLeadMembership(tx, {

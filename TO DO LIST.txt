@@ -102,7 +102,7 @@ pouvoir extraire en pdf ou excel une liste de présence avec les colonnes numero
 Désormais il faudra pointer quotidiennement au bureau il faudra donc revoir ce type de pointage ce n'est plus les chefs projets qui vont assigner des tâches aux ressources qui doivent pointer au bureau 
 Pouvoir ressortir ou mettre en évidence ceux qui pointent après 8h
 Mettre dans la logique un temps donné pour chaque tâche 
-Au niveau de âche centralisé pouvoir filtrer par chef pr    ojet
+Au niveau de âche centralisé pouvoir filtrer par chef projet
 Prévoir l'affichage de la progression des projets des projets chez les RH, PM, DIRECTION, ADMIN et pouvoir voir si les projets sont en retards et autres 
 
 
@@ -153,3 +153,8 @@ Pour les ressources negociation ils vont aussi pointer par zones et c'est au sui
 Y'aura un nombre de scopes (immeuble mais on va appeler ça scope parce que c'est pas que des immeubles) à visiter dans chaque projet et pendant la journée ou à la fin la ressource aura la possibilité de marquer quel scope n'a pas été obtenu c'est à dire y'a eu refus ou quelque chose comme ça, quel scope on a autorisation et autre quel scope on doit revisiter bref tu vois l'esprit ?
 A la fin avec ses infos on doit avoir une sorte de calcul automatique pour enlever dans le scope global par projet le nombre qu'on a pas obtenu le nombre avec les autorisations ok tu vois non ?
 Mais dans ce cas la est ce que faudra remplir les coordonnées géo des scopes dans l'appli comme on fait avec les chantiers et selectionner les scopes qu'une ressource donné doit faire ? ou je sais pas que me propose tu pour que ça soit efficace
+
+
+ENTREPOT ATTINGUIE, CARRIERE YAO, CARRIERE SABLE BRIMBINSSO
+
+

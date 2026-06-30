@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { ProjectStatus, type Role, type SiteStatus, type ReportValidationStatus } from '@prisma/client';
 import { useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import { SignedImage } from '@/components/mobile/SignedImage';
+import { useToast } from '@/components/toast-provider';
 import type {
   MobileProjectDetailPhoto,
   MobileProjectDetailReport,
@@ -19,20 +20,89 @@ type MobileProjectDetailPageProps = Readonly<{
   userRole: Role;
 }>;
 
-type ProjectDetailTab = 'summary' | 'sites' | 'teams' | 'photos' | 'reports';
+type ProjectDetailTab = 'summary' | 'sites' | 'zones' | 'teams' | 'photos' | 'reports';
 type HttpStatusError = Error & { status?: number };
+
+type NegotiationZoneItem = {
+  id: string;
+  projectId: string;
+  name: string;
+  city: string | null;
+  region: string | null;
+  scopeCount?: number;
+};
+
+type NegotiationZonesResponse = {
+  zones: NegotiationZoneItem[];
+};
 
 const tabs: { id: ProjectDetailTab; label: string }[] = [
   { id: 'summary', label: 'Résumé' },
   { id: 'sites', label: 'Chantiers' },
+  { id: 'zones', label: 'Zones' },
   { id: 'teams', label: 'Équipes' },
   { id: 'photos', label: 'Photos' },
   { id: 'reports', label: 'Rapports' },
 ];
 
 export function MobileProjectDetailPage({ projectId, userRole }: MobileProjectDetailPageProps) {
-  const canMutateProject = userRole === 'PROJECT_MANAGER' || userRole === 'DIRECTION';
+  const queryClient = useQueryClient();
+  const { pushToast } = useToast();
+  const canManageZones = userRole === 'NEGOTIATION_MANAGER' || userRole === 'DIRECTION' || userRole === 'ADMIN';
+  const canMutateProject = userRole === 'PROJECT_MANAGER' || userRole === 'NEGOTIATION_MANAGER' || userRole === 'DIRECTION';
   const [activeTab, setActiveTab] = useState<ProjectDetailTab>('summary');
+  const [zoneForm, setZoneForm] = useState({ name: '', city: '', region: '' });
+  const visibleTabs = canManageZones ? tabs : tabs.filter((tab) => tab.id !== 'zones');
+
+  const zonesQuery = useQuery({
+    queryKey: ['mobile-project-zones', projectId],
+    queryFn: async () => {
+      const response = await authFetch(`/api/negotiation/zones?projectId=${encodeURIComponent(projectId)}`);
+
+      if (!response.ok) {
+        throw new Error('Impossible de charger les zones du projet.');
+      }
+
+      return (await response.json()) as NegotiationZonesResponse;
+    },
+    enabled: canManageZones,
+    staleTime: 30_000,
+  });
+
+  const createZoneMutation = useMutation({
+    mutationFn: async () => {
+      const response = await authFetch('/api/negotiation/zones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          name: zoneForm.name,
+          city: zoneForm.city,
+          region: zoneForm.region,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await safeJson(response)) as { message?: string } | null;
+        throw new Error(errorBody?.message ?? 'Impossible de creer la zone.');
+      }
+
+      return response.json() as Promise<unknown>;
+    },
+    onSuccess: async () => {
+      setZoneForm({ name: '', city: '', region: '' });
+      await queryClient.invalidateQueries({ queryKey: ['mobile-project-zones', projectId] });
+      pushToast({ type: 'success', title: 'Zone creee', message: 'La zone est disponible dans le planning.' });
+    },
+    onError: (error) => {
+      pushToast({
+        type: 'error',
+        title: 'Creation impossible',
+        message: error instanceof Error ? error.message : 'La zone n a pas pu etre creee.',
+      });
+    },
+  });
+
   const detailQuery = useQuery({
     queryKey: ['mobile-project-detail', projectId],
     queryFn: async () => {
@@ -148,17 +218,27 @@ export function MobileProjectDetailPage({ projectId, userRole }: MobileProjectDe
           >
             Nouveau chantier
           </Link>
-          <Link
-            className="flex min-h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-panel"
-            href={`/mobile/teams/new?projectId=${encodeURIComponent(projectId)}`}
-          >
-            Nouvelle equipe
-          </Link>
+          {canManageZones ? (
+            <button
+              className="flex min-h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-panel"
+              onClick={() => setActiveTab('zones')}
+              type="button"
+            >
+              Nouvelle zone
+            </button>
+          ) : (
+            <Link
+              className="flex min-h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-panel"
+              href={`/mobile/teams/new?projectId=${encodeURIComponent(projectId)}`}
+            >
+              Nouvelle equipe
+            </Link>
+          )}
         </section>
       ) : null}
 
       <section className="flex gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 shadow-panel [-webkit-overflow-scrolling:touch]">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             className={`min-h-11 shrink-0 rounded-lg px-3 text-sm font-black transition ${
               activeTab === tab.id ? 'bg-slate-950 text-white' : 'text-slate-600'
@@ -174,6 +254,16 @@ export function MobileProjectDetailPage({ projectId, userRole }: MobileProjectDe
 
       {activeTab === 'summary' ? <SummaryTab detail={detail} /> : null}
       {activeTab === 'sites' ? <SitesTab sites={detail.sites} /> : null}
+      {activeTab === 'zones' && canManageZones ? (
+        <ZonesTab
+          form={zoneForm}
+          loading={zonesQuery.isLoading}
+          onChange={setZoneForm}
+          onCreate={() => createZoneMutation.mutate()}
+          pending={createZoneMutation.isPending}
+          zones={zonesQuery.data?.zones ?? []}
+        />
+      ) : null}
       {activeTab === 'teams' ? <TeamsTab teams={detail.teams} /> : null}
       {activeTab === 'photos' ? <PhotosTab galleryHref={galleryHref} photos={detail.photos} /> : null}
       {activeTab === 'reports' ? <ReportsTab projectId={projectId} reports={detail.reports} /> : null}
@@ -247,6 +337,127 @@ function SitesTab({ sites }: Readonly<{ sites: MobileProjectDetailSite[] }>) {
   );
 }
 
+function ZonesTab({
+  zones,
+  form,
+  loading,
+  pending,
+  onChange,
+  onCreate,
+}: Readonly<{
+  zones: NegotiationZoneItem[];
+  form: { name: string; city: string; region: string };
+  loading: boolean;
+  pending: boolean;
+  onChange: (nextForm: { name: string; city: string; region: string }) => void;
+  onCreate: () => void;
+}>) {
+  return (
+    <section className="space-y-3">
+      <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Nouvelle zone</p>
+        <h2 className="mt-2 text-lg font-black text-slate-950">Enregistrer une zone projet</h2>
+        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+          Une zone sert au planning et au pointage zone. Elle ne remplace pas un chantier GPS fixe.
+        </p>
+        <div className="mt-4 space-y-3">
+          <ZoneTextField
+            label="Nom de la zone"
+            onChange={(value) => onChange({ ...form, name: value })}
+            placeholder="Ex : Cocody, Abengourou, Entrepot Attingie"
+            required
+            value={form.name}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <ZoneTextField
+              label="Ville / commune"
+              onChange={(value) => onChange({ ...form, city: value })}
+              placeholder="Commune"
+              value={form.city}
+            />
+            <ZoneTextField
+              label="Region"
+              onChange={(value) => onChange({ ...form, region: value })}
+              placeholder="Region"
+              value={form.region}
+            />
+          </div>
+          <button
+            className="min-h-12 w-full rounded-lg bg-primary text-sm font-black text-white shadow-panel transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!form.name.trim() || pending}
+            onClick={onCreate}
+            type="button"
+          >
+            {pending ? 'Enregistrement...' : 'Creer la zone'}
+          </button>
+        </div>
+      </article>
+
+      <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Zones du projet</p>
+            <h2 className="mt-1 text-base font-black text-slate-950">{zones.length} zone(s)</h2>
+          </div>
+        </div>
+        {loading ? <p className="mt-4 text-sm font-bold text-slate-500">Chargement des zones...</p> : null}
+        {!loading && zones.length === 0 ? (
+          <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm font-bold text-slate-500">
+            Aucune zone enregistree pour ce projet.
+          </p>
+        ) : null}
+        {zones.length > 0 ? (
+          <div className="mt-4 space-y-2">
+            {zones.map((zone) => (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" key={zone.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-slate-950">{zone.name}</p>
+                    <p className="mt-1 truncate text-xs font-bold text-slate-500">
+                      {[zone.city, zone.region].filter(Boolean).join(' - ') || 'Localisation non renseignee'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-black text-slate-600">
+                    {zone.scopeCount ?? 0} scope(s)
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </article>
+    </section>
+  );
+}
+
+function ZoneTextField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required = false,
+}: Readonly<{
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+}>) {
+  return (
+    <label className="block">
+      <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+        {label}
+        {required ? ' *' : ''}
+      </span>
+      <input
+        className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        value={value}
+      />
+    </label>
+  );
+}
 function TeamsTab({ teams }: Readonly<{ teams: MobileProjectDetailTeam[] }>) {
   if (teams.length === 0) {
     return <EmptyPanel text="Aucune équipe active sur ce projet." />;
@@ -495,6 +706,13 @@ function siteStatusTone(status: SiteStatus) {
   return 'bg-slate-100 text-slate-700';
 }
 
+async function safeJson(response: Response) {
+  try {
+    return await response.json() as unknown;
+  } catch {
+    return null;
+  }
+}
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('fr-FR', {
     day: '2-digit',

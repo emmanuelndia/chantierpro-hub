@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
 import { Eye, EyeOff } from 'lucide-react';
 import { clearAccessToken, authFetch } from '@/lib/auth/client-session';
-import { removeMobileOfflineCache } from '@/lib/mobile-offline-db';
+import { clearClientSessionState } from '@/lib/client-session-cleanup';
 import {
   MOBILE_PHOTO_QUALITY_OPTIONS,
   getStoredMobilePhotoQuality,
@@ -231,8 +231,7 @@ export function MobileProfilePage() {
       }
     },
     onSettled: () => {
-      clearAccessToken();
-      void removeMobileOfflineCache('offline-user').finally(() => {
+      void clearClientSessionState(queryClient).finally(() => {
         window.location.href = '/mobile/login';
       });
     },

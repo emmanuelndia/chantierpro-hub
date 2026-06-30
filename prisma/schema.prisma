@@ -195,6 +195,8 @@ model User {
   createdSites                           Site[]                           @relation("SiteCreator")
   ledTeams                               Team[]                           @relation("TeamLead")
   createdTeams                           Team[]                           @relation("TeamCreator")
+  supervisedTeamAssignments              TeamAssignment[]                 @relation("TeamAssignmentSupervisor")
+  createdTeamAssignments                 TeamAssignment[]                 @relation("TeamAssignmentCreator")
   teamMemberships                        TeamMember[]                     @relation("TeamMemberUser")
   createdMemberships                     TeamMember[]                     @relation("TeamMemberCreator")
   clockInRecords                         ClockInRecord[]
@@ -322,6 +324,7 @@ model Site {
   siteManager             User                         @relation("SiteManager", fields: [siteManagerId], references: [id])
   createdBy               User                         @relation("SiteCreator", fields: [createdById], references: [id])
   teams                   Team[]
+  teamAssignments         TeamAssignment[]
   clockInRecords          ClockInRecord[]
   photos                  Photo[]
   reports                 Report[]
@@ -387,9 +390,30 @@ model Team {
   teamLead    User         @relation("TeamLead", fields: [teamLeadId], references: [id])
   createdBy   User         @relation("TeamCreator", fields: [createdById], references: [id])
   members     TeamMember[]
+  assignments TeamAssignment[]
 
   @@index([siteId])
   @@index([teamLeadId])
+  @@index([createdById])
+}
+
+model TeamAssignment {
+  id           String    @id @default(cuid())
+  teamId       String
+  siteId       String
+  supervisorId String
+  startDate    DateTime  @db.Date
+  endDate      DateTime? @db.Date
+  createdById  String
+  createdAt    DateTime  @default(now())
+  team         Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  site         Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  supervisor   User      @relation("TeamAssignmentSupervisor", fields: [supervisorId], references: [id])
+  createdBy    User      @relation("TeamAssignmentCreator", fields: [createdById], references: [id])
+
+  @@index([teamId, startDate, endDate])
+  @@index([siteId, startDate])
+  @@index([supervisorId, startDate])
   @@index([createdById])
 }
 

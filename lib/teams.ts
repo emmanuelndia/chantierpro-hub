@@ -9,6 +9,7 @@ import {
 import { EXTERNAL_TEAM_RESOURCE_ROLES } from '@/lib/field-roles';
 import type {
   AddTeamMemberInput,
+  CreateTeamAssignmentInput,
   CreateTeamInput,
   TeamApiErrorCode,
   TeamDetail,
@@ -38,6 +39,33 @@ export const teamMemberPublicSelect = {
   },
 } satisfies Prisma.TeamMemberSelect;
 
+export const teamAssignmentPublicSelect = {
+  id: true,
+  teamId: true,
+  siteId: true,
+  supervisorId: true,
+  startDate: true,
+  endDate: true,
+  site: {
+    select: {
+      id: true,
+      name: true,
+      projectId: true,
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+  supervisor: {
+    select: {
+      firstName: true,
+      lastName: true,
+    },
+  },
+} satisfies Prisma.TeamAssignmentSelect;
 export const teamPublicSelect = {
   id: true,
   name: true,
@@ -56,6 +84,10 @@ export const teamPublicSelect = {
     orderBy: [{ assignmentDate: 'asc' }, { id: 'asc' }],
     select: teamMemberPublicSelect,
   },
+  assignments: {
+    orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+    select: teamAssignmentPublicSelect,
+  },
 } satisfies Prisma.TeamSelect;
 
 const unassignedUserSelect = {
@@ -72,6 +104,10 @@ type SerializableTeam = Prisma.TeamGetPayload<{
 
 type SerializableTeamMember = Prisma.TeamMemberGetPayload<{
   select: typeof teamMemberPublicSelect;
+}>;
+
+type SerializableTeamAssignment = Prisma.TeamAssignmentGetPayload<{
+  select: typeof teamAssignmentPublicSelect;
 }>;
 
 type SerializableUnassignedUser = Prisma.UserGetPayload<{
@@ -249,6 +285,26 @@ export function parseAddTeamMemberInput(body: unknown): AddTeamMemberInput | nul
   };
 }
 
+
+export function parseCreateTeamAssignmentInput(body: unknown): CreateTeamAssignmentInput | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const siteId = sanitizeString(body.siteId);
+  const supervisorId = sanitizeString(body.supervisorId);
+  const startDate = sanitizeDateString(body.startDate);
+
+  if (!siteId || !supervisorId || !startDate) {
+    return null;
+  }
+
+  return {
+    siteId,
+    supervisorId,
+    startDate,
+  };
+}
 export async function validateActiveTechnician(prisma: PrismaClient, userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -358,9 +414,10 @@ export async function syncTeamLeadMembership(
     teamId: string;
     teamLeadId: string;
     createdById: string;
+    effectiveDate?: Date;
   },
 ) {
-  const today = toDateOnlyDate(new Date());
+  const effectiveDate = toDateOnlyDate(payload.effectiveDate ?? new Date());
 
   await tx.teamMember.updateMany({
     where: {
@@ -373,7 +430,7 @@ export async function syncTeamLeadMembership(
     },
     data: {
       status: TeamMemberStatus.INACTIVE,
-      endDate: today,
+      endDate: effectiveDate,
     },
   });
 
@@ -381,12 +438,138 @@ export async function syncTeamLeadMembership(
     teamId: payload.teamId,
     userId: payload.teamLeadId,
     teamRole: TeamRole.TEAM_LEAD,
-    assignmentDate: today,
+    assignmentDate: effectiveDate,
     createdById: payload.createdById,
     activeMode: 'updateRole',
   });
 }
 
+export async function createInitialTeamAssignment(
+  tx: Prisma.TransactionClient,
+  payload: {
+    teamId: string;
+    siteId: string;
+    supervisorId: string;
+    createdById: string;
+    startDate?: Date;
+  },
+) {
+  return tx.teamAssignment.create({
+    data: {
+      teamId: payload.teamId,
+      siteId: payload.siteId,
+      supervisorId: payload.supervisorId,
+      startDate: payload.startDate ?? toDateOnlyDate(new Date()),
+      createdById: payload.createdById,
+    },
+    select: teamAssignmentPublicSelect,
+  });
+}
+
+export async function reassignTeam(
+  tx: Prisma.TransactionClient,
+  payload: {
+    teamId: string;
+    siteId: string;
+    supervisorId: string;
+    startDate: Date;
+    createdById: string;
+  },
+) {
+  const startDate = toDateOnlyDate(payload.startDate);
+  const previousDay = addDays(startDate, -1);
+  const overlapping = await tx.teamAssignment.findFirst({
+    where: {
+      teamId: payload.teamId,
+      startDate: { lte: startDate },
+      OR: [{ endDate: null }, { endDate: { gte: startDate } }],
+    },
+    orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+    select: { id: true, startDate: true, siteId: true, supervisorId: true },
+  });
+
+  if (overlapping && overlapping.startDate.getTime() === startDate.getTime()) {
+    const updated = await tx.teamAssignment.update({
+      where: { id: overlapping.id },
+      data: {
+        siteId: payload.siteId,
+        supervisorId: payload.supervisorId,
+      },
+      select: teamAssignmentPublicSelect,
+    });
+
+    await tx.team.update({
+      where: { id: payload.teamId },
+      data: {
+        siteId: payload.siteId,
+        teamLeadId: payload.supervisorId,
+      },
+    });
+
+    await syncTeamLeadMembership(tx, {
+      teamId: payload.teamId,
+      teamLeadId: payload.supervisorId,
+      createdById: payload.createdById,
+      effectiveDate: startDate,
+    });
+
+    return updated;
+  }
+
+  if (overlapping) {
+    await tx.teamAssignment.update({
+      where: { id: overlapping.id },
+      data: { endDate: previousDay },
+    });
+  }
+
+  const futureOverlap = await tx.teamAssignment.findFirst({
+    where: {
+      teamId: payload.teamId,
+      startDate: { gt: startDate },
+      OR: [{ endDate: null }, { endDate: { gte: startDate } }],
+    },
+    select: { id: true },
+  });
+
+  if (futureOverlap) {
+    throw new TeamAssignmentConflictError();
+  }
+
+  const created = await tx.teamAssignment.create({
+    data: {
+      teamId: payload.teamId,
+      siteId: payload.siteId,
+      supervisorId: payload.supervisorId,
+      startDate,
+      createdById: payload.createdById,
+    },
+    select: teamAssignmentPublicSelect,
+  });
+
+  await tx.team.update({
+    where: { id: payload.teamId },
+    data: {
+      siteId: payload.siteId,
+      teamLeadId: payload.supervisorId,
+    },
+  });
+
+  await syncTeamLeadMembership(tx, {
+    teamId: payload.teamId,
+    teamLeadId: payload.supervisorId,
+    createdById: payload.createdById,
+    effectiveDate: startDate,
+  });
+
+  return created;
+}
+
+export class TeamAssignmentConflictError extends Error {
+  constructor() {
+    super('TEAM_ASSIGNMENT_CONFLICT');
+  }
+}
 export async function softDeleteTeamMember(
   tx: Prisma.TransactionClient,
   payload: {
@@ -432,6 +615,22 @@ export function serializeTeamMember(member: SerializableTeamMember): TeamMemberI
   };
 }
 
+
+export function serializeTeamAssignment(assignment: SerializableTeamAssignment) {
+  return {
+    id: assignment.id,
+    teamId: assignment.teamId,
+    siteId: assignment.siteId,
+    siteName: assignment.site.name,
+    projectId: assignment.site.projectId,
+    projectName: assignment.site.project.name,
+    supervisorId: assignment.supervisorId,
+    supervisorName: `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`,
+    startDate: assignment.startDate.toISOString(),
+    endDate: assignment.endDate?.toISOString() ?? null,
+    isCurrent: assignment.endDate === null,
+  };
+}
 export function serializeTeam(team: SerializableTeam): TeamDetail {
   return {
     id: team.id,
@@ -442,6 +641,8 @@ export function serializeTeam(team: SerializableTeam): TeamDetail {
     createdById: team.createdById,
     createdAt: team.createdAt.toISOString(),
     members: team.members.map(serializeTeamMember),
+    currentAssignment: team.assignments.find((assignment) => assignment.endDate === null) ? serializeTeamAssignment(team.assignments.find((assignment) => assignment.endDate === null)!) : null,
+    assignmentHistory: team.assignments.map(serializeTeamAssignment),
   };
 }
 
@@ -471,6 +672,14 @@ export async function listUnassignedTechnicians(
   });
 
   return users.map(serializeUnassignedUser);
+}
+
+function sanitizeDateString(value: unknown) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return null;
+  }
+
+  return value.trim();
 }
 
 function sanitizeName(value: unknown) {
@@ -510,4 +719,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toDateOnlyDate(value: Date) {
   return new Date(`${value.toISOString().slice(0, 10)}T00:00:00.000Z`);
+}
+
+function addDays(value: Date, days: number) {
+  const date = new Date(value);
+  date.setUTCDate(date.getUTCDate() + days);
+  return toDateOnlyDate(date);
 }

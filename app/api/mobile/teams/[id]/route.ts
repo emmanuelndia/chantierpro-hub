@@ -8,9 +8,11 @@ import {
 } from '@/lib/mobile-teams';
 import { prisma } from '@/lib/prisma';
 import {
+  TeamAssignmentConflictError,
   jsonTeamError,
   parseJsonBody,
   parseUpdateTeamInput,
+  reassignTeam,
   serializeTeam,
   syncTeamLeadMembership,
   teamPublicSelect,
@@ -68,9 +70,11 @@ export const PATCH = withAuth<{ id: string }>(async ({ params, req, user }) => {
     });
 
     if (teamLeadId !== existingTeam.teamLeadId) {
-      await syncTeamLeadMembership(tx, {
+      await reassignTeam(tx, {
         teamId: params.id,
-        teamLeadId,
+        siteId: existingTeam.siteId,
+        supervisorId: teamLeadId,
+        startDate: new Date(),
         createdById: user.id,
       });
     }

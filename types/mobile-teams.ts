@@ -1,5 +1,5 @@
 import type { Role, TeamMemberStatus, TeamRole, TeamStatus } from '@prisma/client';
-import type { TeamDetail, UnassignedUserItem } from '@/types/teams';
+import type { TeamAssignmentItem, TeamDetail, UnassignedUserItem } from '@/types/teams';
 
 export type MobileTeamStatusFilter = 'ALL' | TeamStatus;
 
@@ -46,6 +46,8 @@ export type MobileTeamManagementItem = {
   activeMembersCount: number;
   membersCount: number;
   membersPreview: MobileTeamMember[];
+  currentAssignment: TeamAssignmentItem | null;
+  assignmentHistory: TeamAssignmentItem[];
 };
 
 export type MobileTeamsManagementResponse = {

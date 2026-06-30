@@ -263,7 +263,7 @@ export const mobileTabNavigation: readonly MobileNavigationItem[] = [
     href: '/mobile/projects',
     label: 'Projets',
     icon: 'folder',
-    roles: ['PROJECT_MANAGER', 'DIRECTION', 'AUDITOR'],
+    roles: ['PROJECT_MANAGER', 'NEGOTIATION_MANAGER', 'DIRECTION', 'AUDITOR'],
   },
   {
     href: '/mobile/site-map',

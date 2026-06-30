@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { MobileProjectDetailPage } from '@/components/mobile-project-detail-page';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
 
-const mobileProjectRoles: readonly Role[] = [Role.PROJECT_MANAGER, Role.DIRECTION, Role.AUDITOR];
+const mobileProjectRoles: readonly Role[] = [Role.PROJECT_MANAGER, Role.NEGOTIATION_MANAGER, Role.DIRECTION, Role.AUDITOR];
 
 export default async function MobileProjectDetailRoutePage({
   params,

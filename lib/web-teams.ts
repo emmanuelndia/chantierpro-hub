@@ -10,15 +10,19 @@ import {
 } from '@prisma/client';
 import { EXTERNAL_TEAM_RESOURCE_ROLES } from '@/lib/field-roles';
 import {
+  createInitialTeamAssignment,
   jsonTeamError,
   parseAddTeamMemberInput,
   parseCreateTeamInput,
   parseUpdateTeamInput,
   serializeTeam,
+  serializeTeamAssignment,
+  reassignTeam,
   serializeTeamMember,
   serializeUnassignedUser,
   softDeleteTeamMember,
   syncTeamLeadMembership,
+  teamAssignmentPublicSelect,
   teamMemberPublicSelect,
   teamPublicSelect,
   upsertActiveTeamMember,
@@ -304,6 +308,13 @@ export async function createWebTeam(prisma: PrismaClient, user: AuthLikeUser, bo
       select: { id: true },
     });
 
+    await createInitialTeamAssignment(tx, {
+      teamId: created.id,
+      siteId: site.id,
+      supervisorId: input.teamLeadId,
+      createdById: user.id,
+    });
+
     await syncTeamLeadMembership(tx, {
       teamId: created.id,
       teamLeadId: input.teamLeadId,
@@ -354,7 +365,14 @@ export async function updateWebTeam(prisma: PrismaClient, user: AuthLikeUser, te
     });
 
     if (teamLeadId !== existingTeam.teamLeadId) {
-      await syncTeamLeadMembership(tx, {
+      await createInitialTeamAssignment(tx, {
+      teamId: created.id,
+      siteId: site.id,
+      supervisorId: input.teamLeadId,
+      createdById: user.id,
+    });
+
+    await syncTeamLeadMembership(tx, {
         teamId,
         teamLeadId,
         createdById: user.id,
@@ -412,6 +430,13 @@ export async function addWebTeamMember(prisma: PrismaClient, user: AuthLikeUser,
     await tx.team.update({
       where: { id: team.id },
       data: { teamLeadId: input.userId },
+    });
+
+    await createInitialTeamAssignment(tx, {
+      teamId: created.id,
+      siteId: site.id,
+      supervisorId: input.teamLeadId,
+      createdById: user.id,
     });
 
     await syncTeamLeadMembership(tx, {
@@ -524,6 +549,8 @@ function serializeWebTeam(team: WebTeamRow): WebTeamItem {
     teamLeadName: `${team.teamLead.firstName} ${team.teamLead.lastName}`,
     activeMembersCount,
     inactiveMembersCount,
+    currentAssignment: team.assignments.find((assignment) => assignment.endDate === null) ? serializeTeamAssignment(team.assignments.find((assignment) => assignment.endDate === null)!) : null,
+    assignmentHistory: team.assignments.map(serializeTeamAssignment),
   };
 }
 
@@ -606,5 +633,9 @@ const webTeamSelect = {
         },
       },
     },
+  },
+  assignments: {
+    orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+    select: teamAssignmentPublicSelect,
   },
 } satisfies Prisma.TeamSelect;

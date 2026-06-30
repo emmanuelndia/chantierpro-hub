@@ -8,7 +8,9 @@ import {
 } from '@prisma/client';
 import {
   serializeTeam,
+  serializeTeamAssignment,
   teamAccessWhere,
+  teamAssignmentPublicSelect,
   teamPublicSelect,
 } from '@/lib/teams';
 import { EXTERNAL_TEAM_RESOURCE_ROLES } from '@/lib/field-roles';
@@ -64,6 +66,7 @@ type TeamManagementRow = {
       role: Role;
     };
   }[];
+  assignments: Prisma.TeamAssignmentGetPayload<{ select: typeof teamAssignmentPublicSelect }>[];
 };
 
 const MOBILE_TEAM_READ_ROLES: readonly Role[] = [
@@ -467,6 +470,10 @@ const teamManagementSelect = {
       },
     },
   },
+  assignments: {
+    orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+    select: teamAssignmentPublicSelect,
+  },
 } satisfies Prisma.TeamSelect;
 
 function serializeManagementTeam(team: TeamManagementRow): MobileTeamManagementItem {
@@ -486,6 +493,8 @@ function serializeManagementTeam(team: TeamManagementRow): MobileTeamManagementI
     activeMembersCount: activeMembers.length,
     membersCount: members.length,
     membersPreview: activeMembers.slice(0, 6),
+    currentAssignment: team.assignments.find((assignment) => assignment.endDate === null) ? serializeTeamAssignment(team.assignments.find((assignment) => assignment.endDate === null)!) : null,
+    assignmentHistory: team.assignments.map(serializeTeamAssignment),
   };
 }
 

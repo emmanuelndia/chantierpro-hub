@@ -11,6 +11,7 @@ import { MobileInstallPrompt } from '@/components/mobile-install-prompt';
 import { MustChangePasswordBanner } from '@/components/must-change-password-banner';
 import { OfflineBanner } from '@/components/offline-banner';
 import { authFetch } from '@/lib/auth/client-session';
+import { clearClientSessionState } from '@/lib/client-session-cleanup';
 import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import { getMobileNavigationForRole } from '@/lib/navigation';
 import type { WebSessionUser } from '@/lib/auth/web-session';
@@ -108,8 +109,27 @@ export function MobileAppShell({ user, children }: MobileAppShellProps) {
   const incompleteSessionCount = historyQuery.data ?? 0;
 
   useEffect(() => {
-    void setMobileOfflineCache('offline-user', user, null);
-  }, [user]);
+    let cancelled = false;
+
+    async function syncOfflineUser() {
+      const cachedUser = await getMobileOfflineCache<WebSessionUser>('offline-user');
+      const cachedUserId = cachedUser?.payload?.id;
+
+      if (cachedUserId && cachedUserId !== user.id) {
+        await clearClientSessionState(queryClient);
+      }
+
+      if (!cancelled) {
+        await setMobileOfflineCache('offline-user', user, null);
+      }
+    }
+
+    void syncOfflineUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queryClient, user]);
 
   return (
     <div className="min-h-dvh bg-[#F6F9FC] text-ink">

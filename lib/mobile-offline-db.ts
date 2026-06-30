@@ -242,6 +242,42 @@ export async function removeMobileOfflineCache(key: string) {
   db.close();
 }
 
+export async function clearMobileOfflineStorage() {
+  if (typeof indexedDB === 'undefined') {
+    return;
+  }
+
+  try {
+    const db = await openDb();
+    const stores = Array.from(db.objectStoreNames) as StoreName[];
+
+    await Promise.all(
+      stores.map((storeName) => storeRequest(db, storeName, 'readwrite', (store) => store.clear())),
+    );
+
+    db.close();
+  } catch {
+    // Ignore cleanup failures: logout must not be blocked by a browser storage issue.
+  }
+
+  await deleteDatabase(LEGACY_PHOTO_DB_NAME);
+
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(LEGACY_CLOCK_IN_STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_MIGRATION_KEY);
+    window.localStorage.removeItem(LEGACY_PHOTO_MIGRATION_KEY);
+  }
+}
+
+function deleteDatabase(name: string) {
+  return new Promise<void>((resolve) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+    request.onblocked = () => resolve();
+  });
+}
+
 export async function syncMobileOfflineQueue({ mode }: { mode: 'auto' | 'manual' }) {
   if (syncInFlight) {
     return syncInFlight;

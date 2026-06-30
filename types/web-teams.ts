@@ -1,5 +1,5 @@
 import type { Role, TeamMemberStatus, TeamRole, TeamStatus } from '@prisma/client';
-import type { UnassignedUserItem } from '@/types/teams';
+import type { TeamAssignmentItem, UnassignedUserItem } from '@/types/teams';
 
 export type WebTeamStatusFilter = 'ALL' | TeamStatus;
 
@@ -46,6 +46,8 @@ export type WebTeamItem = {
   teamLeadName: string;
   activeMembersCount: number;
   inactiveMembersCount: number;
+  currentAssignment: TeamAssignmentItem | null;
+  assignmentHistory: TeamAssignmentItem[];
 };
 
 export type WebTeamsResponse = {

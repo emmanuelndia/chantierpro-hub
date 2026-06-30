@@ -50,7 +50,7 @@ export function ProjectsListPage({ scope, viewer }: ProjectsListPageProps) {
   const [editingProject, setEditingProject] = useState<ProjectDetail | null>(null);
   const [projectToArchive, setProjectToArchive] = useState<ProjectDetail | null>(null);
 
-  const canCreateProject = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
+  const canCreateProject = viewer.role === 'PROJECT_MANAGER' || viewer.role === 'NEGOTIATION_MANAGER' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
   const canViewInactiveProjects = viewer.role === 'ADMIN';
   const isNegotiationView = viewer.role === 'NEGOTIATION_MANAGER';
   const pageTitle = scope === 'all' ? 'Tous les projets' : 'Mes projets';

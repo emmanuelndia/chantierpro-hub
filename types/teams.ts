@@ -10,6 +10,20 @@ export type TeamMemberItem = {
   status: TeamMemberStatus;
 };
 
+export type TeamAssignmentItem = {
+  id: string;
+  teamId: string;
+  siteId: string;
+  siteName: string;
+  projectId: string;
+  projectName: string;
+  supervisorId: string;
+  supervisorName: string;
+  startDate: string;
+  endDate: string | null;
+  isCurrent: boolean;
+};
+
 export type TeamDetail = {
   id: string;
   name: string;
@@ -19,6 +33,8 @@ export type TeamDetail = {
   createdById: string;
   createdAt: string;
   members: TeamMemberItem[];
+  currentAssignment: TeamAssignmentItem | null;
+  assignmentHistory: TeamAssignmentItem[];
 };
 
 export type UnassignedUserItem = {
@@ -42,6 +58,12 @@ export type AddTeamMemberInput = {
   teamRole: TeamRole;
 };
 
+export type CreateTeamAssignmentInput = {
+  siteId: string;
+  supervisorId: string;
+  startDate: string;
+};
+
 export type TeamApiErrorCode =
   | 'BAD_REQUEST'
   | 'FORBIDDEN'
@@ -49,4 +71,5 @@ export type TeamApiErrorCode =
   | 'CONFLICT'
   | 'INVALID_TEAM_LEAD'
   | 'INVALID_MEMBER'
-  | 'TEAM_LEAD_REMOVAL_FORBIDDEN';
+  | 'TEAM_LEAD_REMOVAL_FORBIDDEN'
+  | 'INVALID_ASSIGNMENT_DATE';

@@ -9,6 +9,7 @@ import { Badge } from '@/components/badge';
 import { MustChangePasswordBanner } from '@/components/must-change-password-banner';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
+import { clearClientSessionState } from '@/lib/client-session-cleanup';
 import { getWebBreadcrumbs, getWebNavigationForRole } from '@/lib/navigation';
 import { formatRoleLabel } from '@/lib/role-labels';
 import type { WebSessionUser } from '@/lib/auth/web-session';
@@ -120,6 +121,7 @@ export function WebAppShell({ user, children }: WebAppShellProps) {
         return;
       }
 
+      await clearClientSessionState(queryClient);
       window.location.href = '/login';
     } catch {
       pushToast({
