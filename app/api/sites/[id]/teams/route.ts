@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import {
   canManageTeams,
+  createInitialTeamAssignment,
   getScopedSiteByIdForTeams,
   jsonTeamError,
   parseCreateTeamInput,
@@ -78,6 +79,13 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
       select: {
         id: true,
       },
+    });
+
+    await createInitialTeamAssignment(tx, {
+      teamId: created.id,
+      siteId: site.id,
+      supervisorId: input.teamLeadId,
+      createdById: user.id,
     });
 
     await syncTeamLeadMembership(tx, {

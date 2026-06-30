@@ -180,6 +180,8 @@ export type RhSitePresenceLiveResource = {
   outOfPlanningValidationLabel?: string | null;
   outOfPlanningTaskText?: string | null;
   outOfPlanningDecisionNote?: string | null;
+  teamName?: string | null;
+  teamSupervisorName?: string | null;
 };
 
 export type RhPresenceGpsPoint = {

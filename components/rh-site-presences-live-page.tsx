@@ -529,6 +529,8 @@ function ResourcePresenceItem({
                   {context.distanceKm === null ? '-' : `${context.distanceKm.toFixed(2)} km`}
                 </p>
                 <p><span className="font-semibold text-slate-950">Tache :</span> {context.taskAction ?? (isProfessionalTravelContext(context) ? 'Deplacement professionnel' : context.presenceContext === 'OFFICE' ? 'Pointage bureau' : 'Aucune tache terrain planifiee')}</p>
+                {context.teamName ? <p><span className="font-semibold text-slate-950">Equipe :</span> {context.teamName}</p> : null}
+                {context.teamSupervisorName ? <p><span className="font-semibold text-slate-950">Superviseur referent :</span> {context.teamSupervisorName}</p> : null}
               </div>
               {context.outOfPlanningDecisionNote ? (
                 <p className="mt-2 rounded-xl bg-blue-50 p-3 text-sm font-semibold leading-6 text-blue-900">

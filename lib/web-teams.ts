@@ -15,9 +15,9 @@ import {
   parseAddTeamMemberInput,
   parseCreateTeamInput,
   parseUpdateTeamInput,
+  reassignTeam,
   serializeTeam,
   serializeTeamAssignment,
-  reassignTeam,
   serializeTeamMember,
   serializeUnassignedUser,
   softDeleteTeamMember,
@@ -365,16 +365,11 @@ export async function updateWebTeam(prisma: PrismaClient, user: AuthLikeUser, te
     });
 
     if (teamLeadId !== existingTeam.teamLeadId) {
-      await createInitialTeamAssignment(tx, {
-      teamId: created.id,
-      siteId: site.id,
-      supervisorId: input.teamLeadId,
-      createdById: user.id,
-    });
-
-    await syncTeamLeadMembership(tx, {
+      await reassignTeam(tx, {
         teamId,
-        teamLeadId,
+        siteId: existingTeam.siteId,
+        supervisorId: teamLeadId,
+        startDate: new Date(),
         createdById: user.id,
       });
     }
@@ -426,22 +421,11 @@ export async function addWebTeamMember(prisma: PrismaClient, user: AuthLikeUser,
     if (input.teamRole !== TeamRole.TEAM_LEAD) {
       return upserted;
     }
-
-    await tx.team.update({
-      where: { id: team.id },
-      data: { teamLeadId: input.userId },
-    });
-
-    await createInitialTeamAssignment(tx, {
-      teamId: created.id,
-      siteId: site.id,
-      supervisorId: input.teamLeadId,
-      createdById: user.id,
-    });
-
-    await syncTeamLeadMembership(tx, {
+    await reassignTeam(tx, {
       teamId: team.id,
-      teamLeadId: input.userId,
+      siteId: team.siteId,
+      supervisorId: input.userId,
+      startDate: new Date(),
       createdById: user.id,
     });
 
@@ -493,7 +477,7 @@ export async function removeWebTeamMember(prisma: PrismaClient, user: AuthLikeUs
   return new Response(null, { status: 204 });
 }
 
-function getScopedWebSiteForTeams(prisma: PrismaClient, siteId: string, user: AuthLikeUser) {
+export function getScopedWebSiteForTeams(prisma: PrismaClient, siteId: string, user: AuthLikeUser) {
   return prisma.site.findFirst({
     where: {
       id: siteId,

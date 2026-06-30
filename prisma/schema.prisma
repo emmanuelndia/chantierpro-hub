@@ -379,16 +379,16 @@ model OfficeLocation {
 }
 
 model Team {
-  id          String       @id @default(cuid())
+  id          String           @id @default(cuid())
   name        String
   siteId      String
   teamLeadId  String
   status      TeamStatus
   createdById String
-  createdAt   DateTime     @default(now())
-  site        Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  teamLead    User         @relation("TeamLead", fields: [teamLeadId], references: [id])
-  createdBy   User         @relation("TeamCreator", fields: [createdById], references: [id])
+  createdAt   DateTime         @default(now())
+  site        Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  teamLead    User             @relation("TeamLead", fields: [teamLeadId], references: [id])
+  createdBy   User             @relation("TeamCreator", fields: [createdById], references: [id])
   members     TeamMember[]
   assignments TeamAssignment[]
 

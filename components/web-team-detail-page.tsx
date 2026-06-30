@@ -3,14 +3,14 @@
 import Link from 'next/link';
 import { TeamMemberStatus, TeamRole, TeamStatus } from '@prisma/client';
 import { History, UserRoundX } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableActionsMenu } from '@/components/table-actions-menu';
 import { useToast } from '@/components/toast-provider';
 import { authFetch } from '@/lib/auth/client-session';
-import type { WebTeamDetailResponse, WebTeamMember } from '@/types/web-teams';
+import type { WebTeamDetailResponse, WebTeamFormOptionsResponse, WebTeamMember } from '@/types/web-teams';
 
 type WebTeamDetailPageProps = Readonly<{
   teamId: string;
@@ -25,10 +25,20 @@ export function WebTeamDetailPage({ teamId }: WebTeamDetailPageProps) {
   const [userId, setUserId] = useState('');
   const [teamRole, setTeamRole] = useState<TeamRole>(TeamRole.MEMBER);
   const [removeTarget, setRemoveTarget] = useState<WebTeamMember | null>(null);
+  const [moveSiteId, setMoveSiteId] = useState('');
+  const [moveSupervisorId, setMoveSupervisorId] = useState('');
+  const [moveStartDate, setMoveStartDate] = useState(new Date().toISOString().slice(0, 10));
 
   const detailQuery = useQuery({
     queryKey: ['web-team-detail', teamId],
     queryFn: () => fetchTeamDetail(teamId),
+    staleTime: 30_000,
+  });
+
+  const optionsQuery = useQuery({
+    queryKey: ['web-team-move-options'],
+    queryFn: fetchTeamOptions,
+    enabled: Boolean(detailQuery.data),
     staleTime: 30_000,
   });
 
@@ -46,6 +56,16 @@ export function WebTeamDetailPage({ teamId }: WebTeamDetailPageProps) {
     onError: (error) => pushToast({ type: 'error', title: 'Ajout impossible', message: error instanceof Error ? error.message : 'Operation refusee.' }),
   });
 
+  const moveMutation = useMutation({
+    mutationFn: () => moveTeam(teamId, { siteId: moveSiteId, supervisorId: moveSupervisorId, startDate: moveStartDate }),
+    onSuccess: async () => {
+      pushToast({ type: 'success', title: 'Equipe deplacee', message: "L'affectation est historisee." });
+      await queryClient.invalidateQueries({ queryKey: ['web-team-detail', teamId] });
+      await queryClient.invalidateQueries({ queryKey: ['web-teams'] });
+    },
+    onError: (error) => pushToast({ type: 'error', title: 'Deplacement impossible', message: error instanceof Error ? error.message : 'Operation refusee.' }),
+  });
+
   const removeMutation = useMutation({
     mutationFn: (memberUserId: string) => removeMember(teamId, memberUserId),
     onSuccess: async () => {
@@ -57,6 +77,13 @@ export function WebTeamDetailPage({ teamId }: WebTeamDetailPageProps) {
   });
 
   const detail = detailQuery.data;
+  const moveOptions = optionsQuery.data;
+
+  useEffect(() => {
+    if (!detail || !moveOptions) return;
+    setMoveSiteId((current) => current ? current : detail.team.siteId);
+    setMoveSupervisorId((current) => current ? current : (detail.team.teamLeadId ?? moveOptions.teamLeads.at(0)?.id ?? ''));
+  }, [detail, moveOptions]);
 
   if (detailQuery.isLoading) return <LoadingState />;
   if (detailQuery.isError || !detail) {
@@ -89,6 +116,53 @@ export function WebTeamDetailPage({ teamId }: WebTeamDetailPageProps) {
         <MetricCard label="Membres actifs" value={detail.activeMembers.length} />
         <MetricCard label="Historique" value={detail.inactiveMembers.length} />
         <MetricCard label="Disponibles" value={detail.availableMembers.length} />
+      </section>
+
+      <section className="grid gap-4 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel lg:grid-cols-[1fr_1fr_180px_auto]">
+        <div className="lg:col-span-4">
+          <h2 className="text-lg font-semibold text-slate-950">Deplacer l&apos;equipe</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Actuel : {detail.team.currentAssignment?.siteName ?? detail.team.siteName} / {detail.team.currentAssignment?.supervisorName ?? detail.team.teamLeadName}
+          </p>
+        </div>
+        <select className={selectClassName} onChange={(event) => setMoveSiteId(event.target.value)} value={moveSiteId}>
+          <option value="">Choisir un chantier</option>
+          {moveOptions?.sites.map((site) => (
+            <option key={site.id} value={site.id}>{site.projectName} - {site.name}</option>
+          ))}
+        </select>
+        <select className={selectClassName} onChange={(event) => setMoveSupervisorId(event.target.value)} value={moveSupervisorId}>
+          <option value="">Choisir un superviseur</option>
+          {moveOptions?.teamLeads.map((lead) => (
+            <option key={lead.id} value={lead.id}>{lead.firstName} {lead.lastName} ({lead.role})</option>
+          ))}
+        </select>
+        <input className={selectClassName} onChange={(event) => setMoveStartDate(event.target.value)} type="date" value={moveStartDate} />
+        <button className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={!moveSiteId || !moveSupervisorId || !moveStartDate || moveMutation.isPending} onClick={() => moveMutation.mutate()} type="button">
+          {moveMutation.isPending ? 'Deplacement...' : 'Affecter'}
+        </button>
+      </section>
+
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-slate-950">Historique des affectations</h2>
+          <Badge tone="neutral">{detail.team.assignmentHistory.length}</Badge>
+        </div>
+        {detail.team.assignmentHistory.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">Aucune affectation historisee.</p>
+        ) : (
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {detail.team.assignmentHistory.map((assignment) => (
+              <article className="rounded-2xl border border-slate-200 p-4" key={assignment.id}>
+                <Badge tone={assignment.isCurrent ? 'success' : 'neutral'}>{assignment.isCurrent ? 'Actuelle' : 'Historique'}</Badge>
+                <p className="mt-3 font-semibold text-slate-950">{assignment.siteName}</p>
+                <p className="mt-1 text-sm text-slate-600">{assignment.projectName}</p>
+                <p className="mt-1 text-sm font-semibold text-slate-700">Superviseur : {assignment.supervisorName}</p>
+                <p className="mt-2 text-xs font-semibold text-slate-500">{formatDate(assignment.startDate)} - {assignment.endDate ? formatDate(assignment.endDate) : 'Actuel'}</p>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-panel">
@@ -183,40 +257,29 @@ function MembersSection({
                   {member.status === TeamMemberStatus.ACTIVE ? 'Actif' : 'Inactif'}
                 </Badge>
               </div>
-              {onRemove && member.status === TeamMemberStatus.ACTIVE ? (
-                <div className="mt-4">
-                  <TableActionsMenu
-                    actions={[
-                      {
-                        label: 'Historique',
-                        icon: <History className="h-4 w-4" />,
-                        href: `/web/users/${encodeURIComponent(member.userId)}/assignments-history`,
-                        navigation: 'client',
-                      },
-                      {
-                        label: 'Retirer',
-                        icon: <UserRoundX className="h-4 w-4" />,
-                        tone: 'danger',
-                        disabled: member.userId === teamLeadId,
-                        onClick: () => onRemove(member),
-                      },
-                    ]}
-                  />
-                </div>
-              ) : (
-                <div className="mt-4">
-                  <TableActionsMenu
-                    actions={[
-                      {
-                        label: 'Historique',
-                        icon: <History className="h-4 w-4" />,
-                        href: `/web/users/${encodeURIComponent(member.userId)}/assignments-history`,
-                        navigation: 'client',
-                      },
-                    ]}
-                  />
-                </div>
-              )}
+              <div className="mt-4">
+                <TableActionsMenu
+                  actions={[
+                    {
+                      label: 'Historique',
+                      icon: <History className="h-4 w-4" />,
+                      href: `/web/users/${encodeURIComponent(member.userId)}/assignments-history`,
+                      navigation: 'client',
+                    },
+                    ...(onRemove && member.status === TeamMemberStatus.ACTIVE
+                      ? [
+                          {
+                            label: 'Retirer',
+                            icon: <UserRoundX className="h-4 w-4" />,
+                            tone: 'danger' as const,
+                            disabled: member.userId === teamLeadId,
+                            onClick: () => onRemove(member),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </div>
             </article>
           ))}
         </div>
@@ -231,6 +294,12 @@ async function fetchTeamDetail(teamId: string) {
   return (await response.json()) as WebTeamDetailResponse;
 }
 
+async function fetchTeamOptions() {
+  const response = await authFetch('/api/teams/web/options', { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Team options request failed with status ${response.status}`);
+  return (await response.json()) as WebTeamFormOptionsResponse;
+}
+
 async function addMember(teamId: string, payload: { userId: string; teamRole: TeamRole }) {
   const response = await authFetch(`/api/teams/web/${teamId}/members`, {
     method: 'POST',
@@ -242,12 +311,26 @@ async function addMember(teamId: string, payload: { userId: string; teamRole: Te
   return { reactivated: Boolean(body?.reactivated) };
 }
 
+async function moveTeam(teamId: string, payload: { siteId: string; supervisorId: string; startDate: string }) {
+  const response = await authFetch(`/api/teams/web/${teamId}/assignments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = (await response.json().catch(() => null)) as { message?: string } | null;
+  if (!response.ok) throw new Error(body?.message ?? "Impossible de deplacer l'equipe.");
+}
+
 async function removeMember(teamId: string, userId: string) {
   const response = await authFetch(`/api/teams/web/${teamId}/members/${userId}`, { method: 'DELETE' });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { message?: string } | null;
     throw new Error(body?.message ?? 'Impossible de retirer ce membre.');
   }
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('fr-FR').format(new Date(value));
 }
 
 function MetricCard({ label, value }: Readonly<{ label: string; value: number }>) {

@@ -413,7 +413,7 @@ export async function getSitePresencesLive(
         ...(query.siteId ? { id: query.siteId } : {}),
       };
 
-  const [sites, assignments, records, freeMissions, officeRecords, negotiationAssignments, negotiationSessions] = await Promise.all([
+  const [sites, assignments, records, freeMissions, officeRecords, negotiationAssignments, negotiationSessions, teamAssignments] = await Promise.all([
     includeTerrain ? prisma.site.findMany({
       where: siteWhere,
       orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
@@ -748,6 +748,35 @@ export async function getSitePresencesLive(
         user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
       },
     }) : Promise.resolve([]),
+    includeTerrain ? prisma.teamAssignment.findMany({
+      where: {
+        startDate: { lte: today },
+        OR: [{ endDate: null }, { endDate: { gte: today } }],
+        site: siteWhere,
+        ...(query.siteId ? { siteId: query.siteId } : {}),
+      },
+      select: {
+        siteId: true,
+        supervisor: { select: { id: true, firstName: true, lastName: true } },
+        team: {
+          select: {
+            name: true,
+            members: {
+              where: {
+                status: 'ACTIVE',
+                assignmentDate: { lte: today },
+                OR: [{ endDate: null }, { endDate: { gte: today } }],
+                ...(query.resourceId ? { userId: query.resourceId } : {}),
+                ...(query.role || managedResourceRoles
+                  ? { user: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
+                  : {}),
+              },
+              select: { userId: true },
+            },
+          },
+        },
+      },
+    }) : Promise.resolve([]),
   ]);
 
   type LivePresenceRow = RhSitePresenceLiveResponse['sites'][number] & {
@@ -979,6 +1008,19 @@ export async function getSitePresencesLive(
     assignmentBySiteUser.set(key, existing ? { ...existing, action: `${existing.action} / ${action}` } : nextAssignment);
   }
 
+
+  const teamInfoBySiteUser = new Map<string, { teamName: string; teamSupervisorName: string }>();
+  for (const teamAssignment of teamAssignments) {
+    const teamSupervisorName = formatPersonName(teamAssignment.supervisor);
+    for (const member of teamAssignment.team.members) {
+      const key = liveResourceKey(teamAssignment.siteId, member.userId);
+      const existing = teamInfoBySiteUser.get(key);
+      teamInfoBySiteUser.set(key, {
+        teamName: existing ? `${existing.teamName} / ${teamAssignment.team.name}` : teamAssignment.team.name,
+        teamSupervisorName: existing ? `${existing.teamSupervisorName} / ${teamSupervisorName}` : teamSupervisorName,
+      });
+    }
+  }
   const allKeys = new Set([...recordsBySiteUser.keys(), ...assignmentBySiteUser.keys()]);
   const resourcesById = new Map<string, { id: string; label: string; role: Role }>();
   const projectManagersById = new Map<string, { id: string; label: string }>();
@@ -1015,6 +1057,11 @@ export async function getSitePresencesLive(
 
     const officeTaskAction = site.presenceContext === 'OFFICE' ? getOfficeTaskAction(siteRecords) : null;
     const resource = buildLiveResource(user, assignment?.action ?? officeTaskAction, siteRecords, site.presenceContext, today);
+    const teamInfo = site.siteId ? teamInfoBySiteUser.get(liveResourceKey(site.siteId, user.id)) : null;
+    if (teamInfo) {
+      resource.teamName = teamInfo.teamName;
+      resource.teamSupervisorName = teamInfo.teamSupervisorName;
+    }
     liveResourceEntries.push({ site, resource, user, assignment });
   }
 

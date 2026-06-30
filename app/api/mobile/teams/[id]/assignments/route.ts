@@ -7,13 +7,12 @@ import {
 } from '@/lib/mobile-teams';
 import { prisma } from '@/lib/prisma';
 import {
-  TeamAssignmentConflictError,
   jsonTeamError,
   parseCreateTeamAssignmentInput,
   parseJsonBody,
   reassignTeam,
-  serializeTeam,
-  teamPublicSelect,
+  serializeTeamAssignment,
+  TeamAssignmentConflictError,
 } from '@/lib/teams';
 
 export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
@@ -34,7 +33,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
 
   const site = await getScopedMobileSiteForTeams(prisma, input.siteId, user);
   if (!site) {
-    return jsonTeamError('NOT_FOUND', 404, 'Chantier introuvable dans votre perimetre.');
+    return jsonTeamError('NOT_FOUND', 404, 'Chantier introuvable.');
   }
 
   const supervisorIsValid = await validateMobileAssignableUserForSite(prisma, user, site.id, input.supervisorId);
@@ -43,25 +42,20 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
   }
 
   try {
-    const updated = await prisma.$transaction(async (tx) => {
-      await reassignTeam(tx, {
+    const assignment = await prisma.$transaction((tx) =>
+      reassignTeam(tx, {
         teamId: team.id,
         siteId: site.id,
         supervisorId: input.supervisorId,
         startDate: new Date(`${input.startDate}T00:00:00.000Z`),
         createdById: user.id,
-      });
+      }),
+    );
 
-      return tx.team.findUniqueOrThrow({
-        where: { id: team.id },
-        select: teamPublicSelect,
-      });
-    });
-
-    return Response.json({ team: serializeTeam(updated) });
+    return Response.json({ assignment: serializeTeamAssignment(assignment) }, { status: 201 });
   } catch (error) {
     if (error instanceof TeamAssignmentConflictError) {
-      return jsonTeamError('CONFLICT', 409, 'Cette equipe a deja une affectation qui chevauche cette date.');
+      return jsonTeamError('CONFLICT', 409, 'Cette date chevauche une affectation existante.');
     }
 
     throw error;

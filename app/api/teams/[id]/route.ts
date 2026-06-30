@@ -6,9 +6,9 @@ import {
   getScopedTeamById,
   jsonTeamError,
   parseJsonBody,
+  reassignTeam,
   parseUpdateTeamInput,
   serializeTeam,
-  syncTeamLeadMembership,
   teamPublicSelect,
   validateActiveTechnician,
 } from '@/lib/teams';
@@ -53,9 +53,11 @@ export const PUT = withAuth<{ id: string }>(async ({ params, req, user }) => {
     });
 
     if (teamLeadId !== existingTeam.teamLeadId) {
-      await syncTeamLeadMembership(tx, {
+      await reassignTeam(tx, {
         teamId: params.id,
-        teamLeadId,
+        siteId: existingTeam.siteId,
+        supervisorId: teamLeadId,
+        startDate: new Date(),
         createdById: user.id,
       });
     }

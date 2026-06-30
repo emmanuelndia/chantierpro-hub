@@ -488,7 +488,7 @@ export async function reassignTeam(
     select: { id: true, startDate: true, siteId: true, supervisorId: true },
   });
 
-  if (overlapping && overlapping.startDate.getTime() === startDate.getTime()) {
+  if (overlapping?.startDate.getTime() === startDate.getTime()) {
     const updated = await tx.teamAssignment.update({
       where: { id: overlapping.id },
       data: {

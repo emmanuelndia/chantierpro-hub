@@ -7,7 +7,7 @@ import {
   parseAddTeamMemberInput,
   parseJsonBody,
   serializeTeamMember,
-  syncTeamLeadMembership,
+  reassignTeam,
   teamMemberPublicSelect,
   upsertActiveTeamMember,
 } from '@/lib/teams';
@@ -55,15 +55,11 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     if (input.teamRole !== TeamRole.TEAM_LEAD) {
       return upserted;
     }
-
-    await tx.team.update({
-      where: { id: team.id },
-      data: { teamLeadId: input.userId },
-    });
-
-    await syncTeamLeadMembership(tx, {
+    await reassignTeam(tx, {
       teamId: team.id,
-      teamLeadId: input.userId,
+      siteId: team.siteId,
+      supervisorId: input.userId,
+      startDate: new Date(),
       createdById: user.id,
     });
 

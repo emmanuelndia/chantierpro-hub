@@ -2,11 +2,11 @@
 
 import { TeamMemberStatus, TeamRole } from '@prisma/client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
 import { useToast } from '@/components/toast-provider';
-import type { MobileTeamDetailResponse } from '@/types/mobile-teams';
+import type { MobileTeamDetailResponse, MobileTeamFormOptionsResponse } from '@/types/mobile-teams';
 
 type MobileTeamDetailPageProps = Readonly<{
   teamId: string;
@@ -19,6 +19,9 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
   const [userId, setUserId] = useState('');
   const [teamRole, setTeamRole] = useState<TeamRole>(TeamRole.MEMBER);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [moveSiteId, setMoveSiteId] = useState('');
+  const [moveSupervisorId, setMoveSupervisorId] = useState('');
+  const [moveStartDate, setMoveStartDate] = useState(new Date().toISOString().slice(0, 10));
 
   const detailQuery = useQuery({
     queryKey: ['mobile-team-detail', teamId],
@@ -35,6 +38,17 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
     staleTime: 30_000,
   });
 
+
+  const optionsQuery = useQuery({
+    queryKey: ['mobile-team-move-options'],
+    queryFn: async () => {
+      const response = await authFetch('/api/mobile/teams/form-options');
+      if (!response.ok) throw new Error(`Team move options request failed with status ${response.status}`);
+      return (await response.json()) as MobileTeamFormOptionsResponse;
+    },
+    enabled: Boolean(detailQuery.data?.canMutate),
+    staleTime: 30_000,
+  });
   const addMutation = useMutation({
     mutationFn: async () => {
       setErrorMessage(null);
@@ -110,7 +124,36 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
     },
   });
 
+
+  const moveMutation = useMutation({
+    mutationFn: async () => {
+      setErrorMessage(null);
+      const response = await authFetch(`/api/mobile/teams/${encodeURIComponent(teamId)}/assignments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId: moveSiteId, supervisorId: moveSupervisorId, startDate: moveStartDate }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, "Impossible de deplacer cette equipe."));
+      }
+    },
+    onSuccess: () => {
+      pushToast({ title: 'Equipe deplacee', message: "L'affectation est historisee.", type: 'success' });
+      void queryClient.invalidateQueries({ queryKey: ['mobile-team-detail', teamId] });
+      void queryClient.invalidateQueries({ queryKey: ['mobile-teams-management'] });
+    },
+    onError: (error) => setErrorMessage(error instanceof Error ? error.message : "Impossible de deplacer cette equipe."),
+  });
   const detail = detailQuery.data;
+  const moveOptions = optionsQuery.data;
+  const selectedMoveSite = useMemo(() => moveOptions?.sites.find((site) => site.id === moveSiteId) ?? null, [moveOptions?.sites, moveSiteId]);
+
+  useEffect(() => {
+    if (!detail || !moveOptions) return;
+    setMoveSiteId((current) => current ? current : detail.team.siteId);
+    setMoveSupervisorId((current) => current ? current : (detail.team.teamLeadId ?? moveOptions.teamLeads.at(0)?.id ?? ''));
+  }, [detail, moveOptions]);
 
   if (detailQuery.isLoading) return <TeamDetailLoadingState />;
   if (detailQuery.isError || !detail) {
@@ -182,6 +225,46 @@ export function MobileTeamDetailPage({ teamId }: MobileTeamDetailPageProps) {
         <Metric label="Disponibles" value={detail.availableMembers.length} />
       </section>
 
+
+      {detail.canMutate ? (
+        <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+          <div>
+            <h2 className="text-base font-black text-slate-950">Deplacer l&apos;equipe</h2>
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              Affectation actuelle : {detail.team.currentAssignment?.siteName ?? detail.team.siteName} / {detail.team.currentAssignment?.supervisorName ?? detail.team.teamLeadName}
+            </p>
+          </div>
+          <select className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900" onChange={(event) => setMoveSiteId(event.target.value)} value={moveSiteId}>
+            <option value="">Choisir un chantier</option>
+            {moveOptions?.sites.map((site) => (
+              <option key={site.id} value={site.id}>{site.projectName} - {site.name}</option>
+            ))}
+          </select>
+          <select className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900" onChange={(event) => setMoveSupervisorId(event.target.value)} value={moveSupervisorId}>
+            <option value="">Choisir un superviseur</option>
+            {moveOptions?.teamLeads.map((lead) => (
+              <option key={lead.id} value={lead.id}>{lead.firstName} {lead.lastName}</option>
+            ))}
+          </select>
+          <input className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900" onChange={(event) => setMoveStartDate(event.target.value)} type="date" value={moveStartDate} />
+          {selectedMoveSite ? <p className="text-xs font-semibold text-slate-500">Nouvelle affectation : {selectedMoveSite.projectName} - {selectedMoveSite.name}</p> : null}
+          <button className="flex min-h-12 w-full items-center justify-center rounded-lg bg-slate-950 text-sm font-black text-white disabled:opacity-60" disabled={!moveSiteId || !moveSupervisorId || !moveStartDate || moveMutation.isPending} onClick={() => moveMutation.mutate()} type="button">
+            {moveMutation.isPending ? 'Deplacement...' : "Affecter a ce chantier"}
+          </button>
+        </section>
+      ) : null}
+
+      <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
+        <h2 className="text-base font-black text-slate-950">Historique des affectations</h2>
+        {detail.team.assignmentHistory.length === 0 ? <p className="text-sm font-semibold text-slate-500">Aucune affectation historisee.</p> : null}
+        {detail.team.assignmentHistory.map((assignment) => (
+          <article className="rounded-lg bg-slate-50 p-3" key={assignment.id}>
+            <p className="text-sm font-black text-slate-950">{assignment.siteName}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-600">{assignment.projectName} / {assignment.supervisorName}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">{formatDate(assignment.startDate)} - {assignment.endDate ? formatDate(assignment.endDate) : 'Actuel'}</p>
+          </article>
+        ))}
+      </section>
       {errorMessage ? (
         <section className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
           {errorMessage}
@@ -277,6 +360,10 @@ function TeamDetailLoadingState() {
       <div className="h-72 animate-pulse rounded-lg bg-slate-100" />
     </div>
   );
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('fr-FR').format(new Date(value));
 }
 
 function formatTeamRole(role: TeamRole) {

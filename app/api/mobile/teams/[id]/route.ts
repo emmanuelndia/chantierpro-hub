@@ -8,13 +8,11 @@ import {
 } from '@/lib/mobile-teams';
 import { prisma } from '@/lib/prisma';
 import {
-  TeamAssignmentConflictError,
   jsonTeamError,
   parseJsonBody,
   parseUpdateTeamInput,
   reassignTeam,
   serializeTeam,
-  syncTeamLeadMembership,
   teamPublicSelect,
 } from '@/lib/teams';
 
