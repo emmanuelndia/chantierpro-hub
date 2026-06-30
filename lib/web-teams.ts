@@ -8,7 +8,7 @@ import {
   TeamStatus,
   type PrismaClient,
 } from '@prisma/client';
-import { EXTERNAL_TEAM_RESOURCE_ROLES } from '@/lib/field-roles';
+import { TEAM_ASSIGNABLE_USER_ROLES } from '@/lib/field-roles';
 import {
   createInitialTeamAssignment,
   jsonTeamError,
@@ -293,7 +293,7 @@ export async function createWebTeam(prisma: PrismaClient, user: AuthLikeUser, bo
 
   const leaderIsValid = await validateActiveTechnician(prisma, input.teamLeadId);
   if (!leaderIsValid) {
-    return jsonTeamError('INVALID_TEAM_LEAD', 400, "Le chef d'equipe selectionne doit etre une ressource externe active.");
+    return jsonTeamError('INVALID_TEAM_LEAD', 400, "Le chef d'equipe selectionne doit etre une ressource terrain active.");
   }
 
   const team = await prisma.$transaction(async (tx) => {
@@ -351,7 +351,7 @@ export async function updateWebTeam(prisma: PrismaClient, user: AuthLikeUser, te
   const teamLeadId = input.teamLeadId ?? existingTeam.teamLeadId;
   const leaderIsValid = teamLeadId === existingTeam.teamLeadId || (await validateActiveTechnician(prisma, teamLeadId));
   if (!leaderIsValid) {
-    return jsonTeamError('INVALID_TEAM_LEAD', 400, "Le chef d'equipe selectionne doit etre une ressource externe active.");
+    return jsonTeamError('INVALID_TEAM_LEAD', 400, "Le chef d'equipe selectionne doit etre une ressource terrain active.");
   }
 
   const team = await prisma.$transaction(async (tx) => {
@@ -403,7 +403,7 @@ export async function addWebTeamMember(prisma: PrismaClient, user: AuthLikeUser,
 
   const memberIsValid = await validateActiveTechnician(prisma, input.userId);
   if (!memberIsValid) {
-    return jsonTeamError('INVALID_MEMBER', 400, 'Le membre selectionne doit etre une ressource externe active.');
+    return jsonTeamError('INVALID_MEMBER', 400, 'Le membre selectionne doit etre une ressource terrain active.');
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -556,7 +556,7 @@ function assignableUserWhere(): Prisma.UserWhereInput {
   return {
     isActive: true,
     role: {
-      in: [...EXTERNAL_TEAM_RESOURCE_ROLES],
+      in: [...TEAM_ASSIGNABLE_USER_ROLES],
     },
   };
 }

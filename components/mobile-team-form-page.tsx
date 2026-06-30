@@ -238,7 +238,7 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
             ))}
           </select>
           {options.teamLeads.length === 0 ? (
-            <p className="mt-2 text-xs font-semibold text-orange-700">Aucune ressource externe active disponible.</p>
+            <p className="mt-2 text-xs font-semibold text-orange-700">Aucune ressource terrain active disponible.</p>
           ) : null}
         </Field>
         <Field label="Statut" error={errors.status}>

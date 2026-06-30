@@ -23,6 +23,14 @@ export const FIELD_USER_ROLES: readonly Role[] = [
   ...FLEET_FIELD_USER_ROLES,
 ];
 
+export const TEAM_ASSIGNABLE_USER_ROLES: readonly Role[] = [
+  Role.SUPERVISOR,
+  Role.RESOURCE,
+  Role.EXTERNAL_RESOURCE,
+  Role.COORDINATOR,
+  Role.GENERAL_SUPERVISOR,
+];
+
 export const EXTERNAL_TEAM_RESOURCE_ROLES: readonly Role[] = [Role.EXTERNAL_RESOURCE];
 
 type BusinessManagerRole = Extract<Role, 'BE_MANAGER' | 'NEGOTIATION_MANAGER' | 'FLEET_MANAGER'>;

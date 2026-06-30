@@ -6,7 +6,7 @@ import {
   TeamStatus,
   type PrismaClient,
 } from '@prisma/client';
-import { EXTERNAL_TEAM_RESOURCE_ROLES } from '@/lib/field-roles';
+import { TEAM_ASSIGNABLE_USER_ROLES } from '@/lib/field-roles';
 import type {
   AddTeamMemberInput,
   CreateTeamAssignmentInput,
@@ -149,8 +149,8 @@ export function canManageTeams(role: Role) {
   return TEAM_MANAGE_ROLES.includes(role);
 }
 
-export function isExternalTeamResourceRole(role: Role) {
-  return EXTERNAL_TEAM_RESOURCE_ROLES.includes(role);
+export function isTeamAssignableUserRole(role: Role) {
+  return TEAM_ASSIGNABLE_USER_ROLES.includes(role);
 }
 
 export function teamAccessWhere(user: AuthLikeUser): Prisma.TeamWhereInput {
@@ -315,7 +315,7 @@ export async function validateActiveTechnician(prisma: PrismaClient, userId: str
     },
   });
 
-  return Boolean(user && user.isActive && isExternalTeamResourceRole(user.role));
+  return Boolean(user && user.isActive && isTeamAssignableUserRole(user.role));
 }
 
 export async function hasActiveMember(prisma: PrismaClient, teamId: string, userId: string) {
@@ -663,7 +663,7 @@ export async function listUnassignedTechnicians(
   const users = await prisma.user.findMany({
     where: {
       role: {
-        in: [...EXTERNAL_TEAM_RESOURCE_ROLES],
+        in: [...TEAM_ASSIGNABLE_USER_ROLES],
       },
       isActive: true,
     },
