@@ -25,5 +25,5 @@ function parseDirectionAttendanceRoles(value: string | null): Role[] {
   return value
     .split(',')
     .map((role) => role.trim())
-    .filter((role): role is Role => allowedRoles.has(role as Role));
+    .filter((role): role is Role => allowedRoles.has(role as Role) && role !== Role.DIRECTION);
 }

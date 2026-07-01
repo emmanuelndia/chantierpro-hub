@@ -304,9 +304,10 @@ export async function getDirectionAttendanceReport(
   const day = toDateOnlyDate(date);
   const tomorrow = new Date(day);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const reportRoles = roles.filter((role) => role !== Role.DIRECTION);
   const activeUserWhere: Prisma.UserWhereInput = {
     isActive: true,
-    ...(roles.length > 0 ? { role: { in: roles } } : {}),
+    role: reportRoles.length > 0 ? { in: reportRoles } : { not: Role.DIRECTION },
   };
 
   const [users, clockInBounds, todayRecords, negotiationBounds, todayNegotiationSessions] = await Promise.all([

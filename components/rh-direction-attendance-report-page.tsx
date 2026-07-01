@@ -30,7 +30,9 @@ const directionExportScopes: { id: DirectionExportScope; label: string }[] = [
   { id: 'departure-only', label: 'Sortie seule' },
 ];
 
-const directionRoleOptions = Object.values(Role).map((role) => ({ id: role, label: formatRoleLabel(role) }));
+const directionRoleOptions = Object.values(Role)
+  .filter((role) => role !== Role.DIRECTION)
+  .map((role) => ({ id: role, label: formatRoleLabel(role) }));
 
 export function RhDirectionAttendanceReportPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
