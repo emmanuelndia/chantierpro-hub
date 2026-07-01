@@ -299,14 +299,19 @@ export function canAccessDirectionAttendanceReport(role: Role) {
 export async function getDirectionAttendanceReport(
   prisma: PrismaClient,
   date: Date,
+  roles: Role[] = [],
 ): Promise<RhDirectionAttendanceReportResponse> {
   const day = toDateOnlyDate(date);
   const tomorrow = new Date(day);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const activeUserWhere: Prisma.UserWhereInput = {
+    isActive: true,
+    ...(roles.length > 0 ? { role: { in: roles } } : {}),
+  };
 
   const [users, clockInBounds, todayRecords, negotiationBounds, todayNegotiationSessions] = await Promise.all([
     prisma.user.findMany({
-      where: { isActive: true },
+      where: activeUserWhere,
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
@@ -320,7 +325,7 @@ export async function getDirectionAttendanceReport(
     }),
     prisma.clockInRecord.groupBy({
       by: ['userId'],
-      where: { status: ClockInStatus.VALID, user: { isActive: true } },
+      where: { status: ClockInStatus.VALID, user: activeUserWhere },
       _min: { timestampLocal: true },
       _max: { timestampLocal: true },
     }),
@@ -328,7 +333,7 @@ export async function getDirectionAttendanceReport(
       where: {
         status: ClockInStatus.VALID,
         timestampLocal: { gte: day, lt: tomorrow },
-        user: { isActive: true },
+        user: activeUserWhere,
         type: { in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END] },
       },
       orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
@@ -336,13 +341,13 @@ export async function getDirectionAttendanceReport(
     }),
     prisma.negotiationSession.groupBy({
       by: ['userId'],
-      where: { user: { isActive: true } },
+      where: { user: activeUserWhere },
       _min: { startTime: true },
       _max: { startTime: true, endTime: true },
     }),
     prisma.negotiationSession.findMany({
       where: {
-        user: { isActive: true },
+        user: activeUserWhere,
         OR: [
           { startTime: { gte: day, lt: tomorrow } },
           { endTime: { gte: day, lt: tomorrow } },
@@ -445,10 +450,12 @@ export async function buildDirectionAttendanceReportExport(
   date: Date,
   format: 'xlsx' | 'pdf',
   scope: DirectionAttendanceExportScope = 'all',
+  roles: Role[] = [],
 ) {
-  const report = await getDirectionAttendanceReport(prisma, date);
+  const report = await getDirectionAttendanceReport(prisma, date, roles);
   const scopeSuffix = scope === 'all' ? '' : `-${scope}`;
-  const fileBaseName = `rapport-direction-pointage-${report.date}${scopeSuffix}`;
+  const roleSuffix = roles.length > 0 ? `-${roles.map((role) => role.toLowerCase()).join('-')}` : '';
+  const fileBaseName = `rapport-direction-pointage-${report.date}${scopeSuffix}${roleSuffix}`;
 
   if (format === 'xlsx') {
     return {
@@ -3067,6 +3074,11 @@ type DirectionAttendanceExportSection = {
   users: RhDirectionAttendanceReportResponse['users']['clockedToday'];
 };
 
+type DirectionAttendancePdfMetric = {
+  label: string;
+  value: string | number;
+};
+
 function getDirectionAttendanceExportSections(
   report: RhDirectionAttendanceReportResponse,
   scope: DirectionAttendanceExportScope,
@@ -3138,20 +3150,13 @@ function buildDirectionAttendancePdfBuffer(report: RhDirectionAttendanceReportRe
   pdf.text(`Genere : ${formatDirectionDateTime(report.generatedAt)}`, pageWidth - margin, y + 11, { align: 'right' });
   y += 18;
 
-  const metrics = [
-    ['Utilisateurs actifs', report.summary.activeUsers],
-    ['Ont pointe', report.summary.clockedToday],
-    ['Pas pointe ce jour', report.summary.notClockedToday],
-    ['Jamais pointe', report.summary.neverClocked],
-    ['Sortis', report.summary.leftToday],
-    ['Sessions ouvertes', report.summary.openSessions],
-    ['Retards', report.summary.lateToday],
-    ['Sortie sans entree', report.summary.departureOnlyToday],
-  ] as const;
-  const metricWidth = (pageWidth - margin * 2) / 4;
-  metrics.forEach(([label, value], index) => {
-    const x = margin + (index % 4) * metricWidth;
-    if (index === 4) y += 18;
+  const sections = getDirectionAttendanceExportSections(report, scope);
+  const metrics = getDirectionAttendancePdfMetrics(report, scope, sections);
+  const metricColumns = scope === 'all' ? 4 : Math.min(metrics.length, 3);
+  const metricWidth = (pageWidth - margin * 2) / metricColumns;
+  metrics.forEach(({ label, value }, index) => {
+    const x = margin + (index % metricColumns) * metricWidth;
+    if (index > 0 && index % metricColumns === 0) y += 18;
     pdf.setFillColor(248, 250, 252);
     pdf.setDrawColor(226, 232, 240);
     pdf.rect(x, y, metricWidth - 3, 14, 'FD');
@@ -3161,15 +3166,39 @@ function buildDirectionAttendancePdfBuffer(report: RhDirectionAttendanceReportRe
     pdf.setFontSize(13);
     pdf.text(String(value), x + 2, y + 11);
   });
-  y += 24;
-
-  const sections = getDirectionAttendanceExportSections(report, scope);
+  y += scope === 'all' ? 24 : 18;
 
   for (const section of sections) {
     y = drawDirectionPdfSection(pdf, section.title, section.users, y, margin, pageWidth, pageHeight);
   }
 
   return Buffer.from(pdf.output('arraybuffer'));
+}
+
+function getDirectionAttendancePdfMetrics(
+  report: RhDirectionAttendanceReportResponse,
+  scope: DirectionAttendanceExportScope,
+  sections: DirectionAttendanceExportSection[],
+): DirectionAttendancePdfMetric[] {
+  if (scope === 'all') {
+    return [
+      { label: 'Utilisateurs actifs', value: report.summary.activeUsers },
+      { label: 'Ont pointe', value: report.summary.clockedToday },
+      { label: 'Pas pointe ce jour', value: report.summary.notClockedToday },
+      { label: 'Jamais pointe', value: report.summary.neverClocked },
+      { label: 'Sortis', value: report.summary.leftToday },
+      { label: 'Sessions ouvertes', value: report.summary.openSessions },
+      { label: 'Retards', value: report.summary.lateToday },
+      { label: 'Sortie sans entree', value: report.summary.departureOnlyToday },
+    ];
+  }
+
+  const selectedSection = sections[0];
+  return [
+    { label: 'Liste exportee', value: selectedSection?.title ?? 'Filtre' },
+    { label: 'Utilisateurs liste', value: selectedSection?.users.length ?? 0 },
+    { label: 'Utilisateurs actifs', value: report.summary.activeUsers },
+  ];
 }
 
 function drawDirectionPdfSection(

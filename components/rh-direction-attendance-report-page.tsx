@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { EmptyState } from '@/components/empty-state';
 import { authFetch } from '@/lib/auth/client-session';
 import { formatRoleLabel } from '@/lib/role-labels';
@@ -30,16 +30,23 @@ const directionExportScopes: { id: DirectionExportScope; label: string }[] = [
   { id: 'departure-only', label: 'Sortie seule' },
 ];
 
+const directionRoleOptions = Object.values(Role).map((role) => ({ id: role, label: formatRoleLabel(role) }));
+
 export function RhDirectionAttendanceReportPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [activeTab, setActiveTab] = useState<DirectionReportTab>('not-clocked-today');
+  const [selectedRoles, setSelectedRoles] = useState<Role[]>([]);
   const [exportScope, setExportScope] = useState<DirectionExportScope>('active-tab');
   const [exportingFormat, setExportingFormat] = useState<'xlsx' | 'pdf' | null>(null);
 
+  const rolesQueryValue = selectedRoles.join(',');
+
   const reportQuery = useQuery({
-    queryKey: ['rh-direction-attendance-report', selectedDate],
+    queryKey: ['rh-direction-attendance-report', selectedDate, rolesQueryValue],
     queryFn: async () => {
-      const response = await authFetch(`/api/rh/direction-attendance-report?date=${encodeURIComponent(selectedDate)}`, { cache: 'no-store' });
+      const query = new URLSearchParams({ date: selectedDate });
+      if (rolesQueryValue) query.set('roles', rolesQueryValue);
+      const response = await authFetch(`/api/rh/direction-attendance-report?${query.toString()}`, { cache: 'no-store' });
       if (!response.ok) {
         throw new Error(`Direction attendance report failed with status ${response.status}`);
       }
@@ -72,6 +79,32 @@ export function RhDirectionAttendanceReportPage() {
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
               Suivez les comptes actifs qui utilisent le pointage, les absences de pointage a la date choisie, et les comptes sans aucun pointage.
             </p>
+            <div className="mt-5 flex max-w-4xl flex-wrap gap-2">
+              {directionRoleOptions.map((role) => {
+                const selected = selectedRoles.includes(role.id);
+                return (
+                  <button
+                    className={`rounded-full border px-3 py-2 text-[0.68rem] font-black uppercase tracking-[0.1em] transition ${
+                      selected ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                    key={role.id}
+                    onClick={() => setSelectedRoles((current) => toggleDirectionRole(current, role.id))}
+                    type="button"
+                  >
+                    {role.label}
+                  </button>
+                );
+              })}
+              {selectedRoles.length > 0 ? (
+                <button
+                  className="rounded-full border border-orange-200 bg-orange-50 px-3 py-2 text-[0.68rem] font-black uppercase tracking-[0.1em] text-orange-700 transition hover:bg-orange-100"
+                  onClick={() => setSelectedRoles([])}
+                  type="button"
+                >
+                  Tous les roles
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="flex flex-wrap items-end gap-3">
             <label className="space-y-2">
@@ -104,23 +137,23 @@ export function RhDirectionAttendanceReportPage() {
             </button>
             <button
               className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
-              disabled={!data || exportingFormat !== null}
-              onClick={() => void downloadDirectionReportExport(selectedDate, 'xlsx', resolveDirectionExportScope(exportScope, activeTab), setExportingFormat)}
+              disabled={!data || exportingFormat !== null || reportQuery.isFetching}
+              onClick={() => void downloadDirectionReportExport(selectedDate, 'xlsx', resolveDirectionExportScope(exportScope, activeTab), selectedRoles, setExportingFormat)}
               type="button"
             >
               {exportingFormat === 'xlsx' ? 'Generation...' : 'Export Excel'}
             </button>
             <button
               className="rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-              disabled={!data || exportingFormat !== null}
-              onClick={() => void downloadDirectionReportExport(selectedDate, 'pdf', resolveDirectionExportScope(exportScope, activeTab), setExportingFormat)}
+              disabled={!data || exportingFormat !== null || reportQuery.isFetching}
+              onClick={() => void downloadDirectionReportExport(selectedDate, 'pdf', resolveDirectionExportScope(exportScope, activeTab), selectedRoles, setExportingFormat)}
               type="button"
             >
               {exportingFormat === 'pdf' ? 'Generation...' : 'Export PDF'}
             </button>
             <button
               className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-              disabled={!data || exportingFormat !== null}
+              disabled={!data || exportingFormat !== null || reportQuery.isFetching}
               onClick={() => exportDirectionReportCsv(data, resolveDirectionExportScope(exportScope, activeTab))}
               type="button"
             >
@@ -253,16 +286,24 @@ function resolveDirectionExportScope(scope: DirectionExportScope, activeTab: Dir
   return scope === 'active-tab' ? activeTab : scope;
 }
 
+function toggleDirectionRole(current: Role[], role: Role) {
+  const next = current.includes(role) ? current.filter((item) => item !== role) : [...current, role];
+  return next.sort((left, right) => left.localeCompare(right));
+}
+
 async function downloadDirectionReportExport(
   selectedDate: string,
   format: 'xlsx' | 'pdf',
   scope: 'all' | DirectionReportTab,
+  roles: Role[],
   setExportingFormat: (format: 'xlsx' | 'pdf' | null) => void,
 ) {
   setExportingFormat(format);
   try {
+    const query = new URLSearchParams({ date: selectedDate, format, scope });
+    if (roles.length > 0) query.set('roles', roles.join(','));
     const response = await authFetch(
-      `/api/rh/direction-attendance-report/export?date=${encodeURIComponent(selectedDate)}&format=${format}&scope=${encodeURIComponent(scope)}`,
+      `/api/rh/direction-attendance-report/export?${query.toString()}`,
       { cache: 'no-store' },
     );
     if (!response.ok) {
