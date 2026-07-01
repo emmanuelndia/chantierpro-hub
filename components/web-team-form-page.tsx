@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
 import type { TeamDetail } from '@/types/teams';
 import type { WebTeamDetailResponse, WebTeamFormOptionsResponse, WebTeamPayload } from '@/types/web-teams';
 
@@ -56,6 +57,9 @@ export function WebTeamFormPage({ mode, teamId }: WebTeamFormPageProps) {
     const sites = options?.sites ?? [];
     return values.projectId ? sites.filter((site) => site.projectId === values.projectId) : sites;
   }, [options?.sites, values.projectId]);
+  const projectOptions = useMemo(() => toProjectOptions(options?.projects ?? []), [options?.projects]);
+  const siteOptions = useMemo(() => toSiteOptions(filteredSites), [filteredSites]);
+  const teamLeadOptions = useMemo(() => toTeamLeadOptions(options?.teamLeads ?? []), [options?.teamLeads]);
 
   useEffect(() => {
     if (!options) return;
@@ -86,9 +90,9 @@ export function WebTeamFormPage({ mode, teamId }: WebTeamFormPageProps) {
         '';
       setValues((current) => ({
         ...current,
-        projectId: current.projectId || (options.sites.find((site) => site.id === siteId)?.projectId ?? projectId),
-        siteId: current.siteId || siteId,
-        teamLeadId: current.teamLeadId || (options.teamLeads.at(0)?.id ?? ''),
+        projectId: current.projectId ? current.projectId : (options.sites.find((site) => site.id === siteId)?.projectId ?? projectId),
+        siteId: current.siteId ? current.siteId : siteId,
+        teamLeadId: current.teamLeadId ? current.teamLeadId : (options.teamLeads.at(0)?.id ?? ''),
       }));
     }
   }, [detail, mode, options, preferredProjectId, preferredSiteId]);
@@ -140,49 +144,42 @@ export function WebTeamFormPage({ mode, teamId }: WebTeamFormPageProps) {
 
       <section className="grid gap-5 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel lg:grid-cols-2">
         <Field label="Projet">
-          <select
-            className={inputClassName}
+          <SearchableSelect
+            allowClear={false}
             disabled={mode === 'edit'}
-            onChange={(event) => {
-              const projectId = event.target.value;
-              setValues((current) => ({
-                ...current,
-                projectId,
-                siteId: options.sites.find((site) => site.projectId === projectId)?.id ?? '',
-              }));
+            emptyLabel="Aucun projet trouve."
+            onChange={(projectId) => {
+              const nextSiteId = options.sites.find((site) => site.projectId === projectId)?.id ?? '';
+              setValues((current) => ({ ...current, projectId, siteId: nextSiteId }));
             }}
+            options={projectOptions}
+            placeholder="Rechercher un projet"
             value={values.projectId}
-          >
-            <option value="">Choisir</option>
-            {options.projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
         <Field label="Chantier">
-          <select className={inputClassName} disabled={mode === 'edit'} onChange={(event) => setValues((current) => ({ ...current, siteId: event.target.value }))} value={values.siteId}>
-            <option value="">Choisir</option>
-            {filteredSites.map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.projectName} - {site.name}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            allowClear={false}
+            disabled={mode === 'edit'}
+            emptyLabel="Aucun chantier trouve."
+            onChange={(siteId) => setValues((current) => ({ ...current, siteId }))}
+            options={siteOptions}
+            placeholder="Rechercher un chantier"
+            value={values.siteId}
+          />
         </Field>
         <Field label="Nom">
           <input className={inputClassName} onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))} value={values.name} />
         </Field>
         <Field label="Chef d'equipe">
-          <select className={inputClassName} onChange={(event) => setValues((current) => ({ ...current, teamLeadId: event.target.value }))} value={values.teamLeadId}>
-            <option value="">Choisir</option>
-            {options.teamLeads.map((lead) => (
-              <option key={lead.id} value={lead.id}>
-                {lead.firstName} {lead.lastName} ({lead.role})
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            allowClear={false}
+            emptyLabel="Aucune ressource terrain trouvee."
+            onChange={(teamLeadId) => setValues((current) => ({ ...current, teamLeadId }))}
+            options={teamLeadOptions}
+            placeholder="Rechercher une ressource"
+            value={values.teamLeadId}
+          />
         </Field>
         <Field label="Statut">
           <select className={inputClassName} onChange={(event) => setValues((current) => ({ ...current, status: event.target.value as TeamStatus }))} value={values.status}>
@@ -216,6 +213,31 @@ async function fetchTeamDetail(teamId: string) {
   return (await response.json()) as WebTeamDetailResponse;
 }
 
+function toProjectOptions(projects: { id: string; name: string }[]): SearchableSelectOption[] {
+  return projects.map((project) => ({
+    value: project.id,
+    label: project.name,
+    keywords: project.name,
+  }));
+}
+
+function toSiteOptions(sites: { id: string; name: string; projectName: string }[]): SearchableSelectOption[] {
+  return sites.map((site) => ({
+    value: site.id,
+    label: site.name,
+    description: site.projectName,
+    keywords: `${site.projectName} ${site.name}`,
+  }));
+}
+
+function toTeamLeadOptions(leads: { id: string; firstName: string; lastName: string; role: string }[]): SearchableSelectOption[] {
+  return leads.map((lead) => ({
+    value: lead.id,
+    label: `${lead.firstName} ${lead.lastName}`,
+    description: lead.role,
+    keywords: `${lead.firstName} ${lead.lastName} ${lead.role}`,
+  }));
+}
 function validate(values: TeamFormValues) {
   if (!values.projectId) return 'Projet requis.';
   if (!values.siteId) return 'Chantier requis.';

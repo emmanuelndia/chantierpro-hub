@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { authFetch } from '@/lib/auth/client-session';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select';
 import type { WebSessionUser } from '@/lib/auth/web-session';
 import type { MobileTeamFormOptionsResponse, MobileTeamFormResponse } from '@/types/mobile-teams';
 import type { TeamDetail } from '@/types/teams';
@@ -83,6 +84,9 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
     () => options?.sites.find((site) => site.id === values.siteId) ?? null,
     [options?.sites, values.siteId],
   );
+  const projectOptions = useMemo(() => toProjectOptions(options?.projects ?? []), [options?.projects]);
+  const siteOptions = useMemo(() => toSiteOptions(filteredSites), [filteredSites]);
+  const teamLeadOptions = useMemo(() => toTeamLeadOptions(options?.teamLeads ?? []), [options?.teamLeads]);
 
   useEffect(() => {
     if (mode === 'edit' && team && options) {
@@ -111,9 +115,9 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
 
       setValues((current) => ({
         ...current,
-        projectId: current.projectId || selectedProjectId,
-        siteId: current.siteId || siteId,
-        teamLeadId: current.teamLeadId || teamLeadId,
+        projectId: current.projectId ? current.projectId : selectedProjectId,
+        siteId: current.siteId ? current.siteId : siteId,
+        teamLeadId: current.teamLeadId ? current.teamLeadId : teamLeadId,
       }));
     }
   }, [mode, options, preferredProjectId, preferredSiteId, team]);
@@ -183,38 +187,29 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
 
       <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
         <Field label="Projet" error={errors.projectId}>
-          <select
-            className={inputClass}
+          <SearchableSelect
+            allowClear={false}
             disabled={mode === 'edit'}
-            onChange={(event) => {
-              const nextProjectId = event.target.value;
+            emptyLabel="Aucun projet trouve."
+            onChange={(nextProjectId) => {
               const nextSiteId = options.sites.find((site) => site.projectId === nextProjectId)?.id ?? '';
               setValues((current) => ({ ...current, projectId: nextProjectId, siteId: nextSiteId }));
             }}
+            options={projectOptions}
+            placeholder="Rechercher un projet"
             value={values.projectId}
-          >
-            <option value="">Choisir un projet</option>
-            {options.projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
         <Field label="Chantier" error={errors.siteId}>
-          <select
-            className={inputClass}
+          <SearchableSelect
+            allowClear={false}
             disabled={mode === 'edit'}
-            onChange={(event) => setValues((current) => ({ ...current, siteId: event.target.value }))}
+            emptyLabel="Aucun chantier trouve."
+            onChange={(siteId) => setValues((current) => ({ ...current, siteId }))}
+            options={siteOptions}
+            placeholder="Rechercher un chantier"
             value={values.siteId}
-          >
-            <option value="">Choisir un chantier</option>
-            {filteredSites.map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.projectName} - {site.name}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
         <Field label="Nom de l'équipe" error={errors.name}>
           <input
@@ -225,18 +220,14 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
           />
         </Field>
         <Field label="Chef d'équipe" error={errors.teamLeadId}>
-          <select
-            className={inputClass}
-            onChange={(event) => setValues((current) => ({ ...current, teamLeadId: event.target.value }))}
+          <SearchableSelect
+            allowClear={false}
+            emptyLabel="Aucune ressource terrain trouvee."
+            onChange={(teamLeadId) => setValues((current) => ({ ...current, teamLeadId }))}
+            options={teamLeadOptions}
+            placeholder="Rechercher une ressource"
             value={values.teamLeadId}
-          >
-            <option value="">Choisir un chef</option>
-            {options.teamLeads.map((lead) => (
-              <option key={lead.id} value={lead.id}>
-                {lead.firstName} {lead.lastName}
-              </option>
-            ))}
-          </select>
+          />
           {options.teamLeads.length === 0 ? (
             <p className="mt-2 text-xs font-semibold text-orange-700">Aucune ressource terrain active disponible.</p>
           ) : null}
@@ -263,6 +254,31 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
   );
 }
 
+function toProjectOptions(projects: { id: string; name: string }[]): SearchableSelectOption[] {
+  return projects.map((project) => ({
+    value: project.id,
+    label: project.name,
+    keywords: project.name,
+  }));
+}
+
+function toSiteOptions(sites: { id: string; name: string; projectName: string }[]): SearchableSelectOption[] {
+  return sites.map((site) => ({
+    value: site.id,
+    label: site.name,
+    description: site.projectName,
+    keywords: `${site.projectName} ${site.name}`,
+  }));
+}
+
+function toTeamLeadOptions(leads: { id: string; firstName: string; lastName: string; role: string }[]): SearchableSelectOption[] {
+  return leads.map((lead) => ({
+    value: lead.id,
+    label: `${lead.firstName} ${lead.lastName}`,
+    description: lead.role,
+    keywords: `${lead.firstName} ${lead.lastName} ${lead.role}`,
+  }));
+}
 function Field({ label, error, children }: Readonly<{ label: string; error?: string | undefined; children: ReactNode }>) {
   return (
     <label className="block space-y-2">
