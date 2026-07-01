@@ -1,4 +1,4 @@
-﻿import ExcelJS from 'exceljs';
+import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 import { ClockInStatus, ClockInType, OfficeClockInLocation, Prisma, Role, type PrismaClient } from '@prisma/client';
 import { createSignedStorageUrl, uploadPrivateStorageObject } from '@/lib/storage';
@@ -438,6 +438,28 @@ export async function getDirectionAttendanceReport(
   };
 }
 
+export async function buildDirectionAttendanceReportExport(
+  prisma: PrismaClient,
+  date: Date,
+  format: 'xlsx' | 'pdf',
+) {
+  const report = await getDirectionAttendanceReport(prisma, date);
+  const fileBaseName = `rapport-direction-pointage-${report.date}`;
+
+  if (format === 'xlsx') {
+    return {
+      buffer: await buildDirectionAttendanceXlsxBuffer(report),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fileName: `${fileBaseName}.xlsx`,
+    };
+  }
+
+  return {
+    buffer: buildDirectionAttendancePdfBuffer(report),
+    contentType: 'application/pdf',
+    fileName: `${fileBaseName}.pdf`,
+  };
+}
 export function parseMonthlyPresenceQuery(searchParams: URLSearchParams): MonthlyPresenceQuery | null {
   const month = parseMonth(searchParams.get('month'));
   const year = parseYear(searchParams.get('year'));
@@ -3002,6 +3024,228 @@ function parseRole(value: string | null) {
   return Object.values(Role).includes(value as Role) ? (value as Role) : null;
 }
 
+async function buildDirectionAttendanceXlsxBuffer(report: RhDirectionAttendanceReportResponse) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'ChantierPro';
+  workbook.created = new Date();
+
+  const summarySheet = workbook.addWorksheet('Synthese');
+  summarySheet.columns = [
+    { header: 'Indicateur', key: 'label' },
+    { header: 'Valeur', key: 'value' },
+  ];
+  summarySheet.addRows([
+    { label: 'Date', value: report.date },
+    { label: 'Utilisateurs actifs', value: report.summary.activeUsers },
+    { label: 'Ont pointe', value: report.summary.clockedToday },
+    { label: 'Pas pointe ce jour', value: report.summary.notClockedToday },
+    { label: 'Jamais pointe', value: report.summary.neverClocked },
+    { label: 'Sortis', value: report.summary.leftToday },
+    { label: 'Sessions ouvertes', value: report.summary.openSessions },
+    { label: 'Retards', value: report.summary.lateToday },
+    { label: 'Sortie sans entree', value: report.summary.departureOnlyToday },
+    { label: 'Genere le', value: formatDirectionDateTime(report.generatedAt) },
+  ]);
+  styleExportWorksheet(summarySheet);
+
+  addDirectionUsersWorksheet(workbook, 'Ont pointe', report.users.clockedToday);
+  addDirectionUsersWorksheet(workbook, 'Pas pointe', report.users.notClockedToday);
+  addDirectionUsersWorksheet(workbook, 'Jamais pointe', report.users.neverClocked);
+  addDirectionUsersWorksheet(workbook, 'Sortie seule', report.users.departureOnlyToday);
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+function addDirectionUsersWorksheet(workbook: ExcelJS.Workbook, name: string, users: RhDirectionAttendanceReportResponse['users']['clockedToday']) {
+  const worksheet = workbook.addWorksheet(name);
+  worksheet.columns = getDirectionUsersColumns();
+  users.forEach((user) => worksheet.addRow(toDirectionExportRow(user)));
+  styleExportWorksheet(worksheet);
+}
+
+function getDirectionUsersColumns() {
+  return [
+    { header: 'Matricule', key: 'matricule' },
+    { header: 'Nom', key: 'lastName' },
+    { header: 'Prenom', key: 'firstName' },
+    { header: 'Role', key: 'role' },
+    { header: 'Entree jour', key: 'todayArrivalAt' },
+    { header: 'Sortie jour', key: 'todayDepartureAt' },
+    { header: 'Nb pointages jour', key: 'todayClockInCount' },
+    { header: 'Premier pointage', key: 'firstClockInAt' },
+    { header: 'Dernier pointage', key: 'lastClockInAt' },
+    { header: 'Compte cree', key: 'createdAt' },
+    { header: 'Statut', key: 'status' },
+    { header: 'Email', key: 'email' },
+  ];
+}
+
+function toDirectionExportRow(user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) {
+  return {
+    matricule: user.matricule ?? '',
+    lastName: user.lastName,
+    firstName: user.firstName,
+    role: formatRoleLabel(user.role as Role),
+    todayArrivalAt: user.todayArrivalAt ? formatDirectionTime(user.todayArrivalAt) : '',
+    todayDepartureAt: user.todayDepartureAt ? formatDirectionTime(user.todayDepartureAt) : '',
+    todayClockInCount: user.todayClockInCount,
+    firstClockInAt: user.firstClockInAt ? formatDirectionDateTime(user.firstClockInAt) : '',
+    lastClockInAt: user.lastClockInAt ? formatDirectionDateTime(user.lastClockInAt) : '',
+    createdAt: formatDirectionDate(user.createdAt),
+    status: directionAttendanceStatusLabel(user.status),
+    email: user.email ?? '',
+  };
+}
+
+function buildDirectionAttendancePdfBuffer(report: RhDirectionAttendanceReportResponse) {
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+  let y = margin;
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(15);
+  pdf.text('Rapport Direction - Adoption du pointage', margin, y + 5);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.text(`Date : ${formatDirectionDate(report.date)}`, margin, y + 11);
+  pdf.text(`Genere : ${formatDirectionDateTime(report.generatedAt)}`, pageWidth - margin, y + 11, { align: 'right' });
+  y += 18;
+
+  const metrics = [
+    ['Utilisateurs actifs', report.summary.activeUsers],
+    ['Ont pointe', report.summary.clockedToday],
+    ['Pas pointe ce jour', report.summary.notClockedToday],
+    ['Jamais pointe', report.summary.neverClocked],
+    ['Sortis', report.summary.leftToday],
+    ['Sessions ouvertes', report.summary.openSessions],
+    ['Retards', report.summary.lateToday],
+    ['Sortie sans entree', report.summary.departureOnlyToday],
+  ] as const;
+  const metricWidth = (pageWidth - margin * 2) / 4;
+  metrics.forEach(([label, value], index) => {
+    const x = margin + (index % 4) * metricWidth;
+    if (index === 4) y += 18;
+    pdf.setFillColor(248, 250, 252);
+    pdf.setDrawColor(226, 232, 240);
+    pdf.rect(x, y, metricWidth - 3, 14, 'FD');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7);
+    pdf.text(label.toUpperCase(), x + 2, y + 5);
+    pdf.setFontSize(13);
+    pdf.text(String(value), x + 2, y + 11);
+  });
+  y += 24;
+
+  const sections = [
+    { title: "Pas pointe aujourd'hui", users: report.users.notClockedToday },
+    { title: 'Jamais pointe', users: report.users.neverClocked },
+    { title: "Ont pointe aujourd'hui", users: report.users.clockedToday },
+    { title: 'Sortie sans entree', users: report.users.departureOnlyToday },
+  ];
+
+  for (const section of sections) {
+    y = drawDirectionPdfSection(pdf, section.title, section.users, y, margin, pageWidth, pageHeight);
+  }
+
+  return Buffer.from(pdf.output('arraybuffer'));
+}
+
+function drawDirectionPdfSection(
+  pdf: jsPDF,
+  title: string,
+  users: RhDirectionAttendanceReportResponse['users']['clockedToday'],
+  yStart: number,
+  margin: number,
+  pageWidth: number,
+  pageHeight: number,
+) {
+  let y = yStart;
+  const columns = [
+    { label: 'Matricule', width: 24, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => user.matricule ?? '' },
+    { label: 'Nom', width: 38, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => user.lastName },
+    { label: 'Prenom', width: 42, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => user.firstName },
+    { label: 'Role', width: 38, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => formatRoleLabel(user.role as Role) },
+    { label: 'Entree', width: 22, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => user.todayArrivalAt ? formatDirectionTime(user.todayArrivalAt) : '-' },
+    { label: 'Sortie', width: 22, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => user.todayDepartureAt ? formatDirectionTime(user.todayDepartureAt) : '-' },
+    { label: 'Dernier pointage', width: 46, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => user.lastClockInAt ? formatDirectionDateTime(user.lastClockInAt) : '-' },
+    { label: 'Statut', width: 32, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => directionAttendanceStatusLabel(user.status) },
+  ];
+  const scale = (pageWidth - margin * 2) / columns.reduce((sum, column) => sum + column.width, 0);
+  const scaledColumns = columns.map((column) => ({ ...column, width: column.width * scale }));
+
+  const drawSectionHeader = () => {
+    if (y + 18 > pageHeight - margin) {
+      pdf.addPage();
+      y = margin;
+    }
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.text(`${title} (${users.length})`, margin, y + 5);
+    y += 8;
+    let x = margin;
+    pdf.setFillColor(239, 243, 248);
+    pdf.setDrawColor(210, 219, 232);
+    pdf.setFontSize(8);
+    scaledColumns.forEach((column) => {
+      pdf.rect(x, y, column.width, 8, 'FD');
+      pdf.text(column.label, x + 1.5, y + 5.2);
+      x += column.width;
+    });
+    y += 8;
+    pdf.setFont('helvetica', 'normal');
+  };
+
+  drawSectionHeader();
+  if (users.length === 0) {
+    pdf.setFontSize(8);
+    pdf.text('Aucun utilisateur.', margin, y + 5);
+    return y + 11;
+  }
+
+  pdf.setFontSize(7.5);
+  for (const user of users) {
+    const lineGroups = scaledColumns.map((column) => pdf.splitTextToSize(String(column.value(user)), column.width - 3) as string[]);
+    const rowHeight = Math.max(7, ...lineGroups.map((lines) => lines.length * 3.2 + 3));
+    if (y + rowHeight > pageHeight - margin) {
+      pdf.addPage();
+      y = margin;
+      drawSectionHeader();
+      pdf.setFontSize(7.5);
+    }
+    let x = margin;
+    pdf.setDrawColor(226, 232, 240);
+    scaledColumns.forEach((column, index) => {
+      pdf.rect(x, y, column.width, rowHeight);
+      pdf.text(lineGroups[index] ?? [''], x + 1.5, y + 4.5);
+      x += column.width;
+    });
+    y += rowHeight;
+  }
+
+  return y + 7;
+}
+
+function directionAttendanceStatusLabel(status: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]['status']) {
+  if (status === 'CLOCKED_TODAY') return 'Pointe';
+  if (status === 'NEVER_CLOCKED') return 'Jamais pointe';
+  return 'Pas pointe ce jour';
+}
+
+function formatDirectionDate(value: string) {
+  return new Date(value).toLocaleDateString('fr-FR');
+}
+
+function formatDirectionDateTime(value: string) {
+  const date = new Date(value);
+  return `${date.toLocaleDateString('fr-FR')} ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function formatDirectionTime(value: string) {
+  return new Date(value).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
 function isDateInRange(value: Date, start: Date, end: Date) {
   const time = value.getTime();
   return time >= start.getTime() && time < end.getTime();

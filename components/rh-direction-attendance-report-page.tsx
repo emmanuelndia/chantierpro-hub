@@ -23,6 +23,7 @@ const directionReportTabs: { id: DirectionReportTab; label: string }[] = [
 export function RhDirectionAttendanceReportPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [activeTab, setActiveTab] = useState<DirectionReportTab>('not-clocked-today');
+  const [exportingFormat, setExportingFormat] = useState<'xlsx' | 'pdf' | null>(null);
 
   const reportQuery = useQuery({
     queryKey: ['rh-direction-attendance-report', selectedDate],
@@ -80,11 +81,27 @@ export function RhDirectionAttendanceReportPage() {
             </button>
             <button
               className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
-              disabled={!data}
+              disabled={!data || exportingFormat !== null}
+              onClick={() => void downloadDirectionReportExport(selectedDate, 'xlsx', setExportingFormat)}
+              type="button"
+            >
+              {exportingFormat === 'xlsx' ? 'Generation...' : 'Export Excel'}
+            </button>
+            <button
+              className="rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              disabled={!data || exportingFormat !== null}
+              onClick={() => void downloadDirectionReportExport(selectedDate, 'pdf', setExportingFormat)}
+              type="button"
+            >
+              {exportingFormat === 'pdf' ? 'Generation...' : 'Export PDF'}
+            </button>
+            <button
+              className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              disabled={!data || exportingFormat !== null}
               onClick={() => exportDirectionReportCsv(data)}
               type="button"
             >
-              Export CSV
+              CSV
             </button>
           </div>
         </div>
@@ -207,6 +224,30 @@ function getDirectionReportUsers(data: RhDirectionAttendanceReportResponse, tab:
   if (tab === 'never-clocked') return data.users.neverClocked;
   if (tab === 'departure-only') return data.users.departureOnlyToday;
   return data.users.notClockedToday;
+}
+
+async function downloadDirectionReportExport(
+  selectedDate: string,
+  format: 'xlsx' | 'pdf',
+  setExportingFormat: (format: 'xlsx' | 'pdf' | null) => void,
+) {
+  setExportingFormat(format);
+  try {
+    const response = await authFetch(
+      `/api/rh/direction-attendance-report/export?date=${encodeURIComponent(selectedDate)}&format=${format}`,
+      { cache: 'no-store' },
+    );
+    if (!response.ok) {
+      throw new Error(`Direction report export failed with status ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition');
+    const match = contentDisposition?.match(/filename=\"?([^\";]+)\"?/);
+    triggerDownload(blob, match?.[1] ?? `rapport-direction-pointage-${selectedDate}.${format}`);
+  } finally {
+    setExportingFormat(null);
+  }
 }
 
 function exportDirectionReportCsv(data: RhDirectionAttendanceReportResponse | null) {

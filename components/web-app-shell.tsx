@@ -454,7 +454,29 @@ function NavigationIcon({
     case 'map':
       return <MapIcon className={className} />;
     case 'rh':
-      return <ClockIcon className={className} />;
+      return <IdBadgeIcon className={className} />;
+    case 'attendance':
+      return <AttendanceIcon className={className} />;
+    case 'direction-report':
+      return <DirectionReportIcon className={className} />;
+    case 'resources':
+      return <UserCheckIcon className={className} />;
+    case 'validation':
+      return <ValidationIcon className={className} />;
+    case 'vehicle':
+      return <VehicleIcon className={className} />;
+    case 'scope':
+      return <ScopeIcon className={className} />;
+    case 'coordinators':
+      return <CoordinatorsIcon className={className} />;
+    case 'notifications':
+      return <BellIcon className={className} />;
+    case 'sessions':
+      return <StopwatchIcon className={className} />;
+    case 'office':
+      return <OfficeIcon className={className} />;
+    case 'negotiation':
+      return <HandshakeIcon className={className} />;
     case 'consolidated':
       return <ChartIcon className={className} />;
     case 'photos':
@@ -527,12 +549,124 @@ function MapIcon({ className }: Readonly<{ className: string }>) {
     </>,
   );
 }
-function ClockIcon({ className }: Readonly<{ className: string }>) {
+function IdBadgeIcon({ className }: Readonly<{ className: string }>) {
   return baseIconPath(
     className,
     <>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="5" y="4" width="14" height="16" rx="2" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="10" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8.5 16a3.5 3.5 0 0 1 7 0" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function AttendanceIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
       <path d="M12 7v5l3 2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path d="m7 5 2-2M17 5l-2-2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function DirectionReportIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <path d="M5 20V5h14v15H5Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M8 16v-3M12 16V9M16 16v-5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path d="M8 7h5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function UserCheckIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m15.5 11.5 2 2 3.5-4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function ValidationIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <path d="m8 15 2.2 2.2L16 13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function VehicleIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <path d="M5 16h14l-1.5-5.5A2 2 0 0 0 15.6 9H8.4a2 2 0 0 0-1.9 1.5L5 16Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M7 16v2M17 16v2M8 13h8" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <circle cx="7.5" cy="18" r="1.2" fill="currentColor" />
+      <circle cx="16.5" cy="18" r="1.2" fill="currentColor" />
+    </>,
+  );
+}
+
+function ScopeIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function CoordinatorsIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <circle cx="12" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="6" cy="17" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="18" cy="17" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M10.5 8.2 7.3 14.8M13.5 8.2l3.2 6.6M8.5 17h7" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function StopwatchIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <path d="M9 3h6M12 3v3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <circle cx="12" cy="14" r="7" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 10v4l2.5 1.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function OfficeIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <path d="M5 20V5h9v15M14 9h5v11" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M8 8h3M8 12h3M8 16h3M16 13h1" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </>,
+  );
+}
+
+function HandshakeIcon({ className }: Readonly<{ className: string }>) {
+  return baseIconPath(
+    className,
+    <>
+      <path d="m7 12 3-3 3 3 1.5-1.5a3 3 0 0 1 4.2 0L20 12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M4 12h3l4.5 4.5a2 2 0 0 0 2.8 0L17 14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="m9 14 2 2M12 12l3 3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
     </>,
   );
 }
