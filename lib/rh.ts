@@ -569,7 +569,6 @@ export async function getSitePresencesLive(
   const includeOffice =
     query.context !== 'TERRAIN' &&
     !query.projectId &&
-    !query.projectManagerId &&
     !query.siteId &&
     !query.assignedById;
   const managedResourceRoles = isBusinessManagerRole(user.role)
@@ -593,7 +592,7 @@ export async function getSitePresencesLive(
         ...(query.siteId ? { id: query.siteId } : {}),
       };
 
-  const [sites, assignments, records, freeMissions, officeRecords, negotiationAssignments, negotiationSessions, teamAssignments] = await Promise.all([
+  const [sites, assignments, records, freeMissions, officeRecords, negotiationAssignments, negotiationSessions, teamAssignments, fleetManagerAssignments, fleetManagerFreeMissions, activeFleetManagers] = await Promise.all([
     includeTerrain ? prisma.site.findMany({
       where: siteWhere,
       orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
@@ -817,6 +816,7 @@ export async function getSitePresencesLive(
         user: {
           isActive: true,
           ...(query.role ? { role: query.role } : {}),
+          ...(query.projectManagerId ? { role: Role.FLEET_RESOURCE } : {}),
         },
       },
       orderBy: [{ officeLocation: { name: 'asc' } }, { user: { firstName: 'asc' } }, { timestampLocal: 'asc' }],
@@ -841,6 +841,8 @@ export async function getSitePresencesLive(
             id: true,
             action: true,
             workLocationType: true,
+            createdById: true,
+            createdBy: { select: { id: true, firstName: true, lastName: true, role: true } },
           },
         },
         officeLocation: {
@@ -965,6 +967,41 @@ export async function getSitePresencesLive(
           },
         },
       },
+    }) : Promise.resolve([]),
+    includeOffice ? prisma.planningAssignment.findMany({
+      where: {
+        date: today,
+        deletedAt: null,
+        supervisor: { isActive: true, role: Role.FLEET_RESOURCE },
+        createdBy: { isActive: true, role: Role.FLEET_MANAGER },
+        ...(query.projectManagerId ? { createdById: query.projectManagerId } : {}),
+        ...(query.resourceId ? { supervisorId: query.resourceId } : {}),
+      },
+      select: {
+        supervisorId: true,
+        createdById: true,
+        createdBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    }) : Promise.resolve([]),
+    includeOffice ? prisma.freeMission.findMany({
+      where: {
+        date: today,
+        deletedAt: null,
+        assignee: { isActive: true, role: Role.FLEET_RESOURCE },
+        createdBy: { isActive: true, role: Role.FLEET_MANAGER },
+        ...(query.projectManagerId ? { createdById: query.projectManagerId } : {}),
+        ...(query.resourceId ? { assigneeId: query.resourceId } : {}),
+      },
+      select: {
+        assigneeId: true,
+        createdById: true,
+        createdBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    }) : Promise.resolve([]),
+    includeOffice ? prisma.user.findMany({
+      where: { isActive: true, role: Role.FLEET_MANAGER },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
+      select: { id: true, firstName: true, lastName: true },
     }) : Promise.resolve([]),
   ]);
 
@@ -1097,6 +1134,31 @@ export async function getSitePresencesLive(
       role: Role;
     };
   };
+  const fleetManagersByResourceId = new Map<string, { id: string; label: string }[]>();
+  const addFleetManagerForResource = (resourceId: string, manager: { id: string; firstName: string; lastName: string }) => {
+    const managers = fleetManagersByResourceId.get(resourceId) ?? [];
+    if (!managers.some((item) => item.id === manager.id)) {
+      managers.push({ id: manager.id, label: formatPersonName(manager) });
+    }
+    fleetManagersByResourceId.set(resourceId, managers);
+  };
+
+  for (const assignment of fleetManagerAssignments) {
+    addFleetManagerForResource(assignment.supervisorId, assignment.createdBy);
+  }
+  for (const mission of fleetManagerFreeMissions) {
+    addFleetManagerForResource(mission.assigneeId, mission.createdBy);
+  }
+  const singleActiveFleetManager = activeFleetManagers.length === 1 ? activeFleetManagers[0] : null;
+  for (const record of officeRecords) {
+    if (record.user.role !== Role.FLEET_RESOURCE) continue;
+    if (record.planningAssignment?.createdBy.role === Role.FLEET_MANAGER) {
+      addFleetManagerForResource(record.userId, record.planningAssignment.createdBy);
+    } else if (singleActiveFleetManager) {
+      addFleetManagerForResource(record.userId, singleActiveFleetManager);
+    }
+  }
+
   const recordsBySiteUser = new Map<string, LiveRecordWithUser[]>();
   for (const record of records) {
     if (!record.siteId) {
@@ -1244,6 +1306,11 @@ export async function getSitePresencesLive(
     const user = assignment?.supervisor ?? siteRecords[0]?.user;
     if (!user) continue;
 
+    const officeFleetManagers = site.presenceContext === 'OFFICE' ? (fleetManagersByResourceId.get(user.id) ?? []) : [];
+    if (site.presenceContext === 'OFFICE' && query.projectManagerId && !officeFleetManagers.some((manager) => manager.id === query.projectManagerId)) {
+      continue;
+    }
+
     const officeTaskAction = site.presenceContext === 'OFFICE' ? getOfficeTaskAction(siteRecords) : null;
     const resource = buildLiveResource(user, assignment?.action ?? officeTaskAction, siteRecords, site.presenceContext, today);
     const teamInfo = site.siteId ? teamInfoBySiteUser.get(liveResourceKey(site.siteId, user.id)) : null;
@@ -1272,7 +1339,11 @@ export async function getSitePresencesLive(
     });
 
     if (assignment) site.expectedCount += 1;
-    if (site.projectManagerId) {
+    if (site.presenceContext === 'OFFICE') {
+      for (const manager of fleetManagersByResourceId.get(user.id) ?? []) {
+        projectManagersById.set(manager.id, manager);
+      }
+    } else if (site.projectManagerId) {
       projectManagersById.set(site.projectManagerId, {
         id: site.projectManagerId,
         label: site.projectManagerName,
@@ -3050,12 +3121,12 @@ async function buildDirectionAttendanceXlsxBuffer(report: RhDirectionAttendanceR
     { label: 'Utilisateurs actifs', value: report.summary.activeUsers },
     { label: 'Ont pointe', value: report.summary.clockedToday },
     { label: 'Pas pointe ce jour', value: report.summary.notClockedToday },
-    { label: 'Jamais pointe', value: report.summary.neverClocked },
+    { label: 'Aucun pointage', value: report.summary.neverClocked },
     { label: 'Sortis', value: report.summary.leftToday },
     { label: 'Sessions ouvertes', value: report.summary.openSessions },
     { label: 'Retards', value: report.summary.lateToday },
     { label: 'Sortie sans entree', value: report.summary.departureOnlyToday },
-    { label: 'Genere le', value: formatDirectionDateTime(report.generatedAt) },
+    { label: 'Emis le', value: formatDirectionDateTime(report.generatedAt) },
   ]);
   styleExportWorksheet(summarySheet);
 
@@ -3085,7 +3156,7 @@ function getDirectionAttendanceExportSections(
 ): DirectionAttendanceExportSection[] {
   const sections: DirectionAttendanceExportSection[] = [
     { scope: 'not-clocked-today', sheetName: 'Pas pointe', title: "Pas pointe aujourd'hui", users: report.users.notClockedToday },
-    { scope: 'never-clocked', sheetName: 'Jamais pointe', title: 'Jamais pointe', users: report.users.neverClocked },
+    { scope: 'never-clocked', sheetName: 'Jamais pointe', title: 'Aucun pointage enregistre', users: report.users.neverClocked },
     { scope: 'clocked-today', sheetName: 'Ont pointe', title: "Ont pointe aujourd'hui", users: report.users.clockedToday },
     { scope: 'departure-only', sheetName: 'Sortie seule', title: 'Sortie sans entree', users: report.users.departureOnlyToday },
   ];
@@ -3141,14 +3212,18 @@ function buildDirectionAttendancePdfBuffer(report: RhDirectionAttendanceReportRe
   const margin = 10;
   let y = margin;
 
+  pdf.setTextColor(15, 23, 42);
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(15);
-  pdf.text('Rapport Direction - Adoption du pointage', margin, y + 5);
+  pdf.setFontSize(16);
+  pdf.text('Rapport de suivi du pointage', margin, y + 5);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
-  pdf.text(`Date : ${formatDirectionDate(report.date)}`, margin, y + 11);
-  pdf.text(`Genere : ${formatDirectionDateTime(report.generatedAt)}`, pageWidth - margin, y + 11, { align: 'right' });
-  y += 18;
+  pdf.setTextColor(71, 85, 105);
+  pdf.text(`Date de reference : ${formatDirectionDate(report.date)}`, margin, y + 12);
+  pdf.text(`Emis le : ${formatDirectionDateTime(report.generatedAt)}`, pageWidth - margin, y + 12, { align: 'right' });
+  pdf.setDrawColor(226, 232, 240);
+  pdf.line(margin, y + 16, pageWidth - margin, y + 16);
+  y += 24;
 
   const sections = getDirectionAttendanceExportSections(report, scope);
   const metrics = getDirectionAttendancePdfMetrics(report, scope, sections);
@@ -3162,9 +3237,12 @@ function buildDirectionAttendancePdfBuffer(report: RhDirectionAttendanceReportRe
     pdf.rect(x, y, metricWidth - 3, 14, 'FD');
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(7);
+    pdf.setTextColor(71, 85, 105);
     pdf.text(label.toUpperCase(), x + 2, y + 5);
-    pdf.setFontSize(13);
-    pdf.text(String(value), x + 2, y + 11);
+    pdf.setFontSize(12);
+    pdf.setTextColor(15, 23, 42);
+    const metricValue = pdf.splitTextToSize(String(value), metricWidth - 7) as string[];
+    pdf.text(metricValue.slice(0, 1), x + 2, y + 11);
   });
   y += scope === 'all' ? 24 : 18;
 
@@ -3185,7 +3263,7 @@ function getDirectionAttendancePdfMetrics(
       { label: 'Utilisateurs actifs', value: report.summary.activeUsers },
       { label: 'Ont pointe', value: report.summary.clockedToday },
       { label: 'Pas pointe ce jour', value: report.summary.notClockedToday },
-      { label: 'Jamais pointe', value: report.summary.neverClocked },
+      { label: 'Aucun pointage', value: report.summary.neverClocked },
       { label: 'Sortis', value: report.summary.leftToday },
       { label: 'Sessions ouvertes', value: report.summary.openSessions },
       { label: 'Retards', value: report.summary.lateToday },
@@ -3195,8 +3273,8 @@ function getDirectionAttendancePdfMetrics(
 
   const selectedSection = sections[0];
   return [
-    { label: 'Liste exportee', value: selectedSection?.title ?? 'Filtre' },
-    { label: 'Utilisateurs liste', value: selectedSection?.users.length ?? 0 },
+    { label: 'Perimetre exporte', value: selectedSection?.title ?? 'Filtre' },
+    { label: 'Utilisateurs concernes', value: selectedSection?.users.length ?? 0 },
     { label: 'Utilisateurs actifs', value: report.summary.activeUsers },
   ];
 }
@@ -3229,31 +3307,37 @@ function drawDirectionPdfSection(
       pdf.addPage();
       y = margin;
     }
+    pdf.setTextColor(15, 23, 42);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(11);
     pdf.text(`${title} (${users.length})`, margin, y + 5);
     y += 8;
     let x = margin;
-    pdf.setFillColor(239, 243, 248);
-    pdf.setDrawColor(210, 219, 232);
-    pdf.setFontSize(8);
+    pdf.setFontSize(7.5);
     scaledColumns.forEach((column) => {
+      pdf.setFillColor(241, 245, 249);
+      pdf.setDrawColor(203, 213, 225);
+      pdf.setTextColor(30, 41, 59);
       pdf.rect(x, y, column.width, 8, 'FD');
       pdf.text(column.label, x + 1.5, y + 5.2);
       x += column.width;
     });
     y += 8;
     pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(15, 23, 42);
   };
 
   drawSectionHeader();
   if (users.length === 0) {
     pdf.setFontSize(8);
+    pdf.setTextColor(71, 85, 105);
     pdf.text('Aucun utilisateur.', margin, y + 5);
     return y + 11;
   }
 
+  pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7.5);
+  pdf.setTextColor(15, 23, 42);
   for (const user of users) {
     const lineGroups = scaledColumns.map((column) => pdf.splitTextToSize(String(column.value(user)), column.width - 3) as string[]);
     const rowHeight = Math.max(7, ...lineGroups.map((lines) => lines.length * 3.2 + 3));
@@ -3262,10 +3346,13 @@ function drawDirectionPdfSection(
       y = margin;
       drawSectionHeader();
       pdf.setFontSize(7.5);
+      pdf.setTextColor(15, 23, 42);
     }
     let x = margin;
-    pdf.setDrawColor(226, 232, 240);
     scaledColumns.forEach((column, index) => {
+      pdf.setFillColor(255, 255, 255);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.setTextColor(15, 23, 42);
       pdf.rect(x, y, column.width, rowHeight);
       pdf.text(lineGroups[index] ?? [''], x + 1.5, y + 4.5);
       x += column.width;
@@ -3278,8 +3365,8 @@ function drawDirectionPdfSection(
 
 function directionAttendanceStatusLabel(status: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]['status']) {
   if (status === 'CLOCKED_TODAY') return 'Pointe';
-  if (status === 'NEVER_CLOCKED') return 'Jamais pointe';
-  return 'Pas pointe ce jour';
+  if (status === 'NEVER_CLOCKED') return 'Aucun pointage';
+  return 'Non pointe ce jour';
 }
 
 function formatDirectionDate(value: string) {
