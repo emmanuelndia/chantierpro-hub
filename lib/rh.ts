@@ -320,7 +320,7 @@ export async function getDirectionAttendanceReport(
     }),
     prisma.clockInRecord.groupBy({
       by: ['userId'],
-      where: { status: ClockInStatus.VALID },
+      where: { status: ClockInStatus.VALID, user: { isActive: true } },
       _min: { timestampLocal: true },
       _max: { timestampLocal: true },
     }),
@@ -328,6 +328,7 @@ export async function getDirectionAttendanceReport(
       where: {
         status: ClockInStatus.VALID,
         timestampLocal: { gte: day, lt: tomorrow },
+        user: { isActive: true },
         type: { in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END] },
       },
       orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
@@ -335,11 +336,13 @@ export async function getDirectionAttendanceReport(
     }),
     prisma.negotiationSession.groupBy({
       by: ['userId'],
+      where: { user: { isActive: true } },
       _min: { startTime: true },
       _max: { startTime: true, endTime: true },
     }),
     prisma.negotiationSession.findMany({
       where: {
+        user: { isActive: true },
         OR: [
           { startTime: { gte: day, lt: tomorrow } },
           { endTime: { gte: day, lt: tomorrow } },
@@ -589,9 +592,10 @@ export async function getSitePresencesLive(
         site: siteWhere,
         ...(query.resourceId ? { supervisorId: query.resourceId } : {}),
         ...(query.assignedById ? { createdById: query.assignedById } : {}),
-        ...(query.role || managedResourceRoles
-          ? { supervisor: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
-          : {}),
+        supervisor: {
+          isActive: true,
+          ...(query.role || managedResourceRoles ? { role: query.role ?? { in: managedResourceRoles ?? [] } } : {}),
+        },
       },
       orderBy: [{ site: { project: { name: 'asc' } } }, { site: { name: 'asc' } }, { supervisor: { firstName: 'asc' } }],
       select: {
@@ -630,9 +634,10 @@ export async function getSitePresencesLive(
           in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
         },
         ...(query.resourceId ? { userId: query.resourceId } : {}),
-        ...(query.role || managedResourceRoles
-          ? { user: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
-          : {}),
+        user: {
+          isActive: true,
+          ...(query.role || managedResourceRoles ? { role: query.role ?? { in: managedResourceRoles ?? [] } } : {}),
+        },
       },
       orderBy: [{ site: { project: { name: 'asc' } } }, { site: { name: 'asc' } }, { user: { firstName: 'asc' } }, { timestampLocal: 'asc' }],
       select: {
@@ -683,9 +688,10 @@ export async function getSitePresencesLive(
         ...(query.projectManagerId ? { project: { ...projectAccessWhere(user), projectManagerId: query.projectManagerId } } : {}),
         ...(query.resourceId ? { assigneeId: query.resourceId } : {}),
         ...(query.assignedById ? { createdById: query.assignedById } : {}),
-        ...(query.role || managedResourceRoles
-          ? { assignee: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
-          : {}),
+        assignee: {
+          isActive: true,
+          ...(query.role || managedResourceRoles ? { role: query.role ?? { in: managedResourceRoles ?? [] } } : {}),
+        },
       },
       orderBy: [{ project: { name: 'asc' } }, { action: 'asc' }, { id: 'asc' }],
       select: {
@@ -775,7 +781,10 @@ export async function getSitePresencesLive(
           in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END],
         },
         ...(query.resourceId ? { userId: query.resourceId } : {}),
-        ...(query.role ? { user: { role: query.role } } : {}),
+        user: {
+          isActive: true,
+          ...(query.role ? { role: query.role } : {}),
+        },
       },
       orderBy: [{ officeLocation: { name: 'asc' } }, { user: { firstName: 'asc' } }, { timestampLocal: 'asc' }],
       select: {
@@ -830,9 +839,10 @@ export async function getSitePresencesLive(
         ...(query.projectId ? { projectId: query.projectId } : {}),
         ...(query.resourceId ? { assigneeId: query.resourceId } : {}),
         ...(query.assignedById ? { createdById: query.assignedById } : {}),
-        ...(query.role || managedResourceRoles
-          ? { assignee: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
-          : {}),
+        assignee: {
+          isActive: true,
+          ...(query.role || managedResourceRoles ? { role: query.role ?? { in: managedResourceRoles ?? [] } } : {}),
+        },
       },
       orderBy: [{ project: { name: 'asc' } }, { plannedZone: 'asc' }, { assignee: { firstName: 'asc' } }],
       select: {
@@ -862,9 +872,10 @@ export async function getSitePresencesLive(
         },
         ...(query.projectId ? { projectId: query.projectId } : {}),
         ...(query.resourceId ? { userId: query.resourceId } : {}),
-        ...(query.role || managedResourceRoles
-          ? { user: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
-          : {}),
+        user: {
+          isActive: true,
+          ...(query.role || managedResourceRoles ? { role: query.role ?? { in: managedResourceRoles ?? [] } } : {}),
+        },
       },
       orderBy: [{ project: { name: 'asc' } }, { user: { firstName: 'asc' } }, { startTime: 'asc' }],
       select: {
@@ -911,9 +922,10 @@ export async function getSitePresencesLive(
                 assignmentDate: { lte: today },
                 OR: [{ endDate: null }, { endDate: { gte: today } }],
                 ...(query.resourceId ? { userId: query.resourceId } : {}),
-                ...(query.role || managedResourceRoles
-                  ? { user: { role: query.role ?? { in: managedResourceRoles ?? [] } } }
-                  : {}),
+                user: {
+          isActive: true,
+          ...(query.role || managedResourceRoles ? { role: query.role ?? { in: managedResourceRoles ?? [] } } : {}),
+        },
               },
               select: { userId: true },
             },

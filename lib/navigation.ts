@@ -52,6 +52,13 @@ export const webNavigation: readonly WebNavigationItem[] = [
     breadcrumb: ['Presences / RH', 'Ressources'],
   },
   {
+    href: '/web/rh/rapport-direction',
+    label: 'Rapport Direction',
+    icon: 'reports',
+    roles: ['HR', 'DIRECTION', 'ADMIN'],
+    breadcrumb: ['Presences / RH', 'Rapport Direction'],
+  },
+  {
     href: '/web/rh/presences-chantiers',
     label: 'Presences',
     icon: 'rh',
