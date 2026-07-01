@@ -438,24 +438,28 @@ export async function getDirectionAttendanceReport(
   };
 }
 
+export type DirectionAttendanceExportScope = 'all' | 'clocked-today' | 'not-clocked-today' | 'never-clocked' | 'departure-only';
+
 export async function buildDirectionAttendanceReportExport(
   prisma: PrismaClient,
   date: Date,
   format: 'xlsx' | 'pdf',
+  scope: DirectionAttendanceExportScope = 'all',
 ) {
   const report = await getDirectionAttendanceReport(prisma, date);
-  const fileBaseName = `rapport-direction-pointage-${report.date}`;
+  const scopeSuffix = scope === 'all' ? '' : `-${scope}`;
+  const fileBaseName = `rapport-direction-pointage-${report.date}${scopeSuffix}`;
 
   if (format === 'xlsx') {
     return {
-      buffer: await buildDirectionAttendanceXlsxBuffer(report),
+      buffer: await buildDirectionAttendanceXlsxBuffer(report, scope),
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       fileName: `${fileBaseName}.xlsx`,
     };
   }
 
   return {
-    buffer: buildDirectionAttendancePdfBuffer(report),
+    buffer: buildDirectionAttendancePdfBuffer(report, scope),
     contentType: 'application/pdf',
     fileName: `${fileBaseName}.pdf`,
   };
@@ -3024,7 +3028,7 @@ function parseRole(value: string | null) {
   return Object.values(Role).includes(value as Role) ? (value as Role) : null;
 }
 
-async function buildDirectionAttendanceXlsxBuffer(report: RhDirectionAttendanceReportResponse) {
+async function buildDirectionAttendanceXlsxBuffer(report: RhDirectionAttendanceReportResponse, scope: DirectionAttendanceExportScope) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'ChantierPro';
   workbook.created = new Date();
@@ -3048,13 +3052,33 @@ async function buildDirectionAttendanceXlsxBuffer(report: RhDirectionAttendanceR
   ]);
   styleExportWorksheet(summarySheet);
 
-  addDirectionUsersWorksheet(workbook, 'Ont pointe', report.users.clockedToday);
-  addDirectionUsersWorksheet(workbook, 'Pas pointe', report.users.notClockedToday);
-  addDirectionUsersWorksheet(workbook, 'Jamais pointe', report.users.neverClocked);
-  addDirectionUsersWorksheet(workbook, 'Sortie seule', report.users.departureOnlyToday);
+  getDirectionAttendanceExportSections(report, scope).forEach((section) => {
+    addDirectionUsersWorksheet(workbook, section.sheetName, section.users);
+  });
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
+}
+
+type DirectionAttendanceExportSection = {
+  scope: Exclude<DirectionAttendanceExportScope, 'all'>;
+  sheetName: string;
+  title: string;
+  users: RhDirectionAttendanceReportResponse['users']['clockedToday'];
+};
+
+function getDirectionAttendanceExportSections(
+  report: RhDirectionAttendanceReportResponse,
+  scope: DirectionAttendanceExportScope,
+): DirectionAttendanceExportSection[] {
+  const sections: DirectionAttendanceExportSection[] = [
+    { scope: 'not-clocked-today', sheetName: 'Pas pointe', title: "Pas pointe aujourd'hui", users: report.users.notClockedToday },
+    { scope: 'never-clocked', sheetName: 'Jamais pointe', title: 'Jamais pointe', users: report.users.neverClocked },
+    { scope: 'clocked-today', sheetName: 'Ont pointe', title: "Ont pointe aujourd'hui", users: report.users.clockedToday },
+    { scope: 'departure-only', sheetName: 'Sortie seule', title: 'Sortie sans entree', users: report.users.departureOnlyToday },
+  ];
+
+  return scope === 'all' ? sections : sections.filter((section) => section.scope === scope);
 }
 
 function addDirectionUsersWorksheet(workbook: ExcelJS.Workbook, name: string, users: RhDirectionAttendanceReportResponse['users']['clockedToday']) {
@@ -3098,7 +3122,7 @@ function toDirectionExportRow(user: RhDirectionAttendanceReportResponse['users']
   };
 }
 
-function buildDirectionAttendancePdfBuffer(report: RhDirectionAttendanceReportResponse) {
+function buildDirectionAttendancePdfBuffer(report: RhDirectionAttendanceReportResponse, scope: DirectionAttendanceExportScope) {
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -3139,12 +3163,7 @@ function buildDirectionAttendancePdfBuffer(report: RhDirectionAttendanceReportRe
   });
   y += 24;
 
-  const sections = [
-    { title: "Pas pointe aujourd'hui", users: report.users.notClockedToday },
-    { title: 'Jamais pointe', users: report.users.neverClocked },
-    { title: "Ont pointe aujourd'hui", users: report.users.clockedToday },
-    { title: 'Sortie sans entree', users: report.users.departureOnlyToday },
-  ];
+  const sections = getDirectionAttendanceExportSections(report, scope);
 
   for (const section of sections) {
     y = drawDirectionPdfSection(pdf, section.title, section.users, y, margin, pageWidth, pageHeight);

@@ -171,6 +171,15 @@ export function RhResourcesPage() {
       </section>
 
       <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-panel">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-600">Liste RH</p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">Ressources affichees</h2>
+            </div>
+            <p className="text-sm font-semibold text-slate-500">{data?.items.length ?? 0} ressource(s)</p>
+          </div>
+        </div>
         {(data?.items.length ?? 0) === 0 ? (
           <EmptyState title="Aucune ressource" description="Aucune ressource active ne correspond aux filtres." />
         ) : (
@@ -178,50 +187,65 @@ export function RhResourcesPage() {
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                 <tr>
-                  <th className="px-5 py-4">Modifier</th>
-                  <th className="px-5 py-4">Matricule</th>
-                  <th className="px-5 py-4">Nom</th>
-                  <th className="px-5 py-4">Type</th>
-                  <th className="px-5 py-4">Role</th>
-                  <th className="px-5 py-4">Identifiant</th>
-                  <th className="px-5 py-4">Email</th>
+                  <th className="px-5 py-4">Ressource</th>
+                  <th className="px-5 py-4">Profil</th>
+                  <th className="px-5 py-4">Coordonnees</th>
                   <th className="px-5 py-4">Presence du jour</th>
+                  <th className="px-5 py-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {(data?.items ?? []).map((resource) => (
-                  <tr key={resource.id} className="align-top">
+                  <tr key={resource.id} className="align-middle transition hover:bg-slate-50/70">
                     <td className="px-5 py-4">
-                      <button
-                        className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
-                        onClick={() => openEditResource(resource)}
-                        type="button"
-                      >
-                        Modifier
-                      </button>
+                      <div className="flex min-w-[260px] items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-black text-white">
+                          {getResourceInitials(resource)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-black text-slate-950">{resource.firstName} {resource.lastName}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            {resource.matricule ? (
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-600">
+                                Mat. {resource.matricule}
+                              </span>
+                            ) : (
+                              <Badge tone="warning">Matricule manquant</Badge>
+                            )}
+                            <span className="text-xs font-semibold text-slate-400">@{resource.username}</span>
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-5 py-4">
-                      {resource.matricule ? (
-                        <span className="font-semibold text-slate-800">{resource.matricule}</span>
-                      ) : (
-                        <Badge tone="warning">A renseigner</Badge>
-                      )}
+                      <div className="space-y-2">
+                        <Badge tone="neutral">{formatRoleLabel(resource.role as Role)}</Badge>
+                        <div>
+                          <Badge tone={resource.resourceType === 'EXTERNAL' ? 'warning' : 'success'}>
+                            {resource.resourceType === 'EXTERNAL' ? 'Externe' : 'Interne'}
+                          </Badge>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-5 py-4">
-                      <p className="font-black text-slate-950">{resource.firstName} {resource.lastName}</p>
+                      <div className="min-w-[220px] space-y-1 text-sm text-slate-600">
+                        <p className="font-semibold text-slate-800">{resource.email ?? 'Email non renseigne'}</p>
+                        <p className="text-xs font-semibold text-slate-500">Contact : {resource.contact ?? '-'}</p>
+                      </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <Badge tone={resource.resourceType === 'EXTERNAL' ? 'warning' : 'success'}>
-                        {resource.resourceType === 'EXTERNAL' ? 'Externe' : 'Interne'}
-                      </Badge>
-                    </td>
-                    <td className="px-5 py-4">
-                      <Badge tone="neutral">{formatRoleLabel(resource.role as Role)}</Badge>
-                    </td>
-                    <td className="px-5 py-4 font-semibold text-slate-700">{resource.username}</td>
-                    <td className="px-5 py-4 text-slate-600">{resource.email ?? '-'}</td>
                     <td className="px-5 py-4">
                       <PresenceBadge presence={resource.todayPresence} />
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        aria-label={`Modifier ${resource.firstName} ${resource.lastName}`}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700"
+                        onClick={() => openEditResource(resource)}
+                        title="Modifier"
+                        type="button"
+                      >
+                        <EditIcon />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -229,8 +253,7 @@ export function RhResourcesPage() {
             </table>
           </div>
         )}
-      </section>
-      {editingResource ? (
+      </section>      {editingResource ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
           <form
             className="w-full max-w-2xl rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl"
@@ -320,17 +343,83 @@ function PresenceBadge({
 }: Readonly<{
   presence: RhResourcesResponse['items'][number]['todayPresence'];
 }>) {
-  let tone: 'neutral' | 'success' | 'warning' | 'error' = 'neutral';
-  if (presence.status === 'PRESENT') tone = 'success';
-  if (presence.status === 'PAUSED' || presence.isLate) tone = 'warning';
-  if (presence.status === 'ABSENT' || presence.status === 'ANOMALY') tone = 'error';
+  const presentation = getPresencePresentation(presence);
+  const details = [
+    presence.arrivalAt ? `Entree ${formatTime(presence.arrivalAt)}` : null,
+    presence.departureAt ? `Sortie ${formatTime(presence.departureAt)}` : null,
+    presence.isLate ? 'Retard' : null,
+  ].filter(Boolean);
 
   return (
-    <div className="space-y-1">
-      <Badge tone={tone}>{presence.label}</Badge>
-      {presence.isLate ? <p className="text-xs font-bold text-orange-700">Retard</p> : null}
-      {presence.arrivalAt ? <p className="text-xs text-slate-500">Entree {formatTime(presence.arrivalAt)}</p> : null}
+    <div className="min-w-[190px] space-y-2">
+      <Badge className="tracking-[0.12em]" tone={presentation.tone}>{presentation.label}</Badge>
+      <p className={`text-xs font-semibold ${presentation.helpClassName}`}>
+        {details.length > 0 ? details.join(' - ') : presentation.helpText}
+      </p>
     </div>
+  );
+}
+
+function getPresencePresentation(presence: RhResourcesResponse['items'][number]['todayPresence']) {
+  if (presence.status === 'PRESENT') {
+    return {
+      label: presence.context === 'OFFICE' ? 'Present bureau' : 'Present terrain',
+      tone: 'success' as const,
+      helpText: 'Session ouverte aujourd hui.',
+      helpClassName: 'text-emerald-700',
+    };
+  }
+  if (presence.status === 'PAUSED') {
+    return {
+      label: presence.context === 'OFFICE' ? 'Pause bureau' : 'Pause terrain',
+      tone: 'warning' as const,
+      helpText: 'Pause en cours.',
+      helpClassName: 'text-orange-700',
+    };
+  }
+  if (presence.status === 'LEFT') {
+    return {
+      label: presence.context === 'OFFICE' ? 'Sorti bureau' : 'Sorti terrain',
+      tone: 'neutral' as const,
+      helpText: 'Session fermee.',
+      helpClassName: 'text-slate-500',
+    };
+  }
+  if (presence.status === 'ABSENT') {
+    return {
+      label: 'Attendu non pointe',
+      tone: 'error' as const,
+      helpText: 'Planifie aujourd hui, aucune entree enregistree.',
+      helpClassName: 'text-red-700',
+    };
+  }
+  if (presence.status === 'ANOMALY') {
+    return {
+      label: 'A verifier',
+      tone: 'error' as const,
+      helpText: 'Pointage anomalie ou session fermee automatiquement.',
+      helpClassName: 'text-red-700',
+    };
+  }
+
+  return {
+    label: 'Non pointe',
+    tone: 'neutral' as const,
+    helpText: 'Aucune entree enregistree aujourd hui.',
+    helpClassName: 'text-slate-500',
+  };
+}
+
+function getResourceInitials(resource: Pick<RhResourceListItem, 'firstName' | 'lastName'>) {
+  return `${resource.firstName.charAt(0)}${resource.lastName.charAt(0)}`.toUpperCase();
+}
+
+function EditIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="m14 8 2 2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
   );
 }
 

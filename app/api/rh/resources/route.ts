@@ -174,7 +174,7 @@ function buildTodayPresence(
   if (!latest) {
     return expectedTerrain
       ? {
-          label: 'Absent',
+          label: 'Attendu non pointe',
           context: 'TERRAIN' as const,
           status: 'ABSENT' as const,
           arrivalAt: null,
@@ -182,7 +182,7 @@ function buildTodayPresence(
           isLate: false,
         }
       : {
-          label: 'Aucun pointage',
+          label: 'Non pointe',
           context: null,
           status: 'NONE' as const,
           arrivalAt: null,

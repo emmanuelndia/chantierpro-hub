@@ -9,6 +9,7 @@ import { formatRoleLabel } from '@/lib/role-labels';
 import type { RhDirectionAttendanceReportResponse, RhDirectionAttendanceUser } from '@/types/rh';
 
 type DirectionReportTab = 'not-clocked-today' | 'never-clocked' | 'clocked-today' | 'departure-only';
+type DirectionExportScope = 'all' | 'active-tab' | DirectionReportTab;
 
 const inputClassName =
   'w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white';
@@ -20,9 +21,19 @@ const directionReportTabs: { id: DirectionReportTab; label: string }[] = [
   { id: 'departure-only', label: 'Sortie seule' },
 ];
 
+const directionExportScopes: { id: DirectionExportScope; label: string }[] = [
+  { id: 'active-tab', label: 'Onglet affiche' },
+  { id: 'all', label: 'Toutes les listes' },
+  { id: 'clocked-today', label: "Ont pointe aujourd'hui" },
+  { id: 'not-clocked-today', label: "Pas pointe aujourd'hui" },
+  { id: 'never-clocked', label: 'Jamais pointe' },
+  { id: 'departure-only', label: 'Sortie seule' },
+];
+
 export function RhDirectionAttendanceReportPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [activeTab, setActiveTab] = useState<DirectionReportTab>('not-clocked-today');
+  const [exportScope, setExportScope] = useState<DirectionExportScope>('active-tab');
   const [exportingFormat, setExportingFormat] = useState<'xlsx' | 'pdf' | null>(null);
 
   const reportQuery = useQuery({
@@ -72,6 +83,18 @@ export function RhDirectionAttendanceReportPage() {
                 value={selectedDate}
               />
             </label>
+            <label className="min-w-[13rem] space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Contenu exporte</span>
+              <select
+                className={inputClassName}
+                onChange={(event) => setExportScope(event.target.value as DirectionExportScope)}
+                value={exportScope}
+              >
+                {directionExportScopes.map((scope) => (
+                  <option key={scope.id} value={scope.id}>{scope.label}</option>
+                ))}
+              </select>
+            </label>
             <button
               className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => void reportQuery.refetch()}
@@ -82,7 +105,7 @@ export function RhDirectionAttendanceReportPage() {
             <button
               className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
               disabled={!data || exportingFormat !== null}
-              onClick={() => void downloadDirectionReportExport(selectedDate, 'xlsx', setExportingFormat)}
+              onClick={() => void downloadDirectionReportExport(selectedDate, 'xlsx', resolveDirectionExportScope(exportScope, activeTab), setExportingFormat)}
               type="button"
             >
               {exportingFormat === 'xlsx' ? 'Generation...' : 'Export Excel'}
@@ -90,7 +113,7 @@ export function RhDirectionAttendanceReportPage() {
             <button
               className="rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               disabled={!data || exportingFormat !== null}
-              onClick={() => void downloadDirectionReportExport(selectedDate, 'pdf', setExportingFormat)}
+              onClick={() => void downloadDirectionReportExport(selectedDate, 'pdf', resolveDirectionExportScope(exportScope, activeTab), setExportingFormat)}
               type="button"
             >
               {exportingFormat === 'pdf' ? 'Generation...' : 'Export PDF'}
@@ -98,7 +121,7 @@ export function RhDirectionAttendanceReportPage() {
             <button
               className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
               disabled={!data || exportingFormat !== null}
-              onClick={() => exportDirectionReportCsv(data)}
+              onClick={() => exportDirectionReportCsv(data, resolveDirectionExportScope(exportScope, activeTab))}
               type="button"
             >
               CSV
@@ -226,15 +249,20 @@ function getDirectionReportUsers(data: RhDirectionAttendanceReportResponse, tab:
   return data.users.notClockedToday;
 }
 
+function resolveDirectionExportScope(scope: DirectionExportScope, activeTab: DirectionReportTab) {
+  return scope === 'active-tab' ? activeTab : scope;
+}
+
 async function downloadDirectionReportExport(
   selectedDate: string,
   format: 'xlsx' | 'pdf',
+  scope: 'all' | DirectionReportTab,
   setExportingFormat: (format: 'xlsx' | 'pdf' | null) => void,
 ) {
   setExportingFormat(format);
   try {
     const response = await authFetch(
-      `/api/rh/direction-attendance-report/export?date=${encodeURIComponent(selectedDate)}&format=${format}`,
+      `/api/rh/direction-attendance-report/export?date=${encodeURIComponent(selectedDate)}&format=${format}&scope=${encodeURIComponent(scope)}`,
       { cache: 'no-store' },
     );
     if (!response.ok) {
@@ -250,17 +278,27 @@ async function downloadDirectionReportExport(
   }
 }
 
-function exportDirectionReportCsv(data: RhDirectionAttendanceReportResponse | null) {
+function exportDirectionReportCsv(data: RhDirectionAttendanceReportResponse | null, scope: 'all' | DirectionReportTab) {
   if (!data) return;
+  const sections = getDirectionReportExportSections(data, scope);
   const rows = [
     ['liste', 'matricule', 'nom', 'prenom', 'role', 'entree_jour', 'sortie_jour', 'premier_pointage', 'dernier_pointage', 'compte_cree'],
-    ...data.users.clockedToday.map((user) => directionReportCsvRow('ont_pointe', user)),
-    ...data.users.notClockedToday.map((user) => directionReportCsvRow('pas_pointe_ce_jour', user)),
-    ...data.users.neverClocked.map((user) => directionReportCsvRow('jamais_pointe', user)),
-    ...data.users.departureOnlyToday.map((user) => directionReportCsvRow('sortie_sans_entree', user)),
+    ...sections.flatMap((section) => section.users.map((user) => directionReportCsvRow(section.csvName, user))),
   ];
   const csv = rows.map((row) => row.map(escapeCsvValue).join(';')).join('\n');
-  triggerDownload(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `rapport-direction-pointage-${data.date}.csv`);
+  const suffix = scope === 'all' ? '' : `-${scope}`;
+  triggerDownload(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `rapport-direction-pointage-${data.date}${suffix}.csv`);
+}
+
+function getDirectionReportExportSections(data: RhDirectionAttendanceReportResponse, scope: 'all' | DirectionReportTab) {
+  const sections = [
+    { scope: 'clocked-today' as const, csvName: 'ont_pointe', users: data.users.clockedToday },
+    { scope: 'not-clocked-today' as const, csvName: 'pas_pointe_ce_jour', users: data.users.notClockedToday },
+    { scope: 'never-clocked' as const, csvName: 'jamais_pointe', users: data.users.neverClocked },
+    { scope: 'departure-only' as const, csvName: 'sortie_sans_entree', users: data.users.departureOnlyToday },
+  ];
+
+  return scope === 'all' ? sections : sections.filter((section) => section.scope === scope);
 }
 
 function directionReportCsvRow(listName: string, user: RhDirectionAttendanceUser) {
