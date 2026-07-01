@@ -55,7 +55,8 @@ export function WebTeamFormPage({ mode, teamId }: WebTeamFormPageProps) {
   const detail = detailQuery.data;
   const filteredSites = useMemo(() => {
     const sites = options?.sites ?? [];
-    return values.projectId ? sites.filter((site) => site.projectId === values.projectId) : sites;
+    if (!values.projectId) return [];
+    return sites.filter((site) => site.projectId === values.projectId);
   }, [options?.sites, values.projectId]);
   const projectOptions = useMemo(() => toProjectOptions(options?.projects ?? []), [options?.projects]);
   const siteOptions = useMemo(() => toSiteOptions(filteredSites), [filteredSites]);
@@ -82,17 +83,15 @@ export function WebTeamFormPage({ mode, teamId }: WebTeamFormPageProps) {
       const projectFromQuery = preferredProjectId
         ? options.projects.find((project) => project.id === preferredProjectId)
         : null;
-      const projectId = siteFromQuery?.projectId ?? projectFromQuery?.id ?? options.projects.at(0)?.id ?? '';
-      const siteId =
-        siteFromQuery?.id ??
-        options.sites.find((site) => site.projectId === projectId)?.id ??
-        options.sites.at(0)?.id ??
-        '';
+      const projectId = siteFromQuery?.projectId ?? projectFromQuery?.id ?? '';
+      const siteId = siteFromQuery?.id ?? '';
+
+      if (!projectId && !siteId) return;
+
       setValues((current) => ({
         ...current,
-        projectId: current.projectId ? current.projectId : (options.sites.find((site) => site.id === siteId)?.projectId ?? projectId),
+        projectId: current.projectId ? current.projectId : projectId,
         siteId: current.siteId ? current.siteId : siteId,
-        teamLeadId: current.teamLeadId ? current.teamLeadId : (options.teamLeads.at(0)?.id ?? ''),
       }));
     }
   }, [detail, mode, options, preferredProjectId, preferredSiteId]);
@@ -149,8 +148,7 @@ export function WebTeamFormPage({ mode, teamId }: WebTeamFormPageProps) {
             disabled={mode === 'edit'}
             emptyLabel="Aucun projet trouve."
             onChange={(projectId) => {
-              const nextSiteId = options.sites.find((site) => site.projectId === projectId)?.id ?? '';
-              setValues((current) => ({ ...current, projectId, siteId: nextSiteId }));
+              setValues((current) => ({ ...current, projectId, siteId: '' }));
             }}
             options={projectOptions}
             placeholder="Rechercher un projet"
@@ -160,11 +158,11 @@ export function WebTeamFormPage({ mode, teamId }: WebTeamFormPageProps) {
         <Field label="Chantier">
           <SearchableSelect
             allowClear={false}
-            disabled={mode === 'edit'}
+            disabled={mode === 'edit' || !values.projectId}
             emptyLabel="Aucun chantier trouve."
             onChange={(siteId) => setValues((current) => ({ ...current, siteId }))}
             options={siteOptions}
-            placeholder="Rechercher un chantier"
+            placeholder={values.projectId ? 'Rechercher un chantier' : "Selectionnez d'abord un projet"}
             value={values.siteId}
           />
         </Field>

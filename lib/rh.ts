@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs';
+﻿import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 import { ClockInStatus, ClockInType, OfficeClockInLocation, Prisma, Role, type PrismaClient } from '@prisma/client';
 import { createSignedStorageUrl, uploadPrivateStorageObject } from '@/lib/storage';
@@ -8,6 +8,7 @@ import { getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/fi
 import { formatRoleLabel } from '@/lib/role-labels';
 import type {
   RhApiErrorCode,
+  RhDirectionAttendanceReportResponse,
   RhOptionsResponse,
   RhExportHistoryItem,
   RhExportHistoryResponse,
@@ -289,6 +290,149 @@ export function canAccessRh(role: Role) {
 
 export function canAccessSitePresencesLive(role: Role) {
   return SITE_PRESENCE_LIVE_ALLOWED_ROLES.includes(role);
+}
+
+export function canAccessDirectionAttendanceReport(role: Role) {
+  return RH_ALLOWED_ROLES.includes(role);
+}
+
+export async function getDirectionAttendanceReport(
+  prisma: PrismaClient,
+  date: Date,
+): Promise<RhDirectionAttendanceReportResponse> {
+  const day = toDateOnlyDate(date);
+  const tomorrow = new Date(day);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+  const [users, clockInBounds, todayRecords, negotiationBounds, todayNegotiationSessions] = await Promise.all([
+    prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        matricule: true,
+        role: true,
+        createdAt: true,
+      },
+    }),
+    prisma.clockInRecord.groupBy({
+      by: ['userId'],
+      where: { status: ClockInStatus.VALID },
+      _min: { timestampLocal: true },
+      _max: { timestampLocal: true },
+    }),
+    prisma.clockInRecord.findMany({
+      where: {
+        status: ClockInStatus.VALID,
+        timestampLocal: { gte: day, lt: tomorrow },
+        type: { in: [ClockInType.ARRIVAL, ClockInType.DEPARTURE, ClockInType.PAUSE_START, ClockInType.PAUSE_END] },
+      },
+      orderBy: [{ timestampLocal: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      select: { userId: true, type: true, timestampLocal: true, isLate: true },
+    }),
+    prisma.negotiationSession.groupBy({
+      by: ['userId'],
+      _min: { startTime: true },
+      _max: { startTime: true, endTime: true },
+    }),
+    prisma.negotiationSession.findMany({
+      where: {
+        OR: [
+          { startTime: { gte: day, lt: tomorrow } },
+          { endTime: { gte: day, lt: tomorrow } },
+        ],
+      },
+      orderBy: [{ startTime: 'asc' }, { id: 'asc' }],
+      select: { userId: true, startTime: true, endTime: true },
+    }),
+  ]);
+
+  const clockBoundsByUser = new Map(clockInBounds.map((item) => [item.userId, item]));
+  const negotiationBoundsByUser = new Map(negotiationBounds.map((item) => [item.userId, item]));
+  const todayRecordsByUser = new Map<string, typeof todayRecords>();
+  for (const record of todayRecords) {
+    todayRecordsByUser.set(record.userId, [...(todayRecordsByUser.get(record.userId) ?? []), record]);
+  }
+  const todayNegotiationByUser = new Map<string, typeof todayNegotiationSessions>();
+  for (const session of todayNegotiationSessions) {
+    todayNegotiationByUser.set(session.userId, [...(todayNegotiationByUser.get(session.userId) ?? []), session]);
+  }
+
+  const reportUsers = users.map((user) => {
+    const records = todayRecordsByUser.get(user.id) ?? [];
+    const negotiationSessions = todayNegotiationByUser.get(user.id) ?? [];
+    const clockBounds = clockBoundsByUser.get(user.id);
+    const negotiationBounds = negotiationBoundsByUser.get(user.id);
+    const hasArrivalToday = records.some((record) => record.type === ClockInType.ARRIVAL);
+    const hasDepartureToday = records.some((record) => record.type === ClockInType.DEPARTURE);
+    const hasNegotiationStartToday = negotiationSessions.some((session) => isDateInRange(session.startTime, day, tomorrow));
+    const hasNegotiationEndToday = negotiationSessions.some((session) => Boolean(session.endTime && isDateInRange(session.endTime, day, tomorrow)));
+    const hasClockedToday = hasArrivalToday || hasNegotiationStartToday;
+    const firstClockInAt = minIsoDate([clockBounds?._min.timestampLocal ?? null, negotiationBounds?._min.startTime ?? null]);
+    const lastClockInAt = maxIsoDate([
+      clockBounds?._max.timestampLocal ?? null,
+      negotiationBounds?._max.startTime ?? null,
+      negotiationBounds?._max.endTime ?? null,
+    ]);
+    const todayArrivalAt = minIsoDate([
+      ...records.filter((record) => record.type === ClockInType.ARRIVAL).map((record) => record.timestampLocal),
+      ...negotiationSessions.filter((session) => isDateInRange(session.startTime, day, tomorrow)).map((session) => session.startTime),
+    ]);
+    const todayDepartureAt = maxIsoDate([
+      ...records.filter((record) => record.type === ClockInType.DEPARTURE).map((record) => record.timestampLocal),
+      ...negotiationSessions.map((session) => session.endTime).filter((value): value is Date => Boolean(value && isDateInRange(value, day, tomorrow))),
+    ]);
+    const neverClocked = !firstClockInAt;
+
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      matricule: user.matricule,
+      role: user.role,
+      createdAt: user.createdAt.toISOString(),
+      lastClockInAt,
+      firstClockInAt,
+      todayArrivalAt,
+      todayDepartureAt,
+      todayClockInCount: records.length + negotiationSessions.length,
+      status: hasClockedToday ? ('CLOCKED_TODAY' as const) : neverClocked ? ('NEVER_CLOCKED' as const) : ('NOT_CLOCKED_TODAY' as const),
+      hasDepartureToday: hasDepartureToday || hasNegotiationEndToday,
+      isLateToday: records.some((record) => record.type === ClockInType.ARRIVAL && record.isLate) || Boolean(todayArrivalAt && isLateArrival(new Date(todayArrivalAt))),
+      isOpenToday: hasClockedToday && !(hasDepartureToday || hasNegotiationEndToday),
+      isDepartureOnlyToday: !hasClockedToday && (hasDepartureToday || hasNegotiationEndToday),
+    };
+  });
+
+  const clockedToday = reportUsers.filter((user) => user.status === 'CLOCKED_TODAY');
+  const notClockedToday = reportUsers.filter((user) => user.status !== 'CLOCKED_TODAY');
+  const neverClocked = reportUsers.filter((user) => user.status === 'NEVER_CLOCKED');
+  const departureOnlyToday = reportUsers.filter((user) => user.isDepartureOnlyToday);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    date: day.toISOString().slice(0, 10),
+    summary: {
+      activeUsers: reportUsers.length,
+      clockedToday: clockedToday.length,
+      notClockedToday: notClockedToday.length,
+      neverClocked: neverClocked.length,
+      leftToday: reportUsers.filter((user) => user.hasDepartureToday).length,
+      openSessions: reportUsers.filter((user) => user.isOpenToday).length,
+      lateToday: reportUsers.filter((user) => user.isLateToday).length,
+      departureOnlyToday: departureOnlyToday.length,
+    },
+    users: {
+      clockedToday: clockedToday.map(toDirectionAttendanceUser),
+      notClockedToday: notClockedToday.map(toDirectionAttendanceUser),
+      neverClocked: neverClocked.map(toDirectionAttendanceUser),
+      departureOnlyToday: departureOnlyToday.map(toDirectionAttendanceUser),
+    },
+  };
 }
 
 export function parseMonthlyPresenceQuery(searchParams: URLSearchParams): MonthlyPresenceQuery | null {
@@ -2846,6 +2990,55 @@ function parseRole(value: string | null) {
   return Object.values(Role).includes(value as Role) ? (value as Role) : null;
 }
 
+function isDateInRange(value: Date, start: Date, end: Date) {
+  const time = value.getTime();
+  return time >= start.getTime() && time < end.getTime();
+}
+
+function minIsoDate(values: (Date | null | undefined)[]) {
+  const dates = values.filter((value): value is Date => Boolean(value));
+  if (dates.length === 0) return null;
+  return new Date(Math.min(...dates.map((value) => value.getTime()))).toISOString();
+}
+
+function maxIsoDate(values: (Date | null | undefined)[]) {
+  const dates = values.filter((value): value is Date => Boolean(value));
+  if (dates.length === 0) return null;
+  return new Date(Math.max(...dates.map((value) => value.getTime()))).toISOString();
+}
+
+function toDirectionAttendanceUser(user: {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  matricule: string | null;
+  role: Role;
+  createdAt: string;
+  lastClockInAt: string | null;
+  firstClockInAt: string | null;
+  todayArrivalAt: string | null;
+  todayDepartureAt: string | null;
+  todayClockInCount: number;
+  status: 'CLOCKED_TODAY' | 'NOT_CLOCKED_TODAY' | 'NEVER_CLOCKED';
+}) {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    matricule: user.matricule,
+    role: user.role,
+    createdAt: user.createdAt,
+    lastClockInAt: user.lastClockInAt,
+    firstClockInAt: user.firstClockInAt,
+    todayArrivalAt: user.todayArrivalAt,
+    todayDepartureAt: user.todayDepartureAt,
+    todayClockInCount: user.todayClockInCount,
+    status: user.status,
+  };
+}
+
 function parseLiveStatus(value: string | null): RhSitePresenceLiveStatus | null {
   const statuses: RhSitePresenceLiveStatus[] = ['PRESENT', 'PAUSED', 'EXPECTED_NOT_CLOCKED', 'LEFT', 'ANOMALY'];
   return statuses.includes(value as RhSitePresenceLiveStatus) ? (value as RhSitePresenceLiveStatus) : null;
@@ -3228,6 +3421,6 @@ function uniqueOption<T extends { id: string }>(option: T, index: number, option
 }
 
 function formatPersonName(person: { firstName: string; lastName: string } | null) {
-  if (!person) return 'Non renseigné';
+  if (!person) return 'Non renseignÃ©';
   return `${person.firstName} ${person.lastName}`.trim();
 }

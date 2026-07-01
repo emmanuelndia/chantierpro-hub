@@ -78,7 +78,8 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
   const isError = mode === 'edit' ? editQuery.isError : optionsQuery.isError;
   const filteredSites = useMemo(() => {
     const sites = options?.sites ?? [];
-    return values.projectId ? sites.filter((site) => site.projectId === values.projectId) : sites;
+    if (!values.projectId) return [];
+    return sites.filter((site) => site.projectId === values.projectId);
   }, [options?.sites, values.projectId]);
   const selectedSite = useMemo(
     () => options?.sites.find((site) => site.id === values.siteId) ?? null,
@@ -102,22 +103,21 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
     }
 
     if (mode === 'create' && options) {
-      const projectId =
-        preferredProjectId && options.projects.some((project) => project.id === preferredProjectId)
-          ? preferredProjectId
-          : options.projects.at(0)?.id ?? '';
-      const siteId =
-        preferredSiteId && options.sites.some((site) => site.id === preferredSiteId)
-          ? preferredSiteId
-          : options.sites.find((site) => site.projectId === projectId)?.id ?? options.sites.at(0)?.id ?? '';
-      const selectedProjectId = options.sites.find((site) => site.id === siteId)?.projectId ?? projectId;
-      const teamLeadId = options.teamLeads.at(0)?.id ?? '';
+      const siteFromQuery = preferredSiteId
+        ? options.sites.find((site) => site.id === preferredSiteId)
+        : null;
+      const projectFromQuery = preferredProjectId
+        ? options.projects.find((project) => project.id === preferredProjectId)
+        : null;
+      const projectId = siteFromQuery?.projectId ?? projectFromQuery?.id ?? '';
+      const siteId = siteFromQuery?.id ?? '';
+
+      if (!projectId && !siteId) return;
 
       setValues((current) => ({
         ...current,
-        projectId: current.projectId ? current.projectId : selectedProjectId,
+        projectId: current.projectId ? current.projectId : projectId,
         siteId: current.siteId ? current.siteId : siteId,
-        teamLeadId: current.teamLeadId ? current.teamLeadId : teamLeadId,
       }));
     }
   }, [mode, options, preferredProjectId, preferredSiteId, team]);
@@ -175,7 +175,7 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
           {mode === 'edit' ? "Modifier l'équipe" : 'Nouvelle équipe'}
         </h1>
         <p className="mt-1 text-sm font-semibold text-slate-600">
-          {selectedSite ? `${selectedSite.projectName} · ${selectedSite.name}` : 'Affectation chantier et chef d’équipe'}
+          {selectedSite ? `${selectedSite.projectName} · ${selectedSite.name}` : "Affectation chantier et chef d’équipe"}
         </p>
       </section>
 
@@ -192,8 +192,7 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
             disabled={mode === 'edit'}
             emptyLabel="Aucun projet trouve."
             onChange={(nextProjectId) => {
-              const nextSiteId = options.sites.find((site) => site.projectId === nextProjectId)?.id ?? '';
-              setValues((current) => ({ ...current, projectId: nextProjectId, siteId: nextSiteId }));
+              setValues((current) => ({ ...current, projectId: nextProjectId, siteId: '' }));
             }}
             options={projectOptions}
             placeholder="Rechercher un projet"
@@ -203,11 +202,11 @@ export function MobileTeamFormPage({ mode, user: _user, teamId }: MobileTeamForm
         <Field label="Chantier" error={errors.siteId}>
           <SearchableSelect
             allowClear={false}
-            disabled={mode === 'edit'}
+            disabled={mode === 'edit' || !values.projectId}
             emptyLabel="Aucun chantier trouve."
             onChange={(siteId) => setValues((current) => ({ ...current, siteId }))}
             options={siteOptions}
-            placeholder="Rechercher un chantier"
+            placeholder={values.projectId ? 'Rechercher un chantier' : "Selectionnez d'abord un projet"}
             value={values.siteId}
           />
         </Field>

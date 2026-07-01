@@ -208,6 +208,43 @@ export type RhSitePresenceLiveSite = {
   resources: RhSitePresenceLiveResource[];
 };
 
+export type RhDirectionAttendanceUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  matricule: string | null;
+  role: string;
+  createdAt: string;
+  lastClockInAt: string | null;
+  firstClockInAt: string | null;
+  todayArrivalAt: string | null;
+  todayDepartureAt: string | null;
+  todayClockInCount: number;
+  status: 'CLOCKED_TODAY' | 'NOT_CLOCKED_TODAY' | 'NEVER_CLOCKED';
+};
+
+export type RhDirectionAttendanceReportResponse = {
+  generatedAt: string;
+  date: string;
+  summary: {
+    activeUsers: number;
+    clockedToday: number;
+    notClockedToday: number;
+    neverClocked: number;
+    leftToday: number;
+    openSessions: number;
+    lateToday: number;
+    departureOnlyToday: number;
+  };
+  users: {
+    clockedToday: RhDirectionAttendanceUser[];
+    notClockedToday: RhDirectionAttendanceUser[];
+    neverClocked: RhDirectionAttendanceUser[];
+    departureOnlyToday: RhDirectionAttendanceUser[];
+  };
+};
+
 export type RhSitePresenceLiveResponse = {
   generatedAt: string;
   date: string;
