@@ -31,6 +31,12 @@ export type OfflineClockInItem = ClockInInput & {
   officeLocationId?: string | null;
   officeClockInLocation?: OfficeClockInLocation | null;
   planningAssignmentId?: string | null;
+  negotiationAssignmentId?: string | null;
+  negotiationProjectId?: string | null;
+  negotiationDate?: string | null;
+  negotiationSessionId?: string | null;
+  negotiationSessionClientId?: string | null;
+  offlineQueuedAt?: string;
 };
 
 export type OfflineCommentItem = {
@@ -134,7 +140,13 @@ export function createOfflineId() {
 export async function enqueueOfflineClockIn(item: OfflineClockInItem) {
   await migrateLegacyClockInQueue();
   const db = await openDb();
-  await storeRequest(db, 'clockIns', 'readwrite', (store) => store.put(item));
+  await storeRequest(db, 'clockIns', 'readwrite', (store) =>
+    store.put({
+      ...item,
+      offlineClientId: item.offlineClientId ?? item.clientId,
+      offlineQueuedAt: item.offlineQueuedAt ?? new Date().toISOString(),
+    }),
+  );
   db.close();
 }
 
@@ -366,15 +378,22 @@ async function runSync(mode: 'auto' | 'manual'): Promise<MobileOfflineSyncLog> {
 
 async function syncClockIns(errors: string[]) {
   const db = await openDb();
-  const [clockIns, comments] = await Promise.all([
+  const [clockIns, comments, mappings] = await Promise.all([
     getAll<OfflineClockInItem>(db, 'clockIns'),
     getAll<OfflineCommentItem>(db, 'comments'),
+    getAll<ClientMapping>(db, 'clientMappings'),
   ]);
   db.close();
 
   if (clockIns.length === 0) {
     return;
   }
+
+  const mappingByClientId = new Map<string, string>(
+    mappings
+      .filter((mapping): mapping is ClientMapping & { clockInClientId: string } => Boolean(mapping.clockInClientId))
+      .map((mapping) => [mapping.clockInClientId, mapping.serverRecordId]),
+  );
 
   const sortedClockIns = clockIns.sort(
     (left, right) => new Date(left.timestampLocal).getTime() - new Date(right.timestampLocal).getTime(),
@@ -395,7 +414,12 @@ async function syncClockIns(errors: string[]) {
           longitude: item.longitude,
           accuracy: item.accuracy,
           timestampLocal: item.timestampLocal,
-          comment: item.comment ?? null,
+          gpsCapturedAt: item.gpsCapturedAt,
+          gpsSource: item.gpsSource,
+          offlineClientId: item.offlineClientId ?? item.clientId,
+          offlineQueuedAt: item.offlineQueuedAt,
+          offlineSyncedAt: new Date().toISOString(),
+          comment: buildOfflineClockInComment(item),
         })),
       }),
     });
@@ -418,12 +442,16 @@ async function syncClockIns(errors: string[]) {
           result,
           source,
         });
+
+        if (result.recordId) {
+          mappingByClientId.set(source.clientId, result.recordId);
+        }
       }
     }
   }
 
   for (const source of contextualClockIns) {
-    const response = await syncContextualClockIn(source);
+    const response = await syncContextualClockIn(source, mappingByClientId);
 
     if (!response.ok) {
       errors.push(response.message);
@@ -440,12 +468,19 @@ async function syncClockIns(errors: string[]) {
       },
       source,
     });
+
+    if (response.recordId) {
+      mappingByClientId.set(source.clientId, response.recordId);
+    }
   }
 
   nextDb.close();
 }
 
-async function syncContextualClockIn(item: OfflineClockInItem): Promise<{
+async function syncContextualClockIn(
+  item: OfflineClockInItem,
+  mappingByClientId: Map<string, string> = new Map<string, string>(),
+): Promise<{
   ok: boolean;
   message: string;
   recordId?: string;
@@ -457,7 +492,12 @@ async function syncContextualClockIn(item: OfflineClockInItem): Promise<{
     longitude: item.longitude,
     accuracy: item.accuracy,
     timestampLocal: item.timestampLocal,
-    comment: item.comment ?? null,
+    gpsCapturedAt: item.gpsCapturedAt,
+    gpsSource: item.gpsSource,
+    offlineClientId: item.offlineClientId ?? item.clientId,
+    offlineQueuedAt: item.offlineQueuedAt,
+    offlineSyncedAt: new Date().toISOString(),
+    comment: buildOfflineClockInComment(item),
   };
 
   if (item.officeLocationId) {
@@ -493,6 +533,55 @@ async function syncContextualClockIn(item: OfflineClockInItem): Promise<{
 
     const data = (await response.json()) as { record: { id: string; status: BatchSyncItemResult['status'] } };
     return { ok: true, message: '', recordId: data.record.id, status: data.record.status };
+  }
+
+  if (item.negotiationAssignmentId && item.negotiationProjectId && item.type === 'ARRIVAL') {
+    const response = await authFetch('/api/mobile/negotiation/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: item.negotiationDate ?? item.timestampLocal.slice(0, 10),
+        assignmentId: item.negotiationAssignmentId,
+        projectId: item.negotiationProjectId,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        accuracy: item.accuracy,
+        comment: payload.comment,
+      }),
+    });
+
+    if (!response.ok) {
+      return { ok: false, message: 'Synchronisation de l entree zone negociation refusee.' };
+    }
+
+    const data = (await response.json()) as { session: { id: string } };
+    return { ok: true, message: '', recordId: data.session.id, status: 'VALID' };
+  }
+
+  if ((item.negotiationSessionId || item.negotiationSessionClientId) && item.type === 'DEPARTURE') {
+    const serverSessionId = item.negotiationSessionId ??
+      (item.negotiationSessionClientId ? mappingByClientId.get(item.negotiationSessionClientId) : undefined);
+
+    if (!serverSessionId) {
+      return { ok: false, message: 'Sortie negociation en attente de synchronisation de l entree.' };
+    }
+
+    const response = await authFetch(`/api/mobile/negotiation/session/${encodeURIComponent(serverSessionId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        latitude: item.latitude,
+        longitude: item.longitude,
+        accuracy: item.accuracy,
+        comment: payload.comment,
+      }),
+    });
+
+    if (!response.ok) {
+      return { ok: false, message: 'Synchronisation de la sortie zone negociation refusee.' };
+    }
+
+    return { ok: true, message: '', recordId: serverSessionId, status: 'VALID' };
   }
 
   return { ok: false, message: 'Pointage offline sans contexte exploitable.' };
@@ -542,6 +631,23 @@ async function syncClockInResult(payload: {
   if (result.status === 'ANOMALY' && result.message) {
     errors.push(result.message);
   }
+}
+
+function buildOfflineClockInComment(item: OfflineClockInItem) {
+  const lines = [
+    'Pointage offline : oui',
+    'Statut RH : A verifier',
+    `Client offline : ${item.offlineClientId ?? item.clientId}`,
+    `Heure telephone : ${item.timestampLocal}`,
+    `Mise en attente : ${item.offlineQueuedAt ?? 'Non renseignee'}`,
+    `Synchronise le : ${new Date().toISOString()}`,
+    item.gpsCapturedAt ? `GPS capture : ${item.gpsCapturedAt}` : null,
+    item.gpsSource ? `Source GPS : ${item.gpsSource}` : null,
+    item.accuracy !== null ? `Precision GPS : ${item.accuracy} m` : null,
+  ].filter((line): line is string => Boolean(line));
+  const auditComment = lines.join('\n');
+
+  return item.comment?.trim() ? `${item.comment.trim()}\n\n${auditComment}` : auditComment;
 }
 
 async function syncReports(errors: string[]) {
@@ -836,7 +942,10 @@ function isClockInItem(value: unknown): value is OfflineClockInItem {
     typeof value.timestampLocal === 'string' &&
     ((typeof value.siteId === 'string' && value.siteId.trim().length > 0) ||
       (typeof value.freeMissionId === 'string' && value.freeMissionId.trim().length > 0) ||
-      (typeof value.officeLocationId === 'string' && value.officeLocationId.trim().length > 0)) &&
+      (typeof value.officeLocationId === 'string' && value.officeLocationId.trim().length > 0) ||
+      (typeof value.negotiationAssignmentId === 'string' && value.negotiationAssignmentId.trim().length > 0) ||
+      (typeof value.negotiationSessionId === 'string' && value.negotiationSessionId.trim().length > 0) ||
+      (typeof value.negotiationSessionClientId === 'string' && value.negotiationSessionClientId.trim().length > 0)) &&
     isClockInType(value.type)
   );
 }

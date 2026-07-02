@@ -206,6 +206,11 @@ export function parseClockInInput(body: unknown): ClockInInput | null {
       : typeof body.comment === 'string'
         ? body.comment
         : null;
+  const gpsCapturedAt = sanitizeDateTimeString(body.gpsCapturedAt);
+  const gpsSource = body.gpsSource === 'LIVE' || body.gpsSource === 'CACHED' ? body.gpsSource : undefined;
+  const offlineClientId = sanitizeString(body.offlineClientId);
+  const offlineQueuedAt = sanitizeDateTimeString(body.offlineQueuedAt);
+  const offlineSyncedAt = sanitizeDateTimeString(body.offlineSyncedAt);
 
   if (!type || latitude === null || longitude === null || !timestampLocal) {
     return null;
@@ -218,7 +223,7 @@ export function parseClockInInput(body: unknown): ClockInInput | null {
     return null;
   }
 
-  return {
+  const input: ClockInInput = {
     type,
     latitude,
     longitude,
@@ -226,6 +231,14 @@ export function parseClockInInput(body: unknown): ClockInInput | null {
     timestampLocal,
     comment,
   };
+
+  if (gpsCapturedAt) input.gpsCapturedAt = gpsCapturedAt;
+  if (gpsSource) input.gpsSource = gpsSource;
+  if (offlineClientId) input.offlineClientId = offlineClientId;
+  if (offlineQueuedAt) input.offlineQueuedAt = offlineQueuedAt;
+  if (offlineSyncedAt) input.offlineSyncedAt = offlineSyncedAt;
+
+  return input;
 }
 
 export function getClockInGpsValidationError(input: Pick<ClockInInput, 'latitude' | 'longitude' | 'timestampLocal'>) {
@@ -715,7 +728,7 @@ export async function createBatchClockInRecord(
         payload.input.accuracy === null ? null : new Prisma.Decimal(payload.input.accuracy),
       distanceToSite: new Prisma.Decimal(payload.distanceKm.toFixed(2)),
       status: payload.status,
-      comment: null,
+      comment: payload.input.comment ?? null,
       timestampLocal,
       isRemoteCheckout: payload.isRemoteCheckout ?? false,
       isAutoClosed: payload.isAutoClosed ?? false,

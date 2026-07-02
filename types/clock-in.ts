@@ -91,6 +91,9 @@ export type ClockInInput = {
   timestampLocal: string;
   gpsCapturedAt?: string;
   gpsSource?: 'LIVE' | 'CACHED';
+  offlineClientId?: string;
+  offlineQueuedAt?: string;
+  offlineSyncedAt?: string;
   comment?: string | null;
 };
 

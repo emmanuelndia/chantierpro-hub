@@ -22,6 +22,7 @@ import {
   getPendingOfflineClockIns,
   setMobileOfflineCache,
   syncMobileOfflineQueue,
+  type OfflineClockInItem,
 } from '@/lib/mobile-offline-db';
 import { buildLocalSessionStatus } from '@/lib/mobile-clock-in-session';
 import { useGeolocation } from '@/lib/hooks/useGeolocation';
@@ -110,6 +111,13 @@ type MobileNegotiationDay = {
     assignment: { id: string; plannedZone: string | null; instruction: string | null; zone?: { id: string; name: string } | null } | null;
     visitCount: number;
   } | null;
+};
+
+type PendingNegotiationSession = {
+  clientId: string;
+  startTime: string;
+  siteName: string;
+  negotiationAssignmentId: string | null;
 };
 
 const intentToType: Record<ClockInIntent, ClockInType> = {
@@ -313,23 +321,62 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const officeLocationsQuery = useQuery({
     queryKey: ['mobile-office-locations'],
     queryFn: async () => {
-      const response = await authFetch('/api/mobile/office-locations');
+      let response: Response;
+      try {
+        response = await authFetch('/api/mobile/office-locations');
+      } catch {
+        const cached = await getMobileOfflineCache<OfficeLocationsResponse>('mobile-office-locations');
+        if (cached) {
+          return cached.payload;
+        }
+
+        throw new Error('Office locations failed');
+      }
+
       if (!response.ok) {
+        const cached = await getMobileOfflineCache<OfficeLocationsResponse>('mobile-office-locations');
+        if (cached) {
+          return cached.payload;
+        }
+
         throw new Error(`Office locations failed with status ${response.status}`);
       }
 
-      return (await response.json()) as OfficeLocationsResponse;
+      const payload = (await response.json()) as OfficeLocationsResponse;
+      await setMobileOfflineCache('mobile-office-locations', payload, 7 * 24 * 60 * 60 * 1000);
+      return payload;
     },
+    staleTime: 300_000,
   });
 
+  const negotiationDayCacheKey = `mobile-negotiation-day-${todayKey}`;
   const negotiationDayQuery = useQuery({
     queryKey: ['mobile-negotiation-clock-in-day', todayKey],
     queryFn: async () => {
-      const response = await authFetch(`/api/mobile/negotiation?date=${encodeURIComponent(todayKey)}`);
-      if (!response.ok) {
+      let response: Response;
+      try {
+        response = await authFetch(`/api/mobile/negotiation?date=${encodeURIComponent(todayKey)}`);
+      } catch {
+        const cached = await getMobileOfflineCache<MobileNegotiationDay>(negotiationDayCacheKey);
+        if (cached) {
+          return cached.payload;
+        }
+
         throw new Error('Negotiation day failed');
       }
-      return (await response.json()) as MobileNegotiationDay;
+
+      if (!response.ok) {
+        const cached = await getMobileOfflineCache<MobileNegotiationDay>(negotiationDayCacheKey);
+        if (cached) {
+          return cached.payload;
+        }
+
+        throw new Error('Negotiation day failed');
+      }
+
+      const payload = (await response.json()) as MobileNegotiationDay;
+      await setMobileOfflineCache(negotiationDayCacheKey, payload, 24 * 60 * 60 * 1000);
+      return payload;
     },
     enabled: isNegotiationClockInUser,
     refetchInterval: 30_000,
@@ -354,6 +401,10 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     [negotiationAssignments, selectedNegotiationAssignmentId],
   );
   const openNegotiationSession = negotiationDayQuery.data?.openSession ?? null;
+  const pendingNegotiationSession = useMemo(
+    () => findPendingNegotiationSession(pendingClockInsQuery.data ?? [], selectedNegotiationAssignment?.id ?? null),
+    [pendingClockInsQuery.data, selectedNegotiationAssignment?.id],
+  );
   const freeMissionAssignments = useMemo(
     () =>
       todayAssignments.filter(
@@ -390,7 +441,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     isNegotiationClockInUser &&
     !selectedFreeMission &&
     !hasClassicZoneAssignments &&
-    (Boolean(selectedNegotiationAssignment) || Boolean(openNegotiationSession) || negotiationAssignments.length > 0);
+    (Boolean(selectedNegotiationAssignment) || Boolean(openNegotiationSession) || Boolean(pendingNegotiationSession) || negotiationAssignments.length > 0);
   const isNegotiationZoneSelected =
     selectedClockContext === 'ZONE' && useNegotiationZoneFlow;
   const hasUnselectedZone = selectedClockContext === 'ZONE' && freeMissionAssignments.length > 1 && !selectedFreeMission;
@@ -650,7 +701,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const selectedSiteSessionLoaded = sessionStatus !== undefined || sessionStatusQuery.isError;
   const selectedContextSessionLoaded = isNegotiationZoneSelected || selectedSiteSessionLoaded;
   const hasOpenSession = isNegotiationZoneSelected
-    ? Boolean(openNegotiationSession)
+    ? Boolean(openNegotiationSession ?? pendingNegotiationSession)
     : selectedSite || selectedFreeMission || selectedOffice
       ? Boolean(sessionStatus?.sessionOpen)
       : Boolean(activeSession);
@@ -696,7 +747,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const isProfessionalTravel = selectedOffice && selectedOfficeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL;
   const displayContextLabel = isProfessionalTravel ? 'Deplacement' : activeContextLabel;
   const staleOpenSession = activeSession?.isStaleOpenSession ? activeSession : null;
-  const selectedContextReady = Boolean(selectedSite ?? selectedFreeMission ?? selectedOffice) || (isNegotiationZoneSelected && Boolean(selectedNegotiationAssignment ?? openNegotiationSession));
+  const selectedContextReady = Boolean(selectedSite ?? selectedFreeMission ?? selectedOffice) || (isNegotiationZoneSelected && Boolean(selectedNegotiationAssignment ?? openNegotiationSession ?? pendingNegotiationSession));
   const isZoneClockInContext = selectedFreeMission !== null || isNegotiationZoneSelected;
   const usesSimplifiedFleetZone = isFleetResource && Boolean(selectedFreeMission) && !isNegotiationZoneSelected;
   const zoneActualNameRequired = isZoneClockInContext && !usesSimplifiedFleetZone && currentType === 'ARRIVAL';
@@ -733,11 +784,11 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   }, [requestedIntent, sessionStatus?.sessionOpen]);
 
   useEffect(() => {
-    if (openNegotiationSession) {
+    if (openNegotiationSession || pendingNegotiationSession) {
       setSelectedClockContext('ZONE');
       setSelectedIntent('departure');
     }
-  }, [openNegotiationSession]);
+  }, [openNegotiationSession, pendingNegotiationSession]);
 
   const clockInMutation = useMutation({
     mutationFn: submitClockIn,
@@ -805,7 +856,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     outOfPlanningSiteTaskReady &&
     geoState.status === 'ready' &&
     !outsideRadius &&
-    (isNegotiationZoneSelected || isProfessionalTravel ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
+    (isProfessionalTravel ? networkState !== 'offline' : networkState !== 'offline' || offlineReadyToday) &&
     !(staleOpenSession && currentType === 'ARRIVAL') &&
     !clockInMutation.isPending;
 
@@ -934,16 +985,37 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     }
 
     if (isNegotiationZoneSelected) {
-      if (!navigator.onLine) {
-        throw new Error('Le pointage zone negociation demande une connexion reseau pour cette version.');
-      }
-
       if (actionType === 'DEPARTURE') {
-        if (!openNegotiationSession) {
+        const sessionToClose = openNegotiationSession ?? pendingNegotiationSession;
+        if (!sessionToClose) {
           throw new Error('Aucune session negociation ouverte.');
         }
 
-        const response = await authFetch(`/api/mobile/negotiation/session/${encodeURIComponent(openNegotiationSession.id)}`, {
+        if (!navigator.onLine || 'clientId' in sessionToClose) {
+          const offlineSiteName = getNegotiationSessionLabel(sessionToClose) ?? 'Zone negociation';
+          await enqueueOfflineClockIn({
+            clientId,
+            siteName: offlineSiteName,
+            ...payload,
+            negotiationSessionId: 'id' in sessionToClose && !('clientId' in sessionToClose) ? sessionToClose.id : null,
+            negotiationSessionClientId: 'clientId' in sessionToClose ? sessionToClose.clientId : null,
+            comment,
+          });
+
+          return {
+            clientId,
+            offline: true,
+            record: null,
+            type: actionType,
+            siteId: null,
+            freeMissionId: null,
+            siteName: offlineSiteName,
+            timestampLocal,
+            durationSeconds: elapsedSeconds(sessionToClose.startTime, Date.parse(timestampLocal), 0),
+          };
+        }
+
+        const response = await authFetch(`/api/mobile/negotiation/session/${encodeURIComponent(openNegotiationSession!.id)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -982,6 +1054,31 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         specificPlace: zoneSpecificPlace,
         comment: zoneClockInComment,
       });
+
+      if (!navigator.onLine) {
+        const offlineSiteName = selectedNegotiationAssignment.zone?.name ?? selectedNegotiationAssignment.plannedZone ?? selectedNegotiationAssignment.project.name ?? 'Zone negociation';
+        await enqueueOfflineClockIn({
+          clientId,
+          siteName: offlineSiteName,
+          ...payload,
+          negotiationAssignmentId: selectedNegotiationAssignment.id,
+          negotiationProjectId: selectedNegotiationAssignment.project.id,
+          negotiationDate: todayKey,
+          comment: negotiationZoneComment,
+        });
+
+        return {
+          clientId,
+          offline: true,
+          record: null,
+          type: actionType,
+          siteId: null,
+          freeMissionId: null,
+          siteName: offlineSiteName,
+          timestampLocal,
+          durationSeconds: null,
+        };
+      }
 
       const response = await authFetch('/api/mobile/negotiation/session', {
         method: 'POST',
@@ -1379,12 +1476,12 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               </p>
               <h3 className="mt-2 text-lg font-black text-slate-950">
                 {useNegotiationZoneFlow
-                  ? openNegotiationSession?.assignment?.zone?.name ?? openNegotiationSession?.assignment?.plannedZone ?? selectedNegotiationAssignment?.zone?.name ?? selectedNegotiationAssignment?.plannedZone ?? 'Choisir une zone nego'
+                  ? pendingNegotiationSession?.siteName ?? openNegotiationSession?.assignment?.zone?.name ?? openNegotiationSession?.assignment?.plannedZone ?? selectedNegotiationAssignment?.zone?.name ?? selectedNegotiationAssignment?.plannedZone ?? 'Choisir une zone nego'
                   : selectedFreeMission ? selectedFreeMission.action : 'Choisir une zone'}
               </h3>
               <p className="mt-1 text-sm font-semibold text-slate-600">
                 {useNegotiationZoneFlow
-                  ? openNegotiationSession?.project?.name ?? selectedNegotiationAssignment?.project.name ?? 'Pointage zone pour la negociation'
+                  ? pendingNegotiationSession ? 'Session offline en attente' : openNegotiationSession?.project?.name ?? selectedNegotiationAssignment?.project.name ?? 'Pointage zone pour la negociation'
                   : selectedFreeMission ? selectedFreeMission.projectName : 'Pointage GPS sans chantier fixe'}
               </p>
             </div>
@@ -1392,11 +1489,11 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           </div>
           {useNegotiationZoneFlow ? (
             <>
-              {negotiationAssignments.length === 0 && !openNegotiationSession ? (
+              {negotiationAssignments.length === 0 && !openNegotiationSession && !pendingNegotiationSession ? (
                 <p className="rounded-xl bg-white p-3 text-sm font-semibold leading-6 text-slate-600">
                   Aucune zone negociation prevue aujourd&apos;hui. Le responsable doit planifier depuis Suivi negociation.
                 </p>
-              ) : negotiationAssignments.length > 1 && !openNegotiationSession ? (
+              ) : negotiationAssignments.length > 1 && !openNegotiationSession && !pendingNegotiationSession ? (
                 <label className="space-y-2">
                   <span className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Zone nego a pointer</span>
                   <select
@@ -2418,6 +2515,42 @@ function fromNearbySite(site: NearbySiteItem): SelectableSite {
     distanceKm: site.distance,
     siteType: null,
   };
+}
+
+function findPendingNegotiationSession(items: OfflineClockInItem[], assignmentId: string | null): PendingNegotiationSession | null {
+  const departuresByArrival = new Set(
+    items
+      .filter((item) => item.type === 'DEPARTURE' && item.negotiationSessionClientId)
+      .map((item) => item.negotiationSessionClientId),
+  );
+  const arrivals = items
+    .filter((item) =>
+      item.type === 'ARRIVAL' &&
+      Boolean(item.negotiationAssignmentId) &&
+      (!assignmentId || item.negotiationAssignmentId === assignmentId) &&
+      !departuresByArrival.has(item.clientId),
+    )
+    .sort((left, right) => right.timestampLocal.localeCompare(left.timestampLocal));
+  const arrival = arrivals[0];
+
+  if (!arrival) {
+    return null;
+  }
+
+  return {
+    clientId: arrival.clientId,
+    startTime: arrival.timestampLocal,
+    siteName: arrival.siteName,
+    negotiationAssignmentId: arrival.negotiationAssignmentId ?? null,
+  };
+}
+
+function getNegotiationSessionLabel(session: NonNullable<MobileNegotiationDay['openSession']> | PendingNegotiationSession) {
+  if ('siteName' in session) {
+    return session.siteName;
+  }
+
+  return session.assignment?.zone?.name ?? session.assignment?.plannedZone ?? session.project?.name ?? null;
 }
 
 function buildOfflineSessionStatus(

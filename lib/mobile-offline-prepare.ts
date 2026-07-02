@@ -1,13 +1,14 @@
 'use client';
 
 import { authFetch } from '@/lib/auth/client-session';
-import { setMobileOfflineCache } from '@/lib/mobile-offline-db';
+import { getMobileOfflineCache, setMobileOfflineCache } from '@/lib/mobile-offline-db';
 import {
   ensureMobileServiceWorkerRegistration,
   getMobileOfflineServiceWorkerDiagnostics,
   type MobileOfflineServiceWorkerDiagnostics,
 } from '@/lib/mobile-offline-service-worker';
 import type { TodayClockInView } from '@/types/clock-in';
+import type { OfficeLocationsResponse } from '@/types/office-locations';
 import type { MobilePhotoSitesResponse } from '@/types/mobile-photo';
 import type { PlanningDayResponse, SupervisorMyAssignmentsResponse } from '@/types/mobile-planning';
 import type { MobileHistoryResponse } from '@/types/mobile-history';
@@ -40,6 +41,12 @@ type TodaySitesResponse = {
   items: TodaySiteItem[];
 };
 
+type MobileNegotiationDay = {
+  date: string;
+  assignments: unknown[];
+  openSession: Record<string, unknown> | null;
+};
+
 export type MobileOfflinePreparationResult = {
   date: string;
   preparedAt: string;
@@ -66,8 +73,11 @@ export async function prepareMobileOfflineMode() {
 
   await warmMobileRoutes(errors);
   await cacheOfflineUser(dataPrepared, errors);
+  const offlineUser = await getMobileOfflineCache<WebSessionUser>(OFFLINE_USER_CACHE_KEY);
+  const shouldPrepareNegotiation = isNegotiationOfflineRole(offlineUser?.payload.role);
 
   await cacheJson<TodaySitesResponse>('/api/users/me/sites/today', 'sites-today', DAY_CACHE_TTL_MS, dataPrepared, errors);
+  await cacheJson<OfficeLocationsResponse>('/api/mobile/office-locations', 'mobile-office-locations', WEEK_CACHE_TTL_MS, dataPrepared, errors);
   await cacheJson<MobilePhotoSitesResponse>('/api/mobile/photo/sites', 'mobile-photo-sites', DAY_CACHE_TTL_MS, dataPrepared, errors);
   await cacheJson<SupervisorMyAssignmentsResponse>(
     `/api/mobile/planning/my-assignments?date=${encodeURIComponent(todayKey)}`,
@@ -101,6 +111,17 @@ export async function prepareMobileOfflineMode() {
     errors,
     false,
   );
+
+  if (shouldPrepareNegotiation) {
+    await cacheJson<MobileNegotiationDay>(
+      `/api/mobile/negotiation?date=${encodeURIComponent(todayKey)}`,
+      `mobile-negotiation-day-${todayKey}`,
+      DAY_CACHE_TTL_MS,
+      dataPrepared,
+      errors,
+    );
+  }
+
   const missingData = await getMissingPreparedData(todayKey);
   const serviceWorker = await getMobileOfflineServiceWorkerDiagnostics();
   const serviceWorkerMissingRoutes = getMissingServiceWorkerRoutes(serviceWorker);
@@ -124,8 +145,8 @@ export async function prepareMobileOfflineMode() {
 }
 
 async function getMissingPreparedData(todayKey: string) {
-  const { getMobileOfflineCache } = await import('@/lib/mobile-offline-db');
-  const requiredKeys = getRequiredOfflineDataKeys(todayKey);
+  const cachedUser = await getMobileOfflineCache<WebSessionUser>(OFFLINE_USER_CACHE_KEY);
+  const requiredKeys = getRequiredOfflineDataKeys(todayKey, cachedUser?.payload.role);
   const caches = await Promise.all(requiredKeys.map(async (key) => ({ key, item: await getMobileOfflineCache(key) })));
   return caches.filter(({ item }) => !item).map(({ key }) => key);
 }
@@ -169,16 +190,27 @@ export async function getMobileOfflinePreparationState() {
   };
 }
 
-function getRequiredOfflineDataKeys(todayKey: string) {
-  return [
+function getRequiredOfflineDataKeys(todayKey: string, role?: WebSessionUser['role']) {
+  const keys = [
     OFFLINE_USER_CACHE_KEY,
     'sites-today',
+    'mobile-office-locations',
     'mobile-photo-sites',
     `mobile-planning-my-assignments-${todayKey}`,
     'clock-in-history-7d',
     'clock-in-today',
     'mobile-history-week',
-  ] satisfies string[];
+  ];
+
+  if (isNegotiationOfflineRole(role)) {
+    keys.push(`mobile-negotiation-day-${todayKey}`);
+  }
+
+  return keys;
+}
+
+function isNegotiationOfflineRole(role?: WebSessionUser['role']) {
+  return role === 'NEGOTIATION_RESOURCE' || role === 'NEGOTIATION_MANAGER';
 }
 
 async function cacheOfflineUser(dataPrepared: string[], errors: string[]) {
