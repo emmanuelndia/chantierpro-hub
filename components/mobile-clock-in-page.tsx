@@ -1578,12 +1578,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               </label>
             )
           ) : null}
-          <div className="rounded-xl bg-white p-3">
-            <p className="text-sm font-black text-slate-950">Pointage GPS sans chantier fixe.</p>
-            <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-              Aucun chantier proche ne sera detecte automatiquement.
-            </p>
-          </div>
+          
           {usesSimplifiedFleetZone && currentType === 'ARRIVAL' ? (
             <div className="rounded-xl bg-white p-3 text-sm font-semibold leading-6 text-orange-900">
               Pointage simplifie parc auto : aucune saisie texte n&apos;est demandee. La zone prevue et le GPS seront enregistres automatiquement.
@@ -1682,11 +1677,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               <h3 className="mt-2 text-lg font-black text-slate-950">
                 {isProfessionalTravel ? 'Deplacement professionnel' : 'Pointage bureau'}
               </h3>
-              <p className="mt-1 text-sm font-semibold text-slate-600">
-                {isProfessionalTravel
-                  ? 'Presence professionnelle hors bureau, sans chantier ni projet.'
-                  : 'Presence quotidienne independante du planning.'}
-              </p>
+              
             </div>
             <span className="rounded-full bg-sky-600 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white">
               {isProfessionalTravel ? 'Deplacement' : 'Bureau'}
@@ -1800,7 +1791,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
                 </select>
                 {!selectedOfficeLocation && currentType === 'ARRIVAL' ? (
                   <p className="rounded-lg border border-red-100 bg-red-50 p-3 text-xs font-bold leading-5 text-red-700">
-                    Selectionnez le bureau reel avant de pointer. Aucun bureau n&apos;est choisi par defaut.
+                    Veuillez selectionner le bureau.
                   </p>
                 ) : null}
               </div>
@@ -1829,11 +1820,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
               </div>
             </div>
           )}
-          <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">
-            {isProfessionalTravel
-              ? 'La position GPS est enregistree comme preuve du deplacement. Aucun bureau, chantier ou projet ne sera impose.'
-              : 'La position GPS est enregistree comme preuve du pointage. Aucun chantier proche ne sera selectionne.'}
-          </p>
+          
         </section>
       ) : null}
 
