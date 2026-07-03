@@ -385,8 +385,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
 
   const todaySites = useMemo(() => todaySitesQuery.data?.items ?? [], [todaySitesQuery.data?.items]);
   const officeLocations = officeLocationsQuery.data?.items ?? [];
-  const selectedOfficeLocation =
-    officeLocations.find((office) => office.id === selectedOfficeLocationId) ?? officeLocations[0] ?? null;
+  const selectedOfficeLocation = officeLocations.find((office) => office.id === selectedOfficeLocationId) ?? null;
   const { assignments: todayAssignments, officeAssignments } = useTodayOfficeAssignments(true);
   const negotiationAssignments = useMemo(
     () => negotiationDayQuery.data?.assignments ?? [],
@@ -514,6 +513,9 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     }
     if (activeSession?.contextType === 'OFFICE' && activeSession.officeClockInLocation) {
       setSelectedOfficeClockInLocation(activeSession.officeClockInLocation);
+    }
+    if (activeSession?.contextType === 'OFFICE' && activeSession.officeLocationId) {
+      setSelectedOfficeLocationId(activeSession.officeLocationId);
     }
     if (activeSession?.contextType === 'OFFICE') {
       setSelectedClockContext('OFFICE');
@@ -748,6 +750,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const isProfessionalTravel = selectedOffice && selectedOfficeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL;
   const displayContextLabel = isProfessionalTravel ? 'Deplacement' : activeContextLabel;
   const staleOpenSession = activeSession?.isStaleOpenSession ? activeSession : null;
+  const officeLocationReady = !selectedOffice || isProfessionalTravel || currentType !== 'ARRIVAL' || Boolean(selectedOfficeLocation);
   const selectedContextReady = Boolean(selectedSite ?? selectedFreeMission ?? selectedOffice) || (isNegotiationZoneSelected && Boolean(selectedNegotiationAssignment ?? openNegotiationSession ?? pendingNegotiationSession));
   const isZoneClockInContext = selectedFreeMission !== null || isNegotiationZoneSelected;
   const usesSimplifiedFleetZone = isFleetResource && Boolean(selectedFreeMission) && !isNegotiationZoneSelected;
@@ -854,6 +857,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
     selectedContextReady &&
     zoneActualNameReady &&
     travelDetailsReady &&
+    officeLocationReady &&
     outOfPlanningSiteTaskReady &&
     geoState.status === 'ready' &&
     !outsideRadius &&
@@ -1771,19 +1775,34 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
           {!isProfessionalTravel ? (
             <>
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Bureau</label>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Bureau obligatoire</label>
+                  {!selectedOfficeLocation && currentType === 'ARRIVAL' ? (
+                    <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-red-700">A choisir</span>
+                  ) : null}
+                </div>
                 <select
-                  className="min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none"
-                  onChange={(event) => setSelectedOfficeLocationId(event.target.value)}
+                  className={`min-h-14 w-full rounded-xl border bg-white px-3 text-sm font-black text-slate-950 outline-none ${
+                    !selectedOfficeLocation && currentType === 'ARRIVAL'
+                      ? 'border-red-300 ring-2 ring-red-100'
+                      : 'border-sky-200 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20'
+                  }`}
+                  onChange={(event) => setSelectedOfficeLocationId(event.target.value || null)}
                   value={selectedOfficeLocation?.id ?? ''}
                 >
-                  {officeLocations.length === 0 ? <option value="">Aucun bureau actif</option> : null}
+                  <option value="">Veuillez selectionner un bureau</option>
+                  {officeLocations.length === 0 ? <option value="" disabled>Aucun bureau actif</option> : null}
                   {officeLocations.map((office) => (
                     <option key={office.id} value={office.id}>
                       {office.name} - {office.address}
                     </option>
                   ))}
                 </select>
+                {!selectedOfficeLocation && currentType === 'ARRIVAL' ? (
+                  <p className="rounded-lg border border-red-100 bg-red-50 p-3 text-xs font-bold leading-5 text-red-700">
+                    Selectionnez le bureau reel avant de pointer. Aucun bureau n&apos;est choisi par defaut.
+                  </p>
+                ) : null}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
