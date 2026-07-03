@@ -210,13 +210,20 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     input.type === ClockInType.DEPARTURE &&
     !withinGeofence &&
     currentSiteOpenSession?.siteId === site.id;
+  const isClosingStaleSession =
+    input.type === ClockInType.DEPARTURE &&
+    currentSiteOpenSession?.siteId === site.id &&
+    currentSiteOpenSession.clockInDate.toISOString().slice(0, 10) !== new Date(input.timestampLocal).toISOString().slice(0, 10);
   const status = withinGeofence || remoteDepartureAllowed ? ClockInStatus.VALID : ClockInStatus.REJECTED;
-  const recordInput = remoteDepartureAllowed
+  const recordInput = remoteDepartureAllowed || isClosingStaleSession
     ? {
         ...input,
         comment: appendClockInComment(
           input.comment,
-          'Sortie distante autorisee - fermeture de session hors zone.',
+          [
+            remoteDepartureAllowed ? 'Sortie distante autorisee - fermeture de session hors zone.' : null,
+            isClosingStaleSession ? 'Fermeture de session ancienne.' : null,
+          ].filter(Boolean).join(' '),
         ),
       }
     : input;
@@ -229,6 +236,7 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
       distanceKm,
       status,
       isRemoteCheckout: remoteDepartureAllowed,
+      isRegularized: isClosingStaleSession,
     });
 
   if (!withinGeofence && !remoteDepartureAllowed) {

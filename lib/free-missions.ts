@@ -418,12 +418,22 @@ export async function clockInFreeMission(prisma: PrismaClient, user: AuthLikeUse
     }
   }
 
+  const isClosingStaleSession =
+    input.type === ClockInType.DEPARTURE &&
+    openSession?.freeMissionId === mission.id &&
+    openSession.clockInDate.toISOString().slice(0, 10) !== new Date(input.timestampLocal).toISOString().slice(0, 10);
   const record = await createClockInRecord(prisma, {
     freeMissionId: mission.id,
     userId: user.id,
-    input,
+    input: isClosingStaleSession
+      ? {
+          ...input,
+          comment: appendClockInComment(input.comment, 'Fermeture de session ancienne.'),
+        }
+      : input,
     distanceKm: 0,
     status: ClockInStatus.VALID,
+    isRegularized: isClosingStaleSession,
   });
 
   await prisma.freeMission.update({
@@ -733,4 +743,9 @@ function sanitizeDate(value: unknown) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const date = new Date(`${value}T00:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function appendClockInComment(existing: string | null | undefined, note: string) {
+  const trimmed = existing?.trim();
+  return trimmed ? `${note}\n${trimmed}` : note;
 }

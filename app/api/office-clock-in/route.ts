@@ -156,14 +156,24 @@ export const POST = withAuth(async ({ req, user }) => {
     }
   }
 
+  const isClosingStaleSession =
+    input.type === ClockInType.DEPARTURE &&
+    Boolean(openSession?.officeClockInLocation) &&
+    openSession!.clockInDate.toISOString().slice(0, 10) !== new Date(input.timestampLocal).toISOString().slice(0, 10);
   const record = await createClockInRecord(prisma, {
     officeClockInLocation: activeOfficeClockInLocation,
     officeLocationId: activeOfficeClockInLocation === OfficeClockInLocation.OFFICE ? officeLocation?.id ?? null : null,
     planningAssignmentId: linkedAssignmentId,
     userId: user.id,
-    input,
+    input: isClosingStaleSession
+      ? {
+          ...input,
+          comment: appendClockInComment(input.comment, 'Fermeture de session ancienne.'),
+        }
+      : input,
     distanceKm: 0,
     status: ClockInStatus.VALID,
+    isRegularized: isClosingStaleSession,
   });
 
   return Response.json({ record });
@@ -271,4 +281,9 @@ async function validateOfficePlanningAssignment(userId: string, assignmentId: st
   }
 
   return { ok: true as const, assignmentId: assignment.id };
+}
+
+function appendClockInComment(existing: string | null | undefined, note: string) {
+  const trimmed = existing?.trim();
+  return trimmed ? `${note}\n${trimmed}` : note;
 }
