@@ -243,12 +243,14 @@ export async function getPlanningDay(
     });
   }
 
+  const supervisorRoles = getScopedPlanningResourceRoles(user.role);
+
   const [supervisors, clockIns, yesterdayCount, yesterdayFreeMissionResponse] = await Promise.all([
     prisma.user.findMany({
       where: {
         id: { in: scopedSupervisorIds },
         role: {
-          in: [...FIELD_USER_ROLES],
+          in: [...supervisorRoles],
         },
         isActive: true,
       },
@@ -1369,7 +1371,7 @@ async function validateNegotiationAssignmentInput(prisma: PrismaClient, user: Au
 }
 
 async function getScopedSupervisorIds(prisma: PrismaClient, user: AuthLikeUser, _date: Date) {
-  const roles = isBusinessManagerRole(user.role) ? getBusinessManagedResourceRoles(user.role) : CLASSIC_FIELD_USER_ROLES;
+  const roles = getScopedPlanningResourceRoles(user.role);
   const supervisors = await prisma.user.findMany({
     where: {
       role: {
@@ -1381,6 +1383,10 @@ async function getScopedSupervisorIds(prisma: PrismaClient, user: AuthLikeUser, 
   });
 
   return supervisors.map((supervisor) => supervisor.id);
+}
+
+function getScopedPlanningResourceRoles(role: Role) {
+  return isBusinessManagerRole(role) ? getBusinessManagedResourceRoles(role) : CLASSIC_FIELD_USER_ROLES;
 }
 
 async function getAssignedSupervisorIdsForDay(
