@@ -1,11 +1,11 @@
 import { ClockInStatus, ClockInType, PlanningWorkLocationType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
-import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import { CLOCK_IN_FIELD_USER_ROLES } from '@/lib/field-roles';
 import { createInternalPhotoUrl } from '@/lib/photos';
 import type { SessionReportData } from '@/types/mobile-session-report';
 
-const allowedRoles: readonly Role[] = FIELD_USER_ROLES;
+const allowedRoles: readonly Role[] = CLOCK_IN_FIELD_USER_ROLES;
 
 export const GET = withAuth<{ sessionId: string }>(async ({ user, params }) => {
   if (!allowedRoles.includes(user.role)) {

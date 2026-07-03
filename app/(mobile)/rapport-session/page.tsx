@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { MobileSessionReportPage } from '@/components/mobile-session-report-page';
 import { MobilePlaceholderPage } from '@/components/mobile-placeholder-page';
 import { getCurrentWebSession } from '@/lib/auth/web-session';
-import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import { CLOCK_IN_FIELD_USER_ROLES } from '@/lib/field-roles';
 
 export default async function MobileSessionReportPageWrapper() {
   const session = await getCurrentWebSession();
@@ -11,7 +11,7 @@ export default async function MobileSessionReportPageWrapper() {
     redirect('/mobile/login?next=/rapport-session');
   }
 
-  if (FIELD_USER_ROLES.includes(session.role)) {
+  if (CLOCK_IN_FIELD_USER_ROLES.includes(session.role)) {
     return <MobileSessionReportPage user={session} />;
   }
 

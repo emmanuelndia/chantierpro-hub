@@ -9,7 +9,7 @@ import {
   TeamStatus,
   type PrismaClient,
 } from '@prisma/client';
-import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import { CLOCK_IN_FIELD_USER_ROLES } from '@/lib/field-roles';
 import { haversineDistanceKm } from '@/lib/haversine';
 import { normalizeGeofencePolygon } from '@/lib/projects';
 import type {
@@ -26,7 +26,7 @@ import type {
   TodayClockInView,
 } from '@/types/clock-in';
 
-export const FIELD_ROLES: readonly Role[] = FIELD_USER_ROLES;
+export const FIELD_ROLES: readonly Role[] = CLOCK_IN_FIELD_USER_ROLES;
 
 export const clockInRecordSelect = {
   id: true,
@@ -178,7 +178,7 @@ export function jsonClockInError(
 }
 
 export function isTechnician(role: Role) {
-  return FIELD_ROLES.includes(role) || role === Role.PROJECT_MANAGER;
+  return FIELD_ROLES.includes(role);
 }
 
 export async function parseJsonBody<T>(request: Request): Promise<T | null> {

@@ -23,6 +23,11 @@ export const FIELD_USER_ROLES: readonly Role[] = [
   ...FLEET_FIELD_USER_ROLES,
 ];
 
+export const CLOCK_IN_FIELD_USER_ROLES: readonly Role[] = [
+  ...FIELD_USER_ROLES,
+  Role.BE_MANAGER,
+];
+
 export const TEAM_ASSIGNABLE_USER_ROLES: readonly Role[] = [
   Role.SUPERVISOR,
   Role.RESOURCE,

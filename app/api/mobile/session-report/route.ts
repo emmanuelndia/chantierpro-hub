@@ -2,10 +2,10 @@ import { ClockInStatus, ClockInType, PlanningAssignmentStatus, PlanningWorkLocat
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { createDocumentAttachment } from '@/lib/documents';
-import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import { CLOCK_IN_FIELD_USER_ROLES } from '@/lib/field-roles';
 import type { ReportSubmissionResponse, SubmitReportRequest } from '@/types/mobile-session-report';
 
-const allowedRoles: readonly Role[] = FIELD_USER_ROLES;
+const allowedRoles: readonly Role[] = CLOCK_IN_FIELD_USER_ROLES;
 
 export const POST = withAuth(async ({ user, req }) => {
   if (!allowedRoles.includes(user.role)) {
