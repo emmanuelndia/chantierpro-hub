@@ -146,7 +146,7 @@ Du coup dans pointer option zone on doit plus être rédirigé sur taches non ?
 Pour les tâches zone on doit pouvoir renseigner les objectifs quantitatifs non ? et aussi la durée prévue bref la même chose que quand on a mis type chantier ?
 
 Les comptes rh n'ont pas d'accueil ils sont rédirigés sur profil, fait le compte accueil et fait aussi un ecran présence pour la liste de présence avec tous les filtres utiles
-Pour personnel bureau aussi tu fais un ecran d'accueil 
+Pour personnel bureau aussi tu fais un ecran d'accueil  
 Dans les données affichées on a mis retard pour ceux qui ont pointé après 8h00 même après avoir modifié à 30
 
 Pour les ressources negociation ils vont aussi pointer par zones et c'est au suivie de leurs tâches qu'il aura une manière différente :
