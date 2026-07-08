@@ -82,6 +82,7 @@ type Submission = {
   siteName: string;
   timestampLocal: string;
   durationSeconds: number | null;
+  staleSessionClosed?: boolean;
 };
 
 type TodaySitesResponse = {
@@ -815,7 +816,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       setSubmission(result);
       setErrorMessage(null);
       setComment('');
-      setStep('comment');
+      setStep('confirmation');
       await refreshClockInQueries();
     },
     onError: (error) => {
@@ -876,9 +877,10 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       return;
     }
 
-    const timer = window.setTimeout(() => router.push('/mobile/home'), 4_000);
+    const delay = submission?.staleSessionClosed ? 8_000 : 4_000;
+    const timer = window.setTimeout(() => router.push('/mobile/home'), delay);
     return () => window.clearTimeout(timer);
-  }, [router, step]);
+  }, [router, step, submission?.staleSessionClosed]);
 
   async function submitClockIn(intentOverride?: ClockInIntent): Promise<Submission> {
     if (!selectedContextReady || geoState.status !== 'ready') {
@@ -1301,6 +1303,7 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
       siteName: staleOpenSession.contextName,
       timestampLocal: data.record.timestampLocal,
       durationSeconds: staleOpenSession.durationSeconds,
+      staleSessionClosed: true,
     };
   }
 
@@ -2455,20 +2458,30 @@ function PostClockInPanel({
 }
 
 function ConfirmationView({ submission }: Readonly<{ submission: Submission }>) {
+  const router = useRouter();
+  const title = submission.staleSessionClosed
+    ? 'Session ancienne fermee'
+    : submission.offline
+      ? 'Pointage en attente'
+      : 'Pointage confirme';
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-6 text-center shadow-panel">
       <div
         className={`mx-auto flex h-28 w-28 animate-pulse items-center justify-center rounded-full ${
-          submission.offline ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
+          submission.staleSessionClosed || submission.offline ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'
         }`}
       >
         {submission.offline ? <ClockIcon className="h-14 w-14" /> : <CheckIcon className="h-14 w-14" />}
       </div>
-      <h2 className="mt-5 text-2xl font-black text-slate-950">
-        {submission.offline ? 'Pointage en attente' : 'Pointage confirme'}
-      </h2>
+      <h2 className="mt-5 text-2xl font-black text-slate-950">{title}</h2>
+      {submission.staleSessionClosed ? (
+        <div className="mt-5 rounded-xl border border-orange-200 bg-orange-50 p-4 text-left text-sm font-bold leading-6 text-orange-900">
+          Cette action ferme seulement une session oubliee. Pour etre present aujourd&apos;hui, pointez maintenant votre entree du jour.
+        </div>
+      ) : null}
       <div className="mt-5 space-y-3 rounded-lg bg-slate-50 p-4 text-left text-sm">
-        <SummaryRow label="Type" value={typeLabels[submission.type] ?? submission.type} />
+        <SummaryRow label="Type" value={submission.staleSessionClosed ? 'Fermeture ancienne session' : typeLabels[submission.type] ?? submission.type} />
         <SummaryRow label="Chantier" value={submission.siteName} />
         <SummaryRow label="Date" value={formatDate(submission.timestampLocal)} />
         <SummaryRow label="Heure" value={formatTime(submission.timestampLocal)} />
@@ -2476,6 +2489,15 @@ function ConfirmationView({ submission }: Readonly<{ submission: Submission }>) 
           <SummaryRow label="Duree" value={formatShortDuration(submission.durationSeconds)} />
         ) : null}
       </div>
+      {submission.staleSessionClosed ? (
+        <button
+          className="mt-5 flex min-h-14 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-black text-white"
+          onClick={() => router.push('/mobile/clock-in?intent=arrival')}
+          type="button"
+        >
+          Pointer mon entree du jour
+        </button>
+      ) : null}
       <p className="mt-5 text-sm font-semibold text-slate-500">Retour accueil automatique...</p>
     </section>
   );

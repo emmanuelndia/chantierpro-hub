@@ -403,13 +403,22 @@ export async function getDirectionAttendanceReport(
       if (!session.endTime || !isDateInRange(session.endTime, day, tomorrow)) return false;
       return !isDateInRange(session.startTime, day, tomorrow);
     });
-    const hasDepartureToday = sameDayDepartureRecords.length > 0;
-    const hasNegotiationEndToday = sameDayNegotiationEnds.length > 0;
-    const hasOldSessionClosureToday = oldSessionDeparturesToday || oldNegotiationEndsToday;
-    const todayDepartureAt = maxIsoDate([
+    const rawTodayDepartureAt = maxIsoDate([
       ...sameDayDepartureRecords.map((record) => record.timestampLocal),
       ...sameDayNegotiationEnds,
     ]);
+    const rawTodayDepartureDate = rawTodayDepartureAt ? new Date(rawTodayDepartureAt) : null;
+    const hasArrivalAfterFinalDeparture = Boolean(
+      rawTodayDepartureDate &&
+      [
+        ...arrivalRecords.map((record) => record.timestampLocal),
+        ...negotiationStartsToday.map((session) => session.startTime),
+      ].some((value) => value.getTime() >= rawTodayDepartureDate.getTime()),
+    );
+    const todayDepartureAt = hasArrivalAfterFinalDeparture ? null : rawTodayDepartureAt;
+    const hasDepartureToday = Boolean(todayDepartureAt);
+    const hasNegotiationEndToday = Boolean(todayDepartureAt && sameDayNegotiationEnds.length > 0);
+    const hasOldSessionClosureToday = oldSessionDeparturesToday || oldNegotiationEndsToday;
     const neverClocked = !firstClockInAt;
 
     return {
@@ -3234,7 +3243,7 @@ function toDirectionExportRow(user: RhDirectionAttendanceReportResponse['users']
     firstClockInAt: user.firstClockInAt ? formatDirectionDateTime(user.firstClockInAt) : '',
     lastClockInAt: user.lastClockInAt ? formatDirectionDateTime(user.lastClockInAt) : '',
     createdAt: formatDirectionDate(user.createdAt),
-    status: directionAttendanceStatusLabel(user.status),
+    status: directionAttendanceUserStatusLabel(user),
     email: user.email ?? '',
   };
 }
@@ -3331,7 +3340,7 @@ function drawDirectionPdfSection(
     { label: 'Entree', width: 22, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => user.todayArrivalAt ? formatDirectionTime(user.todayArrivalAt) : '-' },
     { label: 'Sortie', width: 22, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => user.todayDepartureAt ? formatDirectionTime(user.todayDepartureAt) : '-' },
     { label: 'Dernier pointage', width: 46, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => user.lastClockInAt ? formatDirectionDateTime(user.lastClockInAt) : '-' },
-    { label: 'Statut', width: 32, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => directionAttendanceStatusLabel(user.status) },
+    { label: 'Statut', width: 32, value: (user: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]) => directionAttendanceUserStatusLabel(user) },
   ];
   const scale = (pageWidth - margin * 2) / columns.reduce((sum, column) => sum + column.width, 0);
   const scaledColumns = columns.map((column) => ({ ...column, width: column.width * scale }));
@@ -3397,9 +3406,9 @@ function drawDirectionPdfSection(
   return y + 7;
 }
 
-function directionAttendanceStatusLabel(status: RhDirectionAttendanceReportResponse['users']['clockedToday'][number]['status']) {
-  if (status === 'CLOCKED_TODAY') return 'Pointe';
-  if (status === 'NEVER_CLOCKED') return 'Aucun pointage';
+function directionAttendanceUserStatusLabel(user: Pick<RhDirectionAttendanceReportResponse['users']['clockedToday'][number], 'status' | 'todayArrivalAt' | 'todayDepartureAt'>) {
+  if (user.status === 'CLOCKED_TODAY') return user.todayArrivalAt && !user.todayDepartureAt ? 'En cours' : 'Pointe';
+  if (user.status === 'NEVER_CLOCKED') return 'Aucun pointage';
   return 'Non pointe ce jour';
 }
 

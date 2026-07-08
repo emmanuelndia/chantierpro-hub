@@ -254,6 +254,7 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
         <LiveKpi label="Presents terrain" tone="success" value={displaySummary.presentTerrain} />
         <LiveKpi label="Presents bureau" tone="neutral" value={displaySummary.presentOffice} />
         <LiveKpi label="Sortis" value={displaySummary.left} />
+        <LiveKpi label="Sessions anciennes fermees" tone={displaySummary.oldSessionDepartures > 0 ? 'warning' : 'neutral'} value={displaySummary.oldSessionDepartures} />
         <LiveKpi label="Absents" tone="danger" value={displaySummary.absent} />
         <LiveKpi label="Retards" tone={displaySummary.late > 0 ? 'warning' : 'neutral'} value={displaySummary.late} />
         <LiveKpi label="Anomalies" tone={displaySummary.anomaly > 0 ? 'danger' : 'neutral'} value={displaySummary.anomaly} />
@@ -451,9 +452,11 @@ function ResourcePresenceItem({
   const contextSummary = getResourceContextSummary(resource.contexts);
   const isOutOfPlanningClockIn = resource.contexts.some(isOutOfPlanningContext);
   const outOfPlanningStatus = getResourceOutOfPlanningStatus(resource.contexts);
+  const isOldSessionClosure = isOldSessionDepartureOnly(resource);
   const flags = [
     isOutOfPlanningClockIn ? 'Hors planning' : null,
     resource.isLate ? 'Retard' : null,
+    isOldSessionClosure ? 'Session ancienne fermee' : null,
   ].filter(Boolean);
   const statusLabel = getLiveResourceStatusLabel(resource);
 
@@ -494,7 +497,7 @@ function ResourcePresenceItem({
         <div className="text-sm font-semibold text-slate-700">
           <p>Entree : {resource.arrivalAt ? formatTime(resource.arrivalAt) : '-'}</p>
           <p className="mt-1 text-xs text-slate-500">
-            Dernier : {resource.lastClockInAt ? `${formatTime(resource.lastClockInAt)} ${clockInTypeLabel(resource.lastClockInType)}` : '-'}
+            Dernier : {resource.lastClockInAt ? `${formatTime(resource.lastClockInAt)} ${isOldSessionClosure ? 'Fermeture ancienne session' : clockInTypeLabel(resource.lastClockInType)}` : '-'}
           </p>
         </div>
       </div>
@@ -524,7 +527,7 @@ function ResourcePresenceItem({
                 <p><span className="font-semibold text-slate-950">Projet :</span> {context.projectName || '-'}</p>
                 <p><span className="font-semibold text-slate-950">Position :</span> {context.siteAddress}</p>
                 <p><span className="font-semibold text-slate-950">Entree :</span> {context.arrivalAt ? formatTime(context.arrivalAt) : '-'}</p>
-                <p><span className="font-semibold text-slate-950">Sortie :</span> {context.lastClockInType === 'DEPARTURE' && context.lastClockInAt ? formatTime(context.lastClockInAt) : '-'}</p>
+                <p><span className="font-semibold text-slate-950">{isOldSessionClosureContext(context) ? 'Fermeture ancienne session :' : 'Sortie :'}</span> {context.lastClockInType === 'DEPARTURE' && context.lastClockInAt ? formatTime(context.lastClockInAt) : '-'}</p>
                 <p>
                   <span className="font-semibold text-slate-950">Distance :</span>{' '}
                   {context.distanceKm === null ? '-' : `${context.distanceKm.toFixed(2)} km`}
@@ -743,7 +746,8 @@ function liveStatusLabel(status: RhSitePresenceLiveStatus) {
   return labels[status];
 }
 
-function getLiveResourceStatusLabel(resource: Pick<RhSitePresenceLiveResource, 'status' | 'anomalyReason' | 'presenceContext' | 'taskAction' | 'outOfPlanningValidationStatus'>) {
+function getLiveResourceStatusLabel(resource: Pick<RhSitePresenceLiveResource, 'status' | 'anomalyReason' | 'presenceContext' | 'taskAction' | 'outOfPlanningValidationStatus' | 'arrivalAt' | 'lastClockInType' | 'isRegularized'>) {
+  if (isOldSessionClosureContext(resource)) return 'Session ancienne fermee';
   if (isOutOfPlanningContext(resource)) {
     const validationSuffix = resource.outOfPlanningValidationStatus ? ` - ${outOfPlanningValidationShortLabel(resource.outOfPlanningValidationStatus)}` : '';
     if (resource.status === 'PRESENT') return `Present hors planning${validationSuffix}`;
@@ -1035,7 +1039,7 @@ function matchesQuickFilter(resource: AggregatedLiveResource, filter: PresenceQu
   if (filter === 'present') return hasPresenceDuringSelectedDay(resource);
   if (filter === 'paused') return resource.status === 'PAUSED';
   if (filter === 'absent') return resource.status === 'EXPECTED_NOT_CLOCKED';
-  if (filter === 'left') return resource.status === 'LEFT';
+  if (filter === 'left') return resource.status === 'LEFT' && !isOldSessionDepartureOnly(resource);
   if (filter === 'late') return resource.isLate;
   if (filter === 'out-of-planning') return resource.contexts.some(isOutOfPlanningContext);
   if (filter === 'anomaly') return resource.status === 'ANOMALY' || Boolean(resource.anomalyReason);
@@ -1057,7 +1061,11 @@ function hasPresenceContextDuringSelectedDay(
   );
 }
 function isOldSessionDepartureOnly(resource: Pick<AggregatedLiveResource, 'contexts' | 'status'>) {
-  return resource.status === 'LEFT' && resource.contexts.every((context) => !context.arrivalAt && context.lastClockInType === 'DEPARTURE');
+  return resource.status === 'LEFT' && resource.contexts.every(isOldSessionClosureContext);
+}
+
+function isOldSessionClosureContext(context: Pick<LiveResourceContext, 'arrivalAt' | 'lastClockInType' | 'isRegularized'>) {
+  return !context.arrivalAt && context.lastClockInType === 'DEPARTURE' && context.isRegularized;
 }
 function buildDisplaySummary(resources: AggregatedLiveResource[]) {
   return resources.reduce(
@@ -1070,8 +1078,11 @@ function buildDisplaySummary(resources: AggregatedLiveResource[]) {
       }
       if (resource.status === 'PAUSED') summary.paused += 1;
       if (resource.status === 'EXPECTED_NOT_CLOCKED') summary.absent += 1;
-      if (resource.status === 'LEFT') summary.left += 1;
-      if (isOldSessionDepartureOnly(resource)) summary.oldSessionDepartures += 1;
+      if (isOldSessionDepartureOnly(resource)) {
+        summary.oldSessionDepartures += 1;
+      } else if (resource.status === 'LEFT') {
+        summary.left += 1;
+      }
       if (resource.status === 'ANOMALY') summary.anomaly += 1;
       if (resource.isLate) summary.late += 1;
       return summary;
