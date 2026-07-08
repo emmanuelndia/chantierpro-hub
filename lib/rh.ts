@@ -375,10 +375,11 @@ export async function getDirectionAttendanceReport(
     const negotiationSessions = todayNegotiationByUser.get(user.id) ?? [];
     const clockBounds = clockBoundsByUser.get(user.id);
     const negotiationBounds = negotiationBoundsByUser.get(user.id);
-    const hasArrivalToday = records.some((record) => record.type === ClockInType.ARRIVAL);
-    const hasDepartureToday = records.some((record) => record.type === ClockInType.DEPARTURE);
-    const hasNegotiationStartToday = negotiationSessions.some((session) => isDateInRange(session.startTime, day, tomorrow));
-    const hasNegotiationEndToday = negotiationSessions.some((session) => Boolean(session.endTime && isDateInRange(session.endTime, day, tomorrow)));
+    const arrivalRecords = records.filter((record) => record.type === ClockInType.ARRIVAL);
+    const departureRecords = records.filter((record) => record.type === ClockInType.DEPARTURE);
+    const negotiationStartsToday = negotiationSessions.filter((session) => isDateInRange(session.startTime, day, tomorrow));
+    const hasArrivalToday = arrivalRecords.length > 0;
+    const hasNegotiationStartToday = negotiationStartsToday.length > 0;
     const hasClockedToday = hasArrivalToday || hasNegotiationStartToday;
     const firstClockInAt = minIsoDate([clockBounds?._min.timestampLocal ?? null, negotiationBounds?._min.startTime ?? null]);
     const lastClockInAt = maxIsoDate([
@@ -387,12 +388,27 @@ export async function getDirectionAttendanceReport(
       negotiationBounds?._max.endTime ?? null,
     ]);
     const todayArrivalAt = minIsoDate([
-      ...records.filter((record) => record.type === ClockInType.ARRIVAL).map((record) => record.timestampLocal),
-      ...negotiationSessions.filter((session) => isDateInRange(session.startTime, day, tomorrow)).map((session) => session.startTime),
+      ...arrivalRecords.map((record) => record.timestampLocal),
+      ...negotiationStartsToday.map((session) => session.startTime),
     ]);
+    const arrivalDate = todayArrivalAt ? new Date(todayArrivalAt) : null;
+    const sameDayDepartureRecords = arrivalDate
+      ? departureRecords.filter((record) => record.timestampLocal.getTime() >= arrivalDate.getTime())
+      : [];
+    const sameDayNegotiationEnds = negotiationStartsToday
+      .map((session) => session.endTime)
+      .filter((value): value is Date => Boolean(value && isDateInRange(value, day, tomorrow)));
+    const oldSessionDeparturesToday = departureRecords.length > sameDayDepartureRecords.length;
+    const oldNegotiationEndsToday = negotiationSessions.some((session) => {
+      if (!session.endTime || !isDateInRange(session.endTime, day, tomorrow)) return false;
+      return !isDateInRange(session.startTime, day, tomorrow);
+    });
+    const hasDepartureToday = sameDayDepartureRecords.length > 0;
+    const hasNegotiationEndToday = sameDayNegotiationEnds.length > 0;
+    const hasOldSessionClosureToday = oldSessionDeparturesToday || oldNegotiationEndsToday;
     const todayDepartureAt = maxIsoDate([
-      ...records.filter((record) => record.type === ClockInType.DEPARTURE).map((record) => record.timestampLocal),
-      ...negotiationSessions.map((session) => session.endTime).filter((value): value is Date => Boolean(value && isDateInRange(value, day, tomorrow))),
+      ...sameDayDepartureRecords.map((record) => record.timestampLocal),
+      ...sameDayNegotiationEnds,
     ]);
     const neverClocked = !firstClockInAt;
 
@@ -411,9 +427,9 @@ export async function getDirectionAttendanceReport(
       todayClockInCount: records.length + negotiationSessions.length,
       status: hasClockedToday ? ('CLOCKED_TODAY' as const) : neverClocked ? ('NEVER_CLOCKED' as const) : ('NOT_CLOCKED_TODAY' as const),
       hasDepartureToday: hasDepartureToday || hasNegotiationEndToday,
-      isLateToday: records.some((record) => record.type === ClockInType.ARRIVAL && record.isLate) || Boolean(todayArrivalAt && isLateArrival(new Date(todayArrivalAt))),
+      isLateToday: arrivalRecords.some((record) => record.isLate) || Boolean(todayArrivalAt && isLateArrival(new Date(todayArrivalAt))),
       isOpenToday: hasClockedToday && !(hasDepartureToday || hasNegotiationEndToday),
-      isDepartureOnlyToday: !hasClockedToday && (hasDepartureToday || hasNegotiationEndToday),
+      isDepartureOnlyToday: !hasClockedToday && (hasDepartureToday || hasNegotiationEndToday || hasOldSessionClosureToday),
     };
   });
 
