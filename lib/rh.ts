@@ -469,8 +469,25 @@ export async function buildDirectionAttendanceReportExport(
   return {
     buffer: buildDirectionAttendancePdfBuffer(report, scope),
     contentType: 'application/pdf',
-    fileName: `${fileBaseName}.pdf`,
+    fileName: buildDirectionAttendancePdfFileName(scope, report.generatedAt),
   };
+}
+
+function buildDirectionAttendancePdfFileName(scope: DirectionAttendanceExportScope, generatedAt: string) {
+  const downloadDate = formatDirectionDownloadDate(generatedAt);
+  if (scope === 'clocked-today') return `recap-pointage-present-${downloadDate}.pdf`;
+  if (scope === 'not-clocked-today') return `recap-pointage-absent-${downloadDate}.pdf`;
+  if (scope === 'never-clocked') return 'recap-aucun-pointage.pdf';
+  if (scope === 'departure-only') return `recap-pointage-sortie-seule-${downloadDate}.pdf`;
+  return `recap-pointage-${downloadDate}.pdf`;
+}
+
+function formatDirectionDownloadDate(value: string) {
+  const date = new Date(value);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
 }
 export function parseMonthlyPresenceQuery(searchParams: URLSearchParams): MonthlyPresenceQuery | null {
   const month = parseMonth(searchParams.get('month'));

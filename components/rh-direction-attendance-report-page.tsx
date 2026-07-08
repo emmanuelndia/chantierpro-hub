@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -315,12 +315,30 @@ async function downloadDirectionReportExport(
     const blob = await response.blob();
     const contentDisposition = response.headers.get('content-disposition');
     const match = contentDisposition?.match(/filename=\"?([^\";]+)\"?/);
-    triggerDownload(blob, match?.[1] ?? `rapport-direction-pointage-${selectedDate}.${format}`);
+    const fallbackFileName = format === 'pdf'
+      ? buildDirectionPdfFallbackFileName(scope)
+      : `rapport-direction-pointage-${selectedDate}.${format}`;
+    triggerDownload(blob, match?.[1] ?? fallbackFileName);
   } finally {
     setExportingFormat(null);
   }
 }
 
+function buildDirectionPdfFallbackFileName(scope: 'all' | DirectionReportTab) {
+  const downloadDate = formatDirectionDownloadDate(new Date());
+  if (scope === 'clocked-today') return `recap-pointage-present-${downloadDate}.pdf`;
+  if (scope === 'not-clocked-today') return `recap-pointage-absent-${downloadDate}.pdf`;
+  if (scope === 'never-clocked') return 'recap-aucun-pointage.pdf';
+  if (scope === 'departure-only') return `recap-pointage-sortie-seule-${downloadDate}.pdf`;
+  return `recap-pointage-${downloadDate}.pdf`;
+}
+
+function formatDirectionDownloadDate(value: Date) {
+  const day = String(value.getDate()).padStart(2, '0');
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const year = value.getFullYear();
+  return `${day}-${month}-${year}`;
+}
 function exportDirectionReportCsv(data: RhDirectionAttendanceReportResponse | null, scope: 'all' | DirectionReportTab) {
   if (!data) return;
   const sections = getDirectionReportExportSections(data, scope);
