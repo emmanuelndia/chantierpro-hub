@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Role } from '@prisma/client';
 import { Badge } from '@/components/badge';
@@ -60,19 +60,11 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
   const [arrivalTo, setArrivalTo] = useState('');
   const [sortMode, setSortMode] = useState<PresenceSortMode>('name');
   const [quickFilter, setQuickFilter] = useState<PresenceQuickFilter>('all');
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchDraft, setSearchDraft] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
   const [anomaliesOnly, setAnomaliesOnly] = useState(false);
   const [lateOnly, setLateOnly] = useState(false);
   const canExportPresenceList = viewer.role === 'HR' || viewer.role === 'DIRECTION' || viewer.role === 'ADMIN';
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedSearch(search.trim());
-    }, 450);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [search]);
 
   const requestPath = useMemo(() => {
     const searchParams = new URLSearchParams();
@@ -88,12 +80,12 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
     if (arrivalFrom) searchParams.set('arrivalFrom', arrivalFrom);
     if (arrivalTo) searchParams.set('arrivalTo', arrivalTo);
     if (lateOnly) searchParams.set('lateOnly', 'true');
-    if (debouncedSearch) searchParams.set('q', debouncedSearch);
+    if (submittedSearch) searchParams.set('q', submittedSearch);
     if (anomaliesOnly) searchParams.set('anomaliesOnly', 'true');
 
     const queryString = searchParams.toString();
     return queryString ? `/api/rh/site-presences-live?${queryString}` : '/api/rh/site-presences-live';
-  }, [anomaliesOnly, arrivalFrom, arrivalTo, assignedById, context, debouncedSearch, lateOnly, projectId, projectManagerId, resourceId, role, selectedDate, siteId, status]);
+  }, [anomaliesOnly, arrivalFrom, arrivalTo, assignedById, context, lateOnly, projectId, projectManagerId, resourceId, role, selectedDate, siteId, status, submittedSearch]);
 
   const liveQuery = useQuery({
     queryKey: ['rh-site-presences-live', requestPath],
@@ -372,13 +364,41 @@ export function RhSitePresencesLivePage({ viewer }: RhSitePresencesLivePageProps
             </select>
           </Field>
           <Field label="Recherche">
-            <input
-              className={inputClassName}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Projet, chantier, ressource, tache..."
-              type="search"
-              value={search}
-            />
+            <form
+              className="flex flex-col gap-2 sm:flex-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setSubmittedSearch(searchDraft.trim());
+              }}
+            >
+              <input
+                className={inputClassName}
+                onChange={(event) => setSearchDraft(event.target.value)}
+                placeholder="Projet, chantier, ressource, tache..."
+                type="search"
+                value={searchDraft}
+              />
+              <div className="flex gap-2">
+                <button
+                  className="rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-white transition hover:bg-orange-600"
+                  type="submit"
+                >
+                  Rechercher
+                </button>
+                {searchDraft || submittedSearch ? (
+                  <button
+                    className="rounded-2xl border border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-slate-600 transition hover:border-orange-200 hover:text-orange-700"
+                    onClick={() => {
+                      setSearchDraft('');
+                      setSubmittedSearch('');
+                    }}
+                    type="button"
+                  >
+                    Effacer
+                  </button>
+                ) : null}
+              </div>
+            </form>
           </Field>
         </div>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
@@ -1170,3 +1190,5 @@ function LoadingState() {
     </div>
   );
 }
+
+
