@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { PhotoTag } from '@prisma/client';
+import { PhotoTag, PlanningWorkLocationType } from '@prisma/client';
 import { useQuery } from '@tanstack/react-query';
 import { authFetch, getAccessToken } from '@/lib/auth/client-session';
 import {
@@ -53,10 +53,11 @@ type CapturedPhoto = {
   freeMissionId?: string | null;
   negotiationAssignmentId?: string | null;
   planningAssignment: SupervisorMyAssignment | null;
+  officePhoto: boolean;
   description: string;
   tags: PhotoTag[];
 };
-type PhotoMode = 'site' | 'task';
+type PhotoMode = 'site' | 'task' | 'office';
 
 const PHOTO_TAG_OPTIONS: readonly { value: PhotoTag; label: string }[] = [
   { value: PhotoTag.TASK_START, label: 'Début tâche' },
@@ -188,7 +189,10 @@ export function MobilePhotoCameraPage() {
   const taskAssignments = useMemo(
     () =>
       assignments.filter(
-        (assignment) => assignment.workLocationType !== 'OFFICE' && (assignment.siteId === selectedSite?.id || assignment.siteId === null),
+        (assignment) =>
+          isOfficePlanningAssignment(assignment) ||
+          assignment.siteId === selectedSite?.id ||
+          assignment.siteId === null,
       ),
     [assignments, selectedSite?.id],
   );
@@ -197,7 +201,11 @@ export function MobilePhotoCameraPage() {
     [requestedTaskAssignment, selectedAssignmentId, taskAssignments],
   );
   const hasRequestedTask = Boolean(requestedFreeMissionId ?? requestedNegotiationAssignmentId);
-  const photoContextName = photoMode === 'task' && selectedAssignment ? selectedAssignment.siteName : (selectedSite?.name ?? 'Choisir un chantier');
+  const photoContextName = photoMode === 'office'
+    ? 'Photo bureau'
+    : photoMode === 'task' && selectedAssignment
+      ? getAssignmentPhotoContextName(selectedAssignment)
+      : (selectedSite?.name ?? 'Choisir un chantier');
 
   useEffect(() => {
     if (!selectedSiteId && selectedSite) {
@@ -430,15 +438,23 @@ export function MobilePhotoCameraPage() {
   async function capturePhoto() {
     const contextAssignment = photoMode === 'task' ? selectedAssignment : null;
     const photoSite =
-      contextAssignment && !contextAssignment.siteId
+      photoMode === 'office'
         ? ({
             id: '',
-            name: contextAssignment.siteName,
-            address: contextAssignment.siteAddress.trim() ? contextAssignment.siteAddress : (contextAssignment.projectName ?? ''),
-            projectName: contextAssignment.projectName ?? '',
+            name: 'Photo bureau',
+            address: 'Bureau',
+            projectName: 'Bureau',
             hasOpenSession: false,
           } satisfies MobilePhotoSiteOption)
-        : selectedSite;
+        : contextAssignment && (!contextAssignment.siteId || isOfficePlanningAssignment(contextAssignment))
+          ? ({
+              id: isOfficePlanningAssignment(contextAssignment) ? '' : contextAssignment.siteId ?? '',
+              name: getAssignmentPhotoContextName(contextAssignment),
+              address: contextAssignment.siteAddress.trim() ? contextAssignment.siteAddress : (contextAssignment.projectName ?? ''),
+              projectName: contextAssignment.projectName ?? '',
+              hasOpenSession: false,
+            } satisfies MobilePhotoSiteOption)
+          : selectedSite;
 
     if (!videoRef.current || !photoSite || (photoMode === 'task' && !contextAssignment)) {
       return;
@@ -494,6 +510,7 @@ export function MobilePhotoCameraPage() {
         planningAssignment: contextAssignment,
         description: description.trim(),
         tags: selectedTags,
+        officePhoto: photoMode === 'office',
       });
       setConfirmationMessage(null);
       setTaskPhotoNotice(false);
@@ -689,7 +706,7 @@ export function MobilePhotoCameraPage() {
           <button
             aria-label="Declencher la photo"
             className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-white/20 disabled:opacity-40"
-            disabled={cameraState !== 'ready' || (photoMode === 'site' ? !selectedSite : !selectedAssignment)}
+            disabled={cameraState !== 'ready' || (photoMode === 'site' ? !selectedSite : photoMode === 'task' ? !selectedAssignment : false)}
             onClick={() => {
               void capturePhoto();
             }}
@@ -761,8 +778,8 @@ function PhotoConfirmation({
         </div>
         <div className="absolute inset-x-0 bottom-0 space-y-4 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
           <div className="rounded-lg bg-white/10 p-4 text-sm backdrop-blur">
-            <SummaryRow label="Chantier" value={photo.site.name} />
-            <SummaryRow label="Type" value={photo.planningAssignment ? 'Photo liée à une tâche' : 'Photo chantier'} />
+            <SummaryRow label={photo.planningAssignment && isOfficePlanningAssignment(photo.planningAssignment) ? 'Contexte' : 'Chantier'} value={photo.site.name} />
+            <SummaryRow label="Type" value={getPhotoTypeLabel(photo)} />
             {photo.planningAssignment ? <SummaryRow label="Tâche" value={photo.planningAssignment.action} /> : null}
             <SummaryRow label="Commentaire" value={photo.description || 'Aucun'} />
             <SummaryRow label="Tags" value={photo.tags.length > 0 ? photo.tags.map(formatPhotoTag).join(', ') : 'Aucun'} />
@@ -953,6 +970,7 @@ function PhotoInfoBottomSheet({
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-white/10 p-1">
           <ModeButton active={photoMode === 'site'} label="Photo chantier" onClick={() => onModeChange('site')} />
           <ModeButton active={photoMode === 'task'} label="Photo liee a une tache" onClick={() => onModeChange('task')} />
+          <ModeButton active={photoMode === 'office'} label="Photo bureau" onClick={() => onModeChange('office')} />
         </div>
 
         {photoMode === 'task' ? (
@@ -1094,20 +1112,38 @@ function SummaryRow({ label, value }: Readonly<{ label: string; value: string }>
   );
 }
 
+function isOfficePlanningAssignment(assignment: Pick<SupervisorMyAssignment, 'workLocationType'>) {
+  return assignment.workLocationType === PlanningWorkLocationType.OFFICE;
+}
+
+function getAssignmentPhotoContextName(assignment: SupervisorMyAssignment) {
+  if (isOfficePlanningAssignment(assignment)) {
+    return assignment.projectName ? `Document bureau - ${assignment.projectName}` : 'Document bureau';
+  }
+
+  return assignment.siteName;
+}
+
+function getPhotoTypeLabel(photo: Pick<CapturedPhoto, 'planningAssignment' | 'officePhoto'>) {
+  if ('officePhoto' in photo && photo.officePhoto) return 'Photo bureau';
+  if (photo.planningAssignment && isOfficePlanningAssignment(photo.planningAssignment)) return 'Document bureau / projet';
+  return photo.planningAssignment ? 'Photo liee a une tache' : 'Photo chantier';
+}
 function toPendingPhoto(photo: CapturedPhoto): PendingMobilePhoto {
   return {
     id: createPendingPhotoId(),
     blob: photo.blob,
     filename: `photo-${photo.timestampLocal.replace(/[:.]/g, '-')}.jpg`,
-    siteId: photo.site.id || null,
+    siteId: photo.officePhoto || (photo.planningAssignment && isOfficePlanningAssignment(photo.planningAssignment)) ? null : photo.site.id || null,
     freeMissionId: photo.freeMissionId ?? null,
     negotiationAssignmentId: photo.negotiationAssignmentId ?? null,
-    planningAssignmentId: photo.planningAssignment?.kind === 'PLANNING_ASSIGNMENT' || photo.planningAssignment?.siteId ? photo.planningAssignment.id : null,
+    planningAssignmentId: photo.officePhoto ? null : photo.planningAssignment?.kind === 'PLANNING_ASSIGNMENT' || photo.planningAssignment?.siteId ? photo.planningAssignment.id : null,
     description: photo.description,
     tags: photo.tags,
     timestampLocal: photo.timestampLocal,
     latitude: photo.latitude,
     longitude: photo.longitude,
+    officePhoto: photo.officePhoto,
   };
 }
 

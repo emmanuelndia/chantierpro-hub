@@ -2,6 +2,8 @@ import { Buffer } from 'node:buffer';
 import { extname } from 'node:path';
 import sharp from 'sharp';
 import {
+  ClockInStatus,
+  ClockInType,
   PhotoCategory,
   PhotoTag,
   Prisma,
@@ -50,6 +52,9 @@ const PHOTO_UPLOAD_ROLES: readonly Role[] = [
   Role.GENERAL_SUPERVISOR,
   ...BUSINESS_MANAGER_ROLES,
   ...BUSINESS_FIELD_RESOURCE_ROLES,
+  Role.OFFICE_STAFF,
+  Role.HR,
+  Role.AUDITOR,
   Role.PROJECT_MANAGER,
   Role.DIRECTION,
   Role.ADMIN,
@@ -268,6 +273,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
   const freeMissionId = sanitizeString(formData.get('freeMissionId'));
   const negotiationAssignmentId = sanitizeString(formData.get('negotiationAssignmentId'));
   const planningAssignmentId = sanitizeString(formData.get('planningAssignmentId'));
+  const officePhoto = formData.get('officePhoto') === 'true';
   const category = parsePhotoCategory(formData.get('category'));
   const tags = parsePhotoTags(formData.get('tags'));
   const descriptionValue = formData.get('description');
@@ -281,9 +287,13 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
   const latitude = sanitizeOptionalNumber(formData.get('lat'));
   const longitude = sanitizeOptionalNumber(formData.get('lng'));
 
+  const primaryContextCount = [siteId, freeMissionId, negotiationAssignmentId].filter(Boolean).length;
+  const officeTaskDocument = primaryContextCount === 0 && Boolean(planningAssignmentId);
+  const officePhotoDocument = primaryContextCount === 0 && !planningAssignmentId && officePhoto;
+
   if (
     !(file instanceof File) ||
-    [siteId, freeMissionId, negotiationAssignmentId].filter(Boolean).length !== 1 ||
+    (primaryContextCount !== 1 && !officeTaskDocument && !officePhotoDocument) ||
     !category ||
     !tags ||
     description === null ||
@@ -309,6 +319,7 @@ export async function parseCreatePhotoFormData(request: Request): Promise<
       freeMissionId,
       negotiationAssignmentId,
       planningAssignmentId,
+      officePhoto,
       category,
       tags,
       description,
@@ -576,6 +587,73 @@ export async function createPhoto(
   },
 ) {
   const timestampLocal = new Date(payload.input.timestampLocal);
+  if (payload.input.officePhoto) {
+    const day = new Date(`${formatDateKey(timestampLocal)}T00:00:00.000Z`);
+    const officeArrival = await prisma.clockInRecord.findFirst({
+      where: {
+        userId: payload.user.id,
+        clockInDate: day,
+        type: ClockInType.ARRIVAL,
+        status: ClockInStatus.VALID,
+        officeClockInLocation: { not: null },
+      },
+      select: { id: true },
+    });
+
+    if (!officeArrival) {
+      return { code: 'FORBIDDEN' as const, photo: null };
+    }
+
+    const prepared = await preparePhotoUpload(payload.file);
+    const storageKey = generatePhotoStorageKey({
+      siteId: `office-photo-${payload.user.id}`,
+      userId: payload.user.id,
+      filename: prepared.filename,
+      timestamp: timestampLocal,
+    });
+
+    let stored: Awaited<ReturnType<typeof uploadPrivatePhotoObject>>;
+    try {
+      stored = await uploadPrivatePhotoObject({
+        storageKey,
+        body: prepared.buffer,
+        contentType: prepared.contentType,
+      });
+    } catch (error) {
+      console.error('Private office photo upload failed:', {
+        providerError: error instanceof Error ? error.message : String(error),
+        storageKeyPrefix: storageKey.split('/').slice(0, 2).join('/'),
+      });
+      return { code: 'UPLOAD_FAILED' as const, photo: null };
+    }
+
+    const created = await prisma.photo.create({
+      data: {
+        siteId: null,
+        uploadedById: payload.user.id,
+        planningAssignmentId: null,
+        category: payload.input.category,
+        tags: payload.input.tags,
+        description: payload.input.description,
+        filename: prepared.filename,
+        storageKey,
+        url: stored.url,
+        fileSize: prepared.fileSize,
+        format: prepared.format,
+        latitude: payload.input.latitude === null ? null : new Prisma.Decimal(payload.input.latitude),
+        longitude: payload.input.longitude === null ? null : new Prisma.Decimal(payload.input.longitude),
+        timestampLocal,
+        takenAt: timestampLocal,
+      },
+      select: photoSelect,
+    });
+
+    return {
+      code: null,
+      photo: serializePhoto(created),
+    };
+  }
+
   if (payload.input.freeMissionId) {
     if (!FIELD_USER_ROLES.includes(payload.user.role)) {
       return { code: 'FORBIDDEN' as const, photo: null };
@@ -699,6 +777,78 @@ export async function createPhoto(
         negotiationAssignmentId: assignment.id,
         uploadedById: payload.user.id,
         planningAssignmentId: null,
+        category: payload.input.category,
+        tags: payload.input.tags,
+        description: payload.input.description,
+        filename: prepared.filename,
+        storageKey,
+        url: stored.url,
+        fileSize: prepared.fileSize,
+        format: prepared.format,
+        latitude: payload.input.latitude === null ? null : new Prisma.Decimal(payload.input.latitude),
+        longitude: payload.input.longitude === null ? null : new Prisma.Decimal(payload.input.longitude),
+        timestampLocal,
+        takenAt: timestampLocal,
+      },
+      select: photoSelect,
+    });
+
+    return {
+      code: null,
+      photo: serializePhoto(created),
+    };
+  }
+
+  if (!payload.input.siteId && payload.input.planningAssignmentId) {
+    if (!FIELD_USER_ROLES.includes(payload.user.role)) {
+      return { code: 'ASSIGNMENT_NOT_FOUND' as const, photo: null };
+    }
+
+    const assignment = await prisma.planningAssignment.findFirst({
+      where: {
+        id: payload.input.planningAssignmentId,
+        supervisorId: payload.user.id,
+        deletedAt: null,
+        workLocationType: 'OFFICE',
+      },
+      select: {
+        id: true,
+        date: true,
+      },
+    });
+
+    if (!assignment || formatDateKey(assignment.date) !== formatDateKey(timestampLocal)) {
+      return { code: 'ASSIGNMENT_NOT_FOUND' as const, photo: null };
+    }
+
+    const prepared = await preparePhotoUpload(payload.file);
+    const storageKey = generatePhotoStorageKey({
+      siteId: `office-task-${assignment.id}`,
+      userId: payload.user.id,
+      filename: prepared.filename,
+      timestamp: timestampLocal,
+    });
+
+    let stored: Awaited<ReturnType<typeof uploadPrivatePhotoObject>>;
+    try {
+      stored = await uploadPrivatePhotoObject({
+        storageKey,
+        body: prepared.buffer,
+        contentType: prepared.contentType,
+      });
+    } catch (error) {
+      console.error('Private office task photo upload failed:', {
+        providerError: error instanceof Error ? error.message : String(error),
+        storageKeyPrefix: storageKey.split('/').slice(0, 2).join('/'),
+      });
+      return { code: 'UPLOAD_FAILED' as const, photo: null };
+    }
+
+    const created = await prisma.photo.create({
+      data: {
+        siteId: null,
+        uploadedById: payload.user.id,
+        planningAssignmentId: assignment.id,
         category: payload.input.category,
         tags: payload.input.tags,
         description: payload.input.description,

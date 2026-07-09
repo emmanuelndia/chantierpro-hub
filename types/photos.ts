@@ -5,6 +5,7 @@ export type CreatePhotoInput = {
   freeMissionId?: string | null;
   negotiationAssignmentId?: string | null;
   planningAssignmentId: string | null;
+  officePhoto?: boolean;
   category: PhotoCategory;
   tags: PhotoTag[];
   description: string;
@@ -28,6 +29,7 @@ export type PhotoItem = {
   siteName: string | null;
   uploadedById: string;
   planningAssignmentId: string | null;
+  officePhoto?: boolean;
   assignmentAction: string | null;
   assignmentStatus: string | null;
   category: PhotoCategory;

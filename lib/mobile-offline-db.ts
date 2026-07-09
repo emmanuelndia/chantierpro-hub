@@ -83,6 +83,7 @@ export type PendingMobilePhoto = {
   freeMissionId?: string | null;
   negotiationAssignmentId?: string | null;
   planningAssignmentId?: string | null;
+  officePhoto?: boolean;
   description?: string;
   tags?: PhotoTag[];
   timestampLocal?: string;
@@ -320,6 +321,9 @@ export function buildPhotoFormData(photo: PendingMobilePhoto) {
 
   if (photo.planningAssignmentId) {
     formData.set('planningAssignmentId', photo.planningAssignmentId);
+  }
+  if (photo.officePhoto) {
+    formData.set('officePhoto', 'true');
   }
 
   if (photo.latitude !== null) {
