@@ -57,6 +57,16 @@ type ClockInRow = {
   createdAt: Date;
 };
 
+type NegotiationPlanningAssignmentRow = Prisma.NegotiationAssignmentGetPayload<{
+  include: {
+    project: { select: { id: true; name: true } };
+    zone: true;
+    assignee: { select: { id: true; firstName: true; lastName: true } };
+    createdBy: { select: { id: true; firstName: true; lastName: true; role: true } };
+    sessions: { select: { status: true } };
+  };
+}>;
+
 export function canAccessMobilePlanning(role: Role) {
   const allowedRoles: readonly Role[] = [Role.GENERAL_SUPERVISOR, ...BUSINESS_MANAGER_ROLES, Role.PROJECT_MANAGER];
 
@@ -188,7 +198,7 @@ export async function getPlanningDay(
             },
           },
         })
-      : Promise.resolve([]),
+      : Promise.resolve([] as NegotiationPlanningAssignmentRow[]),
     prisma.site.findMany({
       where: siteWhere,
       orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }],
@@ -903,8 +913,10 @@ export async function duplicatePlanningAssignments(
   const [
     sourceAssignments,
     sourceFreeMissionResponse,
+    sourceNegotiationAssignments,
     existingTargetAssignments,
     existingTargetFreeMissionResponse,
+    existingTargetNegotiationAssignments,
     validTargetSites,
     validTargetProjects,
     validSupervisorIds,
@@ -921,6 +933,25 @@ export async function duplicatePlanningAssignments(
       select: planningAssignmentSelect,
     }),
     listFreeMissions(prisma, user, formatPlanningDate(sourceDate)),
+    user.role === Role.NEGOTIATION_MANAGER
+      ? prisma.negotiationAssignment.findMany({
+          where: {
+            date: sourceDate,
+            deletedAt: null,
+            status: { not: NegotiationAssignmentStatus.CANCELLED },
+            ...(sourceAssignmentId ? { id: sourceAssignmentId } : {}),
+            project: operationalPlanningProjectWhere(user, sourceDate),
+          },
+          orderBy: [{ project: { name: 'asc' } }, { zone: { name: 'asc' } }, { id: 'asc' }],
+          include: {
+            project: { select: { id: true, name: true } },
+            zone: true,
+            assignee: { select: { id: true, firstName: true, lastName: true } },
+            createdBy: { select: { id: true, firstName: true, lastName: true, role: true } },
+            sessions: { where: { date: sourceDate }, select: { status: true } },
+          },
+        })
+      : Promise.resolve([] as NegotiationPlanningAssignmentRow[]),
     prisma.planningAssignment.findMany({
       where: {
         date: targetDate,
@@ -939,6 +970,23 @@ export async function duplicatePlanningAssignments(
       },
     }),
     listFreeMissions(prisma, user, formatPlanningDate(targetDate)),
+    user.role === Role.NEGOTIATION_MANAGER
+      ? prisma.negotiationAssignment.findMany({
+          where: {
+            date: targetDate,
+            deletedAt: null,
+            status: { not: NegotiationAssignmentStatus.CANCELLED },
+            project: operationalPlanningProjectWhere(user, targetDate),
+          },
+          select: {
+            assigneeId: true,
+            projectId: true,
+            zoneId: true,
+            plannedZone: true,
+            instruction: true,
+          },
+        })
+      : Promise.resolve([] as NegotiationPlanningAssignmentRow[]),
     prisma.site.findMany({ where: targetSiteWhere, select: { id: true } }),
     prisma.project.findMany({ where: targetProjectWhere, select: { id: true } }),
     getScopedSupervisorIds(prisma, user, targetDate),
@@ -947,7 +995,7 @@ export async function duplicatePlanningAssignments(
   const sourceFreeMissions = sourceAssignmentId
     ? sourceFreeMissionResponse.missions.filter((mission) => mission.id === sourceAssignmentId)
     : sourceFreeMissionResponse.missions;
-  if (sourceAssignments.length === 0 && sourceFreeMissions.length === 0) {
+  if (sourceAssignments.length === 0 && sourceFreeMissions.length === 0 && sourceNegotiationAssignments.length === 0) {
     return planningError('NO_ASSIGNMENTS', 'Aucune assignation à dupliquer pour la date source.', 404);
   }
 
@@ -972,8 +1020,14 @@ export async function duplicatePlanningAssignments(
       buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action, mission.plannedZone),
     ),
   );
+  const existingTargetNegotiationKeys = new Set(
+    existingTargetNegotiationAssignments.map((assignment) =>
+      buildNegotiationAssignmentKey(assignment.assigneeId, assignment.projectId, assignment.zoneId, assignment.plannedZone, assignment.instruction),
+    ),
+  );
   const validAssignments: PlanningAssignmentRow[] = [];
   const validFreeMissions: typeof sourceFreeMissions = [];
+  const validNegotiationAssignments: NegotiationPlanningAssignmentRow[] = [];
 
   for (const assignment of sourceAssignments) {
     const key = buildTaskKey(
@@ -1005,7 +1059,18 @@ export async function duplicatePlanningAssignments(
     validFreeMissions.push(mission);
   }
 
-  if (validAssignments.length === 0 && validFreeMissions.length === 0) {
+  for (const assignment of sourceNegotiationAssignments) {
+    const key = buildNegotiationAssignmentKey(assignment.assigneeId, assignment.projectId, assignment.zoneId, assignment.plannedZone, assignment.instruction);
+
+    if (!targetProjectIds.has(assignment.projectId) || !targetSupervisorIds.has(assignment.assigneeId) || existingTargetNegotiationKeys.has(key)) {
+      continue;
+    }
+
+    existingTargetNegotiationKeys.add(key);
+    validNegotiationAssignments.push(assignment);
+  }
+
+  if (validAssignments.length === 0 && validFreeMissions.length === 0 && validNegotiationAssignments.length === 0) {
     return planningError('NO_VALID_ASSIGNMENTS', 'Aucune assignation valide à dupliquer.', 400);
   }
 
@@ -1048,21 +1113,62 @@ export async function duplicatePlanningAssignments(
     });
   }
 
+  if (validNegotiationAssignments.length > 0) {
+    await prisma.negotiationAssignment.createMany({
+      data: validNegotiationAssignments.map((assignment) => ({
+        projectId: assignment.projectId,
+        zoneId: assignment.zoneId,
+        assigneeId: assignment.assigneeId,
+        date: targetDate,
+        plannedZone: assignment.plannedZone,
+        instruction: assignment.instruction,
+        status: NegotiationAssignmentStatus.PLANNED,
+        createdById: user.id,
+      })),
+    });
+  }
+
   const createdFreeMissionKeys = new Set(
     validFreeMissions.map((mission) => buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action, mission.plannedZone)),
   );
   const targetFreeMissionResponse =
     validFreeMissions.length > 0 ? await listFreeMissions(prisma, user, formatPlanningDate(targetDate)) : { missions: [] };
+  const createdNegotiationKeys = new Set(
+    validNegotiationAssignments.map((assignment) =>
+      buildNegotiationAssignmentKey(assignment.assigneeId, assignment.projectId, assignment.zoneId, assignment.plannedZone, assignment.instruction),
+    ),
+  );
+  const targetNegotiationAssignments = validNegotiationAssignments.length > 0
+    ? await prisma.negotiationAssignment.findMany({
+        where: {
+          date: targetDate,
+          deletedAt: null,
+          status: { not: NegotiationAssignmentStatus.CANCELLED },
+          project: operationalPlanningProjectWhere(user, targetDate),
+        },
+        include: {
+          project: { select: { id: true, name: true } },
+          zone: true,
+          assignee: { select: { id: true, firstName: true, lastName: true } },
+          createdBy: { select: { id: true, firstName: true, lastName: true, role: true } },
+          sessions: { where: { date: targetDate }, select: { status: true } },
+        },
+      })
+    : [];
+  const createdNegotiationPlanningAssignments = targetNegotiationAssignments
+    .filter((assignment) => createdNegotiationKeys.has(buildNegotiationAssignmentKey(assignment.assigneeId, assignment.projectId, assignment.zoneId, assignment.plannedZone, assignment.instruction)))
+    .map(serializeNegotiationAssignmentAsPlanningAssignment);
   const createdFreeMissionAssignments = targetFreeMissionResponse.missions
     .filter((mission) => createdFreeMissionKeys.has(buildFreeMissionKey(mission.assigneeId, mission.projectId, mission.action, mission.plannedZone)))
     .map(serializeFreeMissionAsPlanningAssignment);
 
   return {
-    createdCount: created.length + createdFreeMissionAssignments.length,
-    skippedCount: sourceAssignments.length + sourceFreeMissions.length - created.length - createdFreeMissionAssignments.length,
+    createdCount: created.length + createdFreeMissionAssignments.length + createdNegotiationPlanningAssignments.length,
+    skippedCount: sourceAssignments.length + sourceFreeMissions.length + sourceNegotiationAssignments.length - created.length - createdFreeMissionAssignments.length - createdNegotiationPlanningAssignments.length,
     assignments: [
       ...created.map((assignment) => serializePlanningAssignment(assignment, [])),
       ...createdFreeMissionAssignments,
+      ...createdNegotiationPlanningAssignments,
     ],
   };
 }
@@ -1509,6 +1615,10 @@ function buildTaskKey(
 
 function buildFreeMissionKey(assigneeId: string, projectId: string, action: string, plannedZone?: string | null) {
   return `${assigneeId}:${projectId}:${normalizeTaskActionKey(action)}:${normalizeTaskActionKey(plannedZone ?? '')}:${PlanningWorkLocationType.FREE_MISSION}`;
+}
+
+function buildNegotiationAssignmentKey(assigneeId: string, projectId: string, zoneId: string | null, plannedZone: string | null, instruction: string | null) {
+  return `${assigneeId}:${projectId}:${zoneId ?? 'null'}:${normalizeTaskActionKey(plannedZone ?? '')}:${normalizeTaskActionKey(instruction ?? '')}:NEGOTIATION_ASSIGNMENT`;
 }
 
 function normalizeTaskActionKey(action: string) {
