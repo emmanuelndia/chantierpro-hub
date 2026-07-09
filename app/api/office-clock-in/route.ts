@@ -1,10 +1,13 @@
 import { ClockInStatus, ClockInType, OfficeClockInLocation, PlanningWorkLocationType, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
+  buildWeakGpsAcceptedComment,
   createClockInRecord,
   findActivePauseFromRecords,
   getClockInGpsValidationError,
   getOpenSessionForUser,
+  isAcceptedByGpsTolerance,
+  isWithinRadiusWithGpsTolerance,
   jsonClockInError,
   parseClockInInput,
   parseJsonBody,
@@ -86,12 +89,14 @@ export const POST = withAuth(async ({ req, user }) => {
     }
   }
 
+  let officeDistanceKm = 0;
+  let acceptedWithWeakGps = false;
   if (input.type === ClockInType.ARRIVAL && officeClockInLocation === OfficeClockInLocation.OFFICE) {
     if (!officeLocation) {
       return jsonClockInError('PERMISSION_DENIED', 403, 'Bureau introuvable ou inactif.');
     }
 
-    const distanceKm = haversineDistanceKm(
+    officeDistanceKm = haversineDistanceKm(
       {
         latitude: input.latitude,
         longitude: input.longitude,
@@ -102,7 +107,10 @@ export const POST = withAuth(async ({ req, user }) => {
       },
     );
 
-    if (distanceKm > officeLocation.radiusKm.toNumber()) {
+    const officeRadiusKm = officeLocation.radiusKm.toNumber();
+    acceptedWithWeakGps = isAcceptedByGpsTolerance(officeDistanceKm, officeRadiusKm, input.accuracy);
+
+    if (!isWithinRadiusWithGpsTolerance(officeDistanceKm, officeRadiusKm, input.accuracy)) {
       return jsonClockInError('OUTSIDE_RADIUS', 400, 'Vous etes hors du rayon autorise pour ce bureau.');
     }
   }
@@ -165,13 +173,19 @@ export const POST = withAuth(async ({ req, user }) => {
     officeLocationId: activeOfficeClockInLocation === OfficeClockInLocation.OFFICE ? officeLocation?.id ?? null : null,
     planningAssignmentId: linkedAssignmentId,
     userId: user.id,
-    input: isClosingStaleSession
+    input: isClosingStaleSession || acceptedWithWeakGps
       ? {
           ...input,
-          comment: appendClockInComment(input.comment, 'Fermeture de session ancienne.'),
+          comment: appendClockInComment(
+            input.comment,
+            [
+              acceptedWithWeakGps ? buildWeakGpsAcceptedComment(input.accuracy) : null,
+              isClosingStaleSession ? 'Fermeture de session ancienne.' : null,
+            ].filter(Boolean).join(' '),
+          ),
         }
       : input,
-    distanceKm: 0,
+    distanceKm: officeDistanceKm,
     status: ClockInStatus.VALID,
     isRegularized: isClosingStaleSession,
   });

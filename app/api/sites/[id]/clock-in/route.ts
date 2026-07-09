@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/auth/with-auth';
 import { createUserNotification } from '@/lib/notifications';
 import {
   buildOutsideGeofenceMessage,
+  buildWeakGpsAcceptedComment,
   buildOutsideOutOfPlanningRadiusMessage,
   calculateDistanceToSite,
   createClockInRecord,
@@ -13,6 +14,7 @@ import {
   getClockInHistoryForSiteAndUser,
   getOpenSession,
   getOpenSessionForUser,
+  isAcceptedByGpsTolerance,
   isTechnician,
   isWithinOutOfPlanningClockInRadius,
   isWithinSiteGeofence,
@@ -206,6 +208,10 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     return Response.json({ record, outOfPlanning: true }, { status: 201 });
   }
 
+  const acceptedWithWeakGps =
+    input.type === ClockInType.ARRIVAL &&
+    !isOutOfPlanningArrival &&
+    isAcceptedByGpsTolerance(distanceKm, site.radiusKm.toNumber(), input.accuracy);
   const remoteDepartureAllowed =
     input.type === ClockInType.DEPARTURE &&
     !withinGeofence &&
@@ -215,12 +221,13 @@ export const POST = withAuth<{ id: string }>(async ({ params, req, user }) => {
     currentSiteOpenSession?.siteId === site.id &&
     currentSiteOpenSession.clockInDate.toISOString().slice(0, 10) !== new Date(input.timestampLocal).toISOString().slice(0, 10);
   const status = withinGeofence || remoteDepartureAllowed ? ClockInStatus.VALID : ClockInStatus.REJECTED;
-  const recordInput = remoteDepartureAllowed || isClosingStaleSession
+  const recordInput = acceptedWithWeakGps || remoteDepartureAllowed || isClosingStaleSession
     ? {
         ...input,
         comment: appendClockInComment(
           input.comment,
           [
+            acceptedWithWeakGps ? buildWeakGpsAcceptedComment(input.accuracy) : null,
             remoteDepartureAllowed ? 'Sortie distante autorisee - fermeture de session hors zone.' : null,
             isClosingStaleSession ? 'Fermeture de session ancienne.' : null,
           ].filter(Boolean).join(' '),

@@ -28,6 +28,8 @@ import type {
 
 export const FIELD_ROLES: readonly Role[] = CLOCK_IN_FIELD_USER_ROLES;
 
+const MAX_GPS_ACCURACY_TOLERANCE_METERS = 3000;
+
 export const clockInRecordSelect = {
   id: true,
   siteId: true,
@@ -809,7 +811,7 @@ export async function updateClockInComment(
 
 export function calculateDistanceToSite(
   site: Pick<AccessibleSite, 'latitude' | 'longitude'>,
-  input: Pick<ClockInInput, 'latitude' | 'longitude'>,
+  input: { latitude: number; longitude: number; accuracy?: number | null },
 ) {
   return haversineDistanceKm(
     {
@@ -827,9 +829,34 @@ export function isWithinSiteRadius(site: Pick<AccessibleSite, 'radiusKm'>, dista
   return distanceKm <= site.radiusKm.toNumber();
 }
 
+export function isWithinRadiusWithGpsTolerance(distanceKm: number, radiusKm: number, accuracyMeters: number | null | undefined) {
+  if (distanceKm <= radiusKm) {
+    return true;
+  }
+
+  if (accuracyMeters === null || accuracyMeters === undefined || accuracyMeters <= 0) {
+    return false;
+  }
+
+  if (accuracyMeters > MAX_GPS_ACCURACY_TOLERANCE_METERS) {
+    return false;
+  }
+
+  return distanceKm <= radiusKm + accuracyMeters / 1000;
+}
+
+export function isAcceptedByGpsTolerance(distanceKm: number, radiusKm: number, accuracyMeters: number | null | undefined) {
+  return distanceKm > radiusKm && isWithinRadiusWithGpsTolerance(distanceKm, radiusKm, accuracyMeters);
+}
+
+export function buildWeakGpsAcceptedComment(accuracyMeters: number | null | undefined) {
+  const accuracyLabel = accuracyMeters === null || accuracyMeters === undefined ? 'inconnue' : `${Math.round(accuracyMeters)} m`;
+  return `Pointage accepte avec GPS imprecis - precision ${accuracyLabel}.`;
+}
+
 export function isWithinSiteGeofence(
   site: Pick<AccessibleSite, 'radiusKm' | 'geofenceType' | 'geofencePolygon'>,
-  input: Pick<ClockInInput, 'latitude' | 'longitude'>,
+  input: { latitude: number; longitude: number; accuracy?: number | null },
   distanceKm: number,
 ) {
   if (site.geofenceType === SiteGeofenceType.POLYGON) {
@@ -839,7 +866,7 @@ export function isWithinSiteGeofence(
     }
   }
 
-  return isWithinSiteRadius(site, distanceKm);
+  return isWithinRadiusWithGpsTolerance(distanceKm, site.radiusKm.toNumber(), input.accuracy);
 }
 
 export function isWithinOutOfPlanningClockInRadius(distanceKm: number) {

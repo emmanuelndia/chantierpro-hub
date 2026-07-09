@@ -143,6 +143,8 @@ const contextLabels: Record<ClockContext, string> = {
   ZONE: 'Zone',
 };
 
+const MAX_GPS_ACCURACY_TOLERANCE_METERS = 3000;
+
 export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -739,14 +741,18 @@ export function MobileClockInPage({ userRole }: Readonly<{ userRole: Role }>) {
         )
       : null;
   const isAfterOfficeStartTime = isAfterLateThreshold(now);
-  const outsideRadius = currentType === 'ARRIVAL' && selectedDistance !== null && selectedSite ? selectedDistance > selectedSite.radiusKm : false;
+  const outsideRadius = currentType === 'ARRIVAL' && selectedDistance !== null && selectedSite
+    ? isOutOfPlanningSiteArrival
+      ? selectedDistance > selectedSite.radiusKm
+      : !isWithinRadiusWithGpsTolerance(selectedDistance, selectedSite.radiusKm, geoState.status === 'ready' ? geoState.accuracy : null)
+    : false;
   const remoteDeparture =
     currentType === 'DEPARTURE' &&
     hasOpenSession &&
     !openSessionDifferentSite &&
     selectedDistance !== null &&
     selectedSite !== null &&
-    selectedDistance > selectedSite.radiusKm;
+    !isWithinRadiusWithGpsTolerance(selectedDistance, selectedSite.radiusKm, geoState.status === 'ready' ? geoState.accuracy : null);
   const activeContextLabel = contextLabels[selectedClockContext];
   const isProfessionalTravel = selectedOffice && selectedOfficeClockInLocation === OfficeClockInLocation.PROFESSIONAL_TRAVEL;
   const displayContextLabel = isProfessionalTravel ? 'Deplacement' : activeContextLabel;
@@ -2544,6 +2550,12 @@ function fromNearbySite(site: NearbySiteItem): SelectableSite {
     distanceKm: site.distance,
     siteType: null,
   };
+}
+
+function isWithinRadiusWithGpsTolerance(distanceKm: number, radiusKm: number, accuracyMeters: number | null) {
+  if (distanceKm <= radiusKm) return true;
+  if (accuracyMeters === null || accuracyMeters <= 0 || accuracyMeters > MAX_GPS_ACCURACY_TOLERANCE_METERS) return false;
+  return distanceKm <= radiusKm + accuracyMeters / 1000;
 }
 
 function findPendingNegotiationSession(items: OfflineClockInItem[], assignmentId: string | null): PendingNegotiationSession | null {
