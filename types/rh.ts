@@ -50,6 +50,7 @@ export type RhUserPresenceDetail = {
   firstName: string;
   lastName: string;
   email: string | null;
+  matricule: string | null;
   month: number;
   year: number;
   sessions: RhPresenceSessionItem[];

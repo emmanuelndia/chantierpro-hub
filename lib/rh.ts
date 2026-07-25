@@ -1535,6 +1535,7 @@ export async function getRhPresenceDetailForUser(
       firstName: true,
       lastName: true,
       email: true,
+      matricule: true,
     },
   });
 
@@ -1559,12 +1560,207 @@ export async function getRhPresenceDetailForUser(
     firstName: user.firstName,
     lastName: user.lastName,
     email: user.email,
+    matricule: user.matricule,
     month: payload.query.month,
     year: payload.query.year,
     sessions: sortedSessions,
   };
 }
 
+export async function buildRhUserPresenceDetailExport(
+  prisma: PrismaClient,
+  payload: {
+    userId: string;
+    query: UserPresenceQuery;
+    format: 'xlsx' | 'pdf';
+  },
+) {
+  const detail = await getRhPresenceDetailForUser(prisma, {
+    userId: payload.userId,
+    query: payload.query,
+  });
+
+  if (!detail) return null;
+
+  const periodLabel = formatUserPresencePeriod(detail.year, detail.month);
+  const fileBaseName = `pointages-${slugifyFilePart(`${detail.lastName}-${detail.firstName}`)}-${detail.year}-${String(detail.month).padStart(2, '0')}`;
+
+  if (payload.format === 'xlsx') {
+    return {
+      buffer: await buildUserPresenceDetailXlsxBuffer(detail, periodLabel),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fileName: `${fileBaseName}.xlsx`,
+    };
+  }
+
+  return {
+    buffer: buildUserPresenceDetailPdfBuffer(detail, periodLabel),
+    contentType: 'application/pdf',
+    fileName: `${fileBaseName}.pdf`,
+  };
+}
+
+async function buildUserPresenceDetailXlsxBuffer(detail: RhUserPresenceDetail, periodLabel: string) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'ChantierPro';
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet('Pointages du mois');
+  worksheet.addRow(['Matricule', detail.matricule ?? '']);
+  worksheet.addRow(['Nom et prenom', `${detail.lastName} ${detail.firstName}`.trim()]);
+  worksheet.addRow(['Periode', periodLabel]);
+  worksheet.addRow([]);
+  worksheet.addRow(['Date', 'Site', 'Arrivee', 'Depart', 'Duree', 'Commentaire']);
+
+  detail.sessions.forEach((session) => {
+    worksheet.addRow([
+      formatUserPresenceSessionDate(session.date),
+      session.siteName,
+      formatSessionTime(session.arrivalTime),
+      session.departureTime ? formatSessionTime(session.departureTime) : '',
+      formatUserPresenceSessionDuration(session),
+      session.comment ?? '',
+    ]);
+  });
+
+  worksheet.getRow(1).font = { bold: true };
+  worksheet.getRow(2).font = { bold: true };
+  worksheet.getRow(3).font = { bold: true };
+  worksheet.getRow(5).font = { bold: true };
+  worksheet.views = [{ state: 'frozen', ySplit: 5 }];
+  worksheet.columns.forEach((column, index) => {
+    const widths = [14, 42, 12, 12, 14, 48];
+    column.width = widths[index] ?? 18;
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+function buildUserPresenceDetailPdfBuffer(detail: RhUserPresenceDetail, periodLabel: string) {
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+  const columns = [
+    { label: 'Date', key: 'date', width: 24 },
+    { label: 'Site', key: 'site', width: 92 },
+    { label: 'Arrivee', key: 'arrival', width: 24 },
+    { label: 'Depart', key: 'departure', width: 24 },
+    { label: 'Duree', key: 'duration', width: 26 },
+    { label: 'Commentaire', key: 'comment', width: 87 },
+  ] as const;
+  const tableWidth = pageWidth - margin * 2;
+  const scale = tableWidth / columns.reduce((sum, column) => sum + column.width, 0);
+  const scaledColumns = columns.map((column) => ({ ...column, width: column.width * scale }));
+  let y = margin;
+
+  const drawTitle = () => {
+    pdf.setTextColor(15, 23, 42);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(15);
+    pdf.text('Pointages mensuels', margin, y + 5);
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Matricule : ${detail.matricule ?? '-'}`, margin, y + 13);
+    pdf.text(`Nom et prenom : ${detail.lastName} ${detail.firstName}`.trim(), margin + 58, y + 13);
+    pdf.text(`Periode : ${periodLabel}`, pageWidth - margin, y + 13, { align: 'right' });
+    y += 21;
+  };
+
+  const drawHeader = () => {
+    let x = margin;
+    pdf.setFillColor(239, 243, 248);
+    pdf.setDrawColor(210, 219, 232);
+    pdf.setTextColor(15, 23, 42);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    scaledColumns.forEach((column) => {
+      pdf.rect(x, y, column.width, 9, 'FD');
+      pdf.text(column.label, x + 1.5, y + 5.8);
+      x += column.width;
+    });
+    y += 9;
+  };
+
+  const drawPageHeader = () => {
+    drawTitle();
+    drawHeader();
+  };
+
+  drawPageHeader();
+
+  for (const session of detail.sessions) {
+    const cells = {
+      date: formatUserPresenceSessionDate(session.date),
+      site: session.siteName,
+      arrival: formatSessionTime(session.arrivalTime),
+      departure: session.departureTime ? formatSessionTime(session.departureTime) : '-',
+      duration: formatUserPresenceSessionDuration(session),
+      comment: session.comment ?? '-',
+    };
+    const lineGroups = scaledColumns.map((column) =>
+      pdf.splitTextToSize(String(cells[column.key] ?? ''), column.width - 3) as string[],
+    );
+    const rowHeight = Math.max(8, ...lineGroups.map((lines) => lines.length * 3.4 + 4));
+
+    if (y + rowHeight > pageHeight - margin) {
+      pdf.addPage();
+      y = margin;
+      drawPageHeader();
+    }
+
+    let x = margin;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(15, 23, 42);
+    pdf.setDrawColor(225, 231, 240);
+    scaledColumns.forEach((column, index) => {
+      pdf.rect(x, y, column.width, rowHeight);
+      pdf.text(lineGroups[index] ?? [''], x + 1.5, y + 4.8);
+      x += column.width;
+    });
+    y += rowHeight;
+  }
+
+  if (detail.sessions.length === 0) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.text('Aucun pointage pour cette periode.', margin, y + 10);
+  }
+
+  return Buffer.from(pdf.output('arraybuffer'));
+}
+
+function formatUserPresencePeriod(year: number, month: number) {
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date);
+}
+
+function formatUserPresenceSessionDate(value: string) {
+  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function formatSessionTime(value: string) {
+  return value.slice(0, 5);
+}
+
+function formatUserPresenceSessionDuration(session: RhPresenceSessionItem) {
+  if (session.realDurationHours === null) return '-';
+  const totalMinutes = Math.round(session.realDurationHours * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+}
+
+function slugifyFilePart(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'ressource';
+}
 export async function regularizeRhSession(
   prisma: PrismaClient,
   payload: {
@@ -3706,7 +3902,7 @@ function stripAutomaticOldSessionClosureComment(comment: string | null | undefin
 function isAutomaticOldSessionClosureLine(value: string) {
   const normalized = value
     .toLowerCase()
-    .replace(/[.'â€™]/g, '')
+    .replace(/[.'\u2019]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -3900,6 +4096,6 @@ function uniqueOption<T extends { id: string }>(option: T, index: number, option
 }
 
 function formatPersonName(person: { firstName: string; lastName: string } | null) {
-  if (!person) return 'Non renseignÃƒÆ’Ã‚Â©';
+  if (!person) return 'Non renseigne';
   return `${person.firstName} ${person.lastName}`.trim();
 }

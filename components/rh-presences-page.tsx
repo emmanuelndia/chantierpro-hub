@@ -48,6 +48,7 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
   const queryClient = useQueryClient();
 
   const monthOptions = useMemo(() => buildMonthOptions(), []);
+  const selectedPeriodLabel = useMemo(() => formatPresencePeriod(year, month), [month, year]);
 
   const optionsQuery = useQuery({
     queryKey: ['rh-options'],
@@ -113,21 +114,18 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
 
   const detailExportMutation = useMutation({
     mutationFn: async ({ userId, format }: { userId: string; format: PresenceDetailExportFormat }) => {
-      const response = await authFetch('/api/rh/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          format,
-          from: monthStartIso(year, month),
-          to: monthEndIso(year, month),
-          userId,
-          projectId: projectIds[0] ?? null,
-          siteIds,
-          context: null,
-          lateOnly: false,
-          attendanceList: format === 'pdf',
-        }),
-      });
+      const searchParams = new URLSearchParams();
+      searchParams.set('format', format);
+      searchParams.set('month', String(month));
+      searchParams.set('year', String(year));
+      if (projectIds.length > 0) {
+        searchParams.set('projectId', projectIds[0]!);
+      }
+      if (siteIds.length > 0) {
+        searchParams.set('siteIds', siteIds.join(','));
+      }
+
+      const response = await authFetch(`/api/rh/presences/${encodeURIComponent(userId)}/export?${searchParams.toString()}`);
 
       if (!response.ok) {
         throw new Error('Export de la ressource impossible.');
@@ -454,6 +452,7 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
                     exportFormat={detailExportMutation.variables?.userId === item.userId ? detailExportMutation.variables.format : null}
                     exporting={detailExportMutation.isPending && detailExportMutation.variables?.userId === item.userId}
                     onExport={(format) => detailExportMutation.mutate({ userId: item.userId, format })}
+                    periodLabel={selectedPeriodLabel}
                     onToggle={() =>
                       setExpandedUserId((current) => (current === item.userId ? null : item.userId))
                     }
@@ -543,6 +542,7 @@ function ResourcePresenceRow({
   onExport,
   onToggle,
   onRegularize,
+  periodLabel,
 }: Readonly<{
   row: RhPresenceSummaryItem;
   expanded: boolean;
@@ -553,6 +553,7 @@ function ResourcePresenceRow({
   onExport: (format: PresenceDetailExportFormat) => void;
   onToggle: () => void;
   onRegularize: (session: RhUserPresenceDetail['sessions'][number]) => void;
+  periodLabel: string;
 }>) {
   return (
     <>
@@ -586,14 +587,20 @@ function ResourcePresenceRow({
               </div>
             ) : detail ? (
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-                <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950">
-                      Pointages de {detail.firstName} {detail.lastName}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {detail.sessions.length} session(s) sur le mois affiche.
-                    </p>
+                <div className="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="grid gap-3 text-sm sm:grid-cols-3 sm:gap-6">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Matricule</p>
+                      <p className="mt-1 font-semibold text-slate-950">{detail.matricule ?? '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Nom et prenom</p>
+                      <p className="mt-1 font-semibold text-slate-950">{detail.lastName} {detail.firstName}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Periode</p>
+                      <p className="mt-1 font-semibold text-slate-950">{periodLabel}</p>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -615,59 +622,46 @@ function ResourcePresenceRow({
                   </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="min-w-[920px] table-fixed text-left text-sm">
+                  <table className="min-w-[820px] table-fixed text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500">
                       <tr>
-                        <th className="w-24 px-4 py-3 font-semibold">Date</th>
-                        <th className="w-52 px-4 py-3 font-semibold">Site</th>
+                        <th className="w-28 px-4 py-3 font-semibold">Date</th>
+                        <th className="w-64 px-4 py-3 font-semibold">Site</th>
                         <th className="w-24 px-4 py-3 font-semibold">Arrivee</th>
                         <th className="w-24 px-4 py-3 font-semibold">Depart</th>
-                        <th className="w-20 px-4 py-3 font-semibold">Pauses</th>
                         <th className="w-24 px-4 py-3 font-semibold">Duree</th>
-                        <th className="w-56 px-4 py-3 font-semibold">Commentaire</th>
-                        <th className="w-36 px-4 py-3 font-semibold">Statut</th>
-                        <th className="w-28 px-4 py-3 font-semibold">Action</th>
+                        <th className="w-80 px-4 py-3 font-semibold">Commentaire</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {detail.sessions.map((session, index) => (
                         <tr key={`${session.siteId}:${session.date}:${index}`}>
                           <td className="px-4 py-3 text-slate-600">{formatDateOnly(session.date)}</td>
-                          <td className="whitespace-normal break-words px-4 py-3 text-slate-600">{session.siteName}</td>
-                          <td className="px-4 py-3 text-slate-600">{session.arrivalTime}</td>
-                          <td className="px-4 py-3 text-slate-600">{session.departureTime ?? '-'}</td>
-                          <td className="px-4 py-3 text-slate-600">{session.pauseDurationHours.toFixed(2)} h</td>
-                          <td className="px-4 py-3 text-slate-600">
-                            {session.realDurationHours === null ? '-' : `${session.realDurationHours.toFixed(2)} h`}
-                          </td>
-                          <td className="whitespace-normal break-words px-4 py-3 text-slate-600">{session.comment ?? '-'}</td>
-                          <td className="px-4 py-3">
-                            <Badge tone={session.incomplete || session.status === 'TO_REVIEW_RH' ? 'warning' : 'success'}>
-                              {sessionLabel(session.status)}
-                            </Badge>
-                            {session.isRemoteCheckout ? (
-                              <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-[10px] font-bold uppercase text-orange-700">
-                                Distance
-                              </span>
-                            ) : null}
-                            {session.isRegularized ? (
-                              <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
-                                Regularise
-                              </span>
-                            ) : null}
-                          </td>
-                          <td className="px-4 py-3">
-                            {session.incomplete || session.status === 'TO_REVIEW_RH' ? (
-                              <button
-                                className="rounded-full border border-orange-200 px-3 py-2 text-xs font-bold text-orange-700 transition hover:bg-orange-50"
-                                onClick={() => onRegularize(session)}
-                                type="button"
-                              >
-                                Regulariser
-                              </button>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
+                          <td className="whitespace-normal break-words px-4 py-3 font-medium text-slate-700">{session.siteName}</td>
+                          <td className="px-4 py-3 text-slate-600">{session.arrivalTime.slice(0, 5)}</td>
+                          <td className="px-4 py-3 text-slate-600">{session.departureTime?.slice(0, 5) ?? '-'}</td>
+                          <td className="px-4 py-3 text-slate-600">{formatSessionDurationLabel(session)}</td>
+                          <td className="whitespace-normal break-words px-4 py-3 text-slate-600">
+                            <div className="space-y-2">
+                              <p>{session.comment ?? '-'}</p>
+                              <div className="flex flex-wrap gap-2">
+                                {session.incomplete || session.status === 'TO_REVIEW_RH' ? (
+                                  <button
+                                    className="rounded-full border border-orange-200 px-3 py-1.5 text-xs font-bold text-orange-700 transition hover:bg-orange-50"
+                                    onClick={() => onRegularize(session)}
+                                    type="button"
+                                  >
+                                    Regulariser
+                                  </button>
+                                ) : null}
+                                {session.isRemoteCheckout ? (
+                                  <Badge tone="warning">Distance</Badge>
+                                ) : null}
+                                {session.isRegularized ? (
+                                  <Badge tone="info">Regularise</Badge>
+                                ) : null}
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -855,13 +849,6 @@ function getDefaultRegularizationTime(session: RhUserPresenceDetail['sessions'][
   return `${String(nextHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-function monthStartIso(year: number, month: number) {
-  return new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)).toISOString();
-}
-
-function monthEndIso(year: number, month: number) {
-  return new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)).toISOString();
-}
 
 function triggerDownload(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -878,17 +865,19 @@ function formatDateOnly(value: string) {
     dateStyle: 'medium',
   }).format(new Date(`${value}T00:00:00.000Z`));
 }
+function formatPresencePeriod(year: number, month: number) {
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  return new Intl.DateTimeFormat('fr-FR', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
 
-function sessionLabel(status: RhUserPresenceDetail['sessions'][number]['status']) {
-  switch (status) {
-    case 'COMPLETE':
-      return 'Valide';
-    case 'TO_REVIEW_RH':
-      return 'A verifier RH';
-    case 'TO_REGULARIZE':
-      return 'A regulariser';
-    case 'INCOMPLETE_SESSION':
-    default:
-      return 'Incomplete';
-  }
+function formatSessionDurationLabel(session: RhUserPresenceDetail['sessions'][number]) {
+  if (session.realDurationHours === null) return '-';
+  const totalMinutes = Math.round(session.realDurationHours * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
 }
