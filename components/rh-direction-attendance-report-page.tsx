@@ -39,6 +39,7 @@ export function RhDirectionAttendanceReportPage() {
   const [activeTab, setActiveTab] = useState<DirectionReportTab>('not-clocked-today');
   const [selectedRoles, setSelectedRoles] = useState<Role[]>([]);
   const [exportScope, setExportScope] = useState<DirectionExportScope>('active-tab');
+  const [search, setSearch] = useState('');
   const [exportingFormat, setExportingFormat] = useState<'xlsx' | 'pdf' | null>(null);
 
   const rolesQueryValue = selectedRoles.join(',');
@@ -60,7 +61,7 @@ export function RhDirectionAttendanceReportPage() {
   });
 
   const data = reportQuery.data ?? null;
-  const users = useMemo(() => (data ? getDirectionReportUsers(data, activeTab) : []), [activeTab, data]);
+  const users = useMemo(() => (data ? filterDirectionReportUsers(getDirectionReportUsers(data, activeTab), search) : []), [activeTab, data, search]);
 
   if (reportQuery.isError) {
     return (
@@ -140,7 +141,7 @@ export function RhDirectionAttendanceReportPage() {
             <button
               className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
               disabled={!data || exportingFormat !== null || reportQuery.isFetching}
-              onClick={() => void downloadDirectionReportExport(selectedDate, 'xlsx', resolveDirectionExportScope(exportScope, activeTab), selectedRoles, setExportingFormat)}
+              onClick={() => void downloadDirectionReportExport(selectedDate, 'xlsx', resolveDirectionExportScope(exportScope, activeTab), selectedRoles, search, setExportingFormat)}
               type="button"
             >
               {exportingFormat === 'xlsx' ? 'Generation...' : 'Export Excel'}
@@ -148,7 +149,7 @@ export function RhDirectionAttendanceReportPage() {
             <button
               className="rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               disabled={!data || exportingFormat !== null || reportQuery.isFetching}
-              onClick={() => void downloadDirectionReportExport(selectedDate, 'pdf', resolveDirectionExportScope(exportScope, activeTab), selectedRoles, setExportingFormat)}
+              onClick={() => void downloadDirectionReportExport(selectedDate, 'pdf', resolveDirectionExportScope(exportScope, activeTab), selectedRoles, search, setExportingFormat)}
               type="button"
             >
               {exportingFormat === 'pdf' ? 'Generation...' : 'Export PDF'}
@@ -156,7 +157,7 @@ export function RhDirectionAttendanceReportPage() {
             <button
               className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
               disabled={!data || exportingFormat !== null || reportQuery.isFetching}
-              onClick={() => exportDirectionReportCsv(data, resolveDirectionExportScope(exportScope, activeTab))}
+              onClick={() => exportDirectionReportCsv(data, resolveDirectionExportScope(exportScope, activeTab), search)}
               type="button"
             >
               CSV
@@ -196,22 +197,34 @@ export function RhDirectionAttendanceReportPage() {
               {reportQuery.isFetching ? <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Mise a jour...</p> : null}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {directionReportTabs.map((tab) => {
-                const active = activeTab === tab.id;
-                return (
-                  <button
-                    className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.1em] transition ${
-                      active ? 'bg-slate-950 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    type="button"
-                  >
-                    {tab.label} <span className="ml-1">{getDirectionReportUsers(data, tab.id).length}</span>
-                  </button>
-                );
-              })}
+            <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] xl:items-center">
+              <div className="flex flex-wrap gap-2">
+                {directionReportTabs.map((tab) => {
+                  const active = activeTab === tab.id;
+                  return (
+                    <button
+                      className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.1em] transition ${
+                        active ? 'bg-slate-950 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      type="button"
+                    >
+                      {tab.label} <span className="ml-1">{filterDirectionReportUsers(getDirectionReportUsers(data, tab.id), search).length}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Recherche ressource</span>
+                <input
+                  className={inputClassName}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Nom, prenom, matricule, email..."
+                  type="search"
+                  value={search}
+                />
+              </label>
             </div>
 
             <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
@@ -284,6 +297,23 @@ function getDirectionReportUsers(data: RhDirectionAttendanceReportResponse, tab:
   return data.users.notClockedToday;
 }
 
+function filterDirectionReportUsers(users: RhDirectionAttendanceUser[], search: string) {
+  const normalized = normalizeDirectionSearch(search);
+  if (!normalized) return users;
+
+  return users.filter((user) =>
+    normalizeDirectionSearch(`${user.lastName} ${user.firstName} ${user.matricule ?? ''} ${user.email ?? ''} ${formatRoleLabel(user.role as Role)}`).includes(normalized),
+  );
+}
+
+function normalizeDirectionSearch(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 function resolveDirectionExportScope(scope: DirectionExportScope, activeTab: DirectionReportTab) {
   return scope === 'active-tab' ? activeTab : scope;
 }
@@ -298,12 +328,14 @@ async function downloadDirectionReportExport(
   format: 'xlsx' | 'pdf',
   scope: 'all' | DirectionReportTab,
   roles: Role[],
+  search: string,
   setExportingFormat: (format: 'xlsx' | 'pdf' | null) => void,
 ) {
   setExportingFormat(format);
   try {
     const query = new URLSearchParams({ date: selectedDate, format, scope });
     if (roles.length > 0) query.set('roles', roles.join(','));
+    if (search.trim()) query.set('q', search.trim());
     const response = await authFetch(
       `/api/rh/direction-attendance-report/export?${query.toString()}`,
       { cache: 'no-store' },
@@ -339,9 +371,12 @@ function formatDirectionDownloadDate(value: Date) {
   const year = value.getFullYear();
   return `${day}-${month}-${year}`;
 }
-function exportDirectionReportCsv(data: RhDirectionAttendanceReportResponse | null, scope: 'all' | DirectionReportTab) {
+function exportDirectionReportCsv(data: RhDirectionAttendanceReportResponse | null, scope: 'all' | DirectionReportTab, search: string) {
   if (!data) return;
-  const sections = getDirectionReportExportSections(data, scope);
+  const sections = getDirectionReportExportSections(data, scope).map((section) => ({
+    ...section,
+    users: filterDirectionReportUsers(section.users, search),
+  }));
   const rows = [
     ['liste', 'matricule', 'nom', 'prenom', 'role', 'entree_jour', 'sortie_jour', 'premier_pointage', 'dernier_pointage', 'compte_cree'],
     ...sections.flatMap((section) => section.users.map((user) => directionReportCsvRow(section.csvName, user))),

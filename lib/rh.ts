@@ -300,6 +300,7 @@ export async function getDirectionAttendanceReport(
   prisma: PrismaClient,
   date: Date,
   roles: Role[] = [],
+  search = '',
 ): Promise<RhDirectionAttendanceReportResponse> {
   const day = toDateOnlyDate(date);
   const tomorrow = new Date(day);
@@ -442,22 +443,23 @@ export async function getDirectionAttendanceReport(
     };
   });
 
-  const clockedToday = reportUsers.filter((user) => user.status === 'CLOCKED_TODAY');
-  const notClockedToday = reportUsers.filter((user) => user.status !== 'CLOCKED_TODAY');
-  const neverClocked = reportUsers.filter((user) => user.status === 'NEVER_CLOCKED');
-  const departureOnlyToday = reportUsers.filter((user) => user.isDepartureOnlyToday);
+  const searchedReportUsers = filterDirectionAttendanceUsers(reportUsers, search);
+  const clockedToday = searchedReportUsers.filter((user) => user.status === 'CLOCKED_TODAY');
+  const notClockedToday = searchedReportUsers.filter((user) => user.status !== 'CLOCKED_TODAY');
+  const neverClocked = searchedReportUsers.filter((user) => user.status === 'NEVER_CLOCKED');
+  const departureOnlyToday = searchedReportUsers.filter((user) => user.isDepartureOnlyToday);
 
   return {
     generatedAt: new Date().toISOString(),
     date: day.toISOString().slice(0, 10),
     summary: {
-      activeUsers: reportUsers.length,
+      activeUsers: searchedReportUsers.length,
       clockedToday: clockedToday.length,
       notClockedToday: notClockedToday.length,
       neverClocked: neverClocked.length,
-      leftToday: reportUsers.filter((user) => user.hasDepartureToday).length,
-      openSessions: reportUsers.filter((user) => user.isOpenToday).length,
-      lateToday: reportUsers.filter((user) => user.isLateToday).length,
+      leftToday: searchedReportUsers.filter((user) => user.hasDepartureToday).length,
+      openSessions: searchedReportUsers.filter((user) => user.isOpenToday).length,
+      lateToday: searchedReportUsers.filter((user) => user.isLateToday).length,
       departureOnlyToday: departureOnlyToday.length,
     },
     users: {
@@ -469,6 +471,23 @@ export async function getDirectionAttendanceReport(
   };
 }
 
+function filterDirectionAttendanceUsers<T extends { firstName: string; lastName: string; email: string | null; matricule: string | null; role: Role }>(users: T[], search: string) {
+  const normalized = normalizeDirectionAttendanceSearch(search);
+  if (!normalized) return users;
+
+  return users.filter((user) =>
+    normalizeDirectionAttendanceSearch(`${user.lastName} ${user.firstName} ${user.matricule ?? ''} ${user.email ?? ''} ${formatRoleLabel(user.role)}`).includes(normalized),
+  );
+}
+
+function normalizeDirectionAttendanceSearch(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 export type DirectionAttendanceExportScope = 'all' | 'clocked-today' | 'not-clocked-today' | 'never-clocked' | 'departure-only';
 
 export async function buildDirectionAttendanceReportExport(
@@ -477,8 +496,9 @@ export async function buildDirectionAttendanceReportExport(
   format: 'xlsx' | 'pdf',
   scope: DirectionAttendanceExportScope = 'all',
   roles: Role[] = [],
+  search = '',
 ) {
-  const report = await getDirectionAttendanceReport(prisma, date, roles);
+  const report = await getDirectionAttendanceReport(prisma, date, roles, search);
   const scopeSuffix = scope === 'all' ? '' : `-${scope}`;
   const roleSuffix = roles.length > 0 ? `-${roles.map((role) => role.toLowerCase()).join('-')}` : '';
   const fileBaseName = `rapport-direction-pointage-${report.date}${scopeSuffix}${roleSuffix}`;
@@ -3652,7 +3672,7 @@ function collectPresenceComments(records: { type: ClockInType; timestampLocal: D
   };
 
   for (const record of records) {
-    const rawComment = record.comment?.trim();
+    const rawComment = stripAutomaticOldSessionClosureComment(record.comment);
     if (!rawComment) continue;
 
     const details = extractZoneClockInDetails(rawComment);
@@ -3671,6 +3691,31 @@ function collectPresenceComments(records: { type: ClockInType; timestampLocal: D
   return comments;
 }
 
+function stripAutomaticOldSessionClosureComment(comment: string | null | undefined) {
+  const normalized = comment?.trim();
+  if (!normalized) return null;
+
+  const visibleLines = normalized
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !isAutomaticOldSessionClosureLine(line));
+
+  return visibleLines.length > 0 ? visibleLines.join('\n') : null;
+}
+
+function isAutomaticOldSessionClosureLine(value: string) {
+  const normalized = value
+    .toLowerCase()
+    .replace(/[.'â€™]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return (
+    normalized === 'fermeture de session ancienne' ||
+    normalized === 'fermeture d une session ancienne depuis le mobile' ||
+    normalized === 'fermeture dune session ancienne depuis le mobile'
+  );
+}
 function clockInCommentLabel(type: ClockInType) {
   if (type === ClockInType.ARRIVAL) return 'Commentaire arrivee';
   if (type === ClockInType.DEPARTURE) return 'Commentaire depart';
@@ -3855,6 +3900,6 @@ function uniqueOption<T extends { id: string }>(option: T, index: number, option
 }
 
 function formatPersonName(person: { firstName: string; lastName: string } | null) {
-  if (!person) return 'Non renseignÃ©';
+  if (!person) return 'Non renseignÃƒÆ’Ã‚Â©';
   return `${person.firstName} ${person.lastName}`.trim();
 }

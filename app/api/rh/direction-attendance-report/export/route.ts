@@ -1,4 +1,4 @@
-﻿import { Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { buildDirectionAttendanceReportExport, canAccessDirectionAttendanceReport, jsonRhError, type DirectionAttendanceExportScope } from '@/lib/rh';
@@ -13,6 +13,7 @@ export const GET = withAuth(async ({ req, user }) => {
   const dateParam = searchParams.get('date');
   const scope = parseDirectionAttendanceExportScope(searchParams.get('scope'));
   const roles = parseDirectionAttendanceRoles(searchParams.get('roles'));
+  const search = searchParams.get('q') ?? '';
   const date = dateParam ? new Date(`${dateParam}T00:00:00.000Z`) : new Date();
 
   if (format !== 'xlsx' && format !== 'pdf') {
@@ -28,7 +29,7 @@ export const GET = withAuth(async ({ req, user }) => {
   }
 
   try {
-    const artifact = await buildDirectionAttendanceReportExport(prisma, date, format, scope, roles);
+    const artifact = await buildDirectionAttendanceReportExport(prisma, date, format, scope, roles, search);
     return new Response(Uint8Array.from(artifact.buffer), {
       status: 200,
       headers: {

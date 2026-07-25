@@ -23,13 +23,22 @@ type RhPresencesPageProps = Readonly<{
   };
 }>;
 
+type PresenceDetailExportFormat = 'xlsx' | 'pdf';
+
 export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
   const currentMonth = new Date();
-  const [month, setMonth] = useState(currentMonth.getUTCMonth() + 1);
-  const [year, setYear] = useState(currentMonth.getUTCFullYear());
+  const initialMonth = currentMonth.getUTCMonth() + 1;
+  const initialYear = currentMonth.getUTCFullYear();
+  const [month, setMonth] = useState(initialMonth);
+  const [year, setYear] = useState(initialYear);
   const [search, setSearch] = useState('');
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [siteIds, setSiteIds] = useState<string[]>([]);
+  const [draftMonth, setDraftMonth] = useState(initialMonth);
+  const [draftYear, setDraftYear] = useState(initialYear);
+  const [draftSearch, setDraftSearch] = useState('');
+  const [draftProjectIds, setDraftProjectIds] = useState<string[]>([]);
+  const [draftSiteIds, setDraftSiteIds] = useState<string[]>([]);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [regularizationTarget, setRegularizationTarget] = useState<RhUserPresenceDetail['sessions'][number] | null>(null);
   const [regularizationDate, setRegularizationDate] = useState('');
@@ -102,6 +111,40 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
     enabled: expandedUserId !== null,
   });
 
+  const detailExportMutation = useMutation({
+    mutationFn: async ({ userId, format }: { userId: string; format: PresenceDetailExportFormat }) => {
+      const response = await authFetch('/api/rh/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          format,
+          from: monthStartIso(year, month),
+          to: monthEndIso(year, month),
+          userId,
+          projectId: projectIds[0] ?? null,
+          siteIds,
+          context: null,
+          lateOnly: false,
+          attendanceList: format === 'pdf',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Export de la ressource impossible.');
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('content-disposition');
+      const match = contentDisposition?.match(/filename="?([^";]+)"?/);
+      return {
+        blob,
+        fileName: match?.[1] ?? `presence-ressource-${year}-${String(month).padStart(2, '0')}.${format}`,
+      };
+    },
+    onSuccess: ({ blob, fileName }) => {
+      triggerDownload(blob, fileName);
+    },
+  });
   const regularizeMutation = useMutation({
     mutationFn: async (payload: { arrivalRecordId: string; departureRecordId: string | null; correctedDepartureTime: string; comment: string }) => {
       const response = await authFetch('/api/rh/presences/regularize', {
@@ -112,7 +155,7 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
 
       if (!response.ok) {
         const error = await response.json().catch(() => null) as { message?: string } | null;
-        throw new Error(error?.message ?? 'Régularisation impossible.');
+        throw new Error(error?.message ?? 'RÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gularisation impossible.');
       }
     },
     onSuccess: async () => {
@@ -125,19 +168,19 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
       await queryClient.invalidateQueries({ queryKey: ['rh-presence-detail'] });
     },
     onError: (error) => {
-      setRegularizationError(error instanceof Error ? error.message : 'Régularisation impossible.');
+      setRegularizationError(error instanceof Error ? error.message : 'RÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gularisation impossible.');
     },
   });
 
   const visibleSites = useMemo(() => {
     const allSites = optionsQuery.data?.sites ?? [];
-    if (projectIds.length === 0) {
+    if (draftProjectIds.length === 0) {
       return allSites;
     }
 
-    const allowed = new Set(projectIds);
+    const allowed = new Set(draftProjectIds);
     return allSites.filter((site) => allowed.has(site.projectId));
-  }, [optionsQuery.data?.sites, projectIds]);
+  }, [draftProjectIds, optionsQuery.data?.sites]);
 
   const stats = useMemo<DashboardStat[]>(() => {
     const summary = presencesQuery.data?.summary;
@@ -170,6 +213,39 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
     ];
   }, [presencesQuery.data?.summary]);
 
+  function applyFilters() {
+    setMonth(draftMonth);
+    setYear(draftYear);
+    setSearch(draftSearch.trim());
+    setProjectIds(draftProjectIds);
+    setSiteIds(draftSiteIds);
+    setExpandedUserId(null);
+  }
+
+  function resetFilters() {
+    const now = new Date();
+    const nextMonth = now.getUTCMonth() + 1;
+    const nextYear = now.getUTCFullYear();
+
+    setDraftMonth(nextMonth);
+    setDraftYear(nextYear);
+    setDraftSearch('');
+    setDraftProjectIds([]);
+    setDraftSiteIds([]);
+    setMonth(nextMonth);
+    setYear(nextYear);
+    setSearch('');
+    setProjectIds([]);
+    setSiteIds([]);
+    setExpandedUserId(null);
+  }
+
+  const filtersChanged =
+    draftMonth !== month ||
+    draftYear !== year ||
+    draftSearch.trim() !== search ||
+    !sameStringList(draftProjectIds, projectIds) ||
+    !sameStringList(draftSiteIds, siteIds);
   if (presencesQuery.isLoading && !presencesQuery.data) {
     return <LoadingState />;
   }
@@ -209,8 +285,13 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => {
                 const now = new Date();
-                setMonth(now.getUTCMonth() + 1);
-                setYear(now.getUTCFullYear());
+                const nextMonth = now.getUTCMonth() + 1;
+                const nextYear = now.getUTCFullYear();
+                setDraftMonth(nextMonth);
+                setDraftYear(nextYear);
+                setMonth(nextMonth);
+                setYear(nextYear);
+                setExpandedUserId(null);
               }}
               type="button"
             >
@@ -220,8 +301,13 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => {
                 const previous = new Date(Date.UTC(year, month - 2, 1));
-                setMonth(previous.getUTCMonth() + 1);
-                setYear(previous.getUTCFullYear());
+                const nextMonth = previous.getUTCMonth() + 1;
+                const nextYear = previous.getUTCFullYear();
+                setDraftMonth(nextMonth);
+                setDraftYear(nextYear);
+                setMonth(nextMonth);
+                setYear(nextYear);
+                setExpandedUserId(null);
               }}
               type="button"
             >
@@ -239,8 +325,8 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
         <div className="mb-5 flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-slate-950">Filtres de présence</h2>
-          <p className="text-sm text-slate-500">Affinez la période, les ressources et les périmètres visibles.</p>
+          <h2 className="text-lg font-semibold text-slate-950">Filtres de presence</h2>
+          <p className="text-sm text-slate-500">Affinez la periode, les ressources et les perimetres visibles.</p>
         </div>
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[0.9fr_1fr_1.2fr_1.2fr]">
           <Field label="Mois / annee">
@@ -248,11 +334,10 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
               onChange={(event) => {
                 const [nextYear, nextMonth] = event.target.value.split('-').map(Number);
-                setYear(nextYear!);
-                setMonth(nextMonth!);
-                setExpandedUserId(null);
+                setDraftYear(nextYear!);
+                setDraftMonth(nextMonth!);
               }}
-              value={`${year}-${String(month).padStart(2, '0')}`}
+              value={`${draftYear}-${String(draftMonth).padStart(2, '0')}`}
             >
               {monthOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -264,50 +349,72 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
           <Field label="Recherche ressource">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => setDraftSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  applyFilters();
+                }
+              }}
               placeholder="Nom, prenom, email..."
-              value={search}
+              value={draftSearch}
             />
           </Field>
           <Field label="Projets">
             <FilterMultiSelect
               onChange={(nextValues) => {
-                setProjectIds(nextValues);
-                setSiteIds((current) =>
+                setDraftProjectIds(nextValues);
+                setDraftSiteIds((current) =>
                   current.filter((siteId) =>
                     (optionsQuery.data?.sites ?? []).some(
                       (site) => site.id === siteId && nextValues.includes(site.projectId),
                     ),
                   ),
                 );
-                setExpandedUserId(null);
               }}
               options={(optionsQuery.data?.projects ?? []).map((project) => ({
                 value: project.id,
                 label: project.label,
               }))}
               placeholder="Tous les projets"
-              values={projectIds}
+              values={draftProjectIds}
             />
           </Field>
           <Field label="Sites">
             <FilterMultiSelect
               onChange={(nextValues) => {
-                setSiteIds(nextValues);
-                setExpandedUserId(null);
+                setDraftSiteIds(nextValues);
               }}
               options={visibleSites.map((site) => ({
                 value: site.id,
                 label: site.label,
               }))}
               placeholder="Tous les sites"
-              values={siteIds}
+              values={draftSiteIds}
             />
           </Field>
         </div>
-        <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Accès</span>
-          <Badge tone="neutral">{viewer.role}</Badge>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Acces</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!filtersChanged || presencesQuery.isFetching}
+              onClick={applyFilters}
+              type="button"
+            >
+              Appliquer les filtres
+            </button>
+            <button
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={presencesQuery.isFetching && !filtersChanged}
+              onClick={resetFilters}
+              type="button"
+            >
+              Reinitialiser
+            </button>
+            <Badge tone="neutral">{viewer.role}</Badge>
+          </div>
         </div>
       </section>
 
@@ -344,6 +451,9 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
                     detail={expandedUserId === item.userId ? expandedDetailQuery.data ?? null : null}
                     expanded={expandedUserId === item.userId}
                     loadingDetail={expandedUserId === item.userId && expandedDetailQuery.isLoading}
+                    exportFormat={detailExportMutation.variables?.userId === item.userId ? detailExportMutation.variables.format : null}
+                    exporting={detailExportMutation.isPending && detailExportMutation.variables?.userId === item.userId}
+                    onExport={(format) => detailExportMutation.mutate({ userId: item.userId, format })}
                     onToggle={() =>
                       setExpandedUserId((current) => (current === item.userId ? null : item.userId))
                     }
@@ -394,7 +504,7 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
               return;
             }
             if (!comment) {
-              setRegularizationError('Le commentaire de régularisation est obligatoire.');
+              setRegularizationError('Le commentaire de regularisation est obligatoire.');
               return;
             }
 
@@ -417,11 +527,20 @@ export function RhPresencesPage({ viewer }: RhPresencesPageProps) {
   );
 }
 
+function sameStringList(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  const leftSorted = [...left].sort();
+  const rightSorted = [...right].sort();
+  return leftSorted.every((value, index) => value === rightSorted[index]);
+}
 function ResourcePresenceRow({
   row,
   expanded,
   loadingDetail,
   detail,
+  exporting,
+  exportFormat,
+  onExport,
   onToggle,
   onRegularize,
 }: Readonly<{
@@ -429,6 +548,9 @@ function ResourcePresenceRow({
   expanded: boolean;
   loadingDetail: boolean;
   detail: RhUserPresenceDetail | null;
+  exporting: boolean;
+  exportFormat: PresenceDetailExportFormat | null;
+  onExport: (format: PresenceDetailExportFormat) => void;
   onToggle: () => void;
   onRegularize: (session: RhUserPresenceDetail['sessions'][number]) => void;
 }>) {
@@ -464,16 +586,44 @@ function ResourcePresenceRow({
               </div>
             ) : detail ? (
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+                <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">
+                      Pointages de {detail.firstName} {detail.lastName}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {detail.sessions.length} session(s) sur le mois affiche.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="rounded-full border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={exporting}
+                      onClick={() => onExport('xlsx')}
+                      type="button"
+                    >
+                      {exporting && exportFormat === 'xlsx' ? 'Excel...' : 'Excel'}
+                    </button>
+                    <button
+                      className="rounded-full bg-slate-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={exporting}
+                      onClick={() => onExport('pdf')}
+                      type="button"
+                    >
+                      {exporting && exportFormat === 'pdf' ? 'PDF...' : 'PDF'}
+                    </button>
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500">
                       <tr>
                         <th className="px-4 py-3 font-semibold">Date</th>
                         <th className="px-4 py-3 font-semibold">Site</th>
-                        <th className="px-4 py-3 font-semibold">Arrivée</th>
-                        <th className="px-4 py-3 font-semibold">Départ</th>
+                        <th className="px-4 py-3 font-semibold">ArrivÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e</th>
+                        <th className="px-4 py-3 font-semibold">DÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©part</th>
                         <th className="px-4 py-3 font-semibold">Pauses</th>
-                        <th className="px-4 py-3 font-semibold">Durée réelle</th>
+                        <th className="px-4 py-3 font-semibold">DurÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e rÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©elle</th>
                         <th className="px-4 py-3 font-semibold">Commentaire</th>
                         <th className="px-4 py-3 font-semibold">Statut</th>
                         <th className="px-4 py-3 font-semibold">Action</th>
@@ -502,7 +652,7 @@ function ResourcePresenceRow({
                             ) : null}
                             {session.isRegularized ? (
                               <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
-                                Régularisé
+                                RÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gularisÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©
                               </span>
                             ) : null}
                           </td>
@@ -513,7 +663,7 @@ function ResourcePresenceRow({
                                 onClick={() => onRegularize(session)}
                                 type="button"
                               >
-                                Régulariser
+                                RÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gulariser
                               </button>
                             ) : (
                               <span className="text-slate-400">-</span>
@@ -582,10 +732,10 @@ function RegularizationModal({
       <section className="w-full max-w-lg rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">Régularisation RH</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">RÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gularisation RH</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Corriger la sortie</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              {session.siteName} · {formatDateOnly(session.date)} · entrée {session.arrivalTime.slice(0, 5)}
+              {session.siteName} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {formatDateOnly(session.date)} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· entrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e {session.arrivalTime.slice(0, 5)}
             </p>
           </div>
           <button
@@ -595,12 +745,12 @@ function RegularizationModal({
             onClick={onClose}
             type="button"
           >
-            ×
+            ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â
           </button>
         </div>
 
         <div className="mt-6 space-y-4">
-          <Field label="Date de sortie corrigée">
+          <Field label="Date de sortie corrigÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
               disabled={isSubmitting}
@@ -609,7 +759,7 @@ function RegularizationModal({
               value={date}
             />
           </Field>
-          <Field label="Heure de sortie corrigée">
+          <Field label="Heure de sortie corrigÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e">
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
               disabled={isSubmitting}
@@ -623,7 +773,7 @@ function RegularizationModal({
               className="min-h-28 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:bg-white"
               disabled={isSubmitting}
               onChange={(event) => onCommentChange(event.target.value)}
-              placeholder="Explique pourquoi la sortie est corrigée."
+              placeholder="Explique pourquoi la sortie est corrigÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e."
               value={comment}
             />
           </Field>
@@ -649,7 +799,7 @@ function RegularizationModal({
             onClick={onSubmit}
             type="button"
           >
-            {isSubmitting ? 'Régularisation...' : 'Valider la régularisation'}
+            {isSubmitting ? 'RÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gularisation...' : 'Valider la rÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gularisation'}
           </button>
         </div>
       </section>
@@ -705,6 +855,24 @@ function getDefaultRegularizationTime(session: RhUserPresenceDetail['sessions'][
   return `${String(nextHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+function monthStartIso(year: number, month: number) {
+  return new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)).toISOString();
+}
+
+function monthEndIso(year: number, month: number) {
+  return new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)).toISOString();
+}
+
+function triggerDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
 function formatDateOnly(value: string) {
   return new Intl.DateTimeFormat('fr-FR', {
     dateStyle: 'medium',
@@ -716,11 +884,11 @@ function sessionLabel(status: RhUserPresenceDetail['sessions'][number]['status']
     case 'COMPLETE':
       return 'Valide';
     case 'TO_REVIEW_RH':
-      return 'A vérifier RH';
+      return 'A vÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©rifier RH';
     case 'TO_REGULARIZE':
-      return 'A régulariser';
+      return 'A rÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gulariser';
     case 'INCOMPLETE_SESSION':
     default:
-      return 'Incomplète';
+      return 'IncomplÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨te';
   }
 }
