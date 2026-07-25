@@ -1670,13 +1670,15 @@ function buildUserPresenceDetailPdfBuffer(detail: RhUserPresenceDetail, periodLa
 
   const drawHeader = () => {
     let x = margin;
-    pdf.setFillColor(239, 243, 248);
-    pdf.setDrawColor(210, 219, 232);
-    pdf.setTextColor(15, 23, 42);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
+    pdf.setLineWidth(0.2);
     scaledColumns.forEach((column) => {
-      pdf.rect(x, y, column.width, 9, 'FD');
+      pdf.setFillColor(239, 243, 248);
+      pdf.setDrawColor(210, 219, 232);
+      pdf.rect(x, y, column.width, 9, 'F');
+      pdf.rect(x, y, column.width, 9, 'S');
+      pdf.setTextColor(15, 23, 42);
       pdf.text(column.label, x + 1.5, y + 5.8);
       x += column.width;
     });
