@@ -2330,6 +2330,10 @@ function buildSessions(records: SerializableRhClockInRecord[]) {
     }
 
     if (record.type === ClockInType.DEPARTURE) {
+      if (isAutomaticOldSessionClosureRecord(record)) {
+        continue;
+      }
+
       sessions.push(buildCompleteSession(state.arrival, record, state.accumulatedPauseMs));
       states.set(key, {
         arrival: null,
@@ -2346,6 +2350,20 @@ function buildSessions(records: SerializableRhClockInRecord[]) {
   }
 
   return sessions;
+}
+
+function isAutomaticOldSessionClosureRecord(record: SerializableRhClockInRecord) {
+  if (record.type !== ClockInType.DEPARTURE) return false;
+  return hasAutomaticOldSessionClosureComment(record.comment);
+}
+
+function hasAutomaticOldSessionClosureComment(comment: string | null | undefined) {
+  return Boolean(
+    comment
+      ?.split(/\r?\n/)
+      .map((line) => line.trim())
+      .some((line) => line && isAutomaticOldSessionClosureLine(line)),
+  );
 }
 
 function buildClockInContextKey(record: SerializableRhClockInRecord) {
