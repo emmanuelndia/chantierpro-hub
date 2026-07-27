@@ -1619,7 +1619,7 @@ async function buildUserPresenceDetailXlsxBuffer(detail: RhUserPresenceDetail, p
       formatSessionTime(session.arrivalTime),
       session.departureTime ? formatSessionTime(session.departureTime) : '',
       formatUserPresenceSessionDuration(session),
-      session.comment ?? '',
+      formatRhExportSessionComment(session.comment),
     ]);
   });
 
@@ -1699,7 +1699,7 @@ function buildUserPresenceDetailPdfBuffer(detail: RhUserPresenceDetail, periodLa
       arrival: formatSessionTime(session.arrivalTime),
       departure: session.departureTime ? formatSessionTime(session.departureTime) : '-',
       duration: formatUserPresenceSessionDuration(session),
-      comment: session.comment ?? '-',
+      comment: formatRhExportSessionComment(session.comment) || '-',
     };
     const lineGroups = scaledColumns.map((column) =>
       pdf.splitTextToSize(String(cells[column.key] ?? ''), column.width - 3) as string[],
@@ -1734,6 +1734,96 @@ function buildUserPresenceDetailPdfBuffer(detail: RhUserPresenceDetail, periodLa
   return Buffer.from(pdf.output('arraybuffer'));
 }
 
+function formatRhExportSessionComment(comment: string | null) {
+  const normalized = comment?.trim();
+  if (!normalized) return '';
+  const offline = parseRhOfflineComment(normalized);
+  if (!offline) return normalized;
+
+  return [
+    'Pointage offline synchronise',
+    offline.rhStatus ? `Statut RH : ${offline.rhStatus}` : null,
+    offline.phoneTime ? `Heure telephone : ${offline.phoneTime}` : null,
+    offline.syncedAt ? `Synchronise : ${offline.syncedAt}` : null,
+    offline.gpsSummary ? `GPS : ${offline.gpsSummary}` : null,
+    offline.userComment,
+  ].filter(Boolean).join('\n');
+}
+
+function parseRhOfflineComment(comment: string) {
+  if (!/pointage offline\s*:/i.test(comment)) return null;
+
+  const rhStatus = readRhOfflineInlineValue(comment, 'Statut RH');
+  const phoneTime = formatRhOfflineDateTime(readRhOfflineLineValue(comment, 'Heure telephone'));
+  const syncedAt = formatRhOfflineDateTime(readRhOfflineLineValue(comment, 'Synchronise le'));
+  const gpsSource = readRhOfflineInlineValue(comment, 'Source GPS');
+  const gpsPrecision = readRhOfflineInlineValue(comment, 'Precision GPS');
+  const technicalPrefixes = [
+    'Pointage offline',
+    'Client offline',
+    'Heure telephone',
+    'Mise en attente',
+    'Synchronise le',
+    'GPS capture',
+    'Source GPS',
+  ];
+  const readableComment = comment
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !technicalPrefixes.some((prefix) => line.toLowerCase().startsWith(prefix.toLowerCase())))
+    .join('\n');
+  const userComment = readableComment.length > 0 ? readableComment : null;
+
+  return {
+    rhStatus: rhStatus ? normalizeRhOfflineStatus(rhStatus) : null,
+    phoneTime,
+    syncedAt,
+    gpsSummary: formatRhOfflineGpsSummary(gpsSource, gpsPrecision),
+    userComment,
+  };
+}
+
+function readRhOfflineLineValue(comment: string, label: string) {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`^${escapedLabel}\\s*:\\s*(.+)$`, 'im').exec(comment);
+  return match?.[1]?.trim() ?? null;
+}
+
+function readRhOfflineInlineValue(comment: string, label: string) {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`${escapedLabel}\\s*:\\s*(.+?)(?=\\s+[A-Z][A-Za-z ]+\\s*:|$)`, 'i').exec(comment);
+  return match?.[1]?.trim() ?? null;
+}
+
+function formatRhOfflineDateTime(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatRhOfflineGpsSummary(source: string | null, precision: string | null) {
+  const summary = [source ? normalizeRhGpsSource(source) : null, precision ? `precision ${precision}` : null]
+    .filter(Boolean)
+    .join(', ');
+  return summary.length > 0 ? summary : null;
+}
+
+function normalizeRhOfflineStatus(value: string) {
+  return /rh/i.test(value) ? value : value.replace(/A verifier/i, 'A verifier RH');
+}
+
+function normalizeRhGpsSource(value: string) {
+  if (value.toUpperCase() === 'CACHED') return 'position memorisee';
+  if (value.toUpperCase() === 'LIVE') return 'position directe';
+  return value.toLowerCase();
+}
 function formatUserPresencePeriod(year: number, month: number) {
   const date = new Date(Date.UTC(year, month - 1, 1));
   return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date);

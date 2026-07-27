@@ -643,7 +643,7 @@ function ResourcePresenceRow({
                           <td className="px-4 py-3 text-slate-600">{formatSessionDurationLabel(session)}</td>
                           <td className="whitespace-normal break-words px-4 py-3 text-slate-600">
                             <div className="space-y-2">
-                              <p>{session.comment ?? '-'}</p>
+                              <PresenceComment comment={session.comment} />
                               <div className="flex flex-wrap gap-2">
                                 {session.incomplete || session.status === 'TO_REVIEW_RH' ? (
                                   <button
@@ -681,6 +681,46 @@ function ResourcePresenceRow({
   );
 }
 
+function PresenceComment({ comment }: Readonly<{ comment: string | null }>) {
+  const offline = parseOfflinePresenceComment(comment);
+
+  if (!offline) {
+    const visibleComment = comment?.trim() ?? '';
+    return <p>{visibleComment.length > 0 ? visibleComment : '-'}</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <Badge tone="info">Offline synchronise</Badge>
+        {offline.rhStatus ? <Badge tone="warning">{offline.rhStatus}</Badge> : null}
+      </div>
+      <div className="grid gap-1 text-xs text-slate-500 sm:grid-cols-2">
+        {offline.phoneTime ? (
+          <p>
+            <span className="font-semibold text-slate-700">Heure telephone :</span> {offline.phoneTime}
+          </p>
+        ) : null}
+        {offline.syncedAt ? (
+          <p>
+            <span className="font-semibold text-slate-700">Synchronise :</span> {offline.syncedAt}
+          </p>
+        ) : null}
+        {offline.gpsCapturedAt ? (
+          <p>
+            <span className="font-semibold text-slate-700">GPS capture :</span> {offline.gpsCapturedAt}
+          </p>
+        ) : null}
+        {offline.gpsSummary ? (
+          <p>
+            <span className="font-semibold text-slate-700">GPS :</span> {offline.gpsSummary}
+          </p>
+        ) : null}
+      </div>
+      {offline.userComment ? <p className="text-sm text-slate-700">{offline.userComment}</p> : null}
+    </div>
+  );
+}
 function Field({
   label,
   children,
@@ -880,4 +920,91 @@ function formatSessionDurationLabel(session: RhUserPresenceDetail['sessions'][nu
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+}
+
+type OfflinePresenceComment = {
+  rhStatus: string | null;
+  phoneTime: string | null;
+  syncedAt: string | null;
+  gpsCapturedAt: string | null;
+  gpsSummary: string | null;
+  userComment: string | null;
+};
+
+function parseOfflinePresenceComment(comment: string | null): OfflinePresenceComment | null {
+  const normalized = comment?.trim();
+  if (!normalized || !/pointage offline\s*:/i.test(normalized)) return null;
+
+  const rhStatus = readInlineOfflineValue(normalized, 'Statut RH');
+  const phoneTime = formatOfflineDateTime(readOfflineLineValue(normalized, 'Heure telephone'));
+  const syncedAt = formatOfflineDateTime(readOfflineLineValue(normalized, 'Synchronise le'));
+  const gpsCapturedAt = formatOfflineDateTime(readOfflineLineValue(normalized, 'GPS capture'));
+  const gpsSource = readInlineOfflineValue(normalized, 'Source GPS');
+  const gpsPrecision = readInlineOfflineValue(normalized, 'Precision GPS');
+  const technicalPrefixes = [
+    'Pointage offline',
+    'Client offline',
+    'Heure telephone',
+    'Mise en attente',
+    'Synchronise le',
+    'GPS capture',
+    'Source GPS',
+  ];
+  const readableComment = normalized
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !technicalPrefixes.some((prefix) => line.toLowerCase().startsWith(prefix.toLowerCase())))
+    .join('\n');
+  const userComment = readableComment.length > 0 ? readableComment : null;
+
+  return {
+    rhStatus: rhStatus ? normalizeOfflineRhStatus(rhStatus) : null,
+    phoneTime,
+    syncedAt,
+    gpsCapturedAt,
+    gpsSummary: formatOfflineGpsSummary(gpsSource, gpsPrecision),
+    userComment,
+  };
+}
+
+function readOfflineLineValue(comment: string, label: string) {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`^${escapedLabel}\\s*:\\s*(.+)$`, 'im').exec(comment);
+  return match?.[1]?.trim() ?? null;
+}
+
+function readInlineOfflineValue(comment: string, label: string) {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`${escapedLabel}\\s*:\\s*(.+?)(?=\\s+[A-Z][A-Za-z ]+\\s*:|$)`, 'i').exec(comment);
+  return match?.[1]?.trim() ?? null;
+}
+
+function formatOfflineDateTime(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatOfflineGpsSummary(source: string | null, precision: string | null) {
+  const summary = [source ? normalizeGpsSource(source) : null, precision ? `precision ${precision}` : null]
+    .filter(Boolean)
+    .join(', ');
+  return summary.length > 0 ? summary : null;
+}
+
+function normalizeOfflineRhStatus(value: string) {
+  return /rh/i.test(value) ? value : value.replace(/A verifier/i, 'A verifier RH');
+}
+
+function normalizeGpsSource(value: string) {
+  if (value.toUpperCase() === 'CACHED') return 'position memorisee';
+  if (value.toUpperCase() === 'LIVE') return 'position directe';
+  return value.toLowerCase();
 }
