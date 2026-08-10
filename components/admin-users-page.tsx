@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Role } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ellipsis, History, KeyRound, Pencil, UserRoundCheck, UserRoundX } from 'lucide-react';
+import { Ellipsis, History, KeyRound, Pencil, SearchCheck, UserRoundCheck, UserRoundX } from 'lucide-react';
 import { Badge } from '@/components/badge';
 import { ConfirmModal } from '@/components/confirm-modal';
 import { EmptyState } from '@/components/empty-state';
@@ -443,6 +443,15 @@ function UserActionsMenu({
               Historique
             </Link>
           ) : null}
+          <Link
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            href={`/admin/users/${encodeURIComponent(user.id)}/diagnostic`}
+            onClick={() => setOpen(false)}
+            role="menuitem"
+          >
+            <SearchCheck className="h-4 w-4 text-emerald-600" />
+            Diagnostic
+          </Link>
           <button
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             onClick={() => {
