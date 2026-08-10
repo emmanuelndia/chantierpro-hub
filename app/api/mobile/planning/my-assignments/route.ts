@@ -1,10 +1,10 @@
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/auth/with-auth';
 import { getSupervisorMyAssignments } from '@/lib/mobile-planning';
-import { FIELD_USER_ROLES } from '@/lib/field-roles';
+import { CLOCK_IN_FIELD_USER_ROLES } from '@/lib/field-roles';
 
 export const GET = withAuth(async ({ req, user }) => {
-  if (!FIELD_USER_ROLES.includes(user.role)) {
+  if (!CLOCK_IN_FIELD_USER_ROLES.includes(user.role)) {
     return Response.json({ code: 'FORBIDDEN' }, { status: 403 });
   }
 
