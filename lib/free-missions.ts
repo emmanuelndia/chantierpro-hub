@@ -1,5 +1,6 @@
 import { ClockInStatus, ClockInType, FreeMissionStatus, Prisma, ProjectStatus, Role, type PrismaClient } from '@prisma/client';
 import { BUSINESS_MANAGER_ROLES, FIELD_USER_ROLES, getBusinessManagedResourceRoles, isBusinessManagerRole } from '@/lib/field-roles';
+import { generalSupervisorPlanningProjectWhere } from '@/lib/general-supervisor-scopes';
 import {
   createClockInRecord,
   findActivePauseFromRecords,
@@ -181,7 +182,7 @@ export async function listFreeMissions(prisma: PrismaClient, user: AuthLikeUser,
     where: {
       date,
       deletedAt: null,
-      ...freeMissionScopeWhere(user),
+      ...freeMissionScopeWhere(user, date),
     },
     orderBy: [{ project: { name: 'asc' } }, { assignee: { firstName: 'asc' } }, { id: 'asc' }],
     select: freeMissionSelect,
@@ -221,7 +222,7 @@ export async function createFreeMission(prisma: PrismaClient, user: AuthLikeUser
     let skippedCount = 0;
 
     for (const assigneeId of assigneeIds) {
-      const accessError = await validateFreeMissionMutationAccess(prisma, user, input.projectId, assigneeId);
+      const accessError = await validateFreeMissionMutationAccess(prisma, user, input.projectId, assigneeId, input.date);
       if (accessError) return accessError;
 
       const existing = await prisma.freeMission.findFirst({
@@ -272,7 +273,7 @@ export async function createFreeMission(prisma: PrismaClient, user: AuthLikeUser
     );
   }
 
-  const accessError = await validateFreeMissionMutationAccess(prisma, user, input.projectId, input.assigneeId);
+  const accessError = await validateFreeMissionMutationAccess(prisma, user, input.projectId, input.assigneeId, input.date);
   if (accessError) return accessError;
 
   const existing = await prisma.freeMission.findFirst({
@@ -328,7 +329,7 @@ export async function updateFreeMission(prisma: PrismaClient, user: AuthLikeUser
     return Response.json({ code: 'BAD_REQUEST', message: 'Les donnees de mission libre sont invalides.' }, { status: 400 });
   }
 
-  const accessError = await validateFreeMissionMutationAccess(prisma, user, input.projectId, input.assigneeId);
+  const accessError = await validateFreeMissionMutationAccess(prisma, user, input.projectId, input.assigneeId, input.date);
   if (accessError) return accessError;
 
   const mission = await prisma.freeMission.update({
@@ -656,6 +657,7 @@ async function validateFreeMissionMutationAccess(
   user: AuthLikeUser,
   projectId: string,
   assigneeId: string,
+  date: Date,
 ) {
   if (!canMutateFreeMissions(user.role)) {
     return Response.json({ code: 'FORBIDDEN', message: 'Creation de mission libre non autorisee.' }, { status: 403 });
@@ -666,6 +668,7 @@ async function validateFreeMissionMutationAccess(
       id: projectId,
       status: { notIn: [ProjectStatus.ARCHIVED, ProjectStatus.COMPLETED] },
       ...(user.role === Role.PROJECT_MANAGER ? { projectManagerId: user.id } : {}),
+      ...(user.role === Role.GENERAL_SUPERVISOR ? generalSupervisorPlanningProjectWhere(user, date) : {}),
     },
     select: { id: true },
   });
@@ -691,7 +694,7 @@ async function validateFreeMissionMutationAccess(
   return null;
 }
 
-function freeMissionScopeWhere(user: AuthLikeUser): Prisma.FreeMissionWhereInput {
+function freeMissionScopeWhere(user: AuthLikeUser, date: Date = new Date()): Prisma.FreeMissionWhereInput {
   if (user.role === Role.PROJECT_MANAGER) {
     return { project: { projectManagerId: user.id } };
   }
@@ -706,7 +709,7 @@ function freeMissionScopeWhere(user: AuthLikeUser): Prisma.FreeMissionWhereInput
   }
 
   if (user.role === Role.GENERAL_SUPERVISOR) {
-    return { createdById: user.id };
+    return { project: generalSupervisorPlanningProjectWhere(user, date) };
   }
 
   if (FIELD_USER_ROLES.includes(user.role)) {

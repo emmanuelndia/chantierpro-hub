@@ -134,6 +134,31 @@ export function generalSupervisorPlanningSiteWhere(user: AuthLikeUser, date: Dat
   };
 }
 
+export function generalSupervisorPlanningProjectWhere(user: AuthLikeUser, date: Date): Prisma.ProjectWhereInput {
+  return {
+    status: {
+      notIn: [...CLOSED_PROJECT_STATUSES],
+    },
+    OR: [
+      {
+        generalSupervisorProjectScopes: {
+          some: generalSupervisorActiveScopeWhere(user.id, date),
+        },
+      },
+      {
+        sites: {
+          some: {
+            status: SiteStatus.ACTIVE,
+            generalSupervisorScopes: {
+              some: generalSupervisorActiveScopeWhere(user.id, date),
+            },
+          },
+        },
+      },
+    ],
+  };
+}
+
 export async function getGeneralSupervisorScopes(
   prisma: PrismaClient,
   user: AuthLikeUser,

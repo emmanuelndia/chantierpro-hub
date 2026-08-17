@@ -33,7 +33,7 @@ import {
   getBusinessManagedResourceRoles,
   isBusinessManagerRole,
 } from '@/lib/field-roles';
-import { generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
+import { generalSupervisorPlanningProjectWhere, generalSupervisorPlanningSiteWhere } from '@/lib/general-supervisor-scopes';
 import { freeMissionSelect, listFreeMissions, listMyFreeMissions, serializeFreeMission } from '@/lib/free-missions';
 
 type AuthLikeUser = {
@@ -129,13 +129,7 @@ function operationalPlanningProjectWhere(user: AuthLikeUser, date?: Date): Prism
   }
 
   if (user.role === Role.GENERAL_SUPERVISOR) {
-    const siteWhere = operationalPlanningSiteWhere(user, date);
-    return {
-      ...activeProjectWhere,
-      sites: {
-        some: siteWhere,
-      },
-    };
+    return generalSupervisorPlanningProjectWhere(user, date ?? new Date());
   }
 
   return activeProjectWhere;
